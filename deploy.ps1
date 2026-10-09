@@ -1,6 +1,6 @@
 param (
     [ValidateSet('prod', 'dev')]
-    [string]$Environment = 'dev',
+    [string]$Environment = 'prod',
 
     # Ueberspringt das Datenbank-Dump vor dem Deployment
     [switch]$SkipBackup
@@ -79,6 +79,42 @@ rm -rf apps packages
 tar -xzf "$ArchiveName"
 rm -f "$ArchiveName"
 
+if [ ! -f .env ]; then
+  echo "Initiale .env Datei wird mit sicheren Schluesseln erstellt..."
+  db_pw=`$(openssl rand -hex 20 2>/dev/null || tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)
+  jwt_sec=`$(openssl rand -hex 32 2>/dev/null || tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)
+  if [ "$Environment" = "dev" ]; then
+    cat > .env <<ENVEOF
+NODE_ENV=production
+DOMAIN_DEV=$DefaultDomain
+DB_USER=cevi_schichtplan_dev
+DB_PASSWORD=`$db_pw
+DB_NAME=cevi_schichtplan_dev
+DATABASE_URL=postgresql://cevi_schichtplan_dev:`$db_pw@db:5432/cevi_schichtplan_dev?schema=public
+JWT_SECRET=`$jwt_sec
+CEVIDB_BASE_URL=https://db.cevi.ch
+CEVIDB_CLIENT_ID=
+CEVIDB_CLIENT_SECRET=
+CEVIDB_REDIRECT_URI=https://login.$DefaultDomain/api/auth/cevidb/callback
+ENVEOF
+  else
+    cat > .env <<ENVEOF
+NODE_ENV=production
+DOMAIN=$DefaultDomain
+DB_USER=cevi_schichtplan
+DB_PASSWORD=`$db_pw
+DB_NAME=cevi_schichtplan_v2
+DATABASE_URL=postgresql://cevi_schichtplan:`$db_pw@db:5432/cevi_schichtplan_v2?schema=public
+JWT_SECRET=`$jwt_sec
+CEVIDB_BASE_URL=https://db.cevi.ch
+CEVIDB_CLIENT_ID=
+CEVIDB_CLIENT_SECRET=
+CEVIDB_REDIRECT_URI=https://login.$DefaultDomain/api/auth/cevidb/callback
+ENVEOF
+  fi
+  chmod 600 .env
+fi
+
 # Rolling Build & Restart
 log=`$(mktemp)
 if ! docker compose -f "$ComposeFile" -p "$ProjectName" up -d --build > "`$log" 2>&1; then
@@ -91,6 +127,8 @@ rm -f "`$log"
 # Migrationen ausfuehren
 echo "Prisma Migrationen ausfuehren..."
 docker compose -f "$ComposeFile" -p "$ProjectName" exec -T backend npx prisma migrate deploy || true
+echo "Seed-Daten einspielen (Cevi Illnau & Inferno)..."
+docker compose -f "$ComposeFile" -p "$ProjectName" exec -T backend npm run db:seed || true
 
 # Healthcheck Verify
 domain=`$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2- | tr -d '\r"' || true)
