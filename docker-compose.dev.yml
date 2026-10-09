@@ -31,6 +31,10 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan}:${DB_PASSWORD:-cevi_schichtplan_dev_pw}@db:5432/${DB_NAME:-cevi_schichtplan_dev}?schema=public
       JWT_SECRET: ${JWT_SECRET:-super-secret-development-key-min-32-chars}
       CORS_ORIGIN: "http://localhost:3000,http://localhost:3001"
+      CEVIDB_BASE_URL: ${CEVIDB_BASE_URL:-https://db.cevi.ch}
+      CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}
+      CEVIDB_CLIENT_SECRET: ${CEVIDB_CLIENT_SECRET:-}
+      CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-http://localhost:4000/api/auth/cevidb/callback}
     ports:
       - "4000:4000"
     depends_on:

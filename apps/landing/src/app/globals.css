@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  --background: #090d16;
+  --foreground: #f8fafc;
 }
 
 body {
@@ -14,4 +14,6 @@ body {
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  background-color: #090d16;
+  color: #f8fafc;
 }

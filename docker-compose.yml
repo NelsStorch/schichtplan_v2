@@ -28,6 +28,10 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan}:${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}@db:5432/${DB_NAME:-cevi_schichtplan_v2}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss in .env gesetzt sein (mind. 32 Zeichen)}
       CORS_ORIGIN: https://${DOMAIN:-cevi-schichtplan.ch}
+      CEVIDB_BASE_URL: ${CEVIDB_BASE_URL:-https://db.cevi.ch}
+      CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}
+      CEVIDB_CLIENT_SECRET: ${CEVIDB_CLIENT_SECRET:-}
+      CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-https://${DOMAIN:-cevi-schichtplan.ch}/api/auth/cevidb/callback}
     depends_on:
       db:
         condition: service_healthy

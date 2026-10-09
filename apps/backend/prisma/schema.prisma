@@ -25,7 +25,8 @@ model Department {
 model User {
   id            String             @id @default(uuid())
   email         String             @unique
-  passwordHash  String
+  passwordHash  String?
+  ceviDbId      Int?               @unique
   firstName     String
   lastName      String
   ceviName      String?

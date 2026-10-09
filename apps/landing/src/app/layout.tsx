@@ -12,11 +12,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="de">
+    <html lang="de" className="dark">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="min-h-screen bg-white text-slate-900 antialiased flex flex-col">
+      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased flex flex-col selection:bg-rose-500 selection:text-white">
         {children}
       </body>
     </html>
