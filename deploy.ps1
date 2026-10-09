@@ -50,7 +50,7 @@ if ($dirty.Count -gt 0) {
 }
 
 Step "1. Archiv erstellen"
-tar.exe --exclude="node_modules" --exclude=".git" --exclude="dist" --exclude="out" --exclude=".next" --exclude=".env*" --exclude="*.sql" --exclude="*.sql.gz" --exclude="*.dump" --exclude="backups" --exclude=$ArchiveName --exclude=$RemoteScript -czf $ArchiveName .
+tar.exe --exclude="node_modules" --exclude=".git" --exclude="dist" --exclude="out" --exclude=".next" --exclude=".env*" --exclude="backups" --exclude="*.dump" --exclude="*.sql.gz" --exclude=$ArchiveName --exclude=$RemoteScript -czf $ArchiveName .
 if ($LASTEXITCODE -ne 0) { Stop-Deploy "Das Archiv konnte nicht erstellt werden." }
 
 # Server Script

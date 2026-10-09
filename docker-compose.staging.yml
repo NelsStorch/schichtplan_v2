@@ -33,6 +33,11 @@ services:
       CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}
       CEVIDB_CLIENT_SECRET: ${CEVIDB_CLIENT_SECRET:-}
       CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-https://login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}/api/auth/cevidb/callback}
+      SMTP_HOST: ${SMTP_HOST:-mail.infomaniak.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-admin@cevi-schichtplan.ch}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-Cevi Schichtplan <admin@cevi-schichtplan.ch>}
     depends_on:
       db:
         condition: service_healthy
