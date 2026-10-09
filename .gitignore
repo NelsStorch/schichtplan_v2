@@ -18,7 +18,8 @@ service-account*.json
 
 # Agent & Server Internals (Local Only - Never in Git)
 AGENTS.md
-temp_*.md
+temp_*
+*.zone
 .claude/
 deploy.tar.gz
 deploy-remote.sh
