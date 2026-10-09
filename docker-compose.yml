@@ -1,0 +1,113 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: schichtplan-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-cevi_schichtplan}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}
+      POSTGRES_DB: ${DB_NAME:-cevi_schichtplan_v2}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - schichtplan_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cevi_schichtplan} -d ${DB_NAME:-cevi_schichtplan_v2}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan}:${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}@db:5432/${DB_NAME:-cevi_schichtplan_v2}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss in .env gesetzt sein (mind. 32 Zeichen)}
+      CORS_ORIGIN: https://${DOMAIN:-cevi-schichtplan.ch}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - schichtplan_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      # API Endpunkte haben Vorrang auf allen Domains & Subdomains
+      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)) && (PathPrefix(`/api`) || Path(`/health`))"
+      - "traefik.http.routers.schichtplan-api.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-api.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-api.priority=100"
+      - "traefik.http.routers.schichtplan-api.service=schichtplan-api"
+      - "traefik.http.services.schichtplan-api.loadbalancer.server.port=4000"
+      # Zero-Downtime Healthcheck: Traefik leitet erst weiter, wenn der Container gesund ist
+      - "traefik.http.services.schichtplan-api.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.schichtplan-api.loadbalancer.healthcheck.interval=2s"
+      - "traefik.http.services.schichtplan-api.loadbalancer.healthcheck.timeout=1s"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      INTERNAL_API_URL: http://backend:4000
+    depends_on:
+      - backend
+    networks:
+      - schichtplan_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      # Alle Abteilungs-Subdomains (z.B. uster.cevi-schichtplan.ch)
+      - "traefik.http.routers.schichtplan-web.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-web.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-web.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-web.priority=10"
+      - "traefik.http.routers.schichtplan-web.service=schichtplan-web"
+      - "traefik.http.services.schichtplan-web.loadbalancer.server.port=3000"
+      - "traefik.http.services.schichtplan-web.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-web.loadbalancer.healthcheck.interval=3s"
+
+  landing:
+    build:
+      context: .
+      dockerfile: apps/landing/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      INTERNAL_API_URL: http://backend:4000
+    depends_on:
+      - backend
+    networks:
+      - schichtplan_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      # Hauptdomain und www (Marketing & Abteilungsauswahl)
+      - "traefik.http.routers.schichtplan-landing.rule=Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-landing.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-landing.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-landing.priority=20"
+      - "traefik.http.routers.schichtplan-landing.service=schichtplan-landing"
+      - "traefik.http.services.schichtplan-landing.loadbalancer.server.port=3001"
+      - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.interval=3s"
+
+networks:
+  schichtplan_network:
+    driver: bridge
+  web_proxy:
+    external: true
+
+volumes:
+  postgres_data:

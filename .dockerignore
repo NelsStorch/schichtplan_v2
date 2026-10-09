@@ -1,0 +1,15 @@
+# Installed and built inside the images.
+**/node_modules
+**/.next
+**/dist
+.git
+
+# Live data in volumes, not part of an image.
+apps/backend/uploads
+
+.env
+.env.*
+backups
+*.sql
+*.sql.gz
+*.dump

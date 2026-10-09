@@ -1,0 +1,25 @@
+{
+  "name": "schichtplan-v2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Cevi Schichtplan V2 - Multi-Tenant, Multi-Event Shift Management",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:local": "npm run dev --workspaces",
+    "dev:docker": "docker compose -f docker-compose.dev.yml up --build",
+    "dev:docker:down": "docker compose -f docker-compose.dev.yml down",
+    "prod:docker:up": "docker compose up -d --build",
+    "prod:docker:down": "docker compose down",
+    "prod:docker:logs": "docker compose logs -f",
+    "build": "npm run build --workspaces",
+    "db:migrate": "npm run db:migrate --workspace=apps/backend",
+    "db:seed": "npm run db:seed --workspace=apps/backend",
+    "db:studio": "npm run db:studio --workspace=apps/backend"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

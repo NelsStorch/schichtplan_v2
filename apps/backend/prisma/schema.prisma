@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Department {
+  id           String             @id @default(uuid())
+  name         String
+  slug         String             @unique
+  logoUrl      String?
+  primaryColor String?            @default("#e11d48")
+  contactEmail String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  events       Event[]
+  members      DepartmentMember[]
+
+  @@map("departments")
+}
+
+model User {
+  id            String             @id @default(uuid())
+  email         String             @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  ceviName      String?
+  phone         String?
+  isGlobalAdmin Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  memberships   DepartmentMember[]
+  signups       ShiftSignup[]
+
+  @@map("users")
+}
+
+model DepartmentMember {
+  id           String     @id @default(uuid())
+  departmentId String
+  userId       String
+  role         String     @default("HELPER") // ADMIN, PLANNER, HELPER
+  createdAt    DateTime   @default(now())
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, userId])
+  @@map("department_members")
+}
+
+model Event {
+  id                String     @id @default(uuid())
+  departmentId      String
+  title             String
+  slug              String
+  description       String?
+  startDate         DateTime
+  endDate           DateTime
+  isPublished       Boolean    @default(true)
+  allowPublicSignup Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  department        Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  shifts            Shift[]
+
+  @@unique([departmentId, slug])
+  @@map("events")
+}
+
+model Shift {
+  id            String        @id @default(uuid())
+  eventId       String
+  title         String
+  category      String
+  description   String?
+  startTime     DateTime
+  endTime       DateTime
+  requiredSlots Int           @default(1)
+  minAge        Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  event         Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  signups       ShiftSignup[]
+
+  @@map("shifts")
+}
+
+model ShiftSignup {
+  id          String   @id @default(uuid())
+  shiftId     String
+  userId      String
+  isConfirmed Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  shift       Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shiftId, userId])
+  @@map("shift_signups")
+}

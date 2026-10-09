@@ -1,0 +1,103 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: schichtplan-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-cevi_schichtplan_dev}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}
+      POSTGRES_DB: ${DB_NAME:-cevi_schichtplan_dev}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - schichtplan_dev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cevi_schichtplan_dev} -d ${DB_NAME:-cevi_schichtplan_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan_dev}:${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}@db:5432/${DB_NAME:-cevi_schichtplan_dev}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss in .env gesetzt sein}
+      CORS_ORIGIN: https://${DOMAIN_DEV:-dev.cevi-schichtplan.ch}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - schichtplan_dev_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      - "traefik.http.routers.schichtplan-dev-api.rule=(Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)) && (PathPrefix(`/api`) || Path(`/health`))"
+      - "traefik.http.routers.schichtplan-dev-api.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-dev-api.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-dev-api.service=schichtplan-dev-api"
+      - "traefik.http.services.schichtplan-dev-api.loadbalancer.server.port=4000"
+      - "traefik.http.services.schichtplan-dev-api.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.schichtplan-dev-api.loadbalancer.healthcheck.interval=3s"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      INTERNAL_API_URL: http://backend:4000
+    depends_on:
+      - backend
+    networks:
+      - schichtplan_dev_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      # Subdomains gehen zur Web-App
+      - "traefik.http.routers.schichtplan-dev-web.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-web.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-dev-web.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-dev-web.service=schichtplan-dev-web"
+      - "traefik.http.services.schichtplan-dev-web.loadbalancer.server.port=3000"
+
+  landing:
+    build:
+      context: .
+      dockerfile: apps/landing/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      INTERNAL_API_URL: http://backend:4000
+    depends_on:
+      - backend
+    networks:
+      - schichtplan_dev_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      # Hauptdomain geht zur Landingpage
+      - "traefik.http.routers.schichtplan-dev-landing.rule=Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-landing.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-dev-landing.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-dev-landing.service=schichtplan-dev-landing"
+      - "traefik.http.services.schichtplan-dev-landing.loadbalancer.server.port=3001"
+
+networks:
+  schichtplan_dev_network:
+    driver: bridge
+  web_proxy:
+    external: true
+
+volumes:
+  postgres_data_dev:

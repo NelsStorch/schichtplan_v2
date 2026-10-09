@@ -1,0 +1,91 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: schichtplan-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-cevi_schichtplan}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-cevi_schichtplan_dev_pw}
+      POSTGRES_DB: ${DB_NAME:-cevi_schichtplan_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cevi_schichtplan} -d ${DB_NAME:-cevi_schichtplan_dev}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: development
+    container_name: schichtplan-dev-backend
+    restart: unless-stopped
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan}:${DB_PASSWORD:-cevi_schichtplan_dev_pw}@db:5432/${DB_NAME:-cevi_schichtplan_dev}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-super-secret-development-key-min-32-chars}
+      CORS_ORIGIN: "http://localhost:3000,http://localhost:3001"
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/backend/node_modules
+      - /app/packages/shared/node_modules
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: development
+    container_name: schichtplan-dev-web
+    restart: unless-stopped
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      INTERNAL_API_URL: http://backend:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/web/.next
+
+  landing:
+    build:
+      context: .
+      dockerfile: apps/landing/Dockerfile
+      target: development
+    container_name: schichtplan-dev-landing
+    restart: unless-stopped
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/landing/node_modules
+      - /app/apps/landing/.next
+
+volumes:
+  postgres_dev_data:
