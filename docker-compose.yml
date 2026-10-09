@@ -27,14 +27,12 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan}:${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}@db:5432/${DB_NAME:-cevi_schichtplan_v2}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss in .env gesetzt sein (mind. 32 Zeichen)}
+      COOKIE_DOMAIN: .${DOMAIN:-cevi-schichtplan.ch}
       CORS_ORIGIN: https://${DOMAIN:-cevi-schichtplan.ch}
       CEVIDB_BASE_URL: ${CEVIDB_BASE_URL:-https://db.cevi.ch}
       CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}
       CEVIDB_CLIENT_SECRET: ${CEVIDB_CLIENT_SECRET:-}
-      CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-https://${DOMAIN:-cevi-schichtplan.ch}/api/auth/cevidb/callback}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-https://${DOMAIN:-cevi-schichtplan.ch}/api/auth/google/callback}
+      CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-https://login.${DOMAIN:-cevi-schichtplan.ch}/api/auth/cevidb/callback}
     depends_on:
       db:
         condition: service_healthy
@@ -44,8 +42,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
-      # API Endpunkte haben Vorrang auf allen Domains & Subdomains
-      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)) && (PathPrefix(`/api`) || Path(`/health`))"
+      # API Endpunkte haben Vorrang auf allen Domains, Login und Subdomains
+      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`login.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-api.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-api.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-api.priority=100"
@@ -109,6 +107,35 @@ services:
       - "traefik.http.services.schichtplan-landing.loadbalancer.server.port=3001"
       - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.interval=3s"
+
+  login:
+    build:
+      context: .
+      dockerfile: apps/login/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      INTERNAL_API_URL: http://backend:4000
+    depends_on:
+      - backend
+    networks:
+      - schichtplan_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      # Zentrales Login-Portal (Single Sign-On für alle Abteilungen)
+      - "traefik.http.routers.schichtplan-login.rule=Host(`login.${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-login.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-login.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-login.priority=30"
+      - "traefik.http.routers.schichtplan-login.service=schichtplan-login"
+      - "traefik.http.services.schichtplan-login.loadbalancer.server.port=3002"
+      # Zero-Downtime Healthcheck
+      - "traefik.http.services.schichtplan-login.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-login.loadbalancer.healthcheck.interval=2s"
+      - "traefik.http.services.schichtplan-login.loadbalancer.healthcheck.timeout=1s"
 
 networks:
   schichtplan_network:

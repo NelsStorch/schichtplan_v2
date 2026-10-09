@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX, ROLES } from './constants.js';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX, SIGNUP_MODES } from './constants.js';
 
 export const RegisterDepartmentSchema = z.object({
   departmentName: z.string().min(2, 'Name muss mindestens 2 Zeichen lang sein'),
@@ -8,7 +8,7 @@ export const RegisterDepartmentSchema = z.object({
     .min(3, 'Subdomain muss mindestens 3 Zeichen lang sein')
     .max(30, 'Subdomain darf maximal 30 Zeichen lang sein')
     .regex(SUBDOMAIN_REGEX, 'Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt')
-    .refine((val) => !RESERVED_SUBDOMAINS.includes(val as any), {
+    .refine((val: string) => !RESERVED_SUBDOMAINS.includes(val as any), {
       message: 'Diese Subdomain ist reserviert und kann nicht verwendet werden',
     }),
   adminFirstName: z.string().min(2, 'Vorname ist erforderlich'),
@@ -39,6 +39,18 @@ export const RegisterHelperSchema = z.object({
 
 export type RegisterHelperInput = z.infer<typeof RegisterHelperSchema>;
 
+export const CeviNameQuickLoginSchema = z.object({
+  ceviName: z.string().min(2, 'Cevi-Name muss mindestens 2 Zeichen lang sein'),
+  firstName: z.string().min(2, 'Vorname ist erforderlich').optional(),
+  lastName: z.string().min(2, 'Nachname ist erforderlich').optional(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Geburtsdatum im Format JJJJ-MM-TT (z.B. 2005-08-14)').optional(),
+  phone: z.string().optional(),
+  departmentSlug: z.string().optional(),
+  returnTo: z.string().optional(),
+});
+
+export type CeviNameQuickLoginInput = z.infer<typeof CeviNameQuickLoginSchema>;
+
 export const CreateEventSchema = z.object({
   title: z.string().min(2, 'Titel ist erforderlich'),
   slug: z
@@ -49,6 +61,9 @@ export const CreateEventSchema = z.object({
   description: z.string().optional(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
+  signupMode: z.enum(['NAME_ONLY', 'OPEN', 'LOGIN_REQUIRED', 'CEVIDB_ONLY']).default('OPEN'),
+  requireEmailForGuests: z.boolean().default(false),
+  requirePhoneForGuests: z.boolean().default(false),
   allowPublicSignup: z.boolean().default(true),
 });
 
@@ -69,6 +84,9 @@ export type CreateShiftInput = z.infer<typeof CreateShiftSchema>;
 
 export const SignupShiftSchema = z.object({
   shiftId: z.string().uuid(),
+  guestName: z.string().min(2, 'Bitte Cevi-Name oder Vorname angeben').optional(),
+  guestEmail: z.string().email('Ungültige E-Mail').optional().or(z.literal('')),
+  guestPhone: z.string().optional(),
 });
 
 export type SignupShiftInput = z.infer<typeof SignupShiftSchema>;

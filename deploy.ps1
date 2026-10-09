@@ -106,7 +106,7 @@ check() {
   return 1
 }
 
-if ! check "https://`$domain/health" || ! check "https://`$domain/"; then
+if ! check "https://`$domain/health" || ! check "https://`$domain/" || ! check "https://login.`$domain/"; then
   echo "--- letzte Zeilen Logs ---"
   docker compose -f "$ComposeFile" -p "$ProjectName" logs --tail 40
   exit 1

@@ -7,6 +7,15 @@ export const ROLES = {
 
 export type UserRole = (typeof ROLES)[keyof typeof ROLES];
 
+export const SIGNUP_MODES = {
+  NAME_ONLY: 'NAME_ONLY',         // "Nur Cevi-Name (Kein Passwort/Login nötig)"
+  OPEN: 'OPEN',                   // "Offen (Mit Account oder nur Cevi-Name)"
+  LOGIN_REQUIRED: 'LOGIN_REQUIRED', // "Login erforderlich (Cevi.DB, Google, E-Mail)"
+  CEVIDB_ONLY: 'CEVIDB_ONLY',     // "Nur Cevi.DB Login erlaubt"
+} as const;
+
+export type SignupMode = (typeof SIGNUP_MODES)[keyof typeof SIGNUP_MODES];
+
 export const DEFAULT_SHIFT_CATEGORIES = [
   'Küche & Verpflegung',
   'Grill & Essensausgabe',

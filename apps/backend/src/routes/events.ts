@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { CreateEventSchema } from '@schichtplan/shared';
+import { CreateEventSchema, SignupMode } from '@schichtplan/shared';
 
 const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Events der aktuellen Abteilung
@@ -31,6 +31,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       endDate: e.endDate.toISOString(),
       isPublished: e.isPublished,
       allowPublicSignup: e.allowPublicSignup,
+      signupMode: e.signupMode as SignupMode,
+      requireEmailForGuests: e.requireEmailForGuests,
+      requirePhoneForGuests: e.requirePhoneForGuests,
       shiftCount: e._count.shifts,
     }));
   });
@@ -59,6 +62,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                     firstName: true,
                     lastName: true,
                     ceviName: true,
+                    birthDate: true,
                   },
                 },
               },
@@ -80,17 +84,34 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       description: event.description,
       startDate: event.startDate.toISOString(),
       endDate: event.endDate.toISOString(),
+      isPublished: event.isPublished,
+      allowPublicSignup: event.allowPublicSignup,
+      signupMode: event.signupMode as SignupMode,
+      requireEmailForGuests: event.requireEmailForGuests,
+      requirePhoneForGuests: event.requirePhoneForGuests,
       shifts: event.shifts.map((s) => {
-        const signups = s.signups.map((su) => ({
-          id: su.id,
-          shiftId: su.shiftId,
-          userId: su.user.id,
-          userFirstName: su.user.firstName,
-          userLastName: su.user.lastName,
-          userCeviName: su.user.ceviName,
-          createdAt: su.createdAt.toISOString(),
-          isConfirmed: su.isConfirmed,
-        }));
+        const signups = s.signups.map((su) => {
+          const displayName =
+            su.user?.ceviName ||
+            (su.user ? `${su.user.firstName} ${su.user.lastName}`.trim() : null) ||
+            su.guestName ||
+            'Helfer*in';
+
+          return {
+            id: su.id,
+            shiftId: su.shiftId,
+            userId: su.user?.id || null,
+            guestName: su.guestName,
+            guestEmail: su.guestEmail,
+            guestPhone: su.guestPhone,
+            displayName,
+            userFirstName: su.user?.firstName || null,
+            userLastName: su.user?.lastName || null,
+            userCeviName: su.user?.ceviName || null,
+            createdAt: su.createdAt.toISOString(),
+            isConfirmed: su.isConfirmed,
+          };
+        });
 
         return {
           id: s.id,
@@ -137,7 +158,17 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
 
-      const { title, slug, description, startDate, endDate, allowPublicSignup } = parse.data;
+      const {
+        title,
+        slug,
+        description,
+        startDate,
+        endDate,
+        allowPublicSignup,
+        signupMode,
+        requireEmailForGuests,
+        requirePhoneForGuests,
+      } = parse.data;
 
       const existing = await fastify.prisma.event.findUnique({
         where: {
@@ -149,7 +180,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (existing) {
-        return reply.status(409).send({ error: 'Ein Event mit diesem Slug existiert bereits in dieser Abteilung' });
+        return reply
+          .status(409)
+          .send({ error: 'Ein Event mit diesem Slug existiert bereits in dieser Abteilung' });
       }
 
       const event = await fastify.prisma.event.create({
@@ -157,10 +190,13 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           departmentId: request.tenant.id,
           title,
           slug,
-          description,
+          description: description || null,
           startDate: new Date(startDate),
           endDate: new Date(endDate),
           allowPublicSignup,
+          signupMode,
+          requireEmailForGuests,
+          requirePhoneForGuests,
         },
       });
 
@@ -170,6 +206,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         slug: event.slug,
         startDate: event.startDate.toISOString(),
         endDate: event.endDate.toISOString(),
+        signupMode: event.signupMode,
       };
     }
   );

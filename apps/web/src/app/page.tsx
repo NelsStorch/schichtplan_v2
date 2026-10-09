@@ -2,8 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Clock, Users, ArrowRight, Award, LogOut, PlusCircle, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { DepartmentDto, EventDto, UserDto } from '@schichtplan/shared';
+import {
+  Calendar,
+  Clock,
+  Users,
+  ArrowRight,
+  Award,
+  LogOut,
+  PlusCircle,
+  AlertCircle,
+  ShieldCheck,
+  Sparkles,
+  Lock,
+} from 'lucide-react';
+import type { DepartmentDto, EventDto, UserDto, SignupMode } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
 
 export default function DepartmentHomePage() {
@@ -21,8 +33,25 @@ export default function DepartmentHomePage() {
     description: '',
     startDate: '',
     endDate: '',
+    signupMode: 'OPEN' as SignupMode,
+    requireEmailForGuests: false,
+    requirePhoneForGuests: false,
   });
-  const [eventStatus, setEventStatus] = useState<{ loading: boolean; error?: string }>({ loading: false });
+  const [eventStatus, setEventStatus] = useState<{ loading: boolean; error?: string }>({
+    loading: false,
+  });
+
+  const getLoginUrl = () => {
+    if (typeof window === 'undefined') return '/login';
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+      return `http://localhost:3002/?return_to=${encodeURIComponent(window.location.href)}`;
+    }
+    const parts = hostname.split('.');
+    const rootDomain = parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
+    return `${protocol}//login.${rootDomain}/?return_to=${encodeURIComponent(window.location.href)}`;
+  };
 
   const loadData = async () => {
     try {
@@ -82,7 +111,16 @@ export default function DepartmentHomePage() {
       if (!res.ok) throw new Error(data.error || 'Event konnte nicht erstellt werden');
 
       setShowEventModal(false);
-      setEventForm({ title: '', slug: '', description: '', startDate: '', endDate: '' });
+      setEventForm({
+        title: '',
+        slug: '',
+        description: '',
+        startDate: '',
+        endDate: '',
+        signupMode: 'OPEN',
+        requireEmailForGuests: false,
+        requirePhoneForGuests: false,
+      });
       await loadData();
     } catch (err: any) {
       setEventStatus({ loading: false, error: err.message });
@@ -116,7 +154,11 @@ export default function DepartmentHomePage() {
     );
   }
 
-  const isPlannerOrAdmin = user && (user.departmentRole === 'ADMIN' || user.departmentRole === 'PLANNER' || user.isGlobalAdmin);
+  const isPlannerOrAdmin =
+    user &&
+    (user.departmentRole === 'ADMIN' ||
+      user.departmentRole === 'PLANNER' ||
+      user.isGlobalAdmin);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-rose-600 selection:text-white">
@@ -128,11 +170,6 @@ export default function DepartmentHomePage() {
             <div>
               <h1 className="font-bold text-white leading-tight flex items-center gap-2">
                 {department.name}
-                {department.slug === 'illnau' && (
-                  <span className="text-[10px] bg-rose-950/80 text-rose-300 border border-rose-800/60 px-1.5 py-0.5 rounded font-normal">
-                    Showcase
-                  </span>
-                )}
               </h1>
               <p className="text-xs text-slate-400">Schichtplan-Portal</p>
             </div>
@@ -174,12 +211,12 @@ export default function DepartmentHomePage() {
               </>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white px-3.5 py-1.5 rounded-xl transition"
+                <a
+                  href={getLoginUrl()}
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white px-3.5 py-1.5 rounded-xl transition shadow-sm"
                 >
                   Anmelden
-                </Link>
+                </a>
               </>
             )}
           </div>
@@ -190,7 +227,9 @@ export default function DepartmentHomePage() {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Veranstaltungen & Pläne</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Veranstaltungen & Pläne
+            </h2>
             <p className="text-slate-400 text-sm mt-1">
               Wähle einen Anlass aus, um Schichten zu sehen und dich einzutragen.
             </p>
@@ -199,7 +238,12 @@ export default function DepartmentHomePage() {
           {user && (
             <div className="bg-slate-900/60 border border-slate-800 rounded-xl px-3.5 py-2 text-xs flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Angemeldet als <strong>{user.ceviName ? `${user.firstName} / ${user.ceviName}` : user.firstName}</strong></span>
+              <span>
+                Angemeldet als{' '}
+                <strong>
+                  {user.ceviName ? `${user.firstName} / ${user.ceviName}` : user.firstName}
+                </strong>
+              </span>
             </div>
           )}
         </div>
@@ -233,7 +277,7 @@ export default function DepartmentHomePage() {
                     <h3 className="font-semibold text-lg text-white group-hover:text-rose-400 transition">
                       {evt.title}
                     </h3>
-                    <span className="inline-flex items-center gap-1 text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-medium">
+                    <span className="inline-flex items-center gap-1 text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-medium shrink-0">
                       <Clock className="w-3.5 h-3.5" />
                       {new Date(evt.startDate).toLocaleDateString('de-CH', {
                         day: '2-digit',
@@ -241,15 +285,42 @@ export default function DepartmentHomePage() {
                       })}
                     </span>
                   </div>
+
+                  {/* Signup Mode Badge */}
+                  <div className="mb-3">
+                    {evt.signupMode === 'NAME_ONLY' && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded-md">
+                        <Sparkles className="w-3 h-3 text-amber-400" /> Nur Cevi-Name (Kein Passwort)
+                      </span>
+                    )}
+                    {evt.signupMode === 'OPEN' && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded-md">
+                        <Users className="w-3 h-3 text-emerald-400" /> Offen (Mit Account oder Cevi-Name)
+                      </span>
+                    )}
+                    {evt.signupMode === 'LOGIN_REQUIRED' && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-blue-950/60 text-blue-300 border border-blue-800/60 px-2 py-0.5 rounded-md">
+                        <Lock className="w-3 h-3 text-blue-400" /> Login erforderlich
+                      </span>
+                    )}
+                    {evt.signupMode === 'CEVIDB_ONLY' && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded-md">
+                        <ShieldCheck className="w-3 h-3 text-purple-400" /> Nur Cevi.DB Accounts
+                      </span>
+                    )}
+                  </div>
+
                   {evt.description && (
-                    <p className="text-slate-400 text-sm mt-2 line-clamp-2 leading-relaxed">{evt.description}</p>
+                    <p className="text-slate-400 text-sm mt-2 line-clamp-2 leading-relaxed">
+                      {evt.description}
+                    </p>
                   )}
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-sm">
                   <span className="text-slate-400 text-xs flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-slate-500" />
-                    Offen für Helfer
+                    {evt.shiftCount || 0} Schichten
                   </span>
                   <span className="font-medium text-rose-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-xs sm:text-sm">
                     Schichten ansehen <ArrowRight className="w-4 h-4" />
@@ -283,7 +354,9 @@ export default function DepartmentHomePage() {
 
             <form onSubmit={handleCreateEvent} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Titel des Anlasses</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Titel des Anlasses
+                </label>
                 <input
                   type="text"
                   required
@@ -303,19 +376,55 @@ export default function DepartmentHomePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Slug (URL-Pfad)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Slug (URL-Pfad)
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="chilbi-2026"
                   value={eventForm.slug}
-                  onChange={(e) => setEventForm({ ...eventForm, slug: e.target.value.toLowerCase() })}
+                  onChange={(e) =>
+                    setEventForm({ ...eventForm, slug: e.target.value.toLowerCase() })
+                  }
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
                 />
               </div>
 
+              {/* Anmelde-Modus / Signup-Policy */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Beschreibung</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Anmelde-Modus für Helfer
+                </label>
+                <select
+                  value={eventForm.signupMode}
+                  onChange={(e) =>
+                    setEventForm({ ...eventForm, signupMode: e.target.value as SignupMode })
+                  }
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                >
+                  <option value="NAME_ONLY">
+                    ⚡ Nur Cevi-Name (Kein Passwort nötig – ideal für Chilbi)
+                  </option>
+                  <option value="OPEN">
+                    🟢 Offen (Wahlweise mit Login oder unkompliziert mit Cevi-Name)
+                  </option>
+                  <option value="LOGIN_REQUIRED">
+                    🔵 Login erforderlich (Cevi.DB, E-Mail oder Cevi-Name Profil)
+                  </option>
+                  <option value="CEVIDB_ONLY">
+                    🛡️ Nur Cevi.DB (Verifizierte Cevi-Leitende)
+                  </option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Steuert, ob Helfer sich ohne Passwort in 2 Sekunden eintragen dürfen.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Beschreibung
+                </label>
                 <textarea
                   rows={2}
                   placeholder="Worum geht es bei diesem Anlass?"
@@ -327,7 +436,9 @@ export default function DepartmentHomePage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Startdatum</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Startdatum
+                  </label>
                   <input
                     type="datetime-local"
                     required
@@ -337,7 +448,9 @@ export default function DepartmentHomePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Enddatum</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Enddatum
+                  </label>
                   <input
                     type="datetime-local"
                     required
@@ -372,7 +485,9 @@ export default function DepartmentHomePage() {
       {/* Footer (Dark) */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-6 mt-12">
         <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} {department.name} • Cevi Schichtplan</p>
+          <p>
+            &copy; {new Date().getFullYear()} {department.name} &middot; Cevi Schichtplan
+          </p>
           <div className="flex gap-4">
             <a href="https://cevi-schichtplan.ch" className="hover:text-slate-300 transition">
               Plattform-Übersicht

@@ -6,6 +6,7 @@ import fastifyCookie from '@fastify/cookie';
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    optionalAuthenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -37,6 +38,14 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
       await request.jwtVerify();
     } catch (err) {
       reply.status(401).send({ error: 'Nicht autorisiert' });
+    }
+  });
+
+  fastify.decorate('optionalAuthenticate', async (request: FastifyRequest) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      // Optional: no error returned if token is absent or invalid
     }
   });
 };

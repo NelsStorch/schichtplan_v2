@@ -24,14 +24,14 @@ model Department {
 
 model User {
   id            String             @id @default(uuid())
-  email         String             @unique
+  email         String?            @unique
   passwordHash  String?
   ceviDbId      Int?               @unique
-  googleId      String?            @unique
   firstName     String
   lastName      String
   ceviName      String?
   phone         String?
+  birthDate     DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
   isGlobalAdmin Boolean            @default(false)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -64,6 +64,9 @@ model Event {
   endDate           DateTime
   isPublished       Boolean    @default(true)
   allowPublicSignup Boolean    @default(true)
+  signupMode        String     @default("OPEN") // "NAME_ONLY", "OPEN", "LOGIN_REQUIRED", "CEVIDB_ONLY"
+  requireEmailForGuests Boolean @default(false)
+  requirePhoneForGuests Boolean @default(false)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   department        Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -94,13 +97,15 @@ model Shift {
 model ShiftSignup {
   id          String   @id @default(uuid())
   shiftId     String
-  userId      String
+  userId      String?
+  guestName   String?  // Cevi-Name oder Name bei passwortloser Anmeldung
+  guestEmail  String?
+  guestPhone  String?
   isConfirmed Boolean  @default(true)
   notes       String?
   createdAt   DateTime @default(now())
   shift       Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([shiftId, userId])
   @@map("shift_signups")
 }
