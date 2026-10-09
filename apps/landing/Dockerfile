@@ -42,6 +42,8 @@ ENV HOSTNAME="0.0.0.0"
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=builder /app/apps/landing/.next/standalone ./
+COPY --from=builder /app/apps/landing/.next/static ./.next/static
+COPY --from=builder /app/apps/landing/public ./public
 COPY --from=builder /app/apps/landing/.next/static ./apps/landing/.next/static
 COPY --from=builder /app/apps/landing/public ./apps/landing/public
 
@@ -50,4 +52,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
   CMD node -e "fetch('http://localhost:3001/').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["node", "apps/landing/server.js"]
+CMD ["node", "server.js"]

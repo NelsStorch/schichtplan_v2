@@ -42,6 +42,8 @@ ENV HOSTNAME="0.0.0.0"
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=builder /app/apps/login/.next/standalone ./
+COPY --from=builder /app/apps/login/.next/static ./.next/static
+COPY --from=builder /app/apps/login/public ./public
 COPY --from=builder /app/apps/login/.next/static ./apps/login/.next/static
 COPY --from=builder /app/apps/login/public ./apps/login/public
 
@@ -50,4 +52,4 @@ EXPOSE 3002
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
   CMD node -e "fetch('http://localhost:3002/').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["node", "apps/login/server.js"]
+CMD ["node", "server.js"]
