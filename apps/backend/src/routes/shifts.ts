@@ -18,13 +18,14 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       // Event & Abteilung prüfen
       const event = await fastify.prisma.event.findUnique({
         where: { id: eventId },
+        include: { organizers: true },
       });
 
       if (!event) {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
 
-      // Prüfe Berechtigung
+      // Prüfe Berechtigung: Abteilungsleitung, Planner oder Event-OK
       const member = await fastify.prisma.departmentMember.findUnique({
         where: {
           departmentId_userId: {
@@ -34,8 +35,13 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      if (!member || (member.role !== 'ADMIN' && member.role !== 'PLANNER')) {
-        return reply.status(403).send({ error: 'Keine Berechtigung' });
+      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
+
+      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+        return reply
+          .status(403)
+          .send({ error: 'Keine Berechtigung zum Erstellen von Schichten für dieses Event' });
       }
 
       const shift = await fastify.prisma.shift.create({
@@ -232,7 +238,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       if (signupId) {
         existingSignup = await fastify.prisma.shiftSignup.findUnique({
           where: { id: signupId },
-          include: { shift: { include: { event: true } } },
+          include: { shift: { include: { event: { include: { organizers: true } } } } },
         });
       } else if (request.user) {
         existingSignup = await fastify.prisma.shiftSignup.findFirst({
@@ -240,7 +246,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             shiftId,
             userId: request.user.id,
           },
-          include: { shift: { include: { event: true } } },
+          include: { shift: { include: { event: { include: { organizers: true } } } } },
         });
       }
 
@@ -248,7 +254,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Eintragung nicht gefunden' });
       }
 
-      // Prüfe Berechtigung: Eigener Eintrag ODER Admin/Planner der Abteilung
+      // Prüfe Berechtigung: Eigener Eintrag ODER Abteilungsleitung ODER Event-OK
       let isAllowed = false;
       if (request.user && existingSignup.userId === request.user.id) {
         isAllowed = true;
@@ -261,7 +267,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             },
           },
         });
-        if (member && (member.role === 'ADMIN' || member.role === 'PLANNER')) {
+        const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+        const isEventOk = existingSignup.shift.event.organizers?.some(
+          (o) => o.userId === request.user.id
+        );
+        if (isDeptAdmin || isEventOk || request.user.isGlobalAdmin) {
           isAllowed = true;
         }
       }

@@ -10,12 +10,27 @@ export interface DepartmentDto {
   createdAt: string;
 }
 
+export interface EventOrganizerDto {
+  id: string;
+  eventId: string;
+  userId: string;
+  userFirstName: string;
+  userLastName: string;
+  userCeviName?: string | null;
+  displayName: string;
+  role: string;
+  roleTitle?: string | null;
+  createdAt: string;
+}
+
 export interface EventDto {
   id: string;
   departmentId: string;
   title: string;
   slug: string;
   description?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
   startDate: string;
   endDate: string;
   isPublished: boolean;
@@ -25,6 +40,7 @@ export interface EventDto {
   allowPublicSignup: boolean;
   createdAt: string;
   shiftCount?: number;
+  organizers?: EventOrganizerDto[];
 }
 
 export interface ShiftDto {

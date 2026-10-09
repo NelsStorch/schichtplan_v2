@@ -150,6 +150,8 @@ async function main() {
         'Der legendäre Cevi-Grill- & Chnoblibrotstand an der Illnauer Chilbi! Hilf mit und unterstütze unsere Abteilung.',
       startDate: new Date('2026-10-16T16:00:00Z'),
       endDate: new Date('2026-10-18T22:00:00Z'),
+      logoUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=200&auto=format&fit=crop',
+      bannerUrl: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=1200&auto=format&fit=crop',
       isPublished: true,
       allowPublicSignup: true,
       signupMode: 'NAME_ONLY',
@@ -162,9 +164,44 @@ async function main() {
         'Der legendäre Cevi-Grill- & Chnoblibrotstand an der Illnauer Chilbi! Hilf mit und unterstütze unsere Abteilung.',
       startDate: new Date('2026-10-16T16:00:00Z'),
       endDate: new Date('2026-10-18T22:00:00Z'),
+      logoUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=200&auto=format&fit=crop',
+      bannerUrl: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=1200&auto=format&fit=crop',
       isPublished: true,
       allowPublicSignup: true,
       signupMode: 'NAME_ONLY',
+    },
+  });
+
+  // Event OK für Chilbi
+  await prisma.eventOrganizer.upsert({
+    where: {
+      eventId_userId: {
+        eventId: chilbi.id,
+        userId: adminInferno.id,
+      },
+    },
+    update: { role: 'OK_LEAD', roleTitle: 'OK-Präsident' },
+    create: {
+      eventId: chilbi.id,
+      userId: adminInferno.id,
+      role: 'OK_LEAD',
+      roleTitle: 'OK-Präsident',
+    },
+  });
+
+  await prisma.eventOrganizer.upsert({
+    where: {
+      eventId_userId: {
+        eventId: chilbi.id,
+        userId: helperUsers[0].id,
+      },
+    },
+    update: { role: 'OK_MEMBER', roleTitle: 'Bau & Grillchef' },
+    create: {
+      eventId: chilbi.id,
+      userId: helperUsers[0].id,
+      role: 'OK_MEMBER',
+      roleTitle: 'Bau & Grillchef',
     },
   });
 

@@ -59,6 +59,8 @@ export const CreateEventSchema = z.object({
     .max(50)
     .regex(/^[a-z0-9-]+$/, 'Slug darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten'),
   description: z.string().optional(),
+  logoUrl: z.string().optional().nullable(),
+  bannerUrl: z.string().optional().nullable(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   signupMode: z.enum(['NAME_ONLY', 'OPEN', 'LOGIN_REQUIRED', 'CEVIDB_ONLY']).default('OPEN'),
@@ -68,6 +70,25 @@ export const CreateEventSchema = z.object({
 });
 
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
+
+export const UpdateDepartmentSchema = z.object({
+  name: z.string().min(2).optional(),
+  logoUrl: z.string().optional().nullable(),
+  primaryColor: z.string().optional().nullable(),
+  contactEmail: z.string().email().optional().nullable(),
+});
+
+export type UpdateDepartmentInput = z.infer<typeof UpdateDepartmentSchema>;
+
+export const AddEventOrganizerSchema = z.object({
+  userId: z.string().uuid().optional(),
+  ceviName: z.string().optional(),
+  email: z.string().email().optional(),
+  role: z.enum(['OK_LEAD', 'OK_MEMBER']).default('OK_MEMBER'),
+  roleTitle: z.string().optional(),
+});
+
+export type AddEventOrganizerInput = z.infer<typeof AddEventOrganizerSchema>;
 
 export const CreateShiftSchema = z.object({
   eventId: z.string().uuid(),

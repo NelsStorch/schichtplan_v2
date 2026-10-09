@@ -1,14 +1,31 @@
-export function CeviLogo({ className = 'w-12 h-12', rounded = 'rounded-2xl' }: { className?: string; rounded?: string }) {
+const sizeClasses: Record<string, string> = {
+  sm: 'w-8 h-8',
+  md: 'w-12 h-12',
+  lg: 'w-16 h-16',
+  xl: 'w-20 h-20',
+};
+
+export function CeviLogo({
+  className,
+  size = 'md',
+  logoUrl,
+  alt = 'Cevi Logo',
+}: {
+  className?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  logoUrl?: string | null;
+  alt?: string;
+  rounded?: string;
+}) {
+  const sizeClass = className || sizeClasses[size] || 'w-12 h-12';
+  const src = logoUrl || '/images/cevi-logo.svg';
   return (
-    <div
-      className={`${className} ${rounded} bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center shadow-lg shadow-rose-950/60 p-2 text-white select-none`}
-    >
-      <svg viewBox="0 0 100 100" fill="currentColor" className="w-full h-full drop-shadow">
-        <polygon points="50,12 88,82 12,82" fill="white" opacity="0.95" />
-        <polygon points="50,28 78,80 22,80" fill="#e11d48" />
-        <rect x="44" y="44" width="12" height="28" fill="white" rx="1.5" />
-        <rect x="36" y="52" width="28" height="12" fill="white" rx="1.5" />
-      </svg>
+    <div className={`${sizeClass} relative flex items-center justify-center shrink-0 select-none overflow-hidden`}>
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-contain drop-shadow-md"
+      />
     </div>
   );
 }

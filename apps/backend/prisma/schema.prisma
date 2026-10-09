@@ -37,6 +37,7 @@ model User {
   updatedAt     DateTime           @updatedAt
   memberships   DepartmentMember[]
   signups       ShiftSignup[]
+  organizedEvents EventOrganizer[]
 
   @@map("users")
 }
@@ -55,25 +56,42 @@ model DepartmentMember {
 }
 
 model Event {
-  id                String     @id @default(uuid())
+  id                String            @id @default(uuid())
   departmentId      String
   title             String
   slug              String
   description       String?
+  logoUrl           String?           // Event-spezifisches Logo
+  bannerUrl         String?           // Event-Hintergrundbild / Hero-Banner
   startDate         DateTime
   endDate           DateTime
-  isPublished       Boolean    @default(true)
-  allowPublicSignup Boolean    @default(true)
-  signupMode        String     @default("OPEN") // "NAME_ONLY", "OPEN", "LOGIN_REQUIRED", "CEVIDB_ONLY"
-  requireEmailForGuests Boolean @default(false)
-  requirePhoneForGuests Boolean @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  department        Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  isPublished       Boolean           @default(true)
+  allowPublicSignup Boolean           @default(true)
+  signupMode        String            @default("OPEN") // "NAME_ONLY", "OPEN", "LOGIN_REQUIRED", "CEVIDB_ONLY"
+  requireEmailForGuests Boolean       @default(false)
+  requirePhoneForGuests Boolean       @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  department        Department        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   shifts            Shift[]
+  organizers        EventOrganizer[]  // Event-spezifisches Organisationskomitee (OK)
 
   @@unique([departmentId, slug])
   @@map("events")
+}
+
+model EventOrganizer {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  role      String   @default("OK_MEMBER") // "OK_LEAD", "OK_MEMBER"
+  roleTitle String?  // z.B. "OK-Präsident", "Bau & Logistik", "Kassier", "Grillchef"
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_organizers")
 }
 
 model Shift {

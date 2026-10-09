@@ -14,9 +14,36 @@ import {
   ShieldCheck,
   Sparkles,
   Lock,
+  Settings,
+  Image as ImageIcon,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
 import type { DepartmentDto, EventDto, UserDto, SignupMode } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
+
+const BANNER_PRESETS = [
+  {
+    name: '🎪 Chilbi / Festzelt',
+    url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🏕️ Sommerlager / Zelte',
+    url: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🔥 Lagerfeuer & Wald',
+    url: 'https://images.unsplash.com/photo-1475483768296-6163e08872a1?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🥩 Grill & Festwirtschaft',
+    url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🏔️ Cevi-Hütte & Berge',
+    url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1200&auto=format&fit=crop',
+  },
+];
 
 export default function DepartmentHomePage() {
   const [department, setDepartment] = useState<DepartmentDto | null>(null);
@@ -31,6 +58,8 @@ export default function DepartmentHomePage() {
     title: '',
     slug: '',
     description: '',
+    logoUrl: '',
+    bannerUrl: '',
     startDate: '',
     endDate: '',
     signupMode: 'OPEN' as SignupMode,
@@ -40,6 +69,19 @@ export default function DepartmentHomePage() {
   const [eventStatus, setEventStatus] = useState<{ loading: boolean; error?: string }>({
     loading: false,
   });
+
+  // Department Settings Modal
+  const [showDeptModal, setShowDeptModal] = useState(false);
+  const [deptForm, setDeptForm] = useState({
+    name: '',
+    logoUrl: '',
+    contactEmail: '',
+  });
+  const [deptStatus, setDeptStatus] = useState<{
+    loading: boolean;
+    error?: string;
+    success?: string;
+  }>({ loading: false });
 
   const getLoginUrl = () => {
     if (typeof window === 'undefined') return '/login';
@@ -61,6 +103,11 @@ export default function DepartmentHomePage() {
       }
       const deptData = await deptRes.json();
       setDepartment(deptData);
+      setDeptForm({
+        name: deptData.name,
+        logoUrl: deptData.logoUrl || '',
+        contactEmail: deptData.contactEmail || '',
+      });
 
       const eventsRes = await fetch('/api/events');
       if (eventsRes.ok) {
@@ -101,6 +148,8 @@ export default function DepartmentHomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...eventForm,
+          logoUrl: eventForm.logoUrl.trim() || undefined,
+          bannerUrl: eventForm.bannerUrl.trim() || undefined,
           startDate: new Date(eventForm.startDate).toISOString(),
           endDate: new Date(eventForm.endDate).toISOString(),
           allowPublicSignup: true,
@@ -115,6 +164,8 @@ export default function DepartmentHomePage() {
         title: '',
         slug: '',
         description: '',
+        logoUrl: '',
+        bannerUrl: '',
         startDate: '',
         endDate: '',
         signupMode: 'OPEN',
@@ -124,6 +175,32 @@ export default function DepartmentHomePage() {
       await loadData();
     } catch (err: any) {
       setEventStatus({ loading: false, error: err.message });
+    }
+  };
+
+  const handleUpdateDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeptStatus({ loading: true, error: undefined, success: undefined });
+
+    try {
+      const res = await fetch('/api/departments/current', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: deptForm.name.trim() || undefined,
+          logoUrl: deptForm.logoUrl.trim() || null,
+          contactEmail: deptForm.contactEmail.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Aktualisierung fehlgeschlagen');
+
+      setDeptStatus({ loading: false, success: 'Abteilungs-Einstellungen gespeichert!' });
+      await loadData();
+      setTimeout(() => setShowDeptModal(false), 900);
+    } catch (err: any) {
+      setDeptStatus({ loading: false, error: err.message });
     }
   };
 
@@ -154,6 +231,8 @@ export default function DepartmentHomePage() {
     );
   }
 
+  const isDeptAdmin =
+    user && (user.departmentRole === 'ADMIN' || user.isGlobalAdmin);
   const isPlannerOrAdmin =
     user &&
     (user.departmentRole === 'ADMIN' ||
@@ -166,10 +245,24 @@ export default function DepartmentHomePage() {
       <header className="bg-slate-950/80 border-b border-slate-800/80 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <CeviLogo className="w-9 h-9" rounded="rounded-xl" />
+            {/* Custom Department Logo or Cevi Default Logo */}
+            <CeviLogo
+              className="w-10 h-10"
+              logoUrl={department.logoUrl}
+              alt={department.name}
+            />
             <div>
               <h1 className="font-bold text-white leading-tight flex items-center gap-2">
                 {department.name}
+                {isDeptAdmin && (
+                  <button
+                    onClick={() => setShowDeptModal(true)}
+                    title="Abteilungs-Einstellungen & Logo bearbeiten"
+                    className="text-slate-500 hover:text-slate-200 transition p-1"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </h1>
               <p className="text-xs text-slate-400">Schichtplan-Portal</p>
             </div>
@@ -243,6 +336,11 @@ export default function DepartmentHomePage() {
                 <strong>
                   {user.ceviName ? `${user.firstName} / ${user.ceviName}` : user.firstName}
                 </strong>
+                {isDeptAdmin && (
+                  <span className="ml-1 text-[10px] bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded">
+                    Abteilungsleitung
+                  </span>
+                )}
               </span>
             </div>
           )}
@@ -265,97 +363,240 @@ export default function DepartmentHomePage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {events.map((evt) => (
-              <Link
-                key={evt.id}
-                href={`/events/${evt.slug}`}
-                className="group bg-slate-900/80 rounded-2xl border border-slate-800 p-6 hover:border-slate-700 hover:bg-slate-900 transition flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-semibold text-lg text-white group-hover:text-rose-400 transition">
-                      {evt.title}
-                    </h3>
-                    <span className="inline-flex items-center gap-1 text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-medium shrink-0">
-                      <Clock className="w-3.5 h-3.5" />
-                      {new Date(evt.startDate).toLocaleDateString('de-CH', {
-                        day: '2-digit',
-                        month: '2-digit',
-                      })}
-                    </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {events.map((evt) => {
+              const hasBanner = !!evt.bannerUrl;
+              return (
+                <Link
+                  key={evt.id}
+                  href={`/events/${evt.slug}`}
+                  style={
+                    hasBanner
+                      ? {
+                          backgroundImage: `url(${evt.bannerUrl})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        }
+                      : undefined
+                  }
+                  className="group relative rounded-3xl border border-slate-800 overflow-hidden shadow-lg transition hover:border-slate-700 hover:scale-[1.01] flex flex-col justify-between"
+                >
+                  {/* Dark gradient overlay for readability if banner is set */}
+                  <div
+                    className={`p-6 flex flex-col justify-between h-full ${
+                      hasBanner
+                        ? 'bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/70 backdrop-blur-[1px]'
+                        : 'bg-slate-900/80'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2.5">
+                          {/* Event Logo or Icon */}
+                          {evt.logoUrl ? (
+                            <img
+                              src={evt.logoUrl}
+                              alt={evt.title}
+                              className="w-9 h-9 rounded-xl object-cover border border-slate-700 shadow-md shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-slate-800/90 border border-slate-700 flex items-center justify-center shrink-0">
+                              <Calendar className="w-4 h-4 text-rose-400" />
+                            </div>
+                          )}
+                          <h3 className="font-bold text-lg text-white group-hover:text-rose-400 transition leading-tight">
+                            {evt.title}
+                          </h3>
+                        </div>
+
+                        <span className="inline-flex items-center gap-1 text-xs bg-slate-950/90 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-medium shrink-0">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          {new Date(evt.startDate).toLocaleDateString('de-CH', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          })}
+                        </span>
+                      </div>
+
+                      {/* Signup Mode Badge */}
+                      <div className="mb-3">
+                        {evt.signupMode === 'NAME_ONLY' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-amber-950/80 text-amber-300 border border-amber-800/80 px-2 py-0.5 rounded-md">
+                            <Sparkles className="w-3 h-3 text-amber-400" /> Nur Cevi-Name (Kein
+                            Passwort)
+                          </span>
+                        )}
+                        {evt.signupMode === 'OPEN' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 px-2 py-0.5 rounded-md">
+                            <Users className="w-3 h-3 text-emerald-400" /> Offen für alle
+                          </span>
+                        )}
+                        {evt.signupMode === 'LOGIN_REQUIRED' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-blue-950/80 text-blue-300 border border-blue-800/80 px-2 py-0.5 rounded-md">
+                            <Lock className="w-3 h-3 text-blue-400" /> Login erforderlich
+                          </span>
+                        )}
+                        {evt.signupMode === 'CEVIDB_ONLY' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-purple-950/80 text-purple-300 border border-purple-800/80 px-2 py-0.5 rounded-md">
+                            <ShieldCheck className="w-3 h-3 text-purple-400" /> Nur Cevi.DB Accounts
+                          </span>
+                        )}
+                      </div>
+
+                      {evt.description && (
+                        <p className="text-slate-300 text-xs mt-2 line-clamp-2 leading-relaxed">
+                          {evt.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-sm">
+                      <span className="text-slate-400 text-xs flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-slate-500" />
+                        {evt.shiftCount || 0} Schichten
+                      </span>
+                      <span className="font-semibold text-rose-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-xs sm:text-sm">
+                        Schichten ansehen <ArrowRight className="w-4 h-4" />
+                      </span>
+                    </div>
                   </div>
-
-                  {/* Signup Mode Badge */}
-                  <div className="mb-3">
-                    {evt.signupMode === 'NAME_ONLY' && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded-md">
-                        <Sparkles className="w-3 h-3 text-amber-400" /> Nur Cevi-Name (Kein Passwort)
-                      </span>
-                    )}
-                    {evt.signupMode === 'OPEN' && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded-md">
-                        <Users className="w-3 h-3 text-emerald-400" /> Offen (Mit Account oder Cevi-Name)
-                      </span>
-                    )}
-                    {evt.signupMode === 'LOGIN_REQUIRED' && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-blue-950/60 text-blue-300 border border-blue-800/60 px-2 py-0.5 rounded-md">
-                        <Lock className="w-3 h-3 text-blue-400" /> Login erforderlich
-                      </span>
-                    )}
-                    {evt.signupMode === 'CEVIDB_ONLY' && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded-md">
-                        <ShieldCheck className="w-3 h-3 text-purple-400" /> Nur Cevi.DB Accounts
-                      </span>
-                    )}
-                  </div>
-
-                  {evt.description && (
-                    <p className="text-slate-400 text-sm mt-2 line-clamp-2 leading-relaxed">
-                      {evt.description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-sm">
-                  <span className="text-slate-400 text-xs flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-slate-500" />
-                    {evt.shiftCount || 0} Schichten
-                  </span>
-                  <span className="font-medium text-rose-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-xs sm:text-sm">
-                    Schichten ansehen <ArrowRight className="w-4 h-4" />
-                  </span>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </main>
 
+      {/* Modal: Abteilungs-Einstellungen & eigenes Logo (für Abteilungsleitung) */}
+      {showDeptModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="font-bold text-lg text-white">Abteilungs-Einstellungen</h3>
+                <p className="text-xs text-slate-400">Nur für Abteilungsleitung</p>
+              </div>
+              <button
+                onClick={() => setShowDeptModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {deptStatus.error && (
+              <div className="p-3 mb-4 rounded-xl bg-rose-950/60 text-rose-300 text-xs border border-rose-800/60 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{deptStatus.error}</span>
+              </div>
+            )}
+
+            {deptStatus.success && (
+              <div className="p-3 mb-4 rounded-xl bg-emerald-950/60 text-emerald-300 text-xs border border-emerald-800/60 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{deptStatus.success}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateDepartment} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Name der Abteilung
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={deptForm.name}
+                  onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white outline-none focus:border-rose-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Eigenes Abteilungs-Logo (Bild-URL)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://.../mein-logo.png"
+                  value={deptForm.logoUrl}
+                  onChange={(e) => setDeptForm({ ...deptForm, logoUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white outline-none focus:border-rose-500"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Leer lassen, um das offizielle rote Cevi-Logo zu verwenden.
+                </p>
+
+                {deptForm.logoUrl && (
+                  <div className="mt-2 p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center gap-3">
+                    <img
+                      src={deptForm.logoUrl}
+                      alt="Logo-Vorschau"
+                      className="w-10 h-10 object-contain rounded-lg border border-slate-700"
+                    />
+                    <span className="text-xs text-slate-400">Logo-Vorschau</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Kontakt-E-Mail der Abteilung
+                </label>
+                <input
+                  type="email"
+                  value={deptForm.contactEmail}
+                  onChange={(e) => setDeptForm({ ...deptForm, contactEmail: e.target.value })}
+                  placeholder="info@cevi-illnau.ch"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white outline-none focus:border-rose-500"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowDeptModal(false)}
+                  className="px-3.5 py-2 text-xs text-slate-400 hover:text-white"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={deptStatus.loading}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-medium rounded-xl text-xs transition"
+                >
+                  {deptStatus.loading ? 'Speichere...' : 'Einstellungen speichern'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal: Neues Event erstellen */}
       {showEventModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-800">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-800 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
               <h3 className="font-bold text-lg text-white">Neues Event anlegen</h3>
               <button
                 onClick={() => setShowEventModal(false)}
-                className="text-slate-400 hover:text-white text-sm"
+                className="text-slate-400 hover:text-white p-1"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {eventStatus.error && (
-              <div className="p-3 mb-4 rounded-lg bg-rose-950/60 text-rose-300 text-xs border border-rose-800/60 flex items-center gap-2">
+              <div className="p-3 mb-4 rounded-xl bg-rose-950/60 text-rose-300 text-xs border border-rose-800/60 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" /> {eventStatus.error}
               </div>
             )}
 
-            <form onSubmit={handleCreateEvent} className="space-y-3.5">
+            <form onSubmit={handleCreateEvent} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Titel des Anlasses
+                  Titel des Anlasses *
                 </label>
                 <input
                   type="text"
@@ -371,13 +612,13 @@ export default function DepartmentHomePage() {
                       .replace(/^-|-$/g, '');
                     setEventForm({ ...eventForm, title, slug: autoSlug });
                   }}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Slug (URL-Pfad)
+                  Slug (URL-Pfad) *
                 </label>
                 <input
                   type="text"
@@ -387,8 +628,53 @@ export default function DepartmentHomePage() {
                   onChange={(e) =>
                     setEventForm({ ...eventForm, slug: e.target.value.toLowerCase() })
                   }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
                 />
+              </div>
+
+              {/* Event Logo */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Eigenes Event-Logo (optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://.../event-logo.png"
+                  value={eventForm.logoUrl}
+                  onChange={(e) => setEventForm({ ...eventForm, logoUrl: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
+                />
+              </div>
+
+              {/* Event Hintergrundbild / Banner */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Hintergrundbild / Banner (optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://.../banner.jpg"
+                  value={eventForm.bannerUrl}
+                  onChange={(e) => setEventForm({ ...eventForm, bannerUrl: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
+                />
+                <div className="mt-2">
+                  <span className="text-[11px] text-slate-500 block mb-1">
+                    Oder wähle ein Stimmungs-Preset:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {BANNER_PRESETS.map((p) => (
+                      <button
+                        type="button"
+                        key={p.name}
+                        onClick={() => setEventForm({ ...eventForm, bannerUrl: p.url })}
+                        className="text-[11px] bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 px-2 py-1 rounded-lg transition"
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Anmelde-Modus / Signup-Policy */}
@@ -401,7 +687,7 @@ export default function DepartmentHomePage() {
                   onChange={(e) =>
                     setEventForm({ ...eventForm, signupMode: e.target.value as SignupMode })
                   }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500"
                 >
                   <option value="NAME_ONLY">
                     ⚡ Nur Cevi-Name (Kein Passwort nötig – ideal für Chilbi)
@@ -416,9 +702,6 @@ export default function DepartmentHomePage() {
                     🛡️ Nur Cevi.DB (Verifizierte Cevi-Leitende)
                   </option>
                 </select>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Steuert, ob Helfer sich ohne Passwort in 2 Sekunden eintragen dürfen.
-                </p>
               </div>
 
               <div>
@@ -430,7 +713,7 @@ export default function DepartmentHomePage() {
                   placeholder="Worum geht es bei diesem Anlass?"
                   value={eventForm.description}
                   onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
                 />
               </div>
 
@@ -444,7 +727,7 @@ export default function DepartmentHomePage() {
                     required
                     value={eventForm.startDate}
                     onChange={(e) => setEventForm({ ...eventForm, startDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
                 <div>
@@ -456,7 +739,7 @@ export default function DepartmentHomePage() {
                     required
                     value={eventForm.endDate}
                     onChange={(e) => setEventForm({ ...eventForm, endDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
               </div>
@@ -472,7 +755,7 @@ export default function DepartmentHomePage() {
                 <button
                   type="submit"
                   disabled={eventStatus.loading}
-                  className="px-5 py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-lg disabled:opacity-50 transition"
+                  className="px-5 py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl disabled:opacity-50 transition"
                 >
                   {eventStatus.loading ? 'Erstelle...' : 'Event speichern'}
                 </button>

@@ -15,24 +15,70 @@ import {
   Sparkles,
   ShieldCheck,
   Lock,
-  UserCheck,
   X,
+  Crown,
+  Shield,
+  Settings,
+  Calendar,
+  Image as ImageIcon,
+  UserPlus,
+  Info,
 } from 'lucide-react';
 import type { ShiftDto, UserDto, SignupMode } from '@schichtplan/shared';
 import { DEFAULT_SHIFT_CATEGORIES } from '@schichtplan/shared';
+import { CeviLogo } from '@/components/CeviLogo';
+
+interface EventOrganizer {
+  id: string;
+  eventId: string;
+  userId: string;
+  userFirstName: string;
+  userLastName: string;
+  userCeviName?: string | null;
+  displayName: string;
+  role: 'OK_LEAD' | 'OK_MEMBER';
+  roleTitle?: string | null;
+  createdAt: string;
+}
 
 interface EventDetails {
   id: string;
   title: string;
   slug: string;
   description?: string;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
   startDate: string;
   endDate: string;
   signupMode: SignupMode;
   requireEmailForGuests?: boolean;
   requirePhoneForGuests?: boolean;
+  organizers?: EventOrganizer[];
   shifts: ShiftDto[];
 }
+
+const BANNER_PRESETS = [
+  {
+    name: '🎪 Chilbi / Festzelt',
+    url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🏕️ Sommerlager / Zelte',
+    url: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🔥 Lagerfeuer & Wald',
+    url: 'https://images.unsplash.com/photo-1475483768296-6163e08872a1?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🥩 Grill & Festwirtschaft',
+    url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1200&auto=format&fit=crop',
+  },
+  {
+    name: '🏔️ Cevi-Hütte & Berge',
+    url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1200&auto=format&fit=crop',
+  },
+];
 
 export default function EventDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
@@ -66,6 +112,33 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     description: '',
   });
   const [shiftStatus, setShiftStatus] = useState<{ loading: boolean; error?: string }>({
+    loading: false,
+  });
+
+  // Event Settings Modal (Banner, Logo, Modus)
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    title: '',
+    description: '',
+    logoUrl: '',
+    bannerUrl: '',
+    signupMode: 'OPEN' as SignupMode,
+    requireEmailForGuests: false,
+    requirePhoneForGuests: false,
+  });
+  const [settingsStatus, setSettingsStatus] = useState<{ loading: boolean; error?: string }>({
+    loading: false,
+  });
+
+  // OK Member Modal
+  const [showOkModal, setShowOkModal] = useState(false);
+  const [okForm, setOkForm] = useState({
+    ceviName: '',
+    email: '',
+    role: 'OK_MEMBER' as 'OK_LEAD' | 'OK_MEMBER',
+    roleTitle: '',
+  });
+  const [okStatus, setOkStatus] = useState<{ loading: boolean; error?: string }>({
     loading: false,
   });
 
@@ -105,6 +178,30 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     loadEvent();
   }, [resolvedParams.slug]);
 
+  // Sync settings form when event is loaded
+  useEffect(() => {
+    if (event) {
+      setSettingsForm({
+        title: event.title || '',
+        description: event.description || '',
+        logoUrl: event.logoUrl || '',
+        bannerUrl: event.bannerUrl || '',
+        signupMode: event.signupMode || 'OPEN',
+        requireEmailForGuests: event.requireEmailForGuests || false,
+        requirePhoneForGuests: event.requirePhoneForGuests || false,
+      });
+    }
+  }, [event]);
+
+  // Roles & Permissions
+  const isDeptAdmin = Boolean(user && (user.departmentRole === 'ADMIN' || user.isGlobalAdmin));
+  const isPlanner = Boolean(user && user.departmentRole === 'PLANNER');
+  const isEventOk = Boolean(user && event?.organizers?.some((o) => o.userId === user.id));
+  const isOkLead = Boolean(user && event?.organizers?.some((o) => o.userId === user.id && o.role === 'OK_LEAD'));
+
+  const canManageShifts = isDeptAdmin || isPlanner || isEventOk;
+  const canManageEvent = isDeptAdmin || isOkLead;
+
   const handleSignupClick = (shift: ShiftDto) => {
     setActionMessage(null);
 
@@ -128,7 +225,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     setGuestError(null);
   };
 
-  const performSignup = async (shiftId: string, guestData?: { guestName: string; guestEmail?: string; guestPhone?: string }) => {
+  const performSignup = async (
+    shiftId: string,
+    guestData?: { guestName: string; guestEmail?: string; guestPhone?: string }
+  ) => {
     try {
       const res = await fetch(`/api/shifts/${shiftId}/signup`, {
         method: 'POST',
@@ -221,6 +321,89 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     }
   };
 
+  const handleUpdateSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!event) return;
+    setSettingsStatus({ loading: true });
+
+    try {
+      const res = await fetch(`/api/events/${event.slug}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: settingsForm.title,
+          description: settingsForm.description || undefined,
+          logoUrl: settingsForm.logoUrl || null,
+          bannerUrl: settingsForm.bannerUrl || null,
+          signupMode: settingsForm.signupMode,
+          requireEmailForGuests: settingsForm.requireEmailForGuests,
+          requirePhoneForGuests: settingsForm.requirePhoneForGuests,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Aktualisierung fehlgeschlagen');
+
+      setShowSettingsModal(false);
+      setActionMessage({ text: 'Event-Design & Einstellungen gespeichert!', type: 'success' });
+      await loadEvent();
+    } catch (err: any) {
+      setSettingsStatus({ loading: false, error: err.message });
+    }
+  };
+
+  const handleAddOrganizer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!event) return;
+    setOkStatus({ loading: true });
+
+    try {
+      const res = await fetch(`/api/events/${event.slug}/organizers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ceviName: okForm.ceviName.trim() || undefined,
+          email: okForm.email.trim() || undefined,
+          role: okForm.role,
+          roleTitle: okForm.roleTitle.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Konnte OK-Mitglied nicht ernennen');
+
+      setShowOkModal(false);
+      setOkForm({
+        ceviName: '',
+        email: '',
+        role: 'OK_MEMBER',
+        roleTitle: '',
+      });
+      setActionMessage({ text: 'OK-Mitglied erfolgreich ernannt!', type: 'success' });
+      await loadEvent();
+    } catch (err: any) {
+      setOkStatus({ loading: false, error: err.message });
+    }
+  };
+
+  const handleRemoveOrganizer = async (organizerId: string, name: string) => {
+    if (!event) return;
+    if (!confirm(`Soll ${name} wirklich aus dem Organisationskomitee entfernt werden?`)) return;
+
+    try {
+      const res = await fetch(`/api/events/${event.slug}/organizers/${organizerId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Entfernen fehlgeschlagen');
+
+      setActionMessage({ text: 'OK-Mitglied entfernt.', type: 'success' });
+      await loadEvent();
+    } catch (err: any) {
+      setActionMessage({ text: err.message, type: 'error' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
@@ -240,12 +423,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     );
   }
 
-  const isPlannerOrAdmin =
-    user &&
-    (user.departmentRole === 'ADMIN' ||
-      user.departmentRole === 'PLANNER' ||
-      user.isGlobalAdmin);
-
   // Filter Categories
   const categories = Array.from(new Set(event.shifts.map((s) => s.category)));
   const filteredShifts =
@@ -253,11 +430,28 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       ? event.shifts
       : event.shifts.filter((s) => s.category === selectedCategory);
 
+  // Stats calculation
+  const totalSlots = event.shifts.reduce((acc, s) => acc + s.requiredSlots, 0);
+  const filledSlots = event.shifts.reduce((acc, s) => acc + (s.signups?.length || 0), 0);
+
+  const startDateFormatted = new Date(event.startDate).toLocaleDateString('de-CH', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const endDateFormatted = new Date(event.endDate).toLocaleDateString('de-CH', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-rose-600 selection:text-white">
       {/* Header */}
       <header className="bg-slate-950/80 border-b border-slate-800/80 backdrop-blur-md sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-white transition"
@@ -266,7 +460,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           </Link>
 
           <div className="flex items-center gap-2">
-            {isPlannerOrAdmin && (
+            {canManageEvent && (
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl transition"
+                title="Event-Design & Einstellungen bearbeiten"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Design & Einstellungen</span>
+              </button>
+            )}
+
+            {canManageShifts && (
               <button
                 onClick={() => setShowShiftModal(true)}
                 className="inline-flex items-center gap-1.5 text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-xl transition shadow-sm"
@@ -285,44 +490,161 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
               </a>
             )}
 
-            <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-medium border border-slate-700/60">
-              {event.shifts.length} Schichten
+            <span className="text-xs bg-slate-900 text-slate-300 px-2.5 py-1 rounded-full font-medium border border-slate-800">
+              {filledSlots}/{totalSlots} belegt
             </span>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-8">
-        <div className="mb-6">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">{event.title}</h1>
-            {event.signupMode === 'NAME_ONLY' && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60 px-2.5 py-1 rounded-lg">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Chilbi-Modus (Nur Cevi-Name nötig)
-              </span>
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
+        {/* Hero Banner with Custom Background & Event Logo */}
+        <div
+          className="relative overflow-hidden rounded-3xl border border-slate-800/80 mb-8 p-6 sm:p-10 shadow-2xl bg-slate-900 bg-cover bg-center min-h-[240px] flex flex-col justify-end"
+          style={{
+            backgroundImage: event.bannerUrl
+              ? `linear-gradient(to top, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.65) 60%, rgba(2, 6, 23, 0.4) 100%), url(${event.bannerUrl})`
+              : `linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(136, 19, 55, 0.25) 50%, rgba(15, 23, 42, 0.95) 100%)`,
+          }}
+        >
+          <div className="relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5 mb-4">
+              {/* Event Logo or fallback Cevi Logo */}
+              <div className="shrink-0">
+                {event.logoUrl ? (
+                  <img
+                    src={event.logoUrl}
+                    alt={event.title}
+                    className="w-20 h-20 rounded-2xl object-cover bg-slate-950/80 border-2 border-slate-700/80 shadow-xl backdrop-blur-sm"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-2xl bg-slate-950/80 border-2 border-slate-800 flex items-center justify-center p-2 shadow-xl backdrop-blur-sm">
+                    <CeviLogo size="md" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  {event.signupMode === 'NAME_ONLY' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-amber-950/80 text-amber-300 border border-amber-700/60 px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Chilbi-Modus (Passwortlos / Nur Cevi-Name)
+                    </span>
+                  )}
+                  {event.signupMode === 'OPEN' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                      <Users className="w-3.5 h-3.5 text-emerald-400" /> Offen für alle
+                    </span>
+                  )}
+                  {event.signupMode === 'LOGIN_REQUIRED' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-950/80 text-blue-300 border border-blue-700/60 px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                      <Lock className="w-3.5 h-3.5 text-blue-400" /> Login erforderlich
+                    </span>
+                  )}
+                  {event.signupMode === 'CEVIDB_ONLY' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-purple-950/80 text-purple-300 border border-purple-700/60 px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                      <ShieldCheck className="w-3.5 h-3.5 text-purple-400" /> Nur verifizierte Cevi.DB Accounts
+                    </span>
+                  )}
+
+                  <span className="inline-flex items-center gap-1 text-xs font-medium bg-slate-950/70 text-slate-300 border border-slate-700/50 px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    {startDateFormatted === endDateFormatted
+                      ? startDateFormatted
+                      : `${startDateFormatted} – ${endDateFormatted}`}
+                  </span>
+                </div>
+
+                <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm">
+                  {event.title}
+                </h1>
+              </div>
+            </div>
+
+            {event.description && (
+              <p className="text-slate-300 text-sm max-w-3xl leading-relaxed mt-2 drop-shadow">
+                {event.description}
+              </p>
             )}
-            {event.signupMode === 'OPEN' && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 px-2.5 py-1 rounded-lg">
-                <Users className="w-3.5 h-3.5 text-emerald-400" /> Offen für alle
-              </span>
-            )}
-            {event.signupMode === 'LOGIN_REQUIRED' && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium bg-blue-950/60 text-blue-300 border border-blue-800/60 px-2.5 py-1 rounded-lg">
-                <Lock className="w-3.5 h-3.5 text-blue-400" /> Login erforderlich
-              </span>
-            )}
-            {event.signupMode === 'CEVIDB_ONLY' && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2.5 py-1 rounded-lg">
-                <ShieldCheck className="w-3.5 h-3.5 text-purple-400" /> Nur verifizierte Cevi.DB Accounts
-              </span>
+          </div>
+        </div>
+
+        {/* Organisationskomitee (OK) Section */}
+        <section className="mb-8 bg-slate-900/60 border border-slate-800 rounded-3xl p-6">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-rose-500" />
+              <div>
+                <h2 className="text-base font-bold text-white">Organisationskomitee (OK)</h2>
+                <p className="text-xs text-slate-400">
+                  Verantwortliche Leitung & Ressorts für diesen Anlass
+                </p>
+              </div>
+            </div>
+
+            {canManageEvent && (
+              <button
+                onClick={() => setShowOkModal(true)}
+                className="inline-flex items-center gap-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white px-3 py-1.5 rounded-xl transition"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>OK-Mitglied ernennen</span>
+              </button>
             )}
           </div>
 
-          {event.description && (
-            <p className="text-slate-400 text-sm leading-relaxed">{event.description}</p>
+          {event.organizers && event.organizers.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {event.organizers.map((org) => {
+                const isLead = org.role === 'OK_LEAD';
+                return (
+                  <div
+                    key={org.id}
+                    className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                          isLead
+                            ? 'bg-amber-950/60 border-amber-700/60 text-amber-300'
+                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        {isLead ? <Crown className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-semibold text-white truncate">
+                            {org.displayName}
+                          </p>
+                        </div>
+                        <p className="text-xs text-slate-400 truncate">
+                          {org.roleTitle || (isLead ? 'OK-Leitung' : 'OK-Mitglied')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {canManageEvent && (
+                      <button
+                        onClick={() => handleRemoveOrganizer(org.id, org.displayName)}
+                        className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition"
+                        title="Aus dem OK entfernen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-xs text-slate-400">
+              Noch keine OK-Mitglieder zugewiesen. Abteilungsleitung plant diesen Anlass.
+            </div>
           )}
-        </div>
+        </section>
 
         {actionMessage && (
           <div
@@ -454,10 +776,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                               <span>{su.displayName}</span>
-                              {isPlannerOrAdmin && (
+                              {canManageShifts && (
                                 <button
                                   onClick={() => handleCancelSignup(shift.id, su.id)}
-                                  title="Helfer austragen (Admin)"
+                                  title="Helfer austragen (Admin / OK)"
                                   className="text-slate-500 hover:text-rose-400 ml-1 transition"
                                 >
                                   <X className="w-3 h-3" />
@@ -499,6 +821,257 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           })}
         </div>
       </main>
+
+      {/* Modal: Event Design & Einstellungen (Banner, Logo, Modus) */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-800 my-8">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-rose-500" />
+                <h3 className="font-bold text-lg text-white">Event-Design & Einstellungen</h3>
+              </div>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {settingsStatus.error && (
+              <div className="p-3 mb-4 rounded-xl bg-rose-950/50 text-rose-300 text-xs border border-rose-800/60 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{settingsStatus.error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateSettings} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Event-Titel
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={settingsForm.title}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, title: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Beschreibung / Info
+                </label>
+                <textarea
+                  rows={2}
+                  value={settingsForm.description}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, description: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2 text-sm text-white outline-none"
+                />
+              </div>
+
+              {/* Event Logo URL */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Eigenes Event-Logo URL (optional)
+                </label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="url"
+                    placeholder="https://... / logo.png (leer = Cevi Logo)"
+                    value={settingsForm.logoUrl}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, logoUrl: e.target.value })}
+                    className="flex-1 bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none"
+                  />
+                  {settingsForm.logoUrl ? (
+                    <img
+                      src={settingsForm.logoUrl}
+                      alt="Vorschau"
+                      className="w-10 h-10 rounded-xl border border-slate-700 object-cover bg-slate-950"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center p-1">
+                      <CeviLogo size="sm" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Event Banner & Presets */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Hintergrund-Banner Bild
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://images.unsplash.com/..."
+                  value={settingsForm.bannerUrl}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, bannerUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none mb-2"
+                />
+
+                <span className="text-[11px] text-slate-500 block mb-1.5">
+                  Oder Vorlage auswählen:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {BANNER_PRESETS.map((preset) => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => setSettingsForm({ ...settingsForm, bannerUrl: preset.url })}
+                      className={`text-[11px] p-2 rounded-xl text-left border transition truncate ${
+                        settingsForm.bannerUrl === preset.url
+                          ? 'border-rose-500 bg-rose-950/40 text-white font-medium'
+                          : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Anmeldemodus */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Anmelde-Modus für Helfer
+                </label>
+                <select
+                  value={settingsForm.signupMode}
+                  onChange={(e) =>
+                    setSettingsForm({ ...settingsForm, signupMode: e.target.value as SignupMode })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none"
+                >
+                  <option value="NAME_ONLY">
+                    🎪 Chilbi-Modus (Passwortlos - nur Cevi-Name nötig)
+                  </option>
+                  <option value="OPEN">🌐 Offen (Freiwillig ohne Konto oder mit Konto)</option>
+                  <option value="LOGIN_REQUIRED">🔒 Login erforderlich (Konto oder Cevi.DB)</option>
+                  <option value="CEVIDB_ONLY">🛡️ Cevi.DB Only (Nur verifizierte Cevi-Mitglieder)</option>
+                </select>
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(false)}
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-white"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={settingsStatus.loading}
+                  className="px-5 py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl disabled:opacity-50 transition shadow-md shadow-rose-950/60"
+                >
+                  {settingsStatus.loading ? 'Speichere...' : 'Einstellungen speichern'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: OK-Mitglied ernennen */}
+      {showOkModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-800">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-rose-500" />
+                <h3 className="font-bold text-lg text-white">OK-Mitglied ernennen</h3>
+              </div>
+              <button
+                onClick={() => setShowOkModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {okStatus.error && (
+              <div className="p-3 mb-4 rounded-xl bg-rose-950/50 text-rose-300 text-xs border border-rose-800/60 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{okStatus.error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAddOrganizer} className="space-y-4">
+              <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-400 flex items-start gap-2">
+                <Info className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>
+                  OK-Mitglieder können Schichten verwalten, Helfer koordinieren und Schichtpläne leiten.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Cevi-Name (oder E-Mail) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="z. B. Inferno oder falk@cevi.ch"
+                  value={okForm.ceviName}
+                  onChange={(e) => setOkForm({ ...okForm, ceviName: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    OK-Rolle
+                  </label>
+                  <select
+                    value={okForm.role}
+                    onChange={(e) =>
+                      setOkForm({ ...okForm, role: e.target.value as 'OK_LEAD' | 'OK_MEMBER' })
+                    }
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
+                  >
+                    <option value="OK_MEMBER">OK-Mitglied</option>
+                    <option value="OK_LEAD">OK-Leitung (Lead)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Funktion / Ressort
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="z. B. Bau & Grillchef"
+                    value={okForm.roleTitle}
+                    onChange={(e) => setOkForm({ ...okForm, roleTitle: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowOkModal(false)}
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-white"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={okStatus.loading || !okForm.ceviName.trim()}
+                  className="px-5 py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl disabled:opacity-50 transition shadow-md shadow-rose-950/60"
+                >
+                  {okStatus.loading ? 'Erstelle...' : 'Ins OK aufnehmen'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Passwortlose Schnell-Eintragung (Nur Cevi-Name / Chilbi) */}
       {guestSignupShift && (
@@ -606,7 +1179,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         </div>
       )}
 
-      {/* Modal: Neue Schicht anlegen (Admin) */}
+      {/* Modal: Neue Schicht anlegen (Admin / OK) */}
       {showShiftModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-800">
