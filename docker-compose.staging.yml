@@ -47,7 +47,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
-      - "traefik.http.routers.schichtplan-dev-api.rule=(Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`www.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)) && (PathPrefix(`/api`) || Path(`/health`))"
+      - "traefik.http.routers.schichtplan-dev-api.rule=(Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`www.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN_DEV:-dev.cevi-schichtplan.ch}$$`)) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-dev-api.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-dev-api.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-dev-api.priority=100"
@@ -74,7 +74,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
-      - "traefik.http.routers.schichtplan-dev-web.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-web.rule=HostRegexp(`^[a-z0-9-]+[.]${DOMAIN_DEV:-dev.cevi-schichtplan.ch}$$`)"
       - "traefik.http.routers.schichtplan-dev-web.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-dev-web.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-dev-web.priority=10"
