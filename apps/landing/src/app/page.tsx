@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Calendar, CheckCircle2, Shield, Smartphone, Globe, ArrowRight, PlusCircle, Search, LogIn, Lock } from 'lucide-react';
 import type { RegisterDepartmentInput } from '@schichtplan/shared';
+import { CeviLogo } from '@/components/CeviLogo';
 
 export default function LandingPage() {
   const [departments, setDepartments] = useState<any[]>([]);
@@ -78,25 +80,21 @@ export default function LandingPage() {
       <nav className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-rose-600 flex items-center justify-center font-bold text-white shadow-md shadow-rose-950">
-              C
-            </div>
+            <CeviLogo className="w-9 h-9" rounded="rounded-xl" />
             <span className="font-bold text-white tracking-tight text-lg">Cevi Schichtplan</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Cevi.DB Login Button */}
-            <a
-              href="/api/auth/cevidb/login"
-              className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-xs sm:text-sm font-medium px-3.5 py-2 rounded-lg transition"
-              title="Direkt mit deinem Cevi.DB Benutzerkonto einloggen"
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-xs sm:text-sm font-medium px-3.5 py-2 rounded-xl transition"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Login mit <span className="font-bold text-white">Cevi.DB</span>
-            </a>
+              <LogIn className="w-3.5 h-3.5 text-slate-400" />
+              <span>Anmelden</span>
+            </Link>
 
             <button
               onClick={() => setShowRegisterModal(true)}
-              className="inline-flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-medium px-3.5 py-2 rounded-lg shadow-sm transition"
+              className="inline-flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-medium px-3.5 py-2 rounded-xl shadow-sm transition"
             >
               <PlusCircle className="w-4 h-4" /> Abteilung anlegen
             </button>

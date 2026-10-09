@@ -131,6 +131,48 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       return { message: 'Erfolgreich aus der Schicht ausgetragen' };
     }
   );
+
+  // Meine Schichten abfragen
+  fastify.get(
+    '/api/shifts/my',
+    { preHandler: [fastify.authenticate] },
+    async (request) => {
+      const signups = await fastify.prisma.shiftSignup.findMany({
+        where: { userId: request.user.id },
+        include: {
+          shift: {
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  title: true,
+                  slug: true,
+                  department: { select: { name: true, slug: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { shift: { startTime: 'asc' } },
+      });
+
+      return signups.map((su) => ({
+        signupId: su.id,
+        shiftId: su.shift.id,
+        title: su.shift.title,
+        category: su.shift.category,
+        description: su.shift.description,
+        startTime: su.shift.startTime.toISOString(),
+        endTime: su.shift.endTime.toISOString(),
+        eventId: su.shift.event.id,
+        eventTitle: su.shift.event.title,
+        eventSlug: su.shift.event.slug,
+        departmentName: su.shift.event.department.name,
+        departmentSlug: su.shift.event.department.slug,
+        createdAt: su.createdAt.toISOString(),
+      }));
+    }
+  );
 };
 
 export default shiftRoutes;

@@ -27,6 +27,7 @@ model User {
   email         String             @unique
   passwordHash  String?
   ceviDbId      Int?               @unique
+  googleId      String?            @unique
   firstName     String
   lastName      String
   ceviName      String?

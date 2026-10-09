@@ -197,7 +197,193 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // 3. Normales Login mit Passwort
+  // 3. Google OAuth Login Redirect
+  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+  const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+
+  fastify.get<{ Querystring: { returnTo?: string } }>('/api/auth/google/login', async (request, reply) => {
+    if (!GOOGLE_CLIENT_ID) {
+      return reply.status(503).send({
+        error: 'Google Login ist noch nicht konfiguriert (GOOGLE_CLIENT_ID fehlt in der Umgebung)',
+      });
+    }
+
+    const host = request.headers.host || 'cevi-schichtplan.ch';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/auth/google/callback`;
+
+    const stateObj = {
+      token: crypto.randomBytes(16).toString('hex'),
+      returnTo: request.query.returnTo || (request.tenant ? `https://${request.tenant.slug}.${host}` : '/'),
+      tenantSlug: request.tenant?.slug || null,
+    };
+
+    const stateEncoded = Buffer.from(JSON.stringify(stateObj)).toString('base64url');
+
+    reply.setCookie('google_oauth_state', stateEncoded, {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 10,
+    });
+
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('scope', 'openid email profile');
+    authUrl.searchParams.set('state', stateEncoded);
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('prompt', 'select_account');
+
+    return reply.redirect(authUrl.toString());
+  });
+
+  // 4. Google OAuth Callback
+  fastify.get<{ Querystring: { code?: string; state?: string; error?: string } }>(
+    '/api/auth/google/callback',
+    async (request, reply) => {
+      const { code, state, error } = request.query;
+
+      if (error || !code) {
+        return reply.status(400).send({ error: error || 'OAuth-Code fehlt' });
+      }
+
+      const host = request.headers.host || 'cevi-schichtplan.ch';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/auth/google/callback`;
+
+      let returnTo = '/';
+      let tenantSlug: string | null = null;
+
+      try {
+        if (state) {
+          const parsedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+          returnTo = parsedState.returnTo || '/';
+          tenantSlug = parsedState.tenantSlug || null;
+        }
+      } catch (err) {
+        // Fallback
+      }
+
+      // Code gegen Tokens tauschen
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirectUri,
+          code,
+        }),
+      });
+
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text();
+        fastify.log.error(`Google Token-Abruf fehlgeschlagen: ${errText}`);
+        return reply.status(502).send({ error: 'Token-Abruf bei Google fehlgeschlagen' });
+      }
+
+      const tokenData = await tokenRes.json();
+
+      // Benutzerprofil von Google abrufen
+      const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!profileRes.ok) {
+        return reply.status(502).send({ error: 'Profilabruf bei Google fehlgeschlagen' });
+      }
+
+      const profile = await profileRes.json();
+      const googleId = profile.sub;
+      const email = (profile.email || `google_${googleId}@cevi-schichtplan.ch`).toLowerCase();
+      const firstName = profile.given_name || 'Helfer*in';
+      const lastName = profile.family_name || '';
+
+      // User in DB finden oder erstellen
+      let user = await fastify.prisma.user.findFirst({
+        where: {
+          OR: [{ googleId }, { email }],
+        },
+      });
+
+      if (!user) {
+        user = await fastify.prisma.user.create({
+          data: {
+            email,
+            googleId,
+            firstName,
+            lastName,
+          },
+        });
+      } else {
+        user = await fastify.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            googleId: googleId || user.googleId,
+            firstName: firstName || user.firstName,
+            lastName: lastName || user.lastName,
+          },
+        });
+      }
+
+      // Falls Subdomain aktiv, als Helfer der Abteilung eintragen
+      if (tenantSlug) {
+        const department = await fastify.prisma.department.findUnique({
+          where: { slug: tenantSlug },
+        });
+
+        if (department) {
+          const existingMember = await fastify.prisma.departmentMember.findUnique({
+            where: {
+              departmentId_userId: {
+                departmentId: department.id,
+                userId: user.id,
+              },
+            },
+          });
+
+          if (!existingMember) {
+            await fastify.prisma.departmentMember.create({
+              data: {
+                departmentId: department.id,
+                userId: user.id,
+                role: 'HELPER',
+              },
+            });
+          }
+        }
+      }
+
+      const token = fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        isGlobalAdmin: user.isGlobalAdmin,
+      });
+
+      reply.clearCookie('google_oauth_state', { path: '/' });
+      reply.setCookie('token', token, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+      });
+
+      return reply.redirect(returnTo);
+    }
+  );
+
+  // 5. Normales Login mit Passwort
   fastify.post('/api/auth/login', async (request, reply) => {
     const parse = LoginSchema.safeParse(request.body);
     if (!parse.success) {
