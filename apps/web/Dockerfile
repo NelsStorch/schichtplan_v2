@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
@@ -7,6 +7,7 @@ FROM base AS dependencies
 WORKDIR /app
 COPY package.json ./
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/ui/package.json ./packages/ui/
 COPY apps/web/package.json ./apps/web/
 RUN npm install
 
@@ -15,6 +16,7 @@ FROM base AS development
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY packages/shared ./packages/shared
+COPY packages/ui ./packages/ui
 COPY apps/web ./apps/web
 WORKDIR /app/apps/web
 EXPOSE 3000
@@ -26,6 +28,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY packages/shared ./packages/shared
+COPY packages/ui ./packages/ui
 COPY apps/web ./apps/web
 WORKDIR /app/packages/shared
 RUN npm run build

@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -13,9 +14,19 @@ import departmentRoutes from './routes/departments.js';
 import eventRoutes from './routes/events.js';
 import shiftRoutes from './routes/shifts.js';
 
+// pino-pretty ist optional: fehlt es (z. B. im Dev-Container), wird normal geloggt statt zu crashen.
+function hasPinoPretty(): boolean {
+  try {
+    createRequire(import.meta.url).resolve('pino-pretty');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: process.env.NODE_ENV === 'development' ? {
+    logger: process.env.NODE_ENV === 'development' && hasPinoPretty() ? {
       transport: {
         target: 'pino-pretty',
         options: {
