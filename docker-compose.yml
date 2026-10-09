@@ -48,7 +48,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
       # API Endpunkte haben Vorrang auf allen Domains, Login und Subdomains
-      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`login.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)) && (PathPrefix(`/api`) || Path(`/health`))"
+      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`login.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`illnau.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-api.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-api.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-api.priority=100"
@@ -76,8 +76,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
-      # Alle Abteilungs-Subdomains (z.B. uster.cevi-schichtplan.ch)
-      - "traefik.http.routers.schichtplan-web.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)"
+      # Alle Abteilungs-Subdomains (z.B. illnau.cevi-schichtplan.ch)
+      - "traefik.http.routers.schichtplan-web.rule=Host(`illnau.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN:-cevi-schichtplan.ch}`)"
       - "traefik.http.routers.schichtplan-web.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-web.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-web.priority=10"
