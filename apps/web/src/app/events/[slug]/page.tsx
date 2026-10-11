@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import type { ShiftDto, UserDto, SignupMode } from '@schichtplan/shared';
 import { DEFAULT_SHIFT_CATEGORIES } from '@schichtplan/shared';
-import { CeviLogo } from '@/components/CeviLogo';
+import { CeviLogo, fallbackToCeviLogo } from '@/components/CeviLogo';
 
 interface EventOrganizer {
   id: string;
@@ -515,6 +515,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                 {event.logoUrl ? (
                   <img
                     src={event.logoUrl}
+                    onError={fallbackToCeviLogo}
                     alt={event.title}
                     className="w-20 h-20 rounded-2xl object-cover bg-slate-950/80 border-2 border-slate-700/80 shadow-xl backdrop-blur-sm"
                   />

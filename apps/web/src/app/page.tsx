@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import type { DepartmentDto, EventDto, UserDto, SignupMode } from '@schichtplan/shared';
-import { CeviLogo } from '@/components/CeviLogo';
+import { CeviLogo, fallbackToCeviLogo } from '@/components/CeviLogo';
 
 const BANNER_PRESETS = [
   {
@@ -396,6 +396,7 @@ export default function DepartmentHomePage() {
                           {evt.logoUrl ? (
                             <img
                               src={evt.logoUrl}
+                              onError={fallbackToCeviLogo}
                               alt={evt.title}
                               className="w-9 h-9 rounded-xl object-cover border border-slate-700 shadow-md shrink-0"
                             />
