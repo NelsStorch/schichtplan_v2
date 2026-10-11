@@ -79,10 +79,11 @@ services:
       # Dynamische Abteilungs-Subdomains (alle beliebigen Subdomains wie illnau, wetzikon, uster, etc.)
       - "traefik.http.routers.schichtplan-web.rule=HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`)"
       - "traefik.http.routers.schichtplan-web.entrypoints=websecure"
-      - "traefik.http.routers.schichtplan-web.tls.certresolver=myresolver"
-      # Traefik leitet aus HostRegexp keine Zertifikats-Domains ab. Mit TLS-ALPN-01 (myresolver) muss jede
-      # Abteilung hier explizit stehen (weitere kommagetrennt in sans). Für *.${DOMAIN} braucht es DNS-01.
-      - "traefik.http.routers.schichtplan-web.tls.domains[0].main=illnau.${DOMAIN:-cevi-schichtplan.ch}"
+      # Traefik leitet aus HostRegexp keine Zertifikats-Domains ab, deshalb explizit ein Wildcard-Zertifikat.
+      # Wildcards gibt es nur via DNS-01: dnsresolver im zentralen Traefik (Infomaniak-API-Token).
+      - "traefik.http.routers.schichtplan-web.tls.certresolver=dnsresolver"
+      - "traefik.http.routers.schichtplan-web.tls.domains[0].main=${DOMAIN:-cevi-schichtplan.ch}"
+      - "traefik.http.routers.schichtplan-web.tls.domains[0].sans=*.${DOMAIN:-cevi-schichtplan.ch}"
       - "traefik.http.routers.schichtplan-web.priority=10"
       - "traefik.http.routers.schichtplan-web.service=schichtplan-web"
       - "traefik.http.services.schichtplan-web.loadbalancer.server.port=3000"
