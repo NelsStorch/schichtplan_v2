@@ -1,0 +1,50 @@
+import { useEffect, useState } from 'react';
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message);
+  }
+}
+
+/** fetch-Wrapper: wirft ApiError mit der Fehlermeldung des Backends. */
+export async function api<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+  const { json, ...rest } = init ?? {};
+  const res = await fetch(path, {
+    ...rest,
+    headers: json !== undefined ? { 'Content-Type': 'application/json', ...rest.headers } : rest.headers,
+    body: json !== undefined ? JSON.stringify(json) : rest.body,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(data?.error || data?.message || 'Etwas ist schiefgelaufen', res.status);
+  }
+  return data as T;
+}
+
+export const errorMessage = (err: unknown) =>
+  err instanceof Error ? err.message : 'Etwas ist schiefgelaufen';
+
+/**
+ * Login-URL für gerenderte Links: zuerst "/login" (identisch auf Server und Client),
+ * nach dem Mount die echte SSO-URL mit Rücksprung auf die aktuelle Seite.
+ */
+export function useLoginHref() {
+  const [href, setHref] = useState('/login');
+  useEffect(() => setHref(loginUrl()), []);
+  return href;
+}
+
+/** Zentrales SSO-Login (login.<domain>) mit Rücksprung auf die aktuelle Seite. */
+export function loginUrl(returnTo?: string) {
+  if (typeof window === 'undefined') return '/login';
+  const target = encodeURIComponent(returnTo || window.location.href);
+  const { hostname, protocol } = window.location;
+  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1') {
+    return `http://localhost:3002/?return_to=${target}`;
+  }
+  const rootDomain = hostname.split('.').slice(-2).join('.');
+  return `${protocol}//login.${rootDomain}/?return_to=${target}`;
+}

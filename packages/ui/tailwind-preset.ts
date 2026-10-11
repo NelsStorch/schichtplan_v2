@@ -215,6 +215,10 @@ const preset = {
           outline: '2px solid rgb(var(--accent))',
           outlineOffset: '2px',
         },
+        '*': {
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgb(var(--line-strong)) transparent',
+        },
         // Einheitliche Icon-Strichstärke für lucide-react
         'svg.lucide': { strokeWidth: '1.75' },
         '@media (prefers-reduced-motion: reduce)': {
@@ -249,9 +253,9 @@ const preset = {
             inset: '0',
             zIndex: '70',
             pointerEvents: 'none',
-            opacity: '0.035',
+            // Bewusst ohne mix-blend-mode: Blending einer fixen Vollbild-Ebene kostet bei jedem Scroll-Frame
+            opacity: '0.03',
             backgroundImage: grain,
-            mixBlendMode: 'overlay',
           },
         },
         '.skeleton': {

@@ -21,7 +21,6 @@ export {
 } from './components/Feedback';
 export {
   Avatar,
-  CeviLogo,
   EmptyState,
   ProgressRing,
   Skeleton,
@@ -31,3 +30,4 @@ export {
   type ProgressRingProps,
   type SlotStatus,
 } from './components/Display';
+export { CeviLogo } from './components/CeviLogo';

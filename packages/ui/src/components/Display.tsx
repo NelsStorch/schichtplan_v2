@@ -193,26 +193,3 @@ export function EmptyState({
     </div>
   );
 }
-
-/* ---------------------------------------------------------------- CeviLogo */
-
-const logoSizes = { sm: 'size-8', md: 'size-12', lg: 'size-16', xl: 'size-20' };
-
-export function CeviLogo({
-  className,
-  size = 'md',
-  logoUrl,
-  alt = 'Cevi Logo',
-}: {
-  className?: string;
-  size?: keyof typeof logoSizes;
-  logoUrl?: string | null;
-  alt?: string;
-}) {
-  return (
-    <span className={cn('relative inline-flex shrink-0 select-none items-center justify-center', className ?? logoSizes[size])}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logoUrl || '/images/cevi-logo.svg'} alt={alt} className="size-full object-contain" />
-    </span>
-  );
-}

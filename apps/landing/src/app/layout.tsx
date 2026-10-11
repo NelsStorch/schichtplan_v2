@@ -1,9 +1,10 @@
 import './globals.css';
+import { fontVariables } from '@schichtplan/ui/fonts';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Cevi Schichtplan - Die moderne Plattform für deine Abteilung',
-  description: 'Schichtpläne für Chilbi, Lager & Cevi-Tage einfach online organisieren.',
+  title: 'Cevi Schichtplan · Ehrenamtliche Schichtplanung für Cevi-Abteilungen',
+  description: 'Freiwilligeneinsätze an Chilbi, PfiLa und Lagern ohne Excel-Chaos organisieren. Jede Cevi-Abteilung auf ihrer eigenen Subdomain mit Cevi.DB Login.',
 };
 
 export default function RootLayout({
@@ -12,11 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="de" className="dark">
+    <html lang="de" className={`dark ${fontVariables}`} data-theme="dark">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased flex flex-col selection:bg-rose-500 selection:text-white">
+      <body className="min-h-[100dvh] bg-canvas text-fg antialiased flex flex-col selection:bg-accent selection:text-white grain">
         {children}
       </body>
     </html>

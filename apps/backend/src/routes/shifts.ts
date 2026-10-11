@@ -148,7 +148,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
-        const parse = SignupShiftSchema.safeParse(request.body);
+        // shiftId kommt aus der URL, nicht aus dem Body
+        const parse = SignupShiftSchema.safeParse({ ...(request.body as object), shiftId });
         if (!parse.success) {
           return reply.status(400).send({ error: parse.error.issues[0].message });
         }

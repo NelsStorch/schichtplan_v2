@@ -5,6 +5,9 @@
   "description": "Cevi Schichtplan Design-System: Tokens, Tailwind-Preset und React-Komponenten",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo @schichtplan/ui ready"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./fonts": "./src/fonts.ts",

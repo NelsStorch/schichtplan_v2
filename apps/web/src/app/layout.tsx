@@ -1,24 +1,35 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { FeedbackProvider, ThemeScript } from '@schichtplan/ui';
+import { fontVariables } from '@schichtplan/ui/fonts';
+import { PortalProvider } from '@/lib/portal';
 
 export const metadata: Metadata = {
-  title: 'Cevi Schichtplan',
-  description: 'Schichtplan-Verwaltung für Cevi-Events',
+  title: { default: 'Cevi Schichtplan', template: '%s · Cevi Schichtplan' },
+  description: 'Schichten für Chilbi, Lager und Cevi-Anlässe: anschauen, eintragen, fertig.',
   manifest: '/manifest.json',
+  appleWebApp: { capable: true, title: 'Schichtplan', statusBarStyle: 'black-translucent' },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Kein maximum-scale/user-scalable: Zoomen muss möglich bleiben (Barrierefreiheit).
+// Das iOS-Auto-Zoom auf Inputs verhindern stattdessen 16px-Schriftgrössen in Feldern.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#e11d48',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="de" className="dark">
+    <html lang="de-CH" className={fontVariables} suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+        <ThemeScript />
       </head>
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased flex flex-col selection:bg-rose-500 selection:text-white">
-        {children}
+      <body className="min-h-[100dvh]">
+        <FeedbackProvider>
+          <PortalProvider>{children}</PortalProvider>
+        </FeedbackProvider>
       </body>
     </html>
   );
