@@ -1,28 +1,56 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { ArrowLeft, ArrowUpRight, ChevronRight, KeyRound, UserRound } from 'lucide-react';
 import {
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Sparkles,
-  ShieldCheck,
-  UserCheck,
-  KeyRound,
-  Calendar,
-  Phone,
-  User,
-} from 'lucide-react';
-import { CeviLogo } from '@/components/CeviLogo';
+  Button,
+  Callout,
+  CeviLogo,
+  Field,
+  Input,
+  ThemeToggle,
+  buttonClasses,
+  cn,
+} from '@schichtplan/ui';
+import { safeReturnTo } from '@schichtplan/shared/redirect';
+
+type View = 'start' | 'ceviname' | 'password';
+
+// Fehlercodes, mit denen das Backend nach einem gescheiterten Cevi.DB-Login hierher zurückleitet
+const loginErrors: Record<string, string> = {
+  cevidb_unavailable:
+    'Die Anmeldung mit Cevi.DB ist im Moment nicht verfügbar. Melde dich bitte mit Cevi-Name oder E-Mail an.',
+  cevidb_denied: 'Die Anmeldung bei Cevi.DB wurde abgebrochen.',
+  cevidb_failed: 'Die Anmeldung mit Cevi.DB hat nicht geklappt. Bitte versuche es nochmals.',
+};
+
+/** Weiterleitungsziel nur auf der eigenen Domain zulassen (login.<domain> → <domain> und Subdomains). */
+function cleanReturnTo(raw: string | null): string {
+  if (typeof window === 'undefined') return '/';
+  const host = window.location.hostname;
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  return safeReturnTo(raw, host.replace(/^login\./, ''), { allowLocalhost: isLocal });
+}
+
+/** Hostname des Ziels (z. B. illnau.cevi-schichtplan.ch), damit sichtbar ist, wohin es nach dem Login geht. */
+function destinationHost(returnTo: string): string | null {
+  try {
+    return new URL(returnTo).host || null;
+  } catch {
+    return null;
+  }
+}
 
 function LoginContent() {
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get('return_to') || '/';
+  const returnTo = cleanReturnTo(searchParams.get('return_to'));
+  const destination = destinationHost(returnTo);
 
-  const [activeTab, setActiveTab] = useState<'ceviname' | 'cevidb' | 'password'>('ceviname');
+  const [view, setView] = useState<View>('start');
+  const [redirecting, setRedirecting] = useState(false);
 
-  // Cevi-Name Quick Login State
+  // Cevi-Name
   const [quickCeviName, setQuickCeviName] = useState('');
   const [quickFirstName, setQuickFirstName] = useState('');
   const [quickLastName, setQuickLastName] = useState('');
@@ -30,7 +58,7 @@ function LoginContent() {
   const [quickPhone, setQuickPhone] = useState('');
   const [showQuickDetails, setShowQuickDetails] = useState(false);
 
-  // Email/Password State
+  // E-Mail & Passwort
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,10 +68,33 @@ function LoginContent() {
   const [regPhone, setRegPhone] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    () => loginErrors[searchParams.get('error') ?? ''] ?? null
+  );
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Quick Cevi-Name Submit
+  // Fehlercode aus der Adresse entfernen, damit er nach einem Neuladen nicht erneut erscheint
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('error')) {
+      url.searchParams.delete('error');
+      window.history.replaceState(null, '', url);
+    }
+  }, []);
+
+  // Zurück-Navigation aus Cevi.DB stellt die Seite aus dem bfcache wieder her: Ladezustand zurücksetzen
+  useEffect(() => {
+    const reset = () => setRedirecting(false);
+    window.addEventListener('pageshow', reset);
+    return () => window.removeEventListener('pageshow', reset);
+  }, []);
+
+  const goTo = (next: View) => {
+    setView(next);
+    setError(null);
+    setSuccess(null);
+  };
+
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -64,15 +115,16 @@ function LoginContent() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.requiresPassword) {
-          setActiveTab('password');
+          setView('password');
+          setAuthMode('login');
         }
-        throw new Error(data.error || 'Anmeldung fehlgeschlagen');
+        throw new Error(data.error || 'Anmeldung fehlgeschlagen. Bitte versuche es nochmals.');
       }
 
-      setSuccess(`Willkommen, ${data.user.ceviName || data.user.firstName}! Weiterleitung...`);
+      setSuccess(`Hallo ${data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
       setTimeout(() => {
         window.location.href = data.redirectUrl || returnTo;
       }, 700);
@@ -83,7 +135,6 @@ function LoginContent() {
     }
   };
 
-  // Email / Password Submit
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -110,15 +161,15 @@ function LoginContent() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Aktion fehlgeschlagen');
+        throw new Error(data.error || (authMode === 'login' ? 'Anmeldung fehlgeschlagen. Bitte versuche es nochmals.' : 'Konto konnte nicht erstellt werden. Bitte versuche es nochmals.'));
       }
 
       setSuccess(
         authMode === 'login'
-          ? `Angemeldet! Weiterleitung...`
-          : 'Konto erstellt! Weiterleitung...'
+          ? 'Angemeldet. Du wirst weitergeleitet …'
+          : 'Konto erstellt. Du wirst weitergeleitet …'
       );
       setTimeout(() => {
         window.location.href = returnTo;
@@ -132,367 +183,351 @@ function LoginContent() {
 
   const cevidbAuthUrl = `/api/auth/cevidb/login?returnTo=${encodeURIComponent(returnTo)}`;
 
+  const feedback = (
+    <>
+      {error && (
+        <Callout tone="danger" className="animate-fade-in">
+          {error}
+        </Callout>
+      )}
+      {success && (
+        <Callout tone="success" className="animate-fade-in">
+          {success}
+        </Callout>
+      )}
+    </>
+  );
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 py-8">
-      {/* Back button */}
-      <div className="w-full max-w-lg mb-4 flex items-center justify-between">
-        <a
-          href={returnTo}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white transition"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Zurück zum Schichtplan
-        </a>
-        <span className="text-xs text-slate-600">login.cevi-schichtplan.ch</span>
-      </div>
+    <div className="grain flex min-h-[100dvh] flex-col">
+      {/* Feiner Schein von oben, sonst ruhige Fläche */}
+      <div aria-hidden className="bg-campfire pointer-events-none fixed inset-x-0 top-0 h-[60vh] opacity-70" />
 
-      <div className="w-full max-w-lg bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 backdrop-blur-md">
-        {/* Header */}
-        <div className="flex flex-col items-center text-center mb-6">
-          <CeviLogo className="w-16 h-16 mb-3" />
-          <h1 className="text-2xl font-bold text-white tracking-tight">Cevi Schichtplan</h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Zentrales Single Sign-On für alle Cevi-Abteilungen & Events
-          </p>
-        </div>
+      <header className="relative mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
+        <span className="flex items-center gap-2.5">
+          <CeviLogo className="size-8" alt="" />
+          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">
+            Cevi Schichtplan
+          </span>
+        </span>
+        <ThemeToggle />
+      </header>
 
-        {/* Tab Selection */}
-        <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800/80 mb-6 text-xs">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('ceviname');
-              setError(null);
-            }}
-            className={`py-2 px-2 rounded-xl font-medium transition flex items-center justify-center gap-1.5 ${
-              activeTab === 'ceviname'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-950/50'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Cevi-Name</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('cevidb');
-              setError(null);
-            }}
-            className={`py-2 px-2 rounded-xl font-medium transition flex items-center justify-center gap-1.5 ${
-              activeTab === 'cevidb'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/50'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Cevi.DB</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('password');
-              setError(null);
-            }}
-            className={`py-2 px-2 rounded-xl font-medium transition flex items-center justify-center gap-1.5 ${
-              activeTab === 'password'
-                ? 'bg-slate-800 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <KeyRound className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Passwort</span>
-          </button>
-        </div>
-
-        {/* Error / Success Notifications */}
-        {error && (
-          <div className="mb-5 p-3.5 rounded-xl bg-rose-950/50 border border-rose-800/60 text-rose-300 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-5 p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-emerald-300 text-xs flex items-start gap-2.5">
-            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{success}</span>
-          </div>
-        )}
-
-        {/* TAB 1: Cevi-Name Schnell-Login (Passwortlos für Chilbi / Helfer) */}
-        {activeTab === 'ceviname' && (
-          <form onSubmit={handleQuickSubmit} className="space-y-4">
-            <div className="p-3 bg-rose-950/20 border border-rose-900/30 rounded-xl text-xs text-rose-200/90 leading-relaxed">
-              <strong>Passwortlose Schnell-Anmeldung:</strong> Ideal für Chilbi-Helfer, Eltern und
-              Ehemalige. Dein Profil wird sicher gespeichert.
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Cevi-Name oder Vorname *
-              </label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                <input
-                  type="text"
-                  required
-                  value={quickCeviName}
-                  onChange={(e) => setQuickCeviName(e.target.value)}
-                  placeholder="Dein Cevi-Name"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition"
-                />
-              </div>
-            </div>
-
-            {/* Geburtsdatum für Altersrichtlinien */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  Geburtsdatum
-                </label>
-                <span className="text-[11px] text-slate-500">Für Schichten mit Altersgrenze (z. B. Bar ab 18)</span>
-              </div>
-              <input
-                type="date"
-                value={quickBirthDate}
-                onChange={(e) => setQuickBirthDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none transition"
-              />
-            </div>
-
-            {/* Optional details toggle */}
-            {!showQuickDetails ? (
-              <button
-                type="button"
-                onClick={() => setShowQuickDetails(true)}
-                className="text-xs text-slate-400 hover:text-slate-200 transition underline underline-offset-2"
-              >
-                + Vor-/Nachname & Handynummer angeben (optional)
-              </button>
+      <main
+        id="inhalt"
+        className="relative mx-auto flex w-full max-w-[25rem] flex-1 flex-col justify-center px-5 pb-16 pt-6 sm:pt-0"
+      >
+        {view === 'start' && (
+          <div key="start" className="animate-fade-up">
+            <h1 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight text-fg text-balance">
+              Anmelden
+            </h1>
+            {destination ? (
+              <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
+                Danach geht es weiter zu{' '}
+                <span className="whitespace-nowrap font-medium text-fg">{destination}</span>.
+              </p>
             ) : (
-              <div className="space-y-3 pt-2 border-t border-slate-800/80">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Vorname</label>
-                    <input
-                      type="text"
-                      value={quickFirstName}
-                      onChange={(e) => setQuickFirstName(e.target.value)}
-                      placeholder="Vorname"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Nachname</label>
-                    <input
-                      type="text"
-                      value={quickLastName}
-                      onChange={(e) => setQuickLastName(e.target.value)}
-                      placeholder="Nachname"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-slate-500" />
-                    Handynummer (für Schicht-Notfälle)
-                  </label>
-                  <input
-                    type="tel"
-                    value={quickPhone}
-                    onChange={(e) => setQuickPhone(e.target.value)}
-                    placeholder="+41 79 000 00 00"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                  />
-                </div>
-              </div>
+              <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
+                Ein Login für alle Abteilungen und Anlässe.
+              </p>
             )}
 
-            <button
-              type="submit"
-              disabled={loading || !quickCeviName.trim()}
-              className="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition shadow-lg shadow-rose-950/50 text-sm flex items-center justify-center gap-2 mt-4"
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>{loading ? 'Wird angemeldet...' : 'Weiter zum Schichtplan'}</span>
-            </button>
-          </form>
-        )}
-
-        {/* TAB 2: Cevi.DB (Hitobito) */}
-        {activeTab === 'cevidb' && (
-          <div className="space-y-5 py-2">
-            <div className="p-4 bg-emerald-950/20 border border-emerald-900/40 rounded-2xl text-xs text-emerald-200/90 leading-relaxed space-y-2">
-              <div className="font-semibold text-emerald-300 text-sm flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" />
-                Offizieller Cevi-Leiter Login
-              </div>
-              <p>
-                Mit deinem bestehenden Cevi.DB Konto (Hitobito) anmelden. Deine Abteilung, dein
-                Cevi-Name und dein Geburtsdatum werden automatisch synchronisiert.
+            <div className="mt-9 space-y-3">
+              {feedback}
+              <a
+                href={cevidbAuthUrl}
+                onClick={() => setRedirecting(true)}
+                aria-busy={redirecting || undefined}
+                className={buttonClasses({
+                  size: 'lg',
+                  className: cn('w-full justify-between', redirecting && 'pointer-events-none opacity-80'),
+                })}
+              >
+                <span>{redirecting ? 'Weiterleitung zu Cevi.DB …' : 'Mit Cevi.DB anmelden'}</span>
+                {redirecting ? (
+                  <span
+                    aria-hidden
+                    className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+                  />
+                ) : (
+                  <ArrowUpRight />
+                )}
+              </a>
+              <p className="px-1 text-[13px] leading-relaxed text-fg-subtle">
+                Du meldest dich auf <span className="font-mono text-fg-muted">db.cevi.ch</span> an
+                und kommst danach automatisch hierher zurück.
               </p>
             </div>
 
-            <a
-              href={cevidbAuthUrl}
-              className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white py-3.5 px-4 rounded-xl text-sm font-semibold transition shadow-lg shadow-emerald-950/50 group"
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-white group-hover:scale-125 transition-transform"></span>
-              <span>1-Klick Login mit Cevi.DB</span>
-            </a>
-
-            <div className="text-center text-xs text-slate-500">
-              Du wirst zur Authentifizierung an <code className="text-slate-400">db.cevi.ch</code>{' '}
-              weitergeleitet.
+            <div className="my-9 flex items-center gap-4 text-xs text-fg-subtle">
+              <span className="h-px flex-1 bg-line" />
+              <span>oder</span>
+              <span className="h-px flex-1 bg-line" />
             </div>
+
+            <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface/70">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => goTo('ceviname')}
+                  className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
+                    <UserRound className="size-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-fg">Mit Cevi-Name</span>
+                    <span className="mt-0.5 block text-[13px] leading-snug text-fg-subtle">
+                      Ohne Passwort, für Helfer*innen, Eltern und Ehemalige
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => goTo('password')}
+                  className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
+                    <KeyRound className="size-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-fg">Mit E-Mail und Passwort</span>
+                    <span className="mt-0.5 block text-[13px] leading-snug text-fg-subtle">
+                      Anmelden oder Konto erstellen
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                </button>
+              </li>
+            </ul>
           </div>
         )}
 
-        {/* TAB 3: E-Mail & Passwort */}
-        {activeTab === 'password' && (
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs mb-3">
-              <button
-                type="button"
-                onClick={() => setAuthMode('login')}
-                className={`flex-1 py-1.5 rounded-lg font-medium transition ${
-                  authMode === 'login' ? 'bg-slate-800 text-white' : 'text-slate-400'
-                }`}
+        {view !== 'start' && (
+          <button
+            type="button"
+            onClick={() => goTo('start')}
+            className="-ml-2 mb-6 inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-medium text-fg-muted transition hover:text-fg"
+          >
+            <ArrowLeft className="size-4" />
+            Alle Anmeldeoptionen
+          </button>
+        )}
+
+        {view === 'ceviname' && (
+          <form key="ceviname" onSubmit={handleQuickSubmit} className="animate-fade-up">
+            <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
+              Mit Cevi-Name anmelden
+            </h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
+              Kein Passwort nötig.
+            </p>
+
+            <div className="mt-8 space-y-5">
+              {feedback}
+
+              <Field label="Cevi-Name oder Vorname" required>
+                <Input
+                  type="text"
+                  value={quickCeviName}
+                  onChange={(e) => setQuickCeviName(e.target.value)}
+                  autoComplete="nickname"
+                  autoFocus
+                  minLength={2}
+                />
+              </Field>
+
+              <Field
+                label="Geburtsdatum"
+                hint="Nur nötig für Schichten mit Altersgrenze, z. B. an der Bar."
               >
-                Anmelden
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode('register')}
-                className={`flex-1 py-1.5 rounded-lg font-medium transition ${
-                  authMode === 'register' ? 'bg-slate-800 text-white' : 'text-slate-400'
-                }`}
+                <Input
+                  type="date"
+                  value={quickBirthDate}
+                  onChange={(e) => setQuickBirthDate(e.target.value)}
+                  autoComplete="bday"
+                />
+              </Field>
+
+              {showQuickDetails ? (
+                <div className="animate-fade-in space-y-5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Vorname">
+                      <Input
+                        type="text"
+                        value={quickFirstName}
+                        onChange={(e) => setQuickFirstName(e.target.value)}
+                        autoComplete="given-name"
+                      />
+                    </Field>
+                    <Field label="Nachname">
+                      <Input
+                        type="text"
+                        value={quickLastName}
+                        onChange={(e) => setQuickLastName(e.target.value)}
+                        autoComplete="family-name"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Handynummer" hint="Für Notfälle während deiner Schicht.">
+                    <Input
+                      type="tel"
+                      value={quickPhone}
+                      onChange={(e) => setQuickPhone(e.target.value)}
+                      autoComplete="tel"
+                      placeholder="+41 79 000 00 00"
+                    />
+                  </Field>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowQuickDetails(true)}
+                  className="text-[13px] font-medium text-accent-ink underline-offset-4 transition hover:underline"
+                >
+                  Vor-, Nachname und Handynummer ergänzen
+                </button>
+              )}
+
+              <Button
+                type="submit"
+                size="lg"
+                loading={loading}
+                disabled={!quickCeviName.trim() || !!success}
+                className="w-full"
               >
-                Registrieren
-              </button>
+                Weiter
+              </Button>
             </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                E-Mail-Adresse
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="beispiel@cevi.ch"
-                className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Passwort</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition"
-              />
-            </div>
-
-            {authMode === 'register' && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Vorname *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={regFirstName}
-                      onChange={(e) => setRegFirstName(e.target.value)}
-                      placeholder="Vorname"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Nachname *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={regLastName}
-                      onChange={(e) => setRegLastName(e.target.value)}
-                      placeholder="Nachname"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Cevi-Name (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={regCeviName}
-                    onChange={(e) => setRegCeviName(e.target.value)}
-                    placeholder="Dein Cevi-Name"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Telefonnummer (optional)
-                  </label>
-                  <input
-                    type="tel"
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    placeholder="+41 79 000 00 00"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white outline-none"
-                  />
-                </div>
-              </>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 mt-4"
-            >
-              <span>
-                {loading
-                  ? 'Bitte warten...'
-                  : authMode === 'login'
-                  ? 'Mit Passwort anmelden'
-                  : 'Konto erstellen'}
-              </span>
-            </button>
           </form>
         )}
-      </div>
 
-      <div className="mt-8 text-center text-xs text-slate-500">
-        &copy; {new Date().getFullYear()} Cevi Schichtplan &middot; Sicher & DSGVO-konform
-      </div>
+        {view === 'password' && (
+          <form key="password" onSubmit={handlePasswordSubmit} className="animate-fade-up">
+            <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
+              {authMode === 'login' ? 'Mit E-Mail anmelden' : 'Konto erstellen'}
+            </h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
+              {authMode === 'login' ? 'Noch kein Konto? ' : 'Schon ein Konto? '}
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode(authMode === 'login' ? 'register' : 'login');
+                  setError(null);
+                }}
+                className="font-medium text-accent-ink underline-offset-4 hover:underline"
+              >
+                {authMode === 'login' ? 'Konto erstellen' : 'Anmelden'}
+              </button>
+            </p>
+
+            <div className="mt-8 space-y-5">
+              {feedback}
+
+              {authMode === 'register' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Vorname" required>
+                    <Input
+                      type="text"
+                      value={regFirstName}
+                      onChange={(e) => setRegFirstName(e.target.value)}
+                      autoComplete="given-name"
+                      minLength={2}
+                    />
+                  </Field>
+                  <Field label="Nachname" required>
+                    <Input
+                      type="text"
+                      value={regLastName}
+                      onChange={(e) => setRegLastName(e.target.value)}
+                      autoComplete="family-name"
+                      minLength={2}
+                    />
+                  </Field>
+                </div>
+              )}
+
+              <Field label="E-Mail" required>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  autoFocus
+                />
+              </Field>
+
+              <Field
+                label="Passwort"
+                required
+                hint={authMode === 'register' ? 'Mindestens 8 Zeichen.' : undefined}
+              >
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                  minLength={authMode === 'register' ? 8 : undefined}
+                />
+              </Field>
+
+              {authMode === 'register' && (
+                <>
+                  <Field label="Cevi-Name">
+                    <Input
+                      type="text"
+                      value={regCeviName}
+                      onChange={(e) => setRegCeviName(e.target.value)}
+                      autoComplete="nickname"
+                    />
+                  </Field>
+                  <Field label="Handynummer">
+                    <Input
+                      type="tel"
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      autoComplete="tel"
+                      placeholder="+41 79 000 00 00"
+                    />
+                  </Field>
+                </>
+              )}
+
+              <Button
+                type="submit"
+                size="lg"
+                loading={loading}
+                disabled={!!success}
+                className="w-full"
+              >
+                {authMode === 'login' ? 'Anmelden' : 'Konto erstellen'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </main>
+
+      <footer className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-fg-subtle sm:px-8">
+        <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
+        <a
+          href={returnTo}
+          className="inline-flex items-center gap-1.5 font-medium text-fg-muted transition hover:text-fg"
+        >
+          <ArrowLeft className="size-3.5" />
+          Ohne Anmeldung zurück
+        </a>
+      </footer>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
-          Laden...
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="min-h-[100dvh] bg-canvas" />}>
       <LoginContent />
     </Suspense>
   );
