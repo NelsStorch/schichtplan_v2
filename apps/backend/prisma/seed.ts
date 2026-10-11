@@ -3,22 +3,18 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+// Der Seed läuft bei jedem Deploy (deploy.ps1): nur fehlende Musterdaten anlegen, nie bestehende
+// überschreiben (update: {}) oder löschen, sonst gehen Einstellungen, Passwörter und Anmeldungen verloren.
 async function main() {
   console.log('Seede Cevi Schichtplan V2 Datenbank...');
 
   // 1. Abteilung: Cevi Illnau
   const department = await prisma.department.upsert({
     where: { slug: 'illnau' },
-    update: {
-      name: 'Cevi Illnau-Effretikon',
-      logoUrl: '/logos/cevi-illnau.png',
-      primaryColor: '#e11d48',
-      contactEmail: 'info@cevi-illnau.ch',
-    },
+    update: {},
     create: {
       name: 'Cevi Illnau-Effretikon',
       slug: 'illnau',
-      logoUrl: '/logos/cevi-illnau.png',
       primaryColor: '#e11d48',
       contactEmail: 'info@cevi-illnau.ch',
     },
@@ -31,15 +27,7 @@ async function main() {
 
   const adminInferno = await prisma.user.upsert({
     where: { email: 'inferno@cevi-illnau.ch' },
-    update: {
-      firstName: 'Nels',
-      lastName: 'Storch',
-      ceviName: 'Inferno',
-      birthDate: new Date('1998-05-12'),
-      phone: '+41 79 123 45 67',
-      isGlobalAdmin: true,
-      passwordHash: defaultPasswordHash,
-    },
+    update: {},
     create: {
       email: 'inferno@cevi-illnau.ch',
       firstName: 'Nels',
@@ -59,7 +47,7 @@ async function main() {
         userId: adminInferno.id,
       },
     },
-    update: { role: 'ADMIN' },
+    update: {},
     create: {
       departmentId: department.id,
       userId: adminInferno.id,
@@ -100,13 +88,7 @@ async function main() {
   for (const h of helpersData) {
     const user = await prisma.user.upsert({
       where: { email: h.email },
-      update: {
-        firstName: h.firstName,
-        lastName: h.lastName,
-        ceviName: h.ceviName,
-        birthDate: h.birthDate,
-        passwordHash: defaultPasswordHash,
-      },
+      update: {},
       create: {
         email: h.email,
         firstName: h.firstName,
@@ -124,7 +106,7 @@ async function main() {
           userId: user.id,
         },
       },
-      update: { role: 'HELPER' },
+      update: {},
       create: {
         departmentId: department.id,
         userId: user.id,
@@ -144,18 +126,7 @@ async function main() {
         slug: 'chilbi-2026',
       },
     },
-    update: {
-      title: 'Chilbi Illnau 2026',
-      description:
-        'Der legendäre Cevi-Grill- & Chnoblibrotstand an der Illnauer Chilbi! Hilf mit und unterstütze unsere Abteilung.',
-      startDate: new Date('2026-10-16T16:00:00Z'),
-      endDate: new Date('2026-10-18T22:00:00Z'),
-      logoUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=200&auto=format&fit=crop',
-      bannerUrl: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=1200&auto=format&fit=crop',
-      isPublished: true,
-      allowPublicSignup: true,
-      signupMode: 'NAME_ONLY',
-    },
+    update: {},
     create: {
       departmentId: department.id,
       title: 'Chilbi Illnau 2026',
@@ -180,7 +151,7 @@ async function main() {
         userId: adminInferno.id,
       },
     },
-    update: { role: 'OK_LEAD', roleTitle: 'OK-Präsident' },
+    update: {},
     create: {
       eventId: chilbi.id,
       userId: adminInferno.id,
@@ -196,7 +167,7 @@ async function main() {
         userId: helperUsers[0].id,
       },
     },
-    update: { role: 'OK_MEMBER', roleTitle: 'Bau & Grillchef' },
+    update: {},
     create: {
       eventId: chilbi.id,
       userId: helperUsers[0].id,
@@ -213,16 +184,7 @@ async function main() {
         slug: 'sola-2026',
       },
     },
-    update: {
-      title: 'Sommerlager 2026 - Abenteuer im Zelt',
-      description:
-        'Das Sommerlager des Cevi Illnau. Unterstützung gesucht für Vortrupp, Küche und Rücktransport.',
-      startDate: new Date('2026-07-11T08:00:00Z'),
-      endDate: new Date('2026-07-18T18:00:00Z'),
-      isPublished: true,
-      allowPublicSignup: true,
-      signupMode: 'LOGIN_REQUIRED',
-    },
+    update: {},
     create: {
       departmentId: department.id,
       title: 'Sommerlager 2026 - Abenteuer im Zelt',
@@ -239,13 +201,11 @@ async function main() {
 
   console.log(`Events angelegt: ${chilbi.title}, ${sola.title}`);
 
-  // 5. Schichten für Chilbi Illnau (Bestehende bereinigen vor Neuanlage)
-  await prisma.shiftSignup.deleteMany({
-    where: { shift: { eventId: chilbi.id } },
-  });
-  await prisma.shift.deleteMany({
-    where: { eventId: chilbi.id },
-  });
+  // 5. Schichten für Chilbi Illnau (nur beim ersten Seed: echte Schichten & Anmeldungen bleiben unangetastet)
+  if ((await prisma.shift.count({ where: { eventId: chilbi.id } })) > 0) {
+    console.log('Chilbi hat bereits Schichten, Beispielschichten werden übersprungen.');
+    return;
+  }
 
   const shiftsData = [
     {
