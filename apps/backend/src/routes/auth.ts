@@ -1,7 +1,12 @@
 import { FastifyPluginAsync, FastifyReply } from 'fastify';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { LoginSchema, RegisterHelperSchema, CeviNameQuickLoginSchema } from '@schichtplan/shared';
+import {
+  LoginSchema,
+  RegisterHelperSchema,
+  CeviNameQuickLoginSchema,
+  safeReturnTo,
+} from '@schichtplan/shared';
 
 function getCookieDomain(): string | undefined {
   if (process.env.COOKIE_DOMAIN) {
@@ -26,6 +31,24 @@ function setAuthCookie(reply: FastifyReply, token: string) {
   });
 }
 
+// Eigene Domain (auch Staging), auf die nach dem Login weitergeleitet werden darf
+function rootDomain(): string {
+  return (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+}
+
+function cleanReturnTo(value: unknown, fallback = '/'): string {
+  return safeReturnTo(value, rootDomain(), {
+    allowLocalhost: process.env.NODE_ENV !== 'production',
+    fallback,
+  });
+}
+
+/** Zurück zur Login-Seite mit Fehlercode, statt rohes JSON im Browser anzuzeigen. */
+function loginErrorUrl(code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_failed', returnTo: string) {
+  const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
+  return `${base}/?error=${code}&return_to=${encodeURIComponent(returnTo)}`;
+}
+
 function clearAuthCookie(reply: FastifyReply) {
   const domain = getCookieDomain();
   reply.clearCookie('token', {
@@ -43,22 +66,24 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Querystring: { returnTo?: string; tenantSlug?: string } }>(
     '/api/auth/cevidb/login',
     async (request, reply) => {
-      if (!CEVIDB_CLIENT_ID) {
-        return reply.status(503).send({
-          error: 'Cevi.DB OAuth ist noch nicht konfiguriert (CEVIDB_CLIENT_ID fehlt in der Umgebung)',
-        });
-      }
-
       const host = request.headers.host || 'cevi-schichtplan.ch';
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const redirectUri =
         process.env.CEVIDB_REDIRECT_URI || `${protocol}://${host}/api/auth/cevidb/callback`;
 
+      const returnTo = cleanReturnTo(
+        request.query.returnTo,
+        request.tenant ? `${protocol}://${request.tenant.slug}.${host}` : '/'
+      );
+
+      if (!CEVIDB_CLIENT_ID) {
+        fastify.log.error('Cevi.DB OAuth ist nicht konfiguriert (CEVIDB_CLIENT_ID fehlt in der Umgebung)');
+        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo));
+      }
+
       const stateObj = {
         token: crypto.randomBytes(16).toString('hex'),
-        returnTo:
-          request.query.returnTo ||
-          (request.tenant ? `${protocol}://${request.tenant.slug}.${host}` : '/'),
+        returnTo,
         tenantSlug: request.query.tenantSlug || request.tenant?.slug || null,
       };
 
@@ -89,8 +114,28 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { code, state, error } = request.query;
 
-      if (error || !code) {
-        return reply.status(400).send({ error: error || 'OAuth-Code fehlt' });
+      let returnTo = '/';
+      let tenantSlug: string | null = null;
+
+      try {
+        if (state) {
+          const parsedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+          returnTo = cleanReturnTo(parsedState.returnTo);
+          tenantSlug = parsedState.tenantSlug || null;
+        }
+      } catch (err) {
+        // Fallback default
+      }
+
+      // Abbruch durch die Person auf Cevi.DB (z. B. Zugriff verweigert)
+      if (error) {
+        return reply.redirect(loginErrorUrl('cevidb_denied', returnTo));
+      }
+
+      // state muss zum Cookie aus /cevidb/login passen, sonst könnte ein fremder Code untergeschoben werden
+      if (!code || !state || state !== request.cookies.cevidb_oauth_state) {
+        fastify.log.warn('Cevi.DB Callback ohne gültigen Code oder state');
+        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
       }
 
       const host = request.headers.host || 'cevi-schichtplan.ch';
@@ -98,59 +143,52 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const redirectUri =
         process.env.CEVIDB_REDIRECT_URI || `${protocol}://${host}/api/auth/cevidb/callback`;
 
-      let returnTo = '/';
-      let tenantSlug: string | null = null;
-
+      let profile: any;
       try {
-        if (state) {
-          const parsedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
-          returnTo = parsedState.returnTo || '/';
-          tenantSlug = parsedState.tenantSlug || null;
+        // Code gegen Token tauschen
+        const tokenRes = await fetch(`${CEVIDB_BASE_URL}/oauth/token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Accept: 'application/json',
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: CEVIDB_CLIENT_ID,
+            client_secret: CEVIDB_CLIENT_SECRET,
+            redirect_uri: redirectUri,
+            code,
+          }),
+        });
+
+        if (!tokenRes.ok) {
+          const errText = await tokenRes.text();
+          fastify.log.error(`Cevi.DB Token-Abruf fehlgeschlagen: ${errText}`);
+          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
         }
+
+        const tokenData = (await tokenRes.json()) as { access_token: string };
+        const accessToken = tokenData.access_token;
+
+        // Profil abrufen
+        const profileRes = await fetch(`${CEVIDB_BASE_URL}/oauth/profile`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Scope': 'with_roles',
+            Accept: 'application/json',
+          },
+        });
+
+        if (!profileRes.ok) {
+          fastify.log.error('Cevi.DB Profilabruf fehlgeschlagen');
+          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
+        }
+
+        profile = await profileRes.json();
       } catch (err) {
-        // Fallback default
+        fastify.log.error(err, 'Cevi.DB nicht erreichbar');
+        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
       }
-
-      // Code gegen Token tauschen
-      const tokenRes = await fetch(`${CEVIDB_BASE_URL}/oauth/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json',
-        },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: CEVIDB_CLIENT_ID,
-          client_secret: CEVIDB_CLIENT_SECRET,
-          redirect_uri: redirectUri,
-          code,
-        }),
-      });
-
-      if (!tokenRes.ok) {
-        const errText = await tokenRes.text();
-        fastify.log.error(`Cevi.DB Token-Abruf fehlgeschlagen: ${errText}`);
-        return reply.status(502).send({ error: 'Token-Abruf bei Cevi.DB fehlgeschlagen' });
-      }
-
-      const tokenData = (await tokenRes.json()) as { access_token: string };
-      const accessToken = tokenData.access_token;
-
-      // Profil abrufen
-      const profileRes = await fetch(`${CEVIDB_BASE_URL}/oauth/profile`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'X-Scope': 'with_roles',
-          Accept: 'application/json',
-        },
-      });
-
-      if (!profileRes.ok) {
-        fastify.log.error('Cevi.DB Profilabruf fehlgeschlagen');
-        return reply.status(502).send({ error: 'Profilabruf bei Cevi.DB fehlgeschlagen' });
-      }
-
-      const profile = (await profileRes.json()) as any;
       const ceviDbId = profile.id;
       const email = (profile.email || `cevidb_${ceviDbId}@cevi-schichtplan.ch`).toLowerCase();
       const firstName = profile.first_name || profile.given_name || 'Cevianer*in';
@@ -345,7 +383,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       token,
-      redirectUrl: returnTo || '/',
+      redirectUrl: cleanReturnTo(returnTo),
       user: {
         id: user.id,
         email: user.email,

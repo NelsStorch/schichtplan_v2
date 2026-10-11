@@ -1,10 +1,18 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { ThemeScript } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 
 export const metadata: Metadata = {
-  title: 'Anmelden – Cevi Schichtplan',
+  title: 'Anmelden · Cevi Schichtplan',
   description: 'Zentrales Login für Leiter*innen und Helfer*innen des Cevi Schichtplans',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#e11d48',
 };
 
 export default function RootLayout({
@@ -12,12 +20,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Bis zum Redesign dieser App fest dunkel: die Seiten nutzen noch hartkodierte slate-Farben
   return (
-    <html lang="de" className={`dark ${fontVariables}`} data-theme="dark">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-rose-600 selection:text-white">
-        {children}
-      </body>
+    <html lang="de-CH" className={fontVariables} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
+      <body className="min-h-[100dvh]">{children}</body>
     </html>
   );
 }
