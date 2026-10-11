@@ -1,40 +1,40 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'node:crypto';
 
 const prisma = new PrismaClient();
 
-// Der Seed läuft bei jedem Deploy (deploy.ps1): nur fehlende Musterdaten anlegen, nie bestehende
-// überschreiben (update: {}) oder löschen, sonst gehen Einstellungen, Passwörter und Anmeldungen verloren.
+// Neutrale Demo-Daten für die lokale Entwicklung (keine echten Personen, Abteilungen oder Passwörter).
+// Nur fehlende Daten anlegen, nie bestehende überschreiben (update: {}) oder löschen.
 async function main() {
   console.log('Seede Cevi Schichtplan V2 Datenbank...');
 
-  // 1. Abteilung: Cevi Illnau
+  // 1. Demo-Abteilung
   const department = await prisma.department.upsert({
-    where: { slug: 'illnau' },
+    where: { slug: 'demo' },
     update: {},
     create: {
-      name: 'Cevi Illnau-Effretikon',
-      slug: 'illnau',
+      name: 'Demo-Abteilung',
+      slug: 'demo',
       primaryColor: '#e11d48',
-      contactEmail: 'info@cevi-illnau.ch',
     },
   });
 
   console.log(`Abteilung angelegt: ${department.name} (${department.slug})`);
 
-  // 2. Haupt-Admin: "Inferno" (Nels Storch)
-  const defaultPasswordHash = await bcrypt.hash('Password123!', 10);
+  // 2. Demo-Admin. Passwort aus SEED_PASSWORD oder zufällig (gilt nur für neu angelegte Konten)
+  const password = process.env.SEED_PASSWORD || randomBytes(9).toString('base64url');
+  const defaultPasswordHash = await bcrypt.hash(password, 10);
 
-  const adminInferno = await prisma.user.upsert({
-    where: { email: 'inferno@cevi-illnau.ch' },
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@example.com' },
     update: {},
     create: {
-      email: 'inferno@cevi-illnau.ch',
-      firstName: 'Nels',
-      lastName: 'Storch',
-      ceviName: 'Inferno',
-      birthDate: new Date('1998-05-12'),
-      phone: '+41 79 123 45 67',
+      email: 'admin@example.com',
+      firstName: 'Demo',
+      lastName: 'Admin',
+      ceviName: 'Demo-Admin',
+      birthDate: new Date('2000-01-01'),
       isGlobalAdmin: true,
       passwordHash: defaultPasswordHash,
     },
@@ -44,45 +44,28 @@ async function main() {
     where: {
       departmentId_userId: {
         departmentId: department.id,
-        userId: adminInferno.id,
+        userId: admin.id,
       },
     },
     update: {},
     create: {
       departmentId: department.id,
-      userId: adminInferno.id,
+      userId: admin.id,
       role: 'ADMIN',
     },
   });
 
-  console.log(
-    `Admin-Benutzer angelegt: ${adminInferno.firstName} "${adminInferno.ceviName}" ${adminInferno.lastName}`
-  );
+  console.log(`Demo-Admin: ${admin.email}`);
+  if (!process.env.SEED_PASSWORD) console.log(`Passwort für neu angelegte Demo-Konten: ${password}`);
 
-  // 3. Weitere Beispiel-Helfer
-  const helpersData = [
-    {
-      email: 'falk@cevi-illnau.ch',
-      firstName: 'Lukas',
-      lastName: 'Meier',
-      ceviName: 'Falk',
-      birthDate: new Date('2002-03-21'),
-    },
-    {
-      email: 'polka@cevi-illnau.ch',
-      firstName: 'Julia',
-      lastName: 'Keller',
-      ceviName: 'Polka',
-      birthDate: new Date('2004-11-05'),
-    },
-    {
-      email: 'spatz@cevi-illnau.ch',
-      firstName: 'Elena',
-      lastName: 'Schmid',
-      ceviName: 'Spatz',
-      birthDate: new Date('2006-08-14'),
-    },
-  ];
+  // 3. Demo-Helfer (verschiedene Alter für die minAge-Prüfung: volljährig, 16+, unter 16)
+  const helpersData = [1, 2, 3].map((n, i) => ({
+    email: `helfer${n}@example.com`,
+    firstName: 'Helfer',
+    lastName: String(n),
+    ceviName: `Helfer ${n}`,
+    birthDate: new Date(['2000-01-01', '2009-01-01', '2012-01-01'][i]),
+  }));
 
   const helperUsers = [];
   for (const h of helpersData) {
@@ -117,8 +100,8 @@ async function main() {
     helperUsers.push(user);
   }
 
-  // 4. Events für Cevi Illnau
-  // Event A: Chilbi Illnau 2026 (Demonstriert "NAME_ONLY" - Kein Passwort nötig!)
+  // 4. Demo-Events
+  // Event A: Chilbi 2026 (Demonstriert "NAME_ONLY" - Kein Passwort nötig!)
   const chilbi = await prisma.event.upsert({
     where: {
       departmentId_slug: {
@@ -129,10 +112,10 @@ async function main() {
     update: {},
     create: {
       departmentId: department.id,
-      title: 'Chilbi Illnau 2026',
+      title: 'Chilbi 2026',
       slug: 'chilbi-2026',
       description:
-        'Der legendäre Cevi-Grill- & Chnoblibrotstand an der Illnauer Chilbi! Hilf mit und unterstütze unsere Abteilung.',
+        'Grill- und Getränkestand an der Chilbi. Hilf mit und unterstütze die Abteilung.',
       startDate: new Date('2026-10-16T16:00:00Z'),
       endDate: new Date('2026-10-18T22:00:00Z'),
       logoUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=200&auto=format&fit=crop',
@@ -148,15 +131,15 @@ async function main() {
     where: {
       eventId_userId: {
         eventId: chilbi.id,
-        userId: adminInferno.id,
+        userId: admin.id,
       },
     },
     update: {},
     create: {
       eventId: chilbi.id,
-      userId: adminInferno.id,
+      userId: admin.id,
       role: 'OK_LEAD',
-      roleTitle: 'OK-Präsident',
+      roleTitle: 'OK-Leitung',
     },
   });
 
@@ -172,7 +155,7 @@ async function main() {
       eventId: chilbi.id,
       userId: helperUsers[0].id,
       role: 'OK_MEMBER',
-      roleTitle: 'Bau & Grillchef',
+      roleTitle: 'Bau & Technik',
     },
   });
 
@@ -187,10 +170,10 @@ async function main() {
     update: {},
     create: {
       departmentId: department.id,
-      title: 'Sommerlager 2026 - Abenteuer im Zelt',
+      title: 'Sommerlager 2026',
       slug: 'sola-2026',
       description:
-        'Das Sommerlager des Cevi Illnau. Unterstützung gesucht für Vortrupp, Küche und Rücktransport.',
+        'Das Sommerlager der Abteilung. Unterstützung gesucht für Vortrupp, Küche und Rücktransport.',
       startDate: new Date('2026-07-11T08:00:00Z'),
       endDate: new Date('2026-07-18T18:00:00Z'),
       isPublished: true,
@@ -201,7 +184,7 @@ async function main() {
 
   console.log(`Events angelegt: ${chilbi.title}, ${sola.title}`);
 
-  // 5. Schichten für Chilbi Illnau (nur beim ersten Seed: echte Schichten & Anmeldungen bleiben unangetastet)
+  // 5. Schichten für die Chilbi (nur beim ersten Seed: echte Schichten & Anmeldungen bleiben unangetastet)
   if ((await prisma.shift.count({ where: { eventId: chilbi.id } })) > 0) {
     console.log('Chilbi hat bereits Schichten, Beispielschichten werden übersprungen.');
     return;
@@ -278,20 +261,19 @@ async function main() {
       },
     });
 
-    // Einteilung von "Inferno" und Helfern für realistische Musterdaten
+    // Beispiel-Einteilungen
     if (s.title.includes('Grillmeister')) {
       await prisma.shiftSignup.create({
-        data: { shiftId: shift.id, userId: adminInferno.id },
+        data: { shiftId: shift.id, userId: admin.id },
       });
       await prisma.shiftSignup.create({
         data: { shiftId: shift.id, userId: helperUsers[0].id },
       });
-      // Auch ein passwortloser Chilbi-Gast eingetragen
+      // Passwortloser Gast-Eintrag
       await prisma.shiftSignup.create({
         data: {
           shiftId: shift.id,
-          guestName: 'Schnitzel (Ehemaliger)',
-          guestPhone: '+41 79 999 88 77',
+          guestName: 'Gast ohne Konto',
         },
       });
     }
@@ -303,7 +285,7 @@ async function main() {
     }
   }
 
-  console.log('Schichten und Beispiel-Einteilungen für Cevi Illnau erfolgreich angelegt!');
+  console.log('Demo-Schichten und Beispiel-Einteilungen angelegt.');
 }
 
 main()

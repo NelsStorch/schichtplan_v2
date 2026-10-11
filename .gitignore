@@ -23,6 +23,7 @@ temp_*
 .claude/
 deploy.tar.gz
 deploy-remote.sh
+deploy.config.ps1
 
 # Database & Backups
 *.sql

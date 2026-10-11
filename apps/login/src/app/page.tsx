@@ -238,7 +238,7 @@ function LoginContent() {
                   required
                   value={quickCeviName}
                   onChange={(e) => setQuickCeviName(e.target.value)}
-                  placeholder="z. B. Inferno oder Puma"
+                  placeholder="Dein Cevi-Name"
                   className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition"
                 />
               </div>
@@ -279,7 +279,7 @@ function LoginContent() {
                       type="text"
                       value={quickFirstName}
                       onChange={(e) => setQuickFirstName(e.target.value)}
-                      placeholder="Nels"
+                      placeholder="Vorname"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
                     />
                   </div>
@@ -289,7 +289,7 @@ function LoginContent() {
                       type="text"
                       value={quickLastName}
                       onChange={(e) => setQuickLastName(e.target.value)}
-                      placeholder="Storch"
+                      placeholder="Nachname"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
                     />
                   </div>
@@ -304,7 +304,7 @@ function LoginContent() {
                     type="tel"
                     value={quickPhone}
                     onChange={(e) => setQuickPhone(e.target.value)}
-                    placeholder="+41 79 123 45 67"
+                    placeholder="+41 79 000 00 00"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none"
                   />
                 </div>
@@ -440,7 +440,7 @@ function LoginContent() {
                     type="text"
                     value={regCeviName}
                     onChange={(e) => setRegCeviName(e.target.value)}
-                    placeholder="z. B. Inferno"
+                    placeholder="Dein Cevi-Name"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white outline-none"
                   />
                 </div>
@@ -453,7 +453,7 @@ function LoginContent() {
                     type="tel"
                     value={regPhone}
                     onChange={(e) => setRegPhone(e.target.value)}
-                    placeholder="+41 79 123 45 67"
+                    placeholder="+41 79 000 00 00"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white outline-none"
                   />
                 </div>

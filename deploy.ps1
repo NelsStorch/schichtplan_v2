@@ -13,9 +13,16 @@ param (
 #   4. Fuehrt DB-Migrationen durch
 #   5. Wartet bis API und Frontend HTTP 200 melden
 
-$Server = "root@2.59.133.113"
+# Serverdetails ($Server, $RemoteBase) liegen ausserhalb von Git in deploy.config.ps1
+$ConfigFile = Join-Path $PSScriptRoot "deploy.config.ps1"
+if (-not (Test-Path $ConfigFile)) {
+    Write-Host "deploy.config.ps1 fehlt: Vorlage deploy.config.example.ps1 kopieren und ausfuellen." -ForegroundColor Red
+    exit 1
+}
+. $ConfigFile
+
 $ProjectName = "schichtplan-$Environment"
-$RemoteDir = "/home/NelsChlaus/projects/$ProjectName"
+$RemoteDir = "$RemoteBase/$ProjectName"
 $ArchiveName = "deploy.tar.gz"
 $RemoteScript = "deploy-remote.sh"
 
@@ -50,7 +57,7 @@ if ($dirty.Count -gt 0) {
 }
 
 Step "1. Archiv erstellen"
-tar.exe --exclude="node_modules" --exclude=".git" --exclude="dist" --exclude="out" --exclude=".next" --exclude=".env*" --exclude="backups" --exclude="*.dump" --exclude="*.sql.gz" --exclude=$ArchiveName --exclude=$RemoteScript -czf $ArchiveName .
+tar.exe --exclude="node_modules" --exclude=".git" --exclude="dist" --exclude="out" --exclude=".next" --exclude=".env*" --exclude="backups" --exclude="*.dump" --exclude="*.sql.gz" --exclude="deploy.config.ps1" --exclude=$ArchiveName --exclude=$RemoteScript -czf $ArchiveName .
 if ($LASTEXITCODE -ne 0) { Stop-Deploy "Das Archiv konnte nicht erstellt werden." }
 
 # Server Script
@@ -127,8 +134,7 @@ rm -f "`$log"
 # Migrationen ausfuehren
 echo "Prisma Migrationen ausfuehren..."
 docker compose -f "$ComposeFile" -p "$ProjectName" exec -T backend npx prisma migrate deploy || true
-echo "Seed-Daten einspielen (Cevi Illnau & Inferno)..."
-docker compose -f "$ComposeFile" -p "$ProjectName" exec -T backend npm run db:seed || true
+# Kein Seed auf dem Server: Demo-Daten (npm run db:seed) sind nur für die lokale Entwicklung
 
 # Healthcheck Verify
 domain=`$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2- | tr -d '\r"' || true)

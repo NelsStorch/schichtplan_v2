@@ -76,7 +76,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
-      # Dynamische Abteilungs-Subdomains (alle beliebigen Subdomains wie illnau, wetzikon, uster, etc.)
+      # Dynamische Abteilungs-Subdomains (<abteilung>.cevi-schichtplan.ch)
       - "traefik.http.routers.schichtplan-web.rule=HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`)"
       - "traefik.http.routers.schichtplan-web.entrypoints=websecure"
       # Traefik leitet aus HostRegexp keine Zertifikats-Domains ab, deshalb explizit ein Wildcard-Zertifikat.

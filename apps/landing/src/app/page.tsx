@@ -152,7 +152,7 @@ export default function LandingPage() {
               </div>
               <h3 className="font-bold text-white text-lg mb-2">Eigene Subdomain</h3>
               <p className="text-slate-400 text-sm">
-                Deine Abteilung bekommt eine feste Adresse wie <code className="text-rose-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">uster.cevi-schichtplan.ch</code>. Einmal merken, immer aktuell.
+                Deine Abteilung bekommt eine feste Adresse wie <code className="text-rose-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">deine-abteilung.cevi-schichtplan.ch</code>. Einmal merken, immer aktuell.
               </p>
             </div>
 
@@ -193,7 +193,7 @@ export default function LandingPage() {
             <Search className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Name oder Ort suchen (z. B. Uster, Winterthur)..."
+              placeholder="Name oder Ort suchen..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl shadow-inner text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition"
@@ -264,7 +264,7 @@ export default function LandingPage() {
                 <input
                   type="text"
                   required
-                  placeholder="z. B. Cevi Uster"
+                  placeholder="Name der Abteilung"
                   value={formData.departmentName}
                   onChange={(e) => {
                     const name = e.target.value;
@@ -285,7 +285,7 @@ export default function LandingPage() {
                   <input
                     type="text"
                     required
-                    placeholder="uster"
+                    placeholder="abteilung"
                     value={formData.slug}
                     onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase() })}
                     className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-l-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
@@ -318,7 +318,7 @@ export default function LandingPage() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Cevi-Name (optional, z. B. Falk)"
+                  placeholder="Cevi-Name (optional)"
                   value={formData.adminCeviName}
                   onChange={(e) => setFormData({ ...formData, adminCeviName: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 mb-2 focus:outline-none focus:ring-2 focus:ring-rose-500"

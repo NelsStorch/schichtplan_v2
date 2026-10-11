@@ -40,7 +40,7 @@ Basiert auf der bewährten Architektur von `laden_v2`:
 ```
 
 ### 1. Eigene Subdomains pro Abteilung
-* Jede Abteilung erhält eine eigene Subdomain (z. B. `uster.cevi-schichtplan.ch`).
+* Jede Abteilung erhält eine eigene Subdomain (z. B. `<abteilung>.cevi-schichtplan.ch`).
 * Traefik routet alle Subdomains an den `apps/web`-Container weiter.
 * Der `apps/web`-Container und das Backend erkennen die Abteilung automatisch anhand des `Host`-Headers.
 
@@ -58,7 +58,7 @@ Basiert auf der bewährten Architektur von `laden_v2`:
 
 ```bash
 # 1. Repository-Root
-cd C:\Users\Nels\IT\schichtplan_v2
+cd schichtplan_v2
 
 # 2. Lokale Container starten (Hot-Reload)
 docker compose -f docker-compose.dev.yml up --build
