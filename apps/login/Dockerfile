@@ -1,15 +1,20 @@
+# syntax=docker/dockerfile:1
 FROM node:22-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
-# 1. Install dependencies
+# 1. Install dependencies (Workspaces cached via Lockfile)
 FROM base AS dependencies
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/ui/package.json ./packages/ui/
+COPY apps/backend/package.json ./apps/backend/
+COPY apps/landing/package.json ./apps/landing/
 COPY apps/login/package.json ./apps/login/
-RUN npm install
+COPY apps/web/package.json ./apps/web/
+COPY apps/admin/package.json ./apps/admin/
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # 2. Development target (for docker-compose.dev.yml)
 FROM base AS development
@@ -33,7 +38,7 @@ COPY apps/login ./apps/login
 WORKDIR /app/packages/shared
 RUN npm run build
 WORKDIR /app/apps/login
-RUN npm run build
+RUN --mount=type=cache,target=/app/apps/login/.next/cache npm run build
 
 # 4. Production runner
 FROM base AS runner

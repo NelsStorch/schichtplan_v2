@@ -66,6 +66,8 @@ $remote = @"
 #!/bin/bash
 set -euo pipefail
 cd "$RemoteDir"
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
 
 if [ "$backup" = "1" ]; then
   if docker ps --format '{{.Names}}' | grep -qx "$Prefix-db"; then
