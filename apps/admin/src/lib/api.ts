@@ -1,3 +1,5 @@
+import { getDepartmentUrl, getLoginUrl } from '@schichtplan/shared';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -22,21 +24,10 @@ export const errorMessage = (err: unknown) =>
 
 /** Zentrales SSO-Login (login.<domain>) mit Rücksprung auf die aktuelle Seite. */
 export function loginUrl(returnTo?: string) {
-  const target = encodeURIComponent(returnTo || window.location.href);
-  const { hostname, protocol } = window.location;
-  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1') {
-    return `http://localhost:3002/?return_to=${target}`;
-  }
-  const rootDomain = hostname.split('.').slice(-2).join('.');
-  return `${protocol}//login.${rootDomain}/?return_to=${target}`;
+  return getLoginUrl(returnTo);
 }
 
 /** Link auf eine Abteilungs-Subdomain (z. B. illnau.cevi-schichtplan.ch). */
 export function departmentUrl(slug: string, path = '/') {
-  const { hostname, protocol } = window.location;
-  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1') {
-    return `${protocol}//${slug}.localhost:3000${path}`;
-  }
-  const rootDomain = hostname.split('.').slice(-2).join('.');
-  return `${protocol}//${slug}.${rootDomain}${path}`;
+  return getDepartmentUrl(slug, path);
 }

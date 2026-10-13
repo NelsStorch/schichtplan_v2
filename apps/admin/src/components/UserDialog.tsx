@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Building2, CalendarClock, Mail, Phone, Users } from 'lucide-react';
 import { Avatar, Badge, Callout, Dialog, EmptyState, Skeleton } from '@schichtplan/ui';
-import type { AdminUserDetailDto, AdminUserListItemDto } from '@schichtplan/shared';
+import { getRootDomain, type AdminUserDetailDto, type AdminUserListItemDto } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage } from '../lib/api';
 import {
   ageFromBirthDate,
@@ -98,7 +98,12 @@ export function UserDialog({
             <LoginMethodBadges methods={user.loginMethods} isAdmin={user.isGlobalAdmin} />
             {user.ceviDbId && (
               <a
-                href={`https://login.cevi-schichtplan.ch/cevidb-daten?userId=${encodeURIComponent(user.id)}`}
+                href={
+                  typeof window !== 'undefined' &&
+                  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                    ? `http://localhost:3002/cevidb-daten?userId=${encodeURIComponent(user.id)}`
+                    : `https://login.${getRootDomain()}/cevidb-daten?userId=${encodeURIComponent(user.id)}`
+                }
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"

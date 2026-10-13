@@ -2,22 +2,14 @@
 
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { getLoginUrl } from '@schichtplan/shared';
 
 function RedirectContent() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
     const returnTo = searchParams.get('return_to') || window.location.origin;
-
-    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-      window.location.href = `http://localhost:3002/?return_to=${encodeURIComponent(returnTo)}`;
-    } else {
-      const parts = hostname.split('.');
-      const rootDomain = parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
-      window.location.href = `${protocol}//login.${rootDomain}/?return_to=${encodeURIComponent(returnTo)}`;
-    }
+    window.location.href = getLoginUrl(returnTo);
   }, [searchParams]);
 
   return (

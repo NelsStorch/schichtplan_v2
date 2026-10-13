@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getLoginUrl } from '@schichtplan/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -39,12 +40,5 @@ export function useLoginHref() {
 
 /** Zentrales SSO-Login (login.<domain>) mit Rücksprung auf die aktuelle Seite. */
 export function loginUrl(returnTo?: string) {
-  if (typeof window === 'undefined') return '/login';
-  const target = encodeURIComponent(returnTo || window.location.href);
-  const { hostname, protocol } = window.location;
-  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1') {
-    return `http://localhost:3002/?return_to=${target}`;
-  }
-  const rootDomain = hostname.split('.').slice(-2).join('.');
-  return `${protocol}//login.${rootDomain}/?return_to=${target}`;
+  return getLoginUrl(returnTo);
 }

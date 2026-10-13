@@ -27,6 +27,7 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan_dev}:${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}@db:5432/${DB_NAME:-cevi_schichtplan_dev}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss in .env gesetzt sein}
+      DOMAIN: ${DOMAIN_DEV:-dev.cevi-schichtplan.ch}
       COOKIE_DOMAIN: .${DOMAIN_DEV:-dev.cevi-schichtplan.ch}
       CORS_ORIGIN: https://${DOMAIN_DEV:-dev.cevi-schichtplan.ch}
       CEVIDB_BASE_URL: ${CEVIDB_BASE_URL:-https://db.cevi.ch}

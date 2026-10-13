@@ -15,7 +15,13 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
-import type { DepartmentCreationEligibilityDto, RegisterDepartmentInput } from '@schichtplan/shared';
+import {
+  getDepartmentUrl,
+  getLoginUrl,
+  getRootDomain,
+  type DepartmentCreationEligibilityDto,
+  type RegisterDepartmentInput,
+} from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
 import { Button, buttonClasses, Dialog, Input } from '@schichtplan/ui';
 import { Campfire3DCanvas } from '@/components/Campfire3DCanvas';
@@ -105,18 +111,12 @@ export default function LandingPage() {
     };
   }, [showRegisterModal]);
 
-  const departmentUrl = (slug: string) =>
-    window.location.hostname.includes('localhost')
-      ? `http://${slug}.localhost:3000`
-      : `https://${slug}.cevi-schichtplan.ch`;
+  const departmentUrl = (slug: string) => getDepartmentUrl(slug);
 
   /** Zentrales Cevi.DB-Login, danach zurück auf diese Seite mit geöffnetem Dialog. */
   const ceviDbLoginUrl = () => {
-    const { hostname, protocol, origin } = window.location;
-    const returnTo = encodeURIComponent(`${origin}/?registrieren=1`);
-    if (hostname === 'localhost' || hostname === '127.0.0.1') return `http://localhost:3002/?return_to=${returnTo}`;
-    const rootDomain = hostname.split('.').slice(-2).join('.');
-    return `${protocol}//login.${rootDomain}/?return_to=${returnTo}`;
+    if (typeof window === 'undefined') return '/login';
+    return getLoginUrl(`${window.location.origin}/?registrieren=1`);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -497,9 +497,7 @@ export default function LandingPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredDepartments.map((dept) => {
-                  const href = typeof window !== 'undefined' && window.location.hostname.includes('localhost')
-                    ? `http://${dept.slug}.localhost:3000`
-                    : `https://${dept.slug}.cevi-schichtplan.ch`;
+                  const href = departmentUrl(dept.slug);
 
                   return (
                     <Card3DTilt key={dept.id} maxTilt={4} glare={false}>
@@ -519,7 +517,7 @@ export default function LandingPage() {
                               {dept.name}
                             </h4>
                             <div className="flex items-center gap-2 mt-0.5 font-mono text-2xs text-fg-subtle">
-                              <span>{dept.slug}.cevi-schichtplan.ch</span>
+                              <span>{dept.slug}.{typeof window !== 'undefined' ? getRootDomain() : 'cevi-schichtplan.ch'}</span>
                               {dept.activeEventsCount !== undefined && dept.activeEventsCount > 0 && (
                                 <span className="rounded-full bg-surface-2 px-1.5 py-0.2 text-[10px] text-fg-muted font-sans">
                                   {dept.activeEventsCount} {dept.activeEventsCount === 1 ? 'Event' : 'Events'}

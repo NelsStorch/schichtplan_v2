@@ -35,3 +35,58 @@ export function safeReturnTo(
   if (isLocal) return url.toString();
   return fallback;
 }
+
+/**
+ * Ermittelt die Basis-Domain (Root Domain) aus dem aktuellen Hostnamen.
+ * Berücksichtigt auch Staging/Dev-Umgebungen wie dev.cevi-schichtplan.ch.
+ */
+export function getRootDomain(hostname?: string): string {
+  if (!hostname) {
+    if (typeof window !== 'undefined') {
+      hostname = window.location.hostname;
+    } else {
+      return 'cevi-schichtplan.ch';
+    }
+  }
+
+  const host = hostname.toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) {
+    return 'localhost';
+  }
+
+  // Erkennung von dev.cevi-schichtplan.ch (und allfälligen Subdomains wie login.dev.cevi-schichtplan.ch)
+  if (host === 'dev.cevi-schichtplan.ch' || host.endsWith('.dev.cevi-schichtplan.ch')) {
+    return 'dev.cevi-schichtplan.ch';
+  }
+
+  // Standard für cevi-schichtplan.ch und sonstige 2-Level-Domains
+  const parts = host.split('.');
+  return parts.length >= 2 ? parts.slice(-2).join('.') : host;
+}
+
+/**
+ * Erzeugt die zentrale SSO-Login-URL (login.<rootDomain>) für den aktuellen Kontext.
+ */
+export function getLoginUrl(targetUrl?: string): string {
+  if (typeof window === 'undefined') return '/login';
+  const { hostname, protocol, href } = window.location;
+  const target = encodeURIComponent(targetUrl || href);
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) {
+    return `http://localhost:3002/?return_to=${target}`;
+  }
+  const root = getRootDomain(hostname);
+  return `${protocol}//login.${root}/?return_to=${target}`;
+}
+
+/**
+ * Link auf eine Abteilungs-Subdomain (z. B. illnau.cevi-schichtplan.ch oder illnau.dev.cevi-schichtplan.ch).
+ */
+export function getDepartmentUrl(slug: string, path = '/'): string {
+  if (typeof window === 'undefined') return `/${slug}${path}`;
+  const { hostname, protocol } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) {
+    return `http://${slug}.localhost:3000${path}`;
+  }
+  const root = getRootDomain(hostname);
+  return `${protocol}//${slug}.${root}${path}`;
+}
