@@ -21,6 +21,7 @@ model Department {
   updatedAt    DateTime           @updatedAt
   events       Event[]
   members      DepartmentMember[]
+  templates    EventTemplate[]
 
   @@map("departments")
 }
@@ -108,29 +109,64 @@ model Shift {
   startTime     DateTime
   endTime       DateTime
   requiredSlots Int           @default(1)
-  minAge        Int?
+  minAge        Int?          // Mindestalter für die gesamte Schicht
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   event         Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tasks         ShiftTask[]
   signups       ShiftSignup[]
 
   @@map("shifts")
 }
 
+model ShiftTask {
+  id                 String        @id @default(uuid())
+  shiftId            String
+  title              String        // z.B. "Grill", "Kasse", "Ausschank / Bar"
+  description        String?
+  requiredSlots      Int           @default(1)
+  minAge             Int?          // Mindestalter für diese Arbeit
+  ageRequirementType String        @default("ALL") // "ALL" oder "AT_LEAST_ONE"
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  shift              Shift         @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  signups            ShiftSignup[]
+
+  @@map("shift_tasks")
+}
+
 model ShiftSignup {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   shiftId     String
+  taskId      String?
   userId      String?
-  guestName   String?  // Cevi-Name oder Name bei passwortloser Anmeldung
+  guestName   String?    // Cevi-Name oder Name bei passwortloser Anmeldung
   guestEmail  String?
   guestPhone  String?
-  isConfirmed Boolean  @default(true)
+  isConfirmed Boolean    @default(true)
   notes       String?
-  createdAt   DateTime @default(now())
-  shift       Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  shift       Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  task        ShiftTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("shift_signups")
+}
+
+model EventTemplate {
+  id                    String     @id @default(uuid())
+  departmentId          String
+  title                 String     // Name der Vorlage, z.B. "Chilbi Festzelt (3 Tage)"
+  description           String?
+  signupMode            String     @default("OPEN")
+  requireEmailForGuests Boolean    @default(false)
+  requirePhoneForGuests Boolean    @default(false)
+  data                  Json       // Gespeicherte relative Struktur für Schichten und Arbeiten
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  department            Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@map("event_templates")
 }
 
 model Upload {

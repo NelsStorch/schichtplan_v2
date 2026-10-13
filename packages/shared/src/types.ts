@@ -43,6 +43,20 @@ export interface EventDto {
   organizers?: EventOrganizerDto[];
 }
 
+export type AgeRequirementType = 'ALL' | 'AT_LEAST_ONE';
+
+export interface ShiftTaskDto {
+  id: string;
+  shiftId: string;
+  title: string;
+  description?: string | null;
+  requiredSlots: number;
+  freeSlots?: number;
+  minAge?: number | null;
+  ageRequirementType: AgeRequirementType;
+  signups?: ShiftSignupDto[];
+}
+
 export interface ShiftDto {
   id: string;
   eventId: string;
@@ -53,6 +67,7 @@ export interface ShiftDto {
   requiredSlots: number;
   description?: string | null;
   minAge?: number | null;
+  tasks?: ShiftTaskDto[];
   signups?: ShiftSignupDto[];
   freeSlots?: number;
 }
@@ -60,6 +75,8 @@ export interface ShiftDto {
 export interface ShiftSignupDto {
   id: string;
   shiftId: string;
+  taskId?: string | null;
+  taskTitle?: string | null;
   userId?: string | null;
   guestName?: string | null;
   guestEmail?: string | null;
@@ -68,8 +85,47 @@ export interface ShiftSignupDto {
   userFirstName?: string | null;
   userLastName?: string | null;
   userCeviName?: string | null;
+  userBirthDate?: string | null;
+  userAge?: number | null;
   createdAt: string;
   isConfirmed: boolean;
+}
+
+export interface ShiftTaskTemplateItem {
+  title: string;
+  description?: string | null;
+  requiredSlots: number;
+  minAge?: number | null;
+  ageRequirementType: AgeRequirementType;
+}
+
+export interface ShiftTemplateItem {
+  title: string;
+  category: string;
+  description?: string | null;
+  minAge?: number | null;
+  dayOffset: number;
+  startTimeStr: string;
+  endTimeStr: string;
+  tasks: ShiftTaskTemplateItem[];
+}
+
+export interface EventTemplateData {
+  shifts: ShiftTemplateItem[];
+}
+
+export interface EventTemplateDto {
+  id: string;
+  departmentId: string;
+  title: string;
+  description?: string | null;
+  signupMode: SignupMode;
+  requireEmailForGuests: boolean;
+  requirePhoneForGuests: boolean;
+  shiftCount: number;
+  data: EventTemplateData;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UserDto {

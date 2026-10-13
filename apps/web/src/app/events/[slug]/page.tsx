@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CalendarDays, CalendarSearch, Crown, Palette, Plus, Shield, UserPlus, X } from 'lucide-react';
-import type { ShiftDto } from '@schichtplan/shared';
+import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import {
   Avatar,
   Button,
@@ -52,6 +52,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const [busyShift, setBusyShift] = useState<string | null>(null);
 
   const [guestShift, setGuestShift] = useState<ShiftDto | null>(null);
+  const [guestTask, setGuestTask] = useState<ShiftTaskDto | null>(null);
+  const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOkForm, setShowOkForm] = useState(false);
@@ -118,21 +120,27 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     }))
     .filter((d) => d.items.length > 0);
 
-  const signup = async (shift: ShiftDto) => {
+  const signup = async (shift: ShiftDto, task?: ShiftTaskDto) => {
     if (needsLogin) {
       window.location.href = loginUrl();
       return;
     }
     if (!user) {
       setGuestShift(shift);
+      setGuestTask(task || null);
       return;
     }
     setBusyShift(shift.id);
     try {
-      await api(`/api/shifts/${shift.id}/signup`, { method: 'POST', json: {} });
+      await api(`/api/shifts/${shift.id}/signup`, {
+        method: 'POST',
+        json: {
+          taskId: task?.id,
+        },
+      });
       toast({
         title: 'Du bist eingetragen!',
-        description: `${shift.title}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
+        description: `${shift.title}${task ? ` · ${task.title}` : ''}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
       });
       await load();
     } catch (err) {
@@ -186,9 +194,24 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     <AppShell
       actions={
         canManageShifts && (
-          <Button size="sm" onClick={() => setShowShiftForm(true)} aria-label="Schicht anlegen">
-            <Plus /> <span className="hidden sm:inline">Schicht</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/events/${slug}/ok`}
+              className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+            >
+              <Shield className="size-4" /> <span className="hidden sm:inline">OK-Dashboard</span>
+            </Link>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingShift(null);
+                setShowShiftForm(true);
+              }}
+              aria-label="Schicht anlegen"
+            >
+              <Plus /> <span className="hidden sm:inline">Schicht</span>
+            </Button>
+          </div>
         )
       }
     >
@@ -300,7 +323,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
               })}
             </ul>
             {canManageEvent && (
-              <div className="flex gap-2 sm:ml-auto">
+              <div className="flex flex-wrap gap-2 sm:ml-auto">
+                <Link
+                  href={`/events/${event.slug}/ok`}
+                  className={buttonClasses({ variant: 'primary', size: 'sm' })}
+                >
+                  <Shield className="size-4" /> OK-Verwaltung
+                </Link>
                 <Button variant="secondary" size="sm" onClick={() => setShowOkForm(true)}>
                   <UserPlus /> OK ernennen
                 </Button>
@@ -416,9 +445,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                           canManage={canManageShifts}
                           needsLogin={needsLogin}
                           busy={busyShift === shift.id}
-                          onSignup={() => signup(shift)}
-                          onCancel={() => cancel(shift)}
+                          onSignup={(task) => signup(shift, task)}
+                          onCancel={(signupId) => cancel(shift, signupId)}
                           onRemoveHelper={(signupId, name) => cancel(shift, signupId, name)}
+                          onEdit={() => {
+                            setEditingShift(shift);
+                            setShowShiftForm(true);
+                          }}
                         />
                       );
                     })}
@@ -432,10 +465,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
       <GuestSignupDialog
         shift={guestShift}
+        task={guestTask}
         event={event}
-        onClose={() => setGuestShift(null)}
+        onClose={() => {
+          setGuestShift(null);
+          setGuestTask(null);
+        }}
         onSignedUp={async (shift) => {
           setGuestShift(null);
+          setGuestTask(null);
           toast({
             title: 'Du bist eingetragen!',
             description: `${shift.title}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
@@ -446,9 +484,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       <ShiftFormDialog
         open={showShiftForm}
         event={event}
-        onClose={() => setShowShiftForm(false)}
+        shift={editingShift}
+        onClose={() => {
+          setShowShiftForm(false);
+          setEditingShift(null);
+        }}
         onSaved={async () => {
           setShowShiftForm(false);
+          setEditingShift(null);
           await load();
         }}
       />

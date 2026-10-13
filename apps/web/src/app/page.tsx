@@ -24,6 +24,12 @@ export default function DepartmentHomePage() {
   const [showDeptForm, setShowDeptForm] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('createEvent=1')) {
+      setShowEventForm(true);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!department) return;
     api<EventDto[]>('/api/events')
       .then(setEvents)

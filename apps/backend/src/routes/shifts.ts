@@ -1,8 +1,17 @@
 import { FastifyPluginAsync } from 'fastify';
-import { CreateShiftSchema, SignupShiftSchema } from '@schichtplan/shared';
+import { CreateShiftSchema, UpdateShiftSchema, SignupShiftSchema } from '@schichtplan/shared';
+
+function calculateAge(birthDate: Date, targetDate: Date): number {
+  let age = targetDate.getFullYear() - birthDate.getFullYear();
+  const m = targetDate.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && targetDate.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
 
 const shiftRoutes: FastifyPluginAsync = async (fastify) => {
-  // Schicht erstellen (Admin/Planner)
+  // Schicht erstellen (Admin, Planner oder Event-OK)
   fastify.post(
     '/api/shifts',
     { preHandler: [fastify.authenticate] },
@@ -12,7 +21,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
 
-      const { eventId, title, category, startTime, endTime, requiredSlots, description, minAge } =
+      const { eventId, title, category, startTime, endTime, requiredSlots: reqSlots, description, minAge, tasks } =
         parse.data;
 
       // Event & Abteilung prüfen
@@ -44,6 +53,21 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: 'Keine Berechtigung zum Erstellen von Schichten für dieses Event' });
       }
 
+      const resolvedTasks =
+        tasks && tasks.length > 0
+          ? tasks
+          : [
+              {
+                title,
+                description: description || null,
+                requiredSlots: reqSlots || 1,
+                minAge: minAge || null,
+                ageRequirementType: 'ALL' as const,
+              },
+            ];
+
+      const totalRequiredSlots = resolvedTasks.reduce((sum, t) => sum + (t.requiredSlots || 1), 0);
+
       const shift = await fastify.prisma.shift.create({
         data: {
           eventId,
@@ -51,9 +75,23 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           category,
           startTime: new Date(startTime),
           endTime: new Date(endTime),
-          requiredSlots,
+          requiredSlots: totalRequiredSlots,
           description: description || null,
           minAge: minAge || null,
+          tasks: {
+            create: resolvedTasks.map((t) => ({
+              title: t.title,
+              description: t.description || null,
+              requiredSlots: t.requiredSlots || 1,
+              minAge: t.minAge || null,
+              ageRequirementType: t.ageRequirementType || 'ALL',
+            })),
+          },
+        },
+        include: {
+          tasks: {
+            include: { signups: true },
+          },
         },
       });
 
@@ -61,7 +99,242 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // In Schicht eintragen (Unterstützt sowohl eingeloggte Cevianer als auch passwortlose Cevi-Namen)
+  // Schicht bearbeiten (Admin, Planner oder Event-OK)
+  fastify.patch<{ Params: { id: string } }>(
+    '/api/shifts/:id',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const shiftId = request.params.id;
+      const parse = UpdateShiftSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      const shift = await fastify.prisma.shift.findUnique({
+        where: { id: shiftId },
+        include: {
+          event: { include: { organizers: true } },
+          tasks: true,
+        },
+      });
+
+      if (!shift) {
+        return reply.status(404).send({ error: 'Schicht nicht gefunden' });
+      }
+
+      // Berechtigung prüfen
+      const member = await fastify.prisma.departmentMember.findUnique({
+        where: {
+          departmentId_userId: {
+            departmentId: shift.event.departmentId,
+            userId: request.user.id,
+          },
+        },
+      });
+
+      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+      const isEventOk = shift.event.organizers.some((o) => o.userId === request.user.id);
+
+      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten dieser Schicht' });
+      }
+
+      const { title, category, startTime, endTime, description, minAge, tasks } = parse.data;
+
+      // Falls tasks übergeben wurden: Synchronisieren
+      if (tasks && tasks.length > 0) {
+        const totalSlots = tasks.reduce((sum, t) => sum + (t.requiredSlots || 1), 0);
+
+        await fastify.prisma.$transaction(async (tx) => {
+          // Bestehende Tasks ermitteln
+          const existingTasks = await tx.shiftTask.findMany({ where: { shiftId } });
+          const incomingIds = tasks.filter((t) => t.id).map((t) => t.id as string);
+
+          // Lösche Tasks die nicht mehr in der Liste sind
+          const toDelete = existingTasks.filter((et) => !incomingIds.includes(et.id));
+          if (toDelete.length > 0) {
+            await tx.shiftTask.deleteMany({
+              where: { id: { in: toDelete.map((t) => t.id) } },
+            });
+          }
+
+          // Update oder Create
+          for (const t of tasks) {
+            if (t.id && existingTasks.some((et) => et.id === t.id)) {
+              await tx.shiftTask.update({
+                where: { id: t.id },
+                data: {
+                  title: t.title,
+                  description: t.description || null,
+                  requiredSlots: t.requiredSlots || 1,
+                  minAge: t.minAge || null,
+                  ageRequirementType: t.ageRequirementType || 'ALL',
+                },
+              });
+            } else {
+              await tx.shiftTask.create({
+                data: {
+                  shiftId,
+                  title: t.title,
+                  description: t.description || null,
+                  requiredSlots: t.requiredSlots || 1,
+                  minAge: t.minAge || null,
+                  ageRequirementType: t.ageRequirementType || 'ALL',
+                },
+              });
+            }
+          }
+
+          // Update Shift Details
+          await tx.shift.update({
+            where: { id: shiftId },
+            data: {
+              title: title !== undefined ? title : undefined,
+              category: category !== undefined ? category : undefined,
+              startTime: startTime ? new Date(startTime) : undefined,
+              endTime: endTime ? new Date(endTime) : undefined,
+              description: description !== undefined ? description : undefined,
+              minAge: minAge !== undefined ? minAge : undefined,
+              requiredSlots: totalSlots,
+            },
+          });
+        });
+      } else {
+        await fastify.prisma.shift.update({
+          where: { id: shiftId },
+          data: {
+            title: title !== undefined ? title : undefined,
+            category: category !== undefined ? category : undefined,
+            startTime: startTime ? new Date(startTime) : undefined,
+            endTime: endTime ? new Date(endTime) : undefined,
+            description: description !== undefined ? description : undefined,
+            minAge: minAge !== undefined ? minAge : undefined,
+            requiredSlots: parse.data.requiredSlots !== undefined ? parse.data.requiredSlots : undefined,
+          },
+        });
+      }
+
+      const updated = await fastify.prisma.shift.findUnique({
+        where: { id: shiftId },
+        include: {
+          tasks: { include: { signups: true } },
+          signups: { include: { user: true, task: true } },
+        },
+      });
+
+      return updated;
+    }
+  );
+
+  // Schicht löschen (Admin, Planner oder Event-OK)
+  fastify.delete<{ Params: { id: string } }>(
+    '/api/shifts/:id',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const shiftId = request.params.id;
+
+      const shift = await fastify.prisma.shift.findUnique({
+        where: { id: shiftId },
+        include: { event: { include: { organizers: true } } },
+      });
+
+      if (!shift) {
+        return reply.status(404).send({ error: 'Schicht nicht gefunden' });
+      }
+
+      const member = await fastify.prisma.departmentMember.findUnique({
+        where: {
+          departmentId_userId: {
+            departmentId: shift.event.departmentId,
+            userId: request.user.id,
+          },
+        },
+      });
+
+      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+      const isEventOk = shift.event.organizers.some((o) => o.userId === request.user.id);
+
+      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Schicht' });
+      }
+
+      await fastify.prisma.shift.delete({
+        where: { id: shiftId },
+      });
+
+      return { message: 'Schicht erfolgreich gelöscht' };
+    }
+  );
+
+  // Schicht duplizieren (Admin, Planner oder Event-OK)
+  fastify.post<{ Params: { id: string } }>(
+    '/api/shifts/:id/duplicate',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const shiftId = request.params.id;
+
+      const shift = await fastify.prisma.shift.findUnique({
+        where: { id: shiftId },
+        include: {
+          tasks: true,
+          event: { include: { organizers: true } },
+        },
+      });
+
+      if (!shift) {
+        return reply.status(404).send({ error: 'Schicht nicht gefunden' });
+      }
+
+      const member = await fastify.prisma.departmentMember.findUnique({
+        where: {
+          departmentId_userId: {
+            departmentId: shift.event.departmentId,
+            userId: request.user.id,
+          },
+        },
+      });
+
+      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+      const isEventOk = shift.event.organizers.some((o) => o.userId === request.user.id);
+
+      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Duplizieren dieser Schicht' });
+      }
+
+      const body = (request.body as any) || {};
+      const newStartTime = body.startTime ? new Date(body.startTime) : new Date(shift.startTime);
+      const newEndTime = body.endTime ? new Date(body.endTime) : new Date(shift.endTime);
+
+      const duplicated = await fastify.prisma.shift.create({
+        data: {
+          eventId: shift.eventId,
+          title: body.title || `${shift.title} (Kopie)`,
+          category: shift.category,
+          startTime: newStartTime,
+          endTime: newEndTime,
+          requiredSlots: shift.requiredSlots,
+          description: shift.description,
+          minAge: shift.minAge,
+          tasks: {
+            create: shift.tasks.map((t) => ({
+              title: t.title,
+              description: t.description,
+              requiredSlots: t.requiredSlots,
+              minAge: t.minAge,
+              ageRequirementType: t.ageRequirementType,
+            })),
+          },
+        },
+        include: {
+          tasks: true,
+        },
+      });
+
+      return duplicated;
+    }
+  );
+
+  // In Schicht eintragen (oder durch OK einteilen)
   fastify.post<{ Params: { id: string } }>(
     '/api/shifts/:id/signup',
     { preHandler: [fastify.optionalAuthenticate] },
@@ -71,8 +344,19 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       const shift = await fastify.prisma.shift.findUnique({
         where: { id: shiftId },
         include: {
-          signups: true,
-          event: true,
+          tasks: {
+            include: {
+              signups: {
+                include: { user: true },
+              },
+            },
+          },
+          signups: {
+            include: { user: true },
+          },
+          event: {
+            include: { organizers: true },
+          },
         },
       });
 
@@ -81,82 +365,84 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const event = shift.event;
-      if (!event.allowPublicSignup) {
+
+      // Berechtigung für OK-Aktionen prüfen
+      let isOkOrAdmin = false;
+      if (request.user) {
+        const member = await fastify.prisma.departmentMember.findUnique({
+          where: {
+            departmentId_userId: {
+              departmentId: event.departmentId,
+              userId: request.user.id,
+            },
+          },
+        });
+        const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+        const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
+        isOkOrAdmin = Boolean(isDeptAdmin || isEventOk || request.user.isGlobalAdmin);
+      }
+
+      // Falls keine öffentliche Selbsteintragung erlaubt ist und der Aufrufer kein OK-Mitglied ist:
+      if (!event.allowPublicSignup && !isOkOrAdmin) {
         return reply
           .status(403)
           .send({ error: 'Für dieses Event sind keine Selbsteintragungen mehr möglich' });
       }
 
-      // Prüfe freie Plätze
-      if (shift.signups.length >= shift.requiredSlots) {
-        return reply.status(409).send({ error: 'Diese Schicht ist bereits voll belegt' });
+      // Body parsen
+      const parse = SignupShiftSchema.safeParse({ ...(request.body as object), shiftId });
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
       }
 
-      let userId: string | null = null;
+      const { taskId, userId: requestedUserId, guestName: reqGuestName, guestEmail: reqGuestEmail, guestPhone: reqGuestPhone } =
+        parse.data;
+
+      let targetUserId: string | null = null;
+      let targetUser = null;
       let guestName: string | null = null;
       let guestEmail: string | null = null;
       let guestPhone: string | null = null;
 
-      // Authentifizierter Benutzer vorhanden?
-      if (request.user) {
-        userId = request.user.id;
-        const user = await fastify.prisma.user.findUnique({
-          where: { id: userId },
-        });
-
-        if (!user) {
+      // Fall 1: OK teilt eine andere Person ein
+      if (isOkOrAdmin && requestedUserId) {
+        targetUserId = requestedUserId;
+        targetUser = await fastify.prisma.user.findUnique({ where: { id: targetUserId } });
+        if (!targetUser) {
+          return reply.status(404).send({ error: 'Ausgewählter Benutzer nicht gefunden' });
+        }
+      } else if (isOkOrAdmin && reqGuestName) {
+        // OK trägt manuellen Gast/Helfer ein
+        guestName = reqGuestName.trim();
+        guestEmail = reqGuestEmail?.trim() || null;
+        guestPhone = reqGuestPhone?.trim() || null;
+      } else if (request.user) {
+        // Angemeldeter Benutzer trägt sich selbst ein
+        targetUserId = request.user.id;
+        targetUser = await fastify.prisma.user.findUnique({ where: { id: targetUserId } });
+        if (!targetUser) {
           return reply.status(401).send({ error: 'Benutzerkonto nicht gefunden' });
         }
 
         // Modus CEVIDB_ONLY
-        if (event.signupMode === 'CEVIDB_ONLY' && !user.ceviDbId) {
+        if (event.signupMode === 'CEVIDB_ONLY' && !targetUser.ceviDbId) {
           return reply.status(403).send({
             error:
               'Für dieses Event sind nur verifizierte Cevi.DB-Konten zugelassen. Bitte mit Cevi.DB anmelden.',
           });
         }
-
-        // Altersprüfung (minAge)
-        if (shift.minAge && user.birthDate) {
-          const shiftDate = new Date(shift.startTime);
-          const birthDate = new Date(user.birthDate);
-          let age = shiftDate.getFullYear() - birthDate.getFullYear();
-          const monthDiff = shiftDate.getMonth() - birthDate.getMonth();
-          if (monthDiff < 0 || (monthDiff === 0 && shiftDate.getDate() < birthDate.getDate())) {
-            age--;
-          }
-
-          if (age < shift.minAge) {
-            return reply.status(403).send({
-              error: `Für diese Schicht (${shift.title}) ist ein Mindestalter von ${shift.minAge} Jahren erforderlich. Dein Alter: ${age} Jahre.`,
-            });
-          }
-        }
-
-        // Prüfe ob bereits eingetragen
-        const alreadySignedUp = shift.signups.some((s) => s.userId === userId);
-        if (alreadySignedUp) {
-          return reply.status(409).send({ error: 'Du bist für diese Schicht bereits eingetragen' });
-        }
       } else {
-        // Nicht eingeloggt: Prüfe ob Event anonyme / passwortlose Eintragung erlaubt
+        // Nicht eingeloggt: Gast-Anmeldung
         if (event.signupMode === 'LOGIN_REQUIRED' || event.signupMode === 'CEVIDB_ONLY') {
           return reply.status(401).send({
-            error:
-              'Für dieses Event ist ein Login erforderlich. Bitte melde dich an.',
+            error: 'Für dieses Event ist ein Login erforderlich. Bitte melde dich an.',
             requiresLogin: true,
           });
         }
 
-        // shiftId kommt aus der URL, nicht aus dem Body
-        const parse = SignupShiftSchema.safeParse({ ...(request.body as object), shiftId });
-        if (!parse.success) {
-          return reply.status(400).send({ error: parse.error.issues[0].message });
-        }
-
-        guestName = parse.data.guestName?.trim() || null;
-        guestEmail = parse.data.guestEmail?.trim() || null;
-        guestPhone = parse.data.guestPhone?.trim() || null;
+        guestName = reqGuestName?.trim() || null;
+        guestEmail = reqGuestEmail?.trim() || null;
+        guestPhone = reqGuestPhone?.trim() || null;
 
         if (!guestName || guestName.length < 2) {
           return reply
@@ -175,8 +461,15 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             .status(400)
             .send({ error: 'Für dieses Event ist eine Telefonnummer erforderlich' });
         }
+      }
 
-        // Prüfe ob der gleiche Name bereits für die Schicht existiert
+      // Prüfe Duplikate
+      if (targetUserId) {
+        const alreadySignedUp = shift.signups.some((s) => s.userId === targetUserId);
+        if (alreadySignedUp) {
+          return reply.status(409).send({ error: 'Diese Person ist für diese Schicht bereits eingetragen' });
+        }
+      } else if (guestName) {
         const nameConflict = shift.signups.some(
           (s) => s.guestName?.toLowerCase() === guestName!.toLowerCase()
         );
@@ -187,10 +480,87 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
+      // Prüfe freie Plätze in der Gesamtschicht
+      if (shift.signups.length >= shift.requiredSlots) {
+        return reply.status(409).send({ error: 'Diese Schicht ist bereits voll belegt' });
+      }
+
+      // Arbeit (Task) bestimmen
+      let chosenTask = null;
+      if (taskId) {
+        chosenTask = shift.tasks.find((t) => t.id === taskId);
+        if (!chosenTask) {
+          return reply.status(404).send({ error: 'Arbeit in dieser Schicht nicht gefunden' });
+        }
+      } else if (shift.tasks.length === 1) {
+        chosenTask = shift.tasks[0];
+      } else {
+        // Nimm erste Arbeit mit freien Plätzen
+        chosenTask = shift.tasks.find((t) => t.signups.length < t.requiredSlots) || shift.tasks[0] || null;
+      }
+
+      // Prüfe freie Plätze in der gewählten Arbeit
+      if (chosenTask && chosenTask.signups.length >= chosenTask.requiredSlots) {
+        return reply.status(409).send({
+          error: `Für die Arbeit "${chosenTask.title}" sind alle Plätze belegt. Bitte wähle eine andere Arbeit.`,
+        });
+      }
+
+      // Altersprüfungen
+      const shiftDate = new Date(shift.startTime);
+      const userBirthDate = targetUser?.birthDate ? new Date(targetUser.birthDate) : null;
+      const userAge = userBirthDate ? calculateAge(userBirthDate, shiftDate) : null;
+
+      // 1) Mindestalter der Schicht selbst
+      if (shift.minAge && userAge !== null && userAge < shift.minAge) {
+        return reply.status(403).send({
+          error: `Für diese Schicht (${shift.title}) ist ein Mindestalter von ${shift.minAge} Jahren erforderlich. Alter: ${userAge} Jahre.`,
+        });
+      }
+
+      // 2) Mindestalter der spezifischen Arbeit
+      if (chosenTask && chosenTask.minAge) {
+        if (chosenTask.ageRequirementType === 'ALL') {
+          // Alle müssen das Mindestalter haben
+          if (userAge !== null && userAge < chosenTask.minAge) {
+            return reply.status(403).send({
+              error: `Für die Arbeit "${chosenTask.title}" müssen alle Helfer mindestens ${chosenTask.minAge} Jahre alt sein. Alter: ${userAge} Jahre.`,
+            });
+          }
+        } else if (chosenTask.ageRequirementType === 'AT_LEAST_ONE') {
+          // Mindestens eine Person in der Schicht muss das Mindestalter haben
+          // Prüfen, ob bereits jemand in der Schicht das Mindestalter erfüllt
+          const alreadyHasAdult = shift.signups.some((s) => {
+            if (s.user?.birthDate) {
+              const age = calculateAge(new Date(s.user.birthDate), shiftDate);
+              return age >= chosenTask!.minAge!;
+            }
+            return false;
+          });
+
+          if (!alreadyHasAdult) {
+            // Noch niemand in der Schicht hat das geforderte Alter
+            const isUserOldEnough = userAge !== null && userAge >= chosenTask.minAge;
+
+            if (!isUserOldEnough) {
+              // Helfer ist zu jung oder Alter unbekannt.
+              // Prüfe, ob dies der LETZTE freie Platz in der Schicht ist:
+              const remainingShiftSlots = shift.requiredSlots - shift.signups.length;
+              if (remainingShiftSlots <= 1) {
+                return reply.status(403).send({
+                  error: `Für die Arbeit "${chosenTask.title}" muss mindestens eine Person in der Schicht mindestens ${chosenTask.minAge} Jahre alt sein. Da dies der letzte freie Platz ist, muss dieser von einer Person ab ${chosenTask.minAge} Jahren besetzt werden.`,
+                });
+              }
+            }
+          }
+        }
+      }
+
       const signup = await fastify.prisma.shiftSignup.create({
         data: {
           shiftId,
-          userId,
+          taskId: chosenTask?.id || null,
+          userId: targetUserId,
           guestName,
           guestEmail,
           guestPhone,
@@ -202,6 +572,13 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               firstName: true,
               lastName: true,
               ceviName: true,
+              birthDate: true,
+            },
+          },
+          task: {
+            select: {
+              id: true,
+              title: true,
             },
           },
         },
@@ -216,13 +593,15 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       return {
         id: signup.id,
         shiftId: signup.shiftId,
+        taskId: signup.taskId,
+        taskTitle: signup.task?.title || null,
         displayName,
         message: 'Erfolgreich für die Schicht eingetragen!',
       };
     }
   );
 
-  // Aus Schicht austragen (Eigene Eintragung oder Admin/Planner)
+  // Aus Schicht austragen (Eigene Eintragung oder Admin/Planner/Event-OK)
   fastify.delete<{ Params: { id: string }; Querystring: { signupId?: string } }>(
     '/api/shifts/:id/signup',
     { preHandler: [fastify.optionalAuthenticate] },
@@ -297,6 +676,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       const signups = await fastify.prisma.shiftSignup.findMany({
         where: { userId: request.user.id },
         include: {
+          task: { select: { id: true, title: true } },
           shift: {
             include: {
               event: {
@@ -316,6 +696,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       return signups.map((su) => ({
         signupId: su.id,
         shiftId: su.shift.id,
+        taskId: su.task?.id || null,
+        taskTitle: su.task?.title || null,
         title: su.shift.title,
         category: su.shift.category,
         description: su.shift.description,

@@ -1,5 +1,11 @@
 import { FastifyPluginAsync } from 'fastify';
-import { CreateEventSchema, AddEventOrganizerSchema, SignupMode } from '@schichtplan/shared';
+import {
+  CreateEventSchema,
+  AddEventOrganizerSchema,
+  SignupMode,
+  SaveAsTemplateSchema,
+  UnregisterHelperSchema,
+} from '@schichtplan/shared';
 
 const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Events der aktuellen Abteilung
@@ -69,8 +75,15 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         },
         shifts: {
           include: {
+            tasks: {
+              include: {
+                signups: true,
+              },
+              orderBy: { createdAt: 'asc' },
+            },
             signups: {
               include: {
+                task: true,
                 user: {
                   select: {
                     id: true,
@@ -81,6 +94,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                   },
                 },
               },
+              orderBy: { createdAt: 'asc' },
             },
           },
           orderBy: { startTime: 'asc' },
@@ -128,9 +142,23 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             su.guestName ||
             'Helfer*in';
 
+          const userBirthDate = su.user?.birthDate ? su.user.birthDate.toISOString() : null;
+          let userAge: number | null = null;
+          if (su.user?.birthDate) {
+            const shiftDate = new Date(s.startTime);
+            const bDate = new Date(su.user.birthDate);
+            userAge = shiftDate.getFullYear() - bDate.getFullYear();
+            const m = shiftDate.getMonth() - bDate.getMonth();
+            if (m < 0 || (m === 0 && shiftDate.getDate() < bDate.getDate())) {
+              userAge--;
+            }
+          }
+
           return {
             id: su.id,
             shiftId: su.shiftId,
+            taskId: su.taskId || null,
+            taskTitle: su.task?.title || null,
             userId: su.user?.id || null,
             guestName: su.guestName,
             guestEmail: su.guestEmail,
@@ -139,8 +167,25 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             userFirstName: su.user?.firstName || null,
             userLastName: su.user?.lastName || null,
             userCeviName: su.user?.ceviName || null,
+            userBirthDate,
+            userAge,
             createdAt: su.createdAt.toISOString(),
             isConfirmed: su.isConfirmed,
+          };
+        });
+
+        const tasks = s.tasks.map((t) => {
+          const taskSignups = signups.filter((su) => su.taskId === t.id);
+          return {
+            id: t.id,
+            shiftId: t.shiftId,
+            title: t.title,
+            description: t.description,
+            requiredSlots: t.requiredSlots,
+            freeSlots: Math.max(0, t.requiredSlots - taskSignups.length),
+            minAge: t.minAge,
+            ageRequirementType: t.ageRequirementType as 'ALL' | 'AT_LEAST_ONE',
+            signups: taskSignups,
           };
         });
 
@@ -155,6 +200,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           requiredSlots: s.requiredSlots,
           freeSlots: Math.max(0, s.requiredSlots - signups.length),
           minAge: s.minAge,
+          tasks,
           signups,
         };
       }),
@@ -505,6 +551,192 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return { message: 'OK-Mitglied erfolgreich entfernt' };
+    }
+  );
+
+  // Helfer komplett vom Event abmelden (aus allen Schichten dieses Events austragen)
+  fastify.post<{ Params: { slug: string } }>(
+    '/api/events/:slug/unregister-helper',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+
+      const event = await fastify.prisma.event.findUnique({
+        where: {
+          departmentId_slug: {
+            departmentId: request.tenant.id,
+            slug: request.params.slug,
+          },
+        },
+        include: { organizers: true },
+      });
+
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+
+      // Berechtigung prüfen: Admin, Planner oder Event-OK
+      const member = await fastify.prisma.departmentMember.findUnique({
+        where: {
+          departmentId_userId: {
+            departmentId: request.tenant.id,
+            userId: request.user.id,
+          },
+        },
+      });
+
+      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
+
+      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Abmelden von Helfern' });
+      }
+
+      const parse = UnregisterHelperSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      const { userId, guestName } = parse.data;
+
+      if (!userId && !guestName) {
+        return reply.status(400).send({ error: 'userId oder guestName erforderlich' });
+      }
+
+      const whereClause: any = {
+        shift: { eventId: event.id },
+      };
+
+      if (userId) {
+        whereClause.userId = userId;
+      } else if (guestName) {
+        whereClause.guestName = { equals: guestName, mode: 'insensitive' };
+      }
+
+      const deleted = await fastify.prisma.shiftSignup.deleteMany({
+        where: whereClause,
+      });
+
+      return {
+        message: `${deleted.count} Schichteintragung(en) erfolgreich entfernt`,
+        deletedCount: deleted.count,
+      };
+    }
+  );
+
+  // Event als Vorlage für künftige Jahre speichern
+  fastify.post<{ Params: { slug: string } }>(
+    '/api/events/:slug/save-as-template',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+
+      const event = await fastify.prisma.event.findUnique({
+        where: {
+          departmentId_slug: {
+            departmentId: request.tenant.id,
+            slug: request.params.slug,
+          },
+        },
+        include: {
+          organizers: true,
+          shifts: {
+            include: {
+              tasks: {
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+            orderBy: { startTime: 'asc' },
+          },
+        },
+      });
+
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+
+      const member = await fastify.prisma.departmentMember.findUnique({
+        where: {
+          departmentId_userId: {
+            departmentId: request.tenant.id,
+            userId: request.user.id,
+          },
+        },
+      });
+
+      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
+
+      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Vorlagen' });
+      }
+
+      const parse = SaveAsTemplateSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      const templateTitle = parse.data.title || `${event.title} (Vorlage)`;
+      const templateDescription = parse.data.description || event.description || null;
+
+      // Berechne relative Tage und Zeiten ausgehend vom Startdatum des Events
+      const eventStart = new Date(event.startDate);
+      const baseMidnight = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
+
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const formatTimeStr = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+      const shiftTemplates = event.shifts.map((s) => {
+        const sStart = new Date(s.startTime);
+        const sEnd = new Date(s.endTime);
+
+        const sDayMidnight = new Date(sStart.getFullYear(), sStart.getMonth(), sStart.getDate());
+        const diffMs = sDayMidnight.getTime() - baseMidnight.getTime();
+        const dayOffset = Math.max(0, Math.round(diffMs / (24 * 60 * 60 * 1000)));
+
+        return {
+          title: s.title,
+          category: s.category,
+          description: s.description,
+          minAge: s.minAge,
+          dayOffset,
+          startTimeStr: formatTimeStr(sStart),
+          endTimeStr: formatTimeStr(sEnd),
+          tasks: s.tasks.map((t) => ({
+            title: t.title,
+            description: t.description,
+            requiredSlots: t.requiredSlots,
+            minAge: t.minAge,
+            ageRequirementType: t.ageRequirementType as 'ALL' | 'AT_LEAST_ONE',
+          })),
+        };
+      });
+
+      const template = await fastify.prisma.eventTemplate.create({
+        data: {
+          departmentId: request.tenant.id,
+          title: templateTitle,
+          description: templateDescription,
+          signupMode: event.signupMode,
+          requireEmailForGuests: event.requireEmailForGuests,
+          requirePhoneForGuests: event.requirePhoneForGuests,
+          data: {
+            shifts: shiftTemplates,
+          },
+        },
+      });
+
+      return {
+        id: template.id,
+        title: template.title,
+        description: template.description,
+        shiftCount: shiftTemplates.length,
+        createdAt: template.createdAt.toISOString(),
+      };
     }
   );
 };

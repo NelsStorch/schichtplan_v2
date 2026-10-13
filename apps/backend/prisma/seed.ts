@@ -199,6 +199,22 @@ async function main() {
       endTime: new Date('2026-10-16T16:30:00Z'),
       requiredSlots: 4,
       minAge: null,
+      tasks: [
+        {
+          title: 'Zeltbau & Schwere Arbeiten',
+          description: 'Gerüst aufstellen, Planen spannen',
+          requiredSlots: 2,
+          minAge: 16,
+          ageRequirementType: 'ALL' as const,
+        },
+        {
+          title: 'Material & Deko',
+          description: 'Tische, Bänke und Deko einrichten',
+          requiredSlots: 2,
+          minAge: null,
+          ageRequirementType: 'ALL' as const,
+        },
+      ],
     },
     {
       title: 'Grillmeister Freitagabend',
@@ -208,15 +224,47 @@ async function main() {
       endTime: new Date('2026-10-16T21:30:00Z'),
       requiredSlots: 3,
       minAge: null,
+      tasks: [
+        {
+          title: 'Grillleitung',
+          description: 'Fleisch und Grill bedienen',
+          requiredSlots: 1,
+          minAge: 16,
+          ageRequirementType: 'ALL' as const,
+        },
+        {
+          title: 'Ausgabe & Chnoblibrot',
+          description: 'Bestellungen zusammenstellen und ausgeben',
+          requiredSlots: 2,
+          minAge: null,
+          ageRequirementType: 'ALL' as const,
+        },
+      ],
     },
     {
       title: 'Bar & Ausschank Freitagabend',
       category: 'Bar & Getränke',
-      description: 'Getränke ausgeben, Zapfanlage bedienen und Gläser abwaschen. Mindestalter 18 Jahre.',
+      description: 'Getränke ausgeben, Zapfanlage bedienen und Gläser abwaschen.',
       startTime: new Date('2026-10-16T18:00:00Z'),
       endTime: new Date('2026-10-16T23:30:00Z'),
       requiredSlots: 3,
-      minAge: 18,
+      minAge: 16,
+      tasks: [
+        {
+          title: 'Barleitung & Kasse',
+          description: 'Spirituosen-Ausschank und Baraufsicht',
+          requiredSlots: 1,
+          minAge: 18,
+          ageRequirementType: 'ALL' as const,
+        },
+        {
+          title: 'Ausschank & Abwasch',
+          description: 'Bier/Softdrinks und Gläserspülung (mindestens 1 Volljährige/r in Schicht)',
+          requiredSlots: 2,
+          minAge: 18,
+          ageRequirementType: 'AT_LEAST_ONE' as const,
+        },
+      ],
     },
     {
       title: 'Kasse & Bons Samstag Nachmittag',
@@ -226,6 +274,15 @@ async function main() {
       endTime: new Date('2026-10-17T17:30:00Z'),
       requiredSlots: 2,
       minAge: 16,
+      tasks: [
+        {
+          title: 'Hauptkasse',
+          description: 'Bargeld und Twint abrechnen',
+          requiredSlots: 2,
+          minAge: 16,
+          ageRequirementType: 'ALL' as const,
+        },
+      ],
     },
     {
       title: 'Grill & Küche Samstagabend',
@@ -235,6 +292,22 @@ async function main() {
       endTime: new Date('2026-10-17T22:00:00Z'),
       requiredSlots: 4,
       minAge: null,
+      tasks: [
+        {
+          title: 'Grill',
+          description: 'Grillzange führen',
+          requiredSlots: 2,
+          minAge: null,
+          ageRequirementType: 'ALL' as const,
+        },
+        {
+          title: 'Küche & Nachschub',
+          description: 'Salate und Nachschub richten',
+          requiredSlots: 2,
+          minAge: null,
+          ageRequirementType: 'ALL' as const,
+        },
+      ],
     },
     {
       title: 'Chilbi Abbau & Endreinigung',
@@ -244,6 +317,15 @@ async function main() {
       endTime: new Date('2026-10-18T21:30:00Z'),
       requiredSlots: 6,
       minAge: null,
+      tasks: [
+        {
+          title: 'Abbau-Helfer',
+          description: 'Zelt und Stand abbauen',
+          requiredSlots: 6,
+          minAge: null,
+          ageRequirementType: 'ALL' as const,
+        },
+      ],
     },
   ];
 
@@ -258,34 +340,84 @@ async function main() {
         endTime: s.endTime,
         requiredSlots: s.requiredSlots,
         minAge: s.minAge,
+        tasks: {
+          create: s.tasks.map((t) => ({
+            title: t.title,
+            description: t.description,
+            requiredSlots: t.requiredSlots,
+            minAge: t.minAge,
+            ageRequirementType: t.ageRequirementType,
+          })),
+        },
+      },
+      include: {
+        tasks: true,
       },
     });
 
     // Beispiel-Einteilungen
     if (s.title.includes('Grillmeister')) {
+      const task1 = shift.tasks[0];
+      const task2 = shift.tasks[1] || task1;
       await prisma.shiftSignup.create({
-        data: { shiftId: shift.id, userId: admin.id },
+        data: { shiftId: shift.id, taskId: task1?.id, userId: admin.id },
       });
       await prisma.shiftSignup.create({
-        data: { shiftId: shift.id, userId: helperUsers[0].id },
+        data: { shiftId: shift.id, taskId: task2?.id, userId: helperUsers[0].id },
       });
       // Passwortloser Gast-Eintrag
       await prisma.shiftSignup.create({
         data: {
           shiftId: shift.id,
+          taskId: task2?.id,
           guestName: 'Gast ohne Konto',
         },
       });
     }
 
     if (s.title.includes('Bar')) {
+      const task1 = shift.tasks[0];
       await prisma.shiftSignup.create({
-        data: { shiftId: shift.id, userId: helperUsers[1].id },
+        data: { shiftId: shift.id, taskId: task1?.id, userId: helperUsers[0].id },
       });
     }
   }
 
-  console.log('Demo-Schichten und Beispiel-Einteilungen angelegt.');
+  // 6. Demo-Event-Vorlage (Chilbi-Vorlage fürs Folgejahr)
+  await prisma.eventTemplate.upsert({
+    where: { id: 'demo-chilbi-template' },
+    update: {},
+    create: {
+      id: 'demo-chilbi-template',
+      departmentId: department.id,
+      title: 'Muster-Vorlage: 3-Tage Chilbi',
+      description: 'Standard-Schichten und Arbeiten für einen 3-tägigen Chilbistand (Aufbau, Bar, Grill, Kasse, Abbau).',
+      signupMode: 'NAME_ONLY',
+      requireEmailForGuests: false,
+      requirePhoneForGuests: false,
+      data: {
+        shifts: shiftsData.map((s) => ({
+          title: s.title,
+          category: s.category,
+          description: s.description,
+          startDayOffset: Math.floor((s.startTime.getTime() - chilbi.startDate.getTime()) / (1000 * 60 * 60 * 24)),
+          startHour: s.startTime.getUTCHours(),
+          startMinute: s.startTime.getUTCMinutes(),
+          durationMinutes: Math.round((s.endTime.getTime() - s.startTime.getTime()) / (1000 * 60)),
+          minAge: s.minAge,
+          tasks: s.tasks.map((t) => ({
+            title: t.title,
+            description: t.description,
+            requiredSlots: t.requiredSlots,
+            minAge: t.minAge,
+            ageRequirementType: t.ageRequirementType,
+          })),
+        })),
+      },
+    },
+  });
+
+  console.log('Demo-Schichten, Arbeiten, Einteilungen und Event-Vorlage angelegt.');
 }
 
 main()

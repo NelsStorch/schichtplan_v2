@@ -2,8 +2,8 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
-import type { SignupMode } from '@schichtplan/shared';
-import { Button, Callout, Dialog, Field, Input, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
+import type { SignupMode, EventTemplateDto } from '@schichtplan/shared';
+import { Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { BANNER_PRESETS, SIGNUP_MODE_INFO } from './event-meta';
@@ -125,6 +125,10 @@ function EventForm({
   const [newRole, setNewRole] = useState<'OK_LEAD' | 'OK_MEMBER'>('OK_MEMBER');
   const [newRoleTitle, setNewRoleTitle] = useState('');
 
+  // Vorlagen
+  const [templates, setTemplates] = useState<EventTemplateDto[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
   // Ersteller initial als OK-Leitung eintragen
   useEffect(() => {
     if (mode === 'create' && user && organizers.length === 0) {
@@ -139,12 +143,16 @@ function EventForm({
     }
   }, [mode, user, organizers.length]);
 
-  // Abteilungsmitglieder für Auswahl laden
+  // Abteilungsmitglieder & Vorlagen laden
   useEffect(() => {
     if (mode === 'create') {
       api<DeptMemberItem[]>('/api/departments/current/members')
         .then(setDeptMembers)
         .catch(() => setDeptMembers([]));
+
+      api<EventTemplateDto[]>('/api/event-templates')
+        .then(setTemplates)
+        .catch(() => setTemplates([]));
     }
   }, [mode]);
 
@@ -210,26 +218,45 @@ function EventForm({
         requirePhoneForGuests: form.requirePhoneForGuests,
       };
       if (mode === 'create') {
-        await api('/api/events', {
-          method: 'POST',
-          json: {
-            ...shared,
-            slug: form.slug,
-            logoUrl: shared.logoUrl ?? undefined,
-            bannerUrl: shared.bannerUrl ?? undefined,
-            startDate: new Date(form.startDate).toISOString(),
-            endDate: new Date(form.endDate).toISOString(),
-            allowPublicSignup: true,
-            organizers: organizers.map((o) => ({
-              userId: o.userId,
-              ceviName: o.ceviName,
-              email: o.email,
-              role: o.role,
-              roleTitle: o.roleTitle?.trim() || undefined,
-            })),
-          },
-        });
-        toast({ title: 'Anlass erstellt', description: `${form.title} ist jetzt sichtbar.` });
+        if (selectedTemplateId) {
+          await api(`/api/event-templates/${selectedTemplateId}/instantiate`, {
+            method: 'POST',
+            json: {
+              ...shared,
+              slug: form.slug,
+              logoUrl: shared.logoUrl ?? undefined,
+              bannerUrl: shared.bannerUrl ?? undefined,
+              startDate: new Date(form.startDate).toISOString(),
+              endDate: new Date(form.endDate).toISOString(),
+              allowPublicSignup: true,
+            },
+          });
+          toast({
+            title: 'Anlass aus Vorlage erstellt',
+            description: `${form.title} inklusive aller Schichten angelegt.`,
+          });
+        } else {
+          await api('/api/events', {
+            method: 'POST',
+            json: {
+              ...shared,
+              slug: form.slug,
+              logoUrl: shared.logoUrl ?? undefined,
+              bannerUrl: shared.bannerUrl ?? undefined,
+              startDate: new Date(form.startDate).toISOString(),
+              endDate: new Date(form.endDate).toISOString(),
+              allowPublicSignup: true,
+              organizers: organizers.map((o) => ({
+                userId: o.userId,
+                ceviName: o.ceviName,
+                email: o.email,
+                role: o.role,
+                roleTitle: o.roleTitle?.trim() || undefined,
+              })),
+            },
+          });
+          toast({ title: 'Anlass erstellt', description: `${form.title} ist jetzt sichtbar.` });
+        }
         onSaved(form.slug);
       } else {
         await api(`/api/events/${eventSlug}`, { method: 'PATCH', json: shared });
@@ -252,6 +279,44 @@ function EventForm({
       {error && <Callout tone="danger">{error}</Callout>}
 
       <section className="grid gap-5 sm:grid-cols-2">
+        {mode === 'create' && templates.length > 0 && (
+          <Field
+            label="Aus Vorlage erstellen (optional)"
+            hint="Übernimmt alle Schichten, Arbeiten und Mindestalter automatisch"
+            className="sm:col-span-2"
+          >
+            <Select
+              value={selectedTemplateId}
+              onChange={(e) => {
+                const tId = e.target.value;
+                setSelectedTemplateId(tId);
+                if (tId) {
+                  const found = templates.find((t) => t.id === tId);
+                  if (found) {
+                    const cleanTitle = found.title.replace(/\s*\(Vorlage\)\s*/i, '');
+                    setForm((prev) => ({
+                      ...prev,
+                      title: cleanTitle,
+                      slug: slugify(cleanTitle),
+                      description: found.description || '',
+                      signupMode: found.signupMode,
+                      requireEmailForGuests: found.requireEmailForGuests,
+                      requirePhoneForGuests: found.requirePhoneForGuests,
+                    }));
+                  }
+                }
+              }}
+            >
+              <option value="">Keine Vorlage (leeres Event anlegen)</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title} ({t.shiftCount} Schichten)
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
         <Field label="Titel" required className="sm:col-span-2">
           <Input
             value={form.title}

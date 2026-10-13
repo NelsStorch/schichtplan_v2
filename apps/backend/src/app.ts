@@ -15,6 +15,7 @@ import eventRoutes from './routes/events.js';
 import shiftRoutes from './routes/shifts.js';
 import adminRoutes from './routes/admin.js';
 import uploadRoutes from './routes/uploads.js';
+import eventTemplateRoutes from './routes/eventTemplates.js';
 
 // pino-pretty ist optional: fehlt es (z. B. im Dev-Container), wird normal geloggt statt zu crashen.
 function hasPinoPretty(): boolean {
@@ -68,6 +69,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(departmentRoutes);
   await app.register(eventRoutes);
   await app.register(shiftRoutes);
+  await app.register(eventTemplateRoutes);
   await app.register(adminRoutes);
   await app.register(uploadRoutes);
 

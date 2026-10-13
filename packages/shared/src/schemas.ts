@@ -111,24 +111,86 @@ export const AddEventOrganizerSchema = z.object({
 
 export type AddEventOrganizerInput = z.infer<typeof AddEventOrganizerSchema>;
 
+export const CreateShiftTaskSchema = z.object({
+  id: z.string().uuid().optional(),
+  title: z.string().min(2, 'Titel der Arbeit erforderlich'),
+  description: z.string().optional().nullable(),
+  requiredSlots: z.number().int().min(1, 'Mindestens 1 Helfer benötigt').default(1),
+  minAge: z.number().int().min(0).optional().nullable(),
+  ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']).default('ALL'),
+});
+
+export type CreateShiftTaskInput = z.infer<typeof CreateShiftTaskSchema>;
+
 export const CreateShiftSchema = z.object({
   eventId: z.string().uuid(),
   title: z.string().min(2, 'Titel erforderlich'),
   category: z.string().min(2, 'Kategorie erforderlich'),
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
-  requiredSlots: z.number().int().min(1, 'Mindestens 1 Helfer benötigt'),
-  description: z.string().optional(),
+  requiredSlots: z.number().int().min(1).optional(),
+  description: z.string().optional().nullable(),
   minAge: z.number().int().min(0).optional().nullable(),
+  tasks: z.array(CreateShiftTaskSchema).optional(),
 });
 
 export type CreateShiftInput = z.infer<typeof CreateShiftSchema>;
 
+export const UpdateShiftSchema = z.object({
+  title: z.string().min(2).optional(),
+  category: z.string().min(2).optional(),
+  startTime: z.string().datetime().optional(),
+  endTime: z.string().datetime().optional(),
+  requiredSlots: z.number().int().min(1).optional(),
+  description: z.string().optional().nullable(),
+  minAge: z.number().int().min(0).optional().nullable(),
+  tasks: z.array(CreateShiftTaskSchema).optional(),
+});
+
+export type UpdateShiftInput = z.infer<typeof UpdateShiftSchema>;
+
 export const SignupShiftSchema = z.object({
   shiftId: z.string().uuid(),
-  guestName: z.string().min(2, 'Bitte Cevi-Name oder Vorname angeben').optional(),
-  guestEmail: z.string().email('Ungültige E-Mail').optional().or(z.literal('')),
-  guestPhone: z.string().optional(),
+  taskId: z.string().uuid().optional().nullable(),
+  userId: z.string().uuid().optional().nullable(), // Ermöglicht dem OK, ein Abteilungsmitglied einzuteilen
+  guestName: z.string().min(2, 'Bitte Cevi-Name oder Vorname angeben').optional().nullable(),
+  guestEmail: z.string().email('Ungültige E-Mail').optional().or(z.literal('')).nullable(),
+  guestPhone: z.string().optional().nullable(),
 });
 
 export type SignupShiftInput = z.infer<typeof SignupShiftSchema>;
+
+export const SaveAsTemplateSchema = z.object({
+  title: z.string().min(2, 'Name der Vorlage erforderlich'),
+  description: z.string().optional().nullable(),
+});
+
+export type SaveAsTemplateInput = z.infer<typeof SaveAsTemplateSchema>;
+
+export const InstantiateTemplateSchema = z.object({
+  title: z.string().min(2, 'Titel ist erforderlich'),
+  slug: z
+    .string()
+    .min(2, 'Slug erforderlich')
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, 'Slug darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten'),
+  description: z.string().optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
+  bannerUrl: z.string().optional().nullable(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  signupMode: z.enum(['NAME_ONLY', 'OPEN', 'LOGIN_REQUIRED', 'CEVIDB_ONLY']).default('OPEN'),
+  requireEmailForGuests: z.boolean().default(false),
+  requirePhoneForGuests: z.boolean().default(false),
+  allowPublicSignup: z.boolean().default(true),
+});
+
+export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;
+
+export const UnregisterHelperSchema = z.object({
+  userId: z.string().uuid().optional(),
+  guestName: z.string().optional(),
+});
+
+export type UnregisterHelperInput = z.infer<typeof UnregisterHelperSchema>;
+
