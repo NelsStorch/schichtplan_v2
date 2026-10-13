@@ -228,7 +228,21 @@ export interface AdminUserSignupDto {
   createdAt: string;
 }
 
+/** Stufe einer Person, abgeleitet aus ihren Cevi.DB-Rollen (z. B. «Hiskia» als Stufenleiter*in) */
+export interface CeviDbStufeDto {
+  groupId: number;
+  groupName: string;
+  /** Stärkste Rolle in der Stufe: Leitung, Teilnehmer*in oder andere Rolle */
+  kind: 'LEITUNG' | 'TEILNEHMER' | 'ANDERE';
+  /** Bezeichnungen der Rollen in dieser Stufe (z. B. «Stufenleiter/-in») */
+  roleNames: string[];
+  /** Haupt-Stufe der Person (`primary_group_id`) */
+  isPrimary: boolean;
+}
+
 export interface AdminUserDetailDto extends AdminUserListItemDto {
+  /** Stufen laut Cevi.DB (leer ohne Cevi.DB-Login) */
+  stufen: CeviDbStufeDto[];
   organizedEvents: AdminUserOrganizerDto[];
   /** Die neusten Eintragungen (maximal 50) */
   signups: AdminUserSignupDto[];

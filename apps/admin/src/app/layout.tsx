@@ -7,6 +7,13 @@ export const metadata: Metadata = {
   title: 'Admin · Cevi Schichtplan',
   description: 'Verwaltung für globale Admins des Cevi Schichtplans',
   robots: { index: false, follow: false },
+  icons: {
+    icon: [
+      { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
+      { url: '/images/cevi-logo.png', type: 'image/png' },
+    ],
+    apple: '/images/cevi-logo.png',
+  },
 };
 
 export const viewport: Viewport = {

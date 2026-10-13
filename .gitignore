@@ -27,6 +27,8 @@ deploy.config.ps1
 
 # Database & Backups
 *.sql
+# Prisma-Migrationen gehören ins Repository (sonst fehlen sie in einem frischen Checkout)
+!apps/backend/prisma/migrations/**/migration.sql
 *.sql.gz
 *.dump
 *.sqlite

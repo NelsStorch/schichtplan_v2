@@ -141,7 +141,7 @@ docker compose -f "$ComposeFile" -p "$ProjectName" exec -T backend npx prisma mi
 # Kein Seed auf dem Server: Demo-Daten (npm run db:seed) sind nur für die lokale Entwicklung
 
 # Healthcheck Verify
-domain=`$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2- | tr -d '\r"' || true)
+domain=`$(grep -E '^(DOMAIN|DOMAIN_DEV)=' .env 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '\r"' || true)
 domain=`${domain:-$DefaultDomain}
 
 check() {
@@ -154,10 +154,20 @@ check() {
   return 1
 }
 
-if ! check "https://`$domain/health" || ! check "https://`$domain/" || ! check "https://login.`$domain/"; then
+if ! check "https://`$domain/health" || ! check "https://`$domain/"; then
   echo "--- letzte Zeilen Logs ---"
   docker compose -f "$ComposeFile" -p "$ProjectName" logs --tail 40
   exit 1
+fi
+
+if [ "$Environment" = "prod" ]; then
+  if ! check "https://login.`$domain/"; then
+    echo "--- letzte Zeilen Logs ---"
+    docker compose -f "$ComposeFile" -p "$ProjectName" logs --tail 40
+    exit 1
+  fi
+else
+  check "https://login.`$domain/" || echo "WARNUNG: login.`$domain nicht erreichbar (DNS oder Zertifikat noch in Arbeit?)"
 fi
 
 # Admin-Portal: kein harter Fehler, damit ein fehlender DNS-Eintrag den restlichen Deploy nicht kippt

@@ -588,8 +588,8 @@ export default function LandingPage() {
         )}
 
         {ceviDbCreate && (
-          <div className="p-3 mb-4 rounded-tile bg-accent/8 text-fg-muted text-xs border border-accent/20 flex items-start gap-2">
-            <CheckCircle2 className="size-4 shrink-0 mt-px text-accent-ink" />
+          <div className="p-3 mb-4 rounded-tile bg-surface-2 text-fg-muted text-xs border border-line flex items-start gap-2">
+            <CheckCircle2 className="size-4 shrink-0 mt-px text-success-ink" />
             <span>
               Du bist über Cevi.DB als Abteilungsleiter*in
               {eligibility?.leaderGroupName

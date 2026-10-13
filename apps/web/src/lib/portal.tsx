@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { DepartmentDto, UserDto } from '@schichtplan/shared';
 import { applyAccent } from '@schichtplan/ui';
 import { api, errorMessage } from './api';
+import { updateFavicon } from './favicon';
 
 interface PortalState {
   department: DepartmentDto | null;
@@ -50,6 +51,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (department) {
+      updateFavicon(department.logoUrl);
+    }
+  }, [department?.logoUrl]);
 
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });

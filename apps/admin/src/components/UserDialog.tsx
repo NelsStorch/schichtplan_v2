@@ -29,9 +29,9 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div className="min-w-0">
+    <div className={wide ? 'min-w-0 sm:col-span-2' : 'min-w-0'}>
       <dt className="text-xs text-fg-subtle">{label}</dt>
       <dd className="mt-0.5 break-words text-sm font-medium text-fg">{children}</dd>
     </div>
@@ -159,6 +159,27 @@ export function UserDialog({
                 <Fact label="Zuletzt geändert">{formatDateTime(user.updatedAt)}</Fact>
                 <Fact label="Eintragungen">
                   <span className="tabular">{user.signupCount}</span>
+                </Fact>
+                <Fact label="Stufe" wide>
+                  {!loaded ? (
+                    <Skeleton className="h-5 w-40" />
+                  ) : loaded.stufen.length === 0 ? (
+                    <Missing />
+                  ) : (
+                    <ul className="space-y-1">
+                      {loaded.stufen.map((stufe) => (
+                        <li key={stufe.groupId} className="flex flex-wrap items-baseline gap-x-2">
+                          <span>{stufe.groupName}</span>
+                          <span className="font-normal text-fg-muted">{stufe.roleNames.join(', ')}</span>
+                          {stufe.isPrimary && loaded.stufen.length > 1 && (
+                            <span className="text-2xs font-semibold uppercase tracking-wider text-fg-subtle">
+                              Haupt-Stufe
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </Fact>
               </dl>
             </Section>

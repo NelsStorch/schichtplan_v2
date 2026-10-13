@@ -33,6 +33,11 @@ services:
       CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}
       CEVIDB_CLIENT_SECRET: ${CEVIDB_CLIENT_SECRET:-}
       GLOBAL_ADMIN_CEVIDB_IDS: ${GLOBAL_ADMIN_CEVIDB_IDS:-}
+      CEVIDB_ORTSGRUPPE_FIELD: ${CEVIDB_ORTSGRUPPE_FIELD:-}
+      CEVIDB_DEPARTMENT_LEADER_ROLES: ${CEVIDB_DEPARTMENT_LEADER_ROLES:-}
+      CEVIDB_STUFE_ROLE_PREFIX: ${CEVIDB_STUFE_ROLE_PREFIX:-}
+      CEVIDB_STUFE_LEADER_ROLES: ${CEVIDB_STUFE_LEADER_ROLES:-}
+      CEVIDB_STUFE_PARTICIPANT_ROLES: ${CEVIDB_STUFE_PARTICIPANT_ROLES:-}
       CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-https://login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}/api/auth/cevidb/callback}
       SMTP_HOST: ${SMTP_HOST:-mail.infomaniak.com}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -48,7 +53,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
-      - "traefik.http.routers.schichtplan-dev-api.rule=(Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`www.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN_DEV:-dev.cevi-schichtplan.ch}$$`)) && (PathPrefix(`/api`) || Path(`/health`))"
+      - "traefik.http.routers.schichtplan-dev-api.rule=(Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`admin.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN_DEV:-dev.cevi-schichtplan.ch}$$`)) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-dev-api.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-dev-api.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-dev-api.priority=100"
@@ -77,7 +82,9 @@ services:
       - "traefik.docker.network=web_proxy"
       - "traefik.http.routers.schichtplan-dev-web.rule=HostRegexp(`^[a-z0-9-]+[.]${DOMAIN_DEV:-dev.cevi-schichtplan.ch}$$`)"
       - "traefik.http.routers.schichtplan-dev-web.entrypoints=websecure"
-      - "traefik.http.routers.schichtplan-dev-web.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-dev-web.tls.certresolver=dnsresolver"
+      - "traefik.http.routers.schichtplan-dev-web.tls.domains[0].main=${DOMAIN_DEV:-dev.cevi-schichtplan.ch}"
+      - "traefik.http.routers.schichtplan-dev-web.tls.domains[0].sans=*.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}"
       - "traefik.http.routers.schichtplan-dev-web.priority=10"
       - "traefik.http.routers.schichtplan-dev-web.service=schichtplan-dev-web"
       - "traefik.http.services.schichtplan-dev-web.loadbalancer.server.port=3000"
@@ -101,7 +108,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_proxy"
-      - "traefik.http.routers.schichtplan-dev-landing.rule=Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`www.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-landing.rule=Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
       - "traefik.http.routers.schichtplan-dev-landing.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-dev-landing.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-dev-landing.priority=20"

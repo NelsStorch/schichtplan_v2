@@ -6,6 +6,7 @@ import {
   RegisterDepartmentSchema,
   type DepartmentCreationEligibilityDto,
 } from '@schichtplan/shared';
+import { cevidbConfig } from '../config/cevidb.js';
 import { ceviDbLeadership } from '../services/cevidb.js';
 
 const NOT_ELIGIBLE_MESSAGES = {
@@ -70,6 +71,48 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       createdAt: request.tenant.createdAt.toISOString(),
     };
   });
+
+  // Mitglieder der aktuellen Abteilung (für OK-Auswahl, Helferliste etc.)
+  fastify.get(
+    '/api/departments/current/members',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+      }
+
+      const members = await fastify.prisma.departmentMember.findMany({
+        where: { departmentId: request.tenant.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              ceviName: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: [
+          { user: { lastName: 'asc' } },
+        ],
+      });
+
+      return members.map((m) => ({
+        id: m.id,
+        userId: m.userId,
+        role: m.role,
+        firstName: m.user.firstName,
+        lastName: m.user.lastName,
+        ceviName: m.user.ceviName,
+        email: m.user.email,
+        displayName: m.user.ceviName
+          ? `${m.user.ceviName} (${m.user.firstName} ${m.user.lastName})`
+          : `${m.user.firstName} ${m.user.lastName}`,
+      }));
+    }
+  );
 
   // Liste aller Abteilungen (für Hauptseite / Suche)
   fastify.get('/api/departments', async () => {
@@ -151,13 +194,14 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           });
 
           // Alle bereits angemeldeten Cevi.DB-Personen dieser Ortsgruppe gleich als Helfer zuordnen
+          const ortsgruppeField = cevidbConfig().ortsgruppeField;
           await tx.$executeRaw`
             INSERT INTO "department_members" ("id", "departmentId", "userId", "role")
             SELECT gen_random_uuid()::text, ${created.id}::text, u."id", 'HELPER'
             FROM "users" u
             WHERE CASE
-                    WHEN u."ceviDbData"->>'ortsgruppe_id' ~ '^[0-9]{1,9}$'
-                    THEN (u."ceviDbData"->>'ortsgruppe_id')::integer
+                    WHEN u."ceviDbData"->>${ortsgruppeField}::text ~ '^[0-9]{1,9}$'
+                    THEN (u."ceviDbData"->>${ortsgruppeField}::text)::integer
                   END = ${ortsgruppeId}::integer
             ON CONFLICT ("departmentId", "userId") DO NOTHING`;
 

@@ -1,18 +1,15 @@
 /**
  * Auswertung des Cevi.DB-Profils (`/oauth/profile` mit Scope `with_roles`).
  * Das Profil wird beim Cevi.DB-Login in `users.ceviDbData` gespeichert.
+ * Welche Rollen was bedeuten, steht in `config/cevidb.ts`.
  */
-
-/**
- * Cevi.DB-Rollen (`role_class`), die als Abteilungsleitung gelten und damit für ihre Ortsgruppe
- * eine Abteilung (Subdomain) anlegen dürfen. Weitere Rollen hier ergänzen.
- */
-export const DEPARTMENT_LEADER_ROLE_CLASSES: readonly string[] = ['Group::Jungschar::Abteilungsleiter'];
+import type { CeviDbStufeDto } from '@schichtplan/shared';
+import { cevidbConfig } from '../config/cevidb.js';
 
 export interface CeviDbLeadership {
-  /** Hat eine Rolle aus DEPARTMENT_LEADER_ROLE_CLASSES */
+  /** Hat eine Rolle aus `departmentLeaderRoleClasses` */
   isLeader: boolean;
-  /** `ortsgruppe_id` der Person: Cevi.DB-Gruppe, zu der ihre Abteilung gehört */
+  /** Gruppen-ID der Ortsgruppe der Person (Feld `ortsgruppeField`) */
   ortsgruppeId: number | null;
   /** Gruppe, in der die Leitungsrolle liegt (z. B. "JS Illnau") */
   leaderGroupName: string | null;
@@ -28,18 +25,78 @@ export function parseCeviDbGroupId(value: unknown): number | null {
   return Number.isInteger(id) && id > 0 && id <= 2_147_483_647 ? id : null;
 }
 
-export function ceviDbLeadership(profile: unknown): CeviDbLeadership {
-  if (!isRecord(profile)) return { isLeader: false, ortsgruppeId: null, leaderGroupName: null };
+/** Gruppen-ID der Ortsgruppe aus dem Profil (konfiguriertes Feld, Standard `ortsgruppe_id`). */
+export function ortsgruppeIdFromProfile(profile: unknown): number | null {
+  return isRecord(profile) ? parseCeviDbGroupId(profile[cevidbConfig().ortsgruppeField]) : null;
+}
 
-  const roles = Array.isArray(profile.roles) ? profile.roles.filter(isRecord) : [];
-  const leaderRole = roles.find((role) => {
-    const roleClass = typeof role.role_class === 'string' ? role.role_class : role.role;
-    return typeof roleClass === 'string' && DEPARTMENT_LEADER_ROLE_CLASSES.includes(roleClass);
+function profileRoles(profile: unknown): Record<string, unknown>[] {
+  return isRecord(profile) && Array.isArray(profile.roles) ? profile.roles.filter(isRecord) : [];
+}
+
+function roleClassOf(role: Record<string, unknown>): string | null {
+  const roleClass = typeof role.role_class === 'string' ? role.role_class : role.role;
+  return typeof roleClass === 'string' ? roleClass : null;
+}
+
+export function ceviDbLeadership(profile: unknown): CeviDbLeadership {
+  const { departmentLeaderRoleClasses } = cevidbConfig();
+  const leaderRole = profileRoles(profile).find((role) => {
+    const roleClass = roleClassOf(role);
+    return roleClass !== null && departmentLeaderRoleClasses.includes(roleClass);
   });
 
   return {
     isLeader: Boolean(leaderRole),
-    ortsgruppeId: parseCeviDbGroupId(profile.ortsgruppe_id),
+    ortsgruppeId: ortsgruppeIdFromProfile(profile),
     leaderGroupName: leaderRole && typeof leaderRole.group_name === 'string' ? leaderRole.group_name : null,
   };
+}
+
+const kindRank: Record<CeviDbStufeDto['kind'], number> = { LEITUNG: 0, TEILNEHMER: 1, ANDERE: 2 };
+
+/**
+ * Stufen der Person: alle Gruppen, in denen sie eine Rolle mit dem konfigurierten Präfix
+ * (Standard `Group::Stufe::`) hat. Pro Stufe zählt die stärkste Rolle (Leitung vor Teilnehmer*in).
+ * Die Haupt-Stufe (`primary_group_id` des Profils) steht zuerst.
+ */
+export function ceviDbStufen(profile: unknown): CeviDbStufeDto[] {
+  const { stufeRoleClassPrefix, stufeLeaderRoles, stufeParticipantRoles } = cevidbConfig();
+  const primaryGroupId = isRecord(profile) ? parseCeviDbGroupId(profile.primary_group_id) : null;
+  const byGroup = new Map<number, CeviDbStufeDto>();
+
+  for (const role of profileRoles(profile)) {
+    const roleClass = roleClassOf(role);
+    const groupId = parseCeviDbGroupId(role.group_id);
+    if (roleClass === null || groupId === null || !roleClass.startsWith(stufeRoleClassPrefix)) continue;
+
+    const roleKey = roleClass.slice(roleClass.lastIndexOf('::') + 2);
+    const kind: CeviDbStufeDto['kind'] = stufeLeaderRoles.includes(roleKey)
+      ? 'LEITUNG'
+      : stufeParticipantRoles.includes(roleKey)
+        ? 'TEILNEHMER'
+        : 'ANDERE';
+    const roleName = typeof role.role_name === 'string' ? role.role_name : roleKey;
+
+    const existing = byGroup.get(groupId);
+    if (!existing) {
+      byGroup.set(groupId, {
+        groupId,
+        groupName: typeof role.group_name === 'string' ? role.group_name : `Gruppe ${groupId}`,
+        kind,
+        roleNames: [roleName],
+        isPrimary: groupId === primaryGroupId,
+      });
+    } else {
+      if (!existing.roleNames.includes(roleName)) existing.roleNames.push(roleName);
+      if (kindRank[kind] < kindRank[existing.kind]) existing.kind = kind;
+    }
+  }
+
+  return [...byGroup.values()].sort(
+    (a, b) =>
+      Number(b.isPrimary) - Number(a.isPrimary) ||
+      kindRank[a.kind] - kindRank[b.kind] ||
+      a.groupName.localeCompare(b.groupName, 'de')
+  );
 }

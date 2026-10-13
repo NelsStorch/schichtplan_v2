@@ -201,6 +201,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         signupMode,
         requireEmailForGuests,
         requirePhoneForGuests,
+        organizers: requestedOrganizers,
       } = parse.data;
 
       const existing = await fastify.prisma.event.findUnique({
@@ -218,6 +219,61 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: 'Ein Event mit diesem Slug existiert bereits in dieser Abteilung' });
       }
 
+      // OK-Mitglieder auflösen
+      const organizersToCreate: Array<{ userId: string; role: string; roleTitle?: string }> = [];
+      const userIdsSeen = new Set<string>();
+
+      if (Array.isArray(requestedOrganizers) && requestedOrganizers.length > 0) {
+        for (const item of requestedOrganizers) {
+          let targetUser = null;
+          if (item.userId) {
+            targetUser = await fastify.prisma.user.findUnique({ where: { id: item.userId } });
+          } else if (item.ceviName) {
+            targetUser = await fastify.prisma.user.findFirst({
+              where: { ceviName: { equals: item.ceviName.trim(), mode: 'insensitive' } },
+            });
+          } else if (item.email) {
+            targetUser = await fastify.prisma.user.findUnique({
+              where: { email: item.email.toLowerCase() },
+            });
+          }
+
+          if (targetUser && !userIdsSeen.has(targetUser.id)) {
+            userIdsSeen.add(targetUser.id);
+            organizersToCreate.push({
+              userId: targetUser.id,
+              role: item.role || 'OK_MEMBER',
+              roleTitle: item.roleTitle?.trim() || (item.role === 'OK_LEAD' ? 'Event-Leitung' : undefined),
+            });
+
+            // Sicherstellen, dass die Person Mitglied der Abteilung ist
+            await fastify.prisma.departmentMember.upsert({
+              where: {
+                departmentId_userId: {
+                  departmentId: request.tenant.id,
+                  userId: targetUser.id,
+                },
+              },
+              update: {},
+              create: {
+                departmentId: request.tenant.id,
+                userId: targetUser.id,
+                role: 'HELPER',
+              },
+            });
+          }
+        }
+      }
+
+      // Falls der Ersteller noch nicht im OK ist, als OK-Leitung hinzufügen
+      if (!userIdsSeen.has(request.user.id)) {
+        organizersToCreate.unshift({
+          userId: request.user.id,
+          role: 'OK_LEAD',
+          roleTitle: 'Event-Leitung',
+        });
+      }
+
       const event = await fastify.prisma.event.create({
         data: {
           departmentId: request.tenant.id,
@@ -232,13 +288,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           signupMode,
           requireEmailForGuests,
           requirePhoneForGuests,
-          // Ersteller automatisch als OK-Leitung eintragen
           organizers: {
-            create: {
-              userId: request.user.id,
-              role: 'OK_LEAD',
-              roleTitle: 'Event-Leitung',
-            },
+            create: organizersToCreate,
           },
         },
       });

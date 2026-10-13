@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <linearGradient id="sky-alps" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="35%" stop-color="#1e293b"/>
+      <stop offset="65%" stop-color="#475569"/>
+      <stop offset="85%" stop-color="#f472b6"/>
+      <stop offset="100%" stop-color="#fed7aa"/>
+    </linearGradient>
+    <linearGradient id="peak-alpenglow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fecdd3"/>
+      <stop offset="30%" stop-color="#fda4af"/>
+      <stop offset="70%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="peak-shadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="40%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="slope-front" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#15261d"/>
+      <stop offset="100%" stop-color="#09140f"/>
+    </linearGradient>
+    <radialGradient id="window-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#d97706" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="1600" height="900" fill="url(#sky-alps)"/>
+
+  <!-- Stars in Upper Sky -->
+  <g fill="#ffffff" opacity="0.6">
+    <circle cx="200" cy="70" r="1.5"/><circle cx="450" cy="110" r="1.2"/><circle cx="700" cy="50" r="1.8"/>
+    <circle cx="950" cy="90" r="1.3"/><circle cx="1200" cy="60" r="2"/><circle cx="1400" cy="120" r="1.5"/>
+    <circle cx="320" cy="140" r="1.2"/><circle cx="820" cy="130" r="1.4"/><circle cx="1080" cy="150" r="1.6"/>
+  </g>
+
+  <!-- Far Alpine Peaks (Distant Massif) -->
+  <!-- Peak 1 Left -->
+  <polygon points="360,240 180,480 540,480" fill="url(#peak-alpenglow)"/>
+  <polygon points="360,240 180,480 360,480" fill="url(#peak-shadow)" opacity="0.6"/>
+
+  <!-- Peak 2 Center Giant (Matterhorn / Alpine Horn shape) -->
+  <polygon points="820,180 560,510 1140,510" fill="url(#peak-alpenglow)"/>
+  <!-- Ridge Shadow Face -->
+  <polygon points="820,180 560,510 820,510" fill="url(#peak-shadow)" opacity="0.7"/>
+
+  <!-- Peak 3 Right Massif -->
+  <polygon points="1260,260 1020,490 1520,490" fill="url(#peak-alpenglow)"/>
+  <polygon points="1260,260 1020,490 1260,490" fill="url(#peak-shadow)" opacity="0.6"/>
+
+  <!-- Midground Mountain Slope & Pine Forest Layer -->
+  <path d="M0,490 L380,430 L820,480 L1240,410 L1600,470 L1600,900 L0,900 Z" fill="#0f291e" opacity="0.7"/>
+
+  <!-- Midground Pine Trees Silhouettes -->
+  <g fill="#0b1e16">
+    <polygon points="200,410 180,450 220,450"/><polygon points="200,440 170,490 230,490"/><polygon points="200,480 160,540 240,540"/>
+    <polygon points="320,380 305,420 335,420"/><polygon points="320,410 295,460 345,460"/><polygon points="320,450 285,510 355,510"/>
+    <polygon points="1320,370 1300,410 1340,410"/><polygon points="1320,400 1290,450 1350,450"/><polygon points="1320,440 1280,500 1360,500"/>
+    <polygon points="1440,400 1425,440 1455,440"/><polygon points="1440,430 1415,480 1465,480"/><polygon points="1440,470 1405,530 1475,530"/>
+  </g>
+
+  <!-- Foreground Mountain Ridge / Clearing -->
+  <path d="M0,610 Q400,560 850,580 T1600,560 L1600,900 L0,900 Z" fill="url(#slope-front)"/>
+
+  <!-- Traditional Swiss Scout Cabin / Cevi-Hütte -->
+  <g transform="translate(680, 500)">
+    <!-- Cabin Chimney & Smoke -->
+    <rect x="70" y="20" width="22" height="60" fill="#475569"/>
+    <!-- Smoke puffs -->
+    <circle cx="81" cy="5" r="12" fill="#cbd5e1" opacity="0.3"/>
+    <circle cx="92" cy="-18" r="16" fill="#cbd5e1" opacity="0.25"/>
+    <circle cx="106" cy="-45" r="20" fill="#cbd5e1" opacity="0.2"/>
+
+    <!-- Cabin Roof (Overhanging Alpine Shingle Roof) -->
+    <polygon points="160,50 -20,135 340,135" fill="#451a03"/>
+    <polygon points="160,50 160,135 340,135" fill="#291104"/>
+    <rect x="-30" y="130" width="380" height="12" rx="3" fill="#78350f"/>
+
+    <!-- Cabin Front Wooden Walls (Log cabin beams) -->
+    <rect x="15" y="142" width="290" height="140" fill="#78350f"/>
+    <!-- Horizontal log lines -->
+    <line x1="15" y1="165" x2="305" y2="165" stroke="#451a03" stroke-width="3"/>
+    <line x1="15" y1="190" x2="305" y2="190" stroke="#451a03" stroke-width="3"/>
+    <line x1="15" y1="215" x2="305" y2="215" stroke="#451a03" stroke-width="3"/>
+    <line x1="15" y1="240" x2="305" y2="240" stroke="#451a03" stroke-width="3"/>
+    <line x1="15" y1="265" x2="305" y2="265" stroke="#451a03" stroke-width="3"/>
+
+    <!-- Stone Foundation -->
+    <rect x="10" y="282" width="300" height="24" fill="#334155"/>
+
+    <!-- Cabin Door -->
+    <rect x="50" y="180" width="50" height="102" rx="2" fill="#291104"/>
+    <circle cx="90" cy="235" r="4" fill="#fbbf24"/>
+
+    <!-- Warm Glowing Windows with Cross Mullions -->
+    <!-- Window 1 (Right) -->
+    <g transform="translate(145, 175)">
+      <!-- Window glow -->
+      <ellipse cx="30" cy="30" rx="60" ry="45" fill="url(#window-glow)"/>
+      <rect x="0" y="0" width="60" height="60" rx="3" fill="#fef08a"/>
+      <!-- Wooden mullions & frame -->
+      <rect x="-4" y="-4" width="68" height="68" rx="4" fill="none" stroke="#451a03" stroke-width="5"/>
+      <line x1="30" y1="0" x2="30" y2="60" stroke="#451a03" stroke-width="4"/>
+      <line x1="0" y1="30" x2="60" y2="30" stroke="#451a03" stroke-width="4"/>
+    </g>
+
+    <!-- Window 2 (Far Right Attic) -->
+    <g transform="translate(230, 175)">
+      <!-- Window glow -->
+      <ellipse cx="25" cy="30" rx="55" ry="40" fill="url(#window-glow)"/>
+      <rect x="0" y="0" width="50" height="60" rx="3" fill="#fef08a"/>
+      <rect x="-4" y="-4" width="58" height="68" rx="4" fill="none" stroke="#451a03" stroke-width="5"/>
+      <line x1="25" y1="0" x2="25" y2="60" stroke="#451a03" stroke-width="4"/>
+      <line x1="0" y1="30" x2="50" y2="30" stroke="#451a03" stroke-width="4"/>
+    </g>
+
+    <!-- Attic Small Triangular / Diamond Window -->
+    <polygon points="160,85 145,110 175,110" fill="#fef08a"/>
+    <polygon points="160,85 145,110 175,110" fill="none" stroke="#451a03" stroke-width="3"/>
+  </g>
+
+  <!-- Foreground Alpine Flora / Pine Branches Framing Left -->
+  <g fill="#07120c">
+    <polygon points="60,540 40,590 80,590"/><polygon points="60,580 30,640 90,640"/><polygon points="60,630 15,700 105,700"/><rect x="54" y="700" width="12" height="80"/>
+    <polygon points="140,580 120,630 160,630"/><polygon points="140,620 110,680 170,680"/><polygon points="140,670 95,750 185,750"/><rect x="134" y="750" width="12" height="70"/>
+  </g>
+</svg>

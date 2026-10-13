@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <linearGradient id="sky-sola" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0a192f"/>
+      <stop offset="45%" stop-color="#172a45"/>
+      <stop offset="75%" stop-color="#1f4037"/>
+      <stop offset="100%" stop-color="#4776e6" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="hill-back" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#122a22"/>
+      <stop offset="100%" stop-color="#0b1713"/>
+    </linearGradient>
+    <linearGradient id="tent-canvas-left" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="tent-canvas-right" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="tent-brown-left" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#92400e"/>
+    </linearGradient>
+    <linearGradient id="tent-brown-right" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b45309"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </linearGradient>
+    <radialGradient id="lantern-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#f59e0b" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#b45309" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="1600" height="900" fill="url(#sky-sola)"/>
+
+  <!-- Stars -->
+  <g fill="#f8fafc" opacity="0.6">
+    <circle cx="150" cy="80" r="1.5"/><circle cx="280" cy="140" r="1.2"/><circle cx="420" cy="60" r="2"/><circle cx="580" cy="110" r="1.4"/>
+    <circle cx="720" cy="90" r="1.8"/><circle cx="890" cy="70" r="1.5"/><circle cx="1040" cy="130" r="2.2"/><circle cx="1180" cy="65" r="1.3"/>
+    <circle cx="1340" cy="115" r="1.7"/><circle cx="1490" cy="85" r="1.5"/><circle cx="210" cy="220" r="1.4"/><circle cx="850" cy="180" r="1.2"/>
+    <circle cx="1280" cy="210" r="1.6"/><circle cx="650" cy="40" r="2"/><circle cx="980" cy="30" r="1.8"/><circle cx="440" cy="190" r="1.3"/>
+  </g>
+
+  <!-- Distant Mountain Ridges -->
+  <path d="M0,520 L240,430 L520,490 L820,400 L1120,470 L1400,390 L1600,450 L1600,900 L0,900 Z" fill="#091c16" opacity="0.5"/>
+  <path d="M0,580 L350,510 L680,560 L1020,490 L1380,540 L1600,500 L1600,900 L0,900 Z" fill="#0c231c" opacity="0.8"/>
+
+  <!-- Pine Trees Layer 1 (Background silhouettes) -->
+  <g fill="#081712">
+    <!-- Tree cluster left -->
+    <polygon points="60,380 40,430 80,430"/><polygon points="60,420 30,480 90,480"/><polygon points="60,460 20,540 100,540"/><rect x="56" y="540" width="8" height="60"/>
+    <polygon points="120,410 105,450 135,450"/><polygon points="120,440 95,490 145,490"/><polygon points="120,480 85,550 155,550"/><rect x="116" y="550" width="8" height="50"/>
+    <!-- Tree cluster right -->
+    <polygon points="1480,390 1460,440 1500,440"/><polygon points="1480,430 1450,490 1510,490"/><polygon points="1480,480 1440,550 1520,550"/><rect x="1476" y="550" width="8" height="50"/>
+    <polygon points="1540,420 1525,460 1555,460"/><polygon points="1540,450 1515,500 1565,500"/><polygon points="1540,490 1505,560 1575,560"/><rect x="1536" y="560" width="8" height="40"/>
+  </g>
+
+  <!-- Campsite Ground Layer -->
+  <path d="M0,630 Q350,600 750,610 T1600,600 L1600,900 L0,900 Z" fill="url(#hill-back)"/>
+  <path d="M0,690 Q450,670 900,690 T1600,680 L1600,900 L0,900 Z" fill="#08130f"/>
+
+  <!-- Big Central Scout / Patrol Tent (Giebelzelt / Spatz) -->
+  <g transform="translate(620, 520)">
+    <!-- Lantern glow in front of tent -->
+    <circle cx="160" cy="180" r="140" fill="url(#lantern-glow)"/>
+
+    <!-- Guy ropes -->
+    <line x1="160" y1="0" x2="-60" y2="180" stroke="#94a3b8" stroke-width="2" opacity="0.6"/>
+    <line x1="160" y1="0" x2="380" y2="180" stroke="#94a3b8" stroke-width="2" opacity="0.6"/>
+    <line x1="160" y1="0" x2="160" y2="-20" stroke="#cbd5e1" stroke-width="3"/>
+    <!-- Tent Pennant Flag -->
+    <polygon points="160,-20 200,-10 160,0" fill="#dc2626"/>
+
+    <!-- Front Left Roof Slope -->
+    <polygon points="160,0 20,150 160,170" fill="url(#tent-canvas-left)"/>
+    <!-- Front Right Roof Slope -->
+    <polygon points="160,0 160,170 300,150" fill="url(#tent-canvas-right)"/>
+    <!-- Front Triangular Entrance Opening -->
+    <polygon points="160,50 90,170 230,170" fill="#0f172a"/>
+    <polygon points="160,80 110,170 210,170" fill="#fef08a" opacity="0.8"/>
+
+    <!-- Lantern hanging from entrance -->
+    <line x1="160" y1="70" x2="160" y2="105" stroke="#475569" stroke-width="2"/>
+    <rect x="154" y="105" width="12" height="18" rx="2" fill="#d97706"/>
+    <circle cx="160" cy="114" r="5" fill="#fef08a"/>
+  </g>
+
+  <!-- Left Ridge Tent (Classic Spatz) -->
+  <g transform="translate(220, 560)">
+    <!-- Tent shape -->
+    <polygon points="110,0 10,110 110,125" fill="url(#tent-brown-left)"/>
+    <polygon points="110,0 110,125 210,110" fill="url(#tent-brown-right)"/>
+    <!-- Side wall perspective -->
+    <polygon points="210,110 110,125 220,135 320,115" fill="#78350f" opacity="0.6"/>
+    <!-- Entrance flap -->
+    <polygon points="110,40 60,125 160,125" fill="#1c1917"/>
+    <!-- Ropes -->
+    <line x1="110" y1="0" x2="-20" y2="130" stroke="#78716c" stroke-width="1.5" opacity="0.6"/>
+    <line x1="110" y1="0" x2="240" y2="130" stroke="#78716c" stroke-width="1.5" opacity="0.6"/>
+  </g>
+
+  <!-- Right Tent (Pyramid / Tip Tent) -->
+  <g transform="translate(1120, 550)">
+    <polygon points="120,0 20,140 120,150" fill="url(#tent-canvas-left)"/>
+    <polygon points="120,0 120,150 220,140" fill="url(#tent-canvas-right)"/>
+    <polygon points="120,30 80,150 160,150" fill="#1e293b"/>
+    <line x1="120" y1="0" x2="120" y2="-15" stroke="#cbd5e1" stroke-width="2"/>
+    <polygon points="120,-15 150,-7 120,0" fill="#2563eb"/>
+  </g>
+
+  <!-- Foreground Campfire Glow & Embers (subtle) -->
+  <g transform="translate(520, 730)">
+    <circle cx="0" cy="0" r="70" fill="url(#lantern-glow)" opacity="0.4"/>
+    <polygon points="-15,10 15,10 0,-15" fill="#f59e0b"/>
+    <polygon points="-10,10 10,10 0,-8" fill="#fef08a"/>
+    <!-- Fire logs -->
+    <line x1="-25" y1="12" x2="25" y2="12" stroke="#451a03" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-20" y1="8" x2="18" y2="15" stroke="#291104" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>

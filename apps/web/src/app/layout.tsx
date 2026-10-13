@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   title: { default: 'Cevi Schichtplan', template: '%s · Cevi Schichtplan' },
   description: 'Schichten für Chilbi, Lager und Cevi-Anlässe: anschauen, eintragen, fertig.',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
+      { url: '/images/cevi-logo.png', type: 'image/png' },
+    ],
+    apple: '/images/cevi-logo.png',
+  },
   appleWebApp: { capable: true, title: 'Schichtplan', statusBarStyle: 'black-translucent' },
 };
 

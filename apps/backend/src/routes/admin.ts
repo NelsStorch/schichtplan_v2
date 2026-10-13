@@ -8,6 +8,7 @@ import type {
   AdminUserListItemDto,
   LoginMethod,
 } from '@schichtplan/shared';
+import { ceviDbStufen } from '../services/cevidb.js';
 
 const ListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -190,6 +191,8 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: request.params.id },
         select: {
           ...userSelect,
+          // Nur zum Ableiten der Stufen: das rohe Profil wird nicht ausgeliefert
+          ceviDbData: true,
           organizedEvents: {
             select: {
               role: true,
@@ -240,6 +243,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       const detail: AdminUserDetailDto = {
         ...toListItem(user),
+        stufen: ceviDbStufen(user.ceviDbData),
         organizedEvents: user.organizedEvents.map((o) => ({
           eventId: o.event.id,
           eventTitle: o.event.title,

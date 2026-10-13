@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync, FastifyReply } from 'fastify';
-import { parseCeviDbGroupId } from '../services/cevidb.js';
+import { ortsgruppeIdFromProfile } from '../services/cevidb.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import {
@@ -316,7 +316,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Die eigene Abteilung kommt aus Cevi.DB: Ortsgruppe der Person -> Abteilung mit gleicher ceviDbGroupId
-      const ortsgruppeId = parseCeviDbGroupId(profile.ortsgruppe_id);
+      const ortsgruppeId = ortsgruppeIdFromProfile(profile);
       if (ortsgruppeId !== null) {
         const homeDepartment = await fastify.prisma.department.findUnique({
           where: { ceviDbGroupId: ortsgruppeId },

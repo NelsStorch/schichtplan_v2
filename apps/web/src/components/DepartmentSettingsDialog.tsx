@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent } from 'react';
 import { Check, Settings2 } from 'lucide-react';
-import { Button, Callout, CeviLogo, Dialog, Field, Input, applyAccent, cn, useToast } from '@schichtplan/ui';
+import { Button, Callout, Dialog, Field, Input, applyAccent, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
+import { ImageUpload } from './ImageUpload';
 
 // Kuratierte Akzentfarben, alle mit ausreichendem Kontrast in beiden Modi
 const SWATCHES = ['#e11d48', '#dc2626', '#ea580c', '#d97706', '#16a34a', '#0d9488', '#2563eb', '#7c3aed'];
@@ -76,19 +77,13 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
         <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
 
-      <div className="flex items-end gap-3">
-        <Field label="Logo (Bild-URL)" hint="Leer lassen für das Cevi-Logo" className="flex-1">
-          <Input
-            type="url"
-            value={form.logoUrl}
-            placeholder="https://…/logo.png"
-            onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
-          />
-        </Field>
-        <div className="mb-6 flex size-12 shrink-0 items-center justify-center rounded-field border border-line bg-surface-2 p-1.5">
-          <CeviLogo className="size-full" logoUrl={form.logoUrl || null} alt="Logo-Vorschau" />
-        </div>
-      </div>
+      <ImageUpload
+        label="Logo der Abteilung"
+        hint="Leer lassen für das Cevi-Logo"
+        value={form.logoUrl}
+        onChange={(url) => setForm({ ...form, logoUrl: url ?? '' })}
+        showCeviFallback={true}
+      />
 
       <Field label="Kontakt-E-Mail">
         <Input

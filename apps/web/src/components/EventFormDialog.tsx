@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { CalendarPlus, Check, Palette } from 'lucide-react';
+import { useState, useEffect, type FormEvent } from 'react';
+import { CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
 import type { SignupMode } from '@schichtplan/shared';
 import { Button, Callout, Dialog, Field, Input, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
+import { displayName, usePortal } from '@/lib/portal';
 import { BANNER_PRESETS, SIGNUP_MODE_INFO } from './event-meta';
+import { ImageUpload } from './ImageUpload';
 
 export interface EventFormValues {
   title: string;
@@ -18,6 +20,26 @@ export interface EventFormValues {
   signupMode: SignupMode;
   requireEmailForGuests: boolean;
   requirePhoneForGuests: boolean;
+}
+
+export interface FormOrganizer {
+  userId?: string;
+  ceviName?: string;
+  email?: string;
+  displayName: string;
+  role: 'OK_LEAD' | 'OK_MEMBER';
+  roleTitle?: string;
+}
+
+interface DeptMemberItem {
+  id: string;
+  userId: string;
+  role: string;
+  firstName: string;
+  lastName: string;
+  ceviName?: string | null;
+  email?: string | null;
+  displayName: string;
 }
 
 const EMPTY: EventFormValues = {
@@ -67,7 +89,7 @@ export function EventFormDialog({
       title={mode === 'create' ? 'Neuer Anlass' : 'Design & Einstellungen'}
       description={
         mode === 'create'
-          ? 'Lege Titel, Daten und den Anmeldemodus fest. Schichten fügst du danach hinzu.'
+          ? 'Lege Titel, Daten, Anmeldemodus und das OK fest. Schichten fügst du danach hinzu.'
           : 'Banner, Logo und Anmeldemodus dieses Anlasses anpassen.'
       }
     >
@@ -90,11 +112,88 @@ function EventForm({
   onSaved: (slug: string) => void;
 }) {
   const toast = useToast();
+  const { user } = usePortal();
   const [form, setForm] = useState<EventFormValues>({ ...EMPTY, ...initial });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // OK-Mitglieder für neues Event
+  const [organizers, setOrganizers] = useState<FormOrganizer[]>([]);
+  const [deptMembers, setDeptMembers] = useState<DeptMemberItem[]>([]);
+  const [selectedMemberUserId, setSelectedMemberUserId] = useState('');
+  const [customWho, setCustomWho] = useState('');
+  const [newRole, setNewRole] = useState<'OK_LEAD' | 'OK_MEMBER'>('OK_MEMBER');
+  const [newRoleTitle, setNewRoleTitle] = useState('');
+
+  // Ersteller initial als OK-Leitung eintragen
+  useEffect(() => {
+    if (mode === 'create' && user && organizers.length === 0) {
+      setOrganizers([
+        {
+          userId: user.id,
+          displayName: displayName(user),
+          role: 'OK_LEAD',
+          roleTitle: 'Event-Leitung',
+        },
+      ]);
+    }
+  }, [mode, user, organizers.length]);
+
+  // Abteilungsmitglieder für Auswahl laden
+  useEffect(() => {
+    if (mode === 'create') {
+      api<DeptMemberItem[]>('/api/departments/current/members')
+        .then(setDeptMembers)
+        .catch(() => setDeptMembers([]));
+    }
+  }, [mode]);
+
   const set = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const addOrganizer = () => {
+    if (selectedMemberUserId) {
+      const found = deptMembers.find((m) => m.userId === selectedMemberUserId);
+      if (found) {
+        if (organizers.some((o) => o.userId === found.userId)) {
+          toast({ title: 'Bereits im OK', description: `${found.displayName} ist schon eingetragen.` });
+          return;
+        }
+        setOrganizers((prev) => [
+          ...prev,
+          {
+            userId: found.userId,
+            displayName: found.displayName,
+            role: newRole,
+            roleTitle: newRoleTitle.trim() || undefined,
+          },
+        ]);
+        setSelectedMemberUserId('');
+        setNewRoleTitle('');
+        return;
+      }
+    }
+
+    const who = customWho.trim();
+    if (who) {
+      const isEmail = who.includes('@');
+      setOrganizers((prev) => [
+        ...prev,
+        {
+          ...(isEmail ? { email: who } : { ceviName: who }),
+          displayName: who,
+          role: newRole,
+          roleTitle: newRoleTitle.trim() || undefined,
+        },
+      ]);
+      setCustomWho('');
+      setNewRoleTitle('');
+    }
+  };
+
+  const removeOrganizer = (index: number) => {
+    setOrganizers((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -121,6 +220,13 @@ function EventForm({
             startDate: new Date(form.startDate).toISOString(),
             endDate: new Date(form.endDate).toISOString(),
             allowPublicSignup: true,
+            organizers: organizers.map((o) => ({
+              userId: o.userId,
+              ceviName: o.ceviName,
+              email: o.email,
+              role: o.role,
+              roleTitle: o.roleTitle?.trim() || undefined,
+            })),
           },
         });
         toast({ title: 'Anlass erstellt', description: `${form.title} ist jetzt sichtbar.` });
@@ -135,6 +241,11 @@ function EventForm({
       setSaving(false);
     }
   };
+
+  // Verfügbare Mitglieder, die noch nicht im OK sind
+  const availableMembers = deptMembers.filter(
+    (m) => !organizers.some((o) => o.userId === m.userId)
+  );
 
   return (
     <form onSubmit={submit} className="space-y-7">
@@ -188,6 +299,136 @@ function EventForm({
         </Field>
       </section>
 
+      {/* Organisationskomitee (OK) bei neuem Event angeben */}
+      {mode === 'create' && (
+        <fieldset className="rounded-card border border-line bg-surface-2/60 p-4 sm:p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Users className="size-4 text-accent-ink" />
+            <legend className="text-[13px] font-semibold text-fg">Organisationskomitee (OK)</legend>
+          </div>
+          <p className="mb-4 text-xs text-fg-muted">
+            Wer leitet diesen Anlass und teilt Helfer:innen ein? Du kannst weitere Personen direkt hinzufügen.
+          </p>
+
+          {/* Bereits im OK eingetragene Personen */}
+          <div className="mb-4 divide-y divide-line rounded-field border border-line bg-surface-1">
+            {organizers.map((org, idx) => {
+              const isLead = org.role === 'OK_LEAD';
+              return (
+                <div key={idx} className="flex items-center justify-between gap-3 p-3 text-sm">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={cn(
+                        'flex size-7 shrink-0 items-center justify-center rounded-full',
+                        isLead ? 'bg-amber-500/15 text-amber-600' : 'bg-surface-3 text-fg-muted'
+                      )}
+                    >
+                      {isLead ? <Crown className="size-3.5" /> : <Shield className="size-3.5" />}
+                    </span>
+                    <div className="min-w-0">
+                      <span className="font-semibold text-fg truncate block">{org.displayName}</span>
+                      <span className="text-xs text-fg-subtle">
+                        {isLead ? 'OK-Leitung' : 'OK-Mitglied'}
+                        {org.roleTitle && ` · ${org.roleTitle}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeOrganizer(idx)}
+                    title="Aus OK entfernen"
+                    className="rounded p-1.5 text-fg-subtle hover:bg-danger/10 hover:text-danger"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              );
+            })}
+            {organizers.length === 0 && (
+              <div className="p-3 text-xs text-fg-subtle text-center">Noch niemand im OK eingetragen.</div>
+            )}
+          </div>
+
+          {/* Weitere Person hinzufügen */}
+          <div className="space-y-3 rounded-field border border-line/70 bg-surface-2 p-3 text-xs">
+            <span className="font-semibold text-fg block">Weitere Person zum OK hinzufügen</span>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <label className="text-[11px] font-medium text-fg-subtle block mb-1">Aus Mitgliedern wählen</label>
+                <select
+                  value={selectedMemberUserId}
+                  onChange={(e) => {
+                    setSelectedMemberUserId(e.target.value);
+                    if (e.target.value) setCustomWho('');
+                  }}
+                  className="w-full rounded-field border border-line bg-surface-1 px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                >
+                  <option value="">-- Mitglied wählen --</option>
+                  {availableMembers.map((m) => (
+                    <option key={m.userId} value={m.userId}>
+                      {m.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium text-fg-subtle block mb-1">Oder Cevi-Name / E-Mail</label>
+                <input
+                  type="text"
+                  placeholder="z.B. Falk oder falk@cevi.ch"
+                  value={customWho}
+                  onChange={(e) => {
+                    setCustomWho(e.target.value);
+                    if (e.target.value) setSelectedMemberUserId('');
+                  }}
+                  className="w-full rounded-field border border-line bg-surface-1 px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 items-end">
+              <div>
+                <label className="text-[11px] font-medium text-fg-subtle block mb-1">Rolle im OK</label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as 'OK_LEAD' | 'OK_MEMBER')}
+                  className="w-full rounded-field border border-line bg-surface-1 px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                >
+                  <option value="OK_MEMBER">OK-Mitglied (Schichten planen & Helfer koordinieren)</option>
+                  <option value="OK_LEAD">OK-Leitung (Volle Event-Verwaltung & Design)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium text-fg-subtle block mb-1">Ressort / Bezeichnung (optional)</label>
+                <input
+                  type="text"
+                  placeholder="z.B. Bau & Technik, Kassier, Grillchef"
+                  value={newRoleTitle}
+                  onChange={(e) => setNewRoleTitle(e.target.value)}
+                  className="w-full rounded-field border border-line bg-surface-1 px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selectedMemberUserId && !customWho.trim()}
+                onClick={addOrganizer}
+              >
+                <Plus className="size-3.5" /> Person hinzufügen
+              </Button>
+            </div>
+          </div>
+        </fieldset>
+      )}
+
       <fieldset>
         <legend className="mb-3 text-[13px] font-semibold text-fg">Anmeldemodus</legend>
         <div className="grid gap-2.5 sm:grid-cols-2">
@@ -239,37 +480,53 @@ function EventForm({
         )}
       </fieldset>
 
-      <fieldset>
-        <legend className="mb-3 text-[13px] font-semibold text-fg">Banner</legend>
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          {BANNER_PRESETS.map((preset) => {
-            const selected = form.bannerUrl.split('?')[0] === preset.url.split('?')[0];
-            return (
-              <button
-                key={preset.url}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => set('bannerUrl', preset.url)}
-                className={cn(
-                  'group relative aspect-[16/10] overflow-hidden rounded-tile ring-2 ring-offset-2 ring-offset-surface transition',
-                  selected ? 'ring-accent' : 'ring-transparent hover:ring-line-strong'
-                )}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preset.url.replace('w=1600', 'w=400')} alt="" className="size-full object-cover transition duration-500 group-hover:scale-105" />
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-6 text-left text-xs font-semibold text-white">
-                  {preset.name}
-                </span>
-              </button>
-            );
-          })}
+      <fieldset className="space-y-5">
+        <div>
+          <legend className="mb-3 text-[13px] font-semibold text-fg">Banner des Anlasses</legend>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {BANNER_PRESETS.map((preset) => {
+              const selected = form.bannerUrl === preset.url;
+              return (
+                <button
+                  key={preset.url}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => set('bannerUrl', preset.url)}
+                  className={cn(
+                    'group relative aspect-[16/10] overflow-hidden rounded-tile ring-2 ring-offset-2 ring-offset-surface transition',
+                    selected ? 'ring-accent' : 'ring-transparent hover:ring-line-strong'
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preset.url} alt={preset.name} className="size-full object-cover transition duration-500 group-hover:scale-105" />
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-6 text-left text-xs font-semibold text-white">
+                    {preset.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <Field label="Oder eigene Bild-URL" className="mt-4">
-          <Input type="url" value={form.bannerUrl} placeholder="https://…" onChange={(e) => set('bannerUrl', e.target.value)} />
-        </Field>
-        <Field label="Logo des Anlasses (Bild-URL)" hint="Leer lassen für das Cevi-Logo" className="mt-4">
-          <Input type="url" value={form.logoUrl} placeholder="https://…/logo.png" onChange={(e) => set('logoUrl', e.target.value)} />
-        </Field>
+
+        {/* Eigenes Bannerbild hochladen (kein Pfad/URL eingeben) */}
+        <ImageUpload
+          label="Oder eigenes Bannerbild hochladen"
+          hint="Breitbild empfohlen (max. 6 MB)"
+          aspectRatio="banner"
+          value={BANNER_PRESETS.some((p) => p.url === form.bannerUrl) ? null : form.bannerUrl}
+          onChange={(url) => set('bannerUrl', url ?? BANNER_PRESETS[0].url)}
+          showCeviFallback={false}
+        />
+
+        {/* Logo des Anlasses hochladen (kein Pfad/URL eingeben) */}
+        <ImageUpload
+          label="Logo des Anlasses"
+          hint="Leer lassen für das Cevi-Logo"
+          aspectRatio="square"
+          value={form.logoUrl}
+          onChange={(url) => set('logoUrl', url ?? '')}
+          showCeviFallback={true}
+        />
       </fieldset>
 
       <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">

@@ -40,9 +40,9 @@ export function SignupModeBadge({ mode, tone = 'neutral' }: { mode: SignupMode; 
 }
 
 export const BANNER_PRESETS = [
-  { name: 'Chilbi & Festzelt', url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=1600&auto=format&fit=crop' },
-  { name: 'Sommerlager', url: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?q=80&w=1600&auto=format&fit=crop' },
-  { name: 'Lagerfeuer & Wald', url: 'https://images.unsplash.com/photo-1475483768296-6163e08872a1?q=80&w=1600&auto=format&fit=crop' },
-  { name: 'Grill & Festwirtschaft', url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1600&auto=format&fit=crop' },
-  { name: 'Hütte & Berge', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1600&auto=format&fit=crop' },
+  { name: 'Chilbi & Festzelt', url: '/images/banners/chilbi.svg' },
+  { name: 'Sommerlager', url: '/images/banners/sola.svg' },
+  { name: 'Lagerfeuer & Wald', url: '/images/banners/lagerfeuer.svg' },
+  { name: 'Grill & Festwirtschaft', url: '/images/banners/grill.svg' },
+  { name: 'Hütte & Berge', url: '/images/banners/huette.svg' },
 ];

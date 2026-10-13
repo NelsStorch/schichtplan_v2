@@ -33,11 +33,12 @@ import {
   groupByBusinessDay,
 } from '@/lib/format';
 import { usePortal } from '@/lib/portal';
+import { useDynamicFavicon } from '@/lib/favicon';
 import type { EventDetails } from '@/lib/types';
 
 export default function EventDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const { user, isDeptAdmin, isPlanner } = usePortal();
+  const { user, department, isDeptAdmin, isPlanner } = usePortal();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -54,6 +55,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOkForm, setShowOkForm] = useState(false);
+
+  // Favicon: Event-Logo (falls vorhanden), sonst Abteilungs-Logo
+  useDynamicFavicon(event?.logoUrl || department?.logoUrl, department?.logoUrl);
 
   const load = useCallback(async () => {
     try {

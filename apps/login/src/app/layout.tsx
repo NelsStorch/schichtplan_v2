@@ -6,6 +6,13 @@ import { fontVariables } from '@schichtplan/ui/fonts';
 export const metadata: Metadata = {
   title: 'Anmelden · Cevi Schichtplan',
   description: 'Zentrales Login für Leiter*innen und Helfer*innen des Cevi Schichtplans',
+  icons: {
+    icon: [
+      { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
+      { url: '/images/cevi-logo.png', type: 'image/png' },
+    ],
+    apple: '/images/cevi-logo.png',
+  },
 };
 
 export const viewport: Viewport = {

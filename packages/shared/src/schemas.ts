@@ -61,6 +61,16 @@ export const CeviNameQuickLoginSchema = z.object({
 
 export type CeviNameQuickLoginInput = z.infer<typeof CeviNameQuickLoginSchema>;
 
+export const CreateEventOrganizerItemSchema = z.object({
+  userId: z.string().uuid().optional(),
+  ceviName: z.string().optional(),
+  email: z.string().email().optional(),
+  role: z.enum(['OK_LEAD', 'OK_MEMBER']).default('OK_MEMBER'),
+  roleTitle: z.string().optional().nullable(),
+});
+
+export type CreateEventOrganizerItemInput = z.infer<typeof CreateEventOrganizerItemSchema>;
+
 export const CreateEventSchema = z.object({
   title: z.string().min(2, 'Titel ist erforderlich'),
   slug: z
@@ -77,6 +87,7 @@ export const CreateEventSchema = z.object({
   requireEmailForGuests: z.boolean().default(false),
   requirePhoneForGuests: z.boolean().default(false),
   allowPublicSignup: z.boolean().default(true),
+  organizers: z.array(CreateEventOrganizerItemSchema).optional(),
 });
 
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
