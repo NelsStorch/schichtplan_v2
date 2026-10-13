@@ -82,6 +82,54 @@ export interface UserDto {
   birthDate?: string | null;
   isGlobalAdmin: boolean;
   departmentRole?: UserRole | null;
+  ceviDbId?: number | null;
+  ceviDbSyncedAt?: string | null;
+  hasCeviDb?: boolean;
+}
+
+export interface CeviDbRoleDto {
+  group_id: number;
+  group_name: string;
+  role_name: string;
+  role_class?: string;
+  role?: string;
+  permissions?: string[];
+}
+
+export interface CeviDbProfileDto {
+  id: number;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  given_name?: string | null;
+  family_name?: string | null;
+  nickname?: string | null;
+  company_name?: string | null;
+  company?: boolean;
+  address?: string | null;
+  zip_code?: string | null;
+  town?: string | null;
+  country?: string | null;
+  gender?: string | null;
+  birthday?: string | null;
+  primary_group_id?: number | null;
+  language?: string | null;
+  locale?: string | null;
+  roles?: CeviDbRoleDto[];
+  _userInfo?: Record<string, unknown>;
+  _meta?: {
+    fetchedAt?: string;
+    grantedScopes?: string;
+    tokenType?: string;
+    expiresIn?: number;
+  };
+  [key: string]: unknown;
+}
+
+export interface CeviDbDebugResponseDto {
+  user: UserDto;
+  hasCeviDb: boolean;
+  ceviDbData: CeviDbProfileDto | null;
 }
 
 export interface QuickLoginDto {
@@ -104,4 +152,86 @@ export interface HealthCheckResponse {
   timestamp: string;
   version: string;
   database: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Admin-Portal (admin.<domain>), nur für globale Admins
+// ---------------------------------------------------------------------------
+
+/** Womit sich eine Person bisher anmelden kann (abgeleitet aus den gespeicherten Daten). */
+export type LoginMethod = 'CEVIDB' | 'PASSWORD' | 'CEVINAME';
+
+export interface AdminUserMembershipDto {
+  departmentId: string;
+  departmentName: string;
+  departmentSlug: string;
+  role: string;
+}
+
+export interface AdminUserListItemDto {
+  id: string;
+  email: string | null;
+  firstName: string;
+  lastName: string;
+  ceviName: string | null;
+  phone: string | null;
+  birthDate: string | null;
+  isGlobalAdmin: boolean;
+  ceviDbId: number | null;
+  loginMethods: LoginMethod[];
+  signupCount: number;
+  memberships: AdminUserMembershipDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUserListDto {
+  items: AdminUserListItemDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+export interface AdminUserOrganizerDto {
+  eventId: string;
+  eventTitle: string;
+  eventSlug: string;
+  departmentName: string;
+  departmentSlug: string;
+  role: string;
+  roleTitle: string | null;
+}
+
+export interface AdminUserSignupDto {
+  id: string;
+  shiftTitle: string;
+  shiftCategory: string;
+  startTime: string;
+  endTime: string;
+  eventTitle: string;
+  eventSlug: string;
+  departmentName: string;
+  departmentSlug: string;
+  isConfirmed: boolean;
+  createdAt: string;
+}
+
+export interface AdminUserDetailDto extends AdminUserListItemDto {
+  organizedEvents: AdminUserOrganizerDto[];
+  /** Die neusten Eintragungen (maximal 50) */
+  signups: AdminUserSignupDto[];
+}
+
+export interface AdminOverviewDto {
+  users: number;
+  cevidbUsers: number;
+  passwordUsers: number;
+  /** Personen ohne Passwort und ohne Cevi.DB (Cevi-Name-Schnelllogin) */
+  guestUsers: number;
+  globalAdmins: number;
+  newUsers7d: number;
+  departments: number;
+  events: number;
+  signups: number;
 }

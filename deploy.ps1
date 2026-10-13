@@ -102,6 +102,7 @@ JWT_SECRET=`$jwt_sec
 CEVIDB_BASE_URL=https://db.cevi.ch
 CEVIDB_CLIENT_ID=
 CEVIDB_CLIENT_SECRET=
+GLOBAL_ADMIN_CEVIDB_IDS=
 CEVIDB_REDIRECT_URI=https://login.$DefaultDomain/api/auth/cevidb/callback
 ENVEOF
   else
@@ -116,6 +117,7 @@ JWT_SECRET=`$jwt_sec
 CEVIDB_BASE_URL=https://db.cevi.ch
 CEVIDB_CLIENT_ID=
 CEVIDB_CLIENT_SECRET=
+GLOBAL_ADMIN_CEVIDB_IDS=
 CEVIDB_REDIRECT_URI=https://login.$DefaultDomain/api/auth/cevidb/callback
 ENVEOF
   fi
@@ -155,6 +157,9 @@ if ! check "https://`$domain/health" || ! check "https://`$domain/" || ! check "
   docker compose -f "$ComposeFile" -p "$ProjectName" logs --tail 40
   exit 1
 fi
+
+# Admin-Portal: kein harter Fehler, damit ein fehlender DNS-Eintrag den restlichen Deploy nicht kippt
+check "https://admin.`$domain/" || echo "WARNUNG: admin.`$domain nicht erreichbar (DNS oder Zertifikat noch in Arbeit?)"
 
 echo "DEPLOY_SUCCESS=1"
 "@

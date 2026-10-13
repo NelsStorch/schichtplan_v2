@@ -1,0 +1,4 @@
+/* Tokens, Basis-Styles und Utilities kommen aus dem Preset in packages/ui/tailwind-preset.ts */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

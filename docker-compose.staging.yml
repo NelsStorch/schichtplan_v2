@@ -32,6 +32,7 @@ services:
       CEVIDB_BASE_URL: ${CEVIDB_BASE_URL:-https://db.cevi.ch}
       CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}
       CEVIDB_CLIENT_SECRET: ${CEVIDB_CLIENT_SECRET:-}
+      GLOBAL_ADMIN_CEVIDB_IDS: ${GLOBAL_ADMIN_CEVIDB_IDS:-}
       CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-https://login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}/api/auth/cevidb/callback}
       SMTP_HOST: ${SMTP_HOST:-mail.infomaniak.com}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -135,6 +136,33 @@ services:
       - "traefik.http.services.schichtplan-dev-login.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.schichtplan-dev-login.loadbalancer.healthcheck.interval=2s"
       - "traefik.http.services.schichtplan-dev-login.loadbalancer.healthcheck.timeout=1s"
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      INTERNAL_API_URL: http://backend:4000
+    depends_on:
+      - backend
+    networks:
+      - schichtplan_dev_network
+      - web_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_proxy"
+      # Admin-Portal: Verwaltung für globale Admins (Zugriff wird im Backend geprüft)
+      - "traefik.http.routers.schichtplan-dev-admin.rule=Host(`admin.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-admin.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-dev-admin.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-dev-admin.priority=30"
+      - "traefik.http.routers.schichtplan-dev-admin.service=schichtplan-dev-admin"
+      - "traefik.http.services.schichtplan-dev-admin.loadbalancer.server.port=3003"
+      - "traefik.http.services.schichtplan-dev-admin.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-dev-admin.loadbalancer.healthcheck.interval=3s"
 
 networks:
   schichtplan_dev_network:

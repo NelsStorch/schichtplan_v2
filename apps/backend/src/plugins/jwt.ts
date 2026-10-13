@@ -7,6 +7,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     optionalAuthenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    /** Eingeloggt und in der Datenbank als globaler Admin geführt (nicht nur laut Token). */
+    requireGlobalAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -38,6 +40,23 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
       await request.jwtVerify();
     } catch (err) {
       reply.status(401).send({ error: 'Nicht autorisiert' });
+    }
+  });
+
+  // Der Token wird bis zu 30 Tage getragen: die Admin-Rolle gilt nur, solange sie in der DB steht
+  fastify.decorate('requireGlobalAdmin', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.status(401).send({ error: 'Nicht autorisiert' });
+    }
+
+    const user = await fastify.prisma.user.findUnique({
+      where: { id: request.user.id },
+      select: { isGlobalAdmin: true },
+    });
+    if (!user?.isGlobalAdmin) {
+      return reply.status(403).send({ error: 'Kein Zugriff' });
     }
   });
 

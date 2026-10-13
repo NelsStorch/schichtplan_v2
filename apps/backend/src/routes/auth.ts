@@ -49,6 +49,18 @@ function loginErrorUrl(code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_fa
   return `${base}/?error=${code}&return_to=${encodeURIComponent(returnTo)}`;
 }
 
+/**
+ * Cevi.DB-Personen-IDs (kommagetrennt, z. B. "12211,3456"), die beim Cevi.DB-Login automatisch
+ * globale Admins werden. Befördert nur, entzieht die Rolle nie wieder (das geht über die DB).
+ */
+function bootstrapAdminCeviDbIds(): Set<number> {
+  const ids = (process.env.GLOBAL_ADMIN_CEVIDB_IDS || '')
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  return new Set(ids);
+}
+
 function clearAuthCookie(reply: FastifyReply) {
   const domain = getCookieDomain();
   reply.clearCookie('token', {
@@ -167,7 +179,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
         }
 
-        const tokenData = (await tokenRes.json()) as { access_token: string };
+        const tokenData = (await tokenRes.json()) as {
+          access_token: string;
+          token_type?: string;
+          expires_in?: number;
+          refresh_token?: string;
+          scope?: string;
+        };
         const accessToken = tokenData.access_token;
 
         // Profil abrufen
@@ -185,10 +203,45 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         profile = await profileRes.json();
+
+        // Falls OIDC aktiv ist, versuche zusätzlich Userinfo für allfällige extra Felder abzurufen
+        try {
+          const userinfoRes = await fetch(`${CEVIDB_BASE_URL}/oauth/userinfo`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: 'application/json',
+            },
+          });
+          if (userinfoRes.ok) {
+            const userinfo = await userinfoRes.json();
+            profile._userInfo = userinfo;
+          }
+        } catch {
+          // optional
+        }
+
+        profile._meta = {
+          fetchedAt: new Date().toISOString(),
+          grantedScopes: tokenData.scope || 'email name with_roles',
+          tokenType: tokenData.token_type || 'Bearer',
+          expiresIn: tokenData.expires_in,
+        };
       } catch (err) {
         fastify.log.error(err, 'Cevi.DB nicht erreichbar');
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
       }
+
+      // Sicherstellen, dass DB-Spalten ceviDbData / ceviDbSyncedAt existieren
+      try {
+        await fastify.prisma.$executeRawUnsafe(`
+          ALTER TABLE "users"
+          ADD COLUMN IF NOT EXISTS "ceviDbData" JSONB,
+          ADD COLUMN IF NOT EXISTS "ceviDbSyncedAt" TIMESTAMP(3);
+        `);
+      } catch {
+        // Ignorieren falls Berechtigung fehlt oder Tabelle bereits angepasst
+      }
+
       const ceviDbId = profile.id;
       const email = (profile.email || `cevidb_${ceviDbId}@cevi-schichtplan.ch`).toLowerCase();
       const firstName = profile.first_name || profile.given_name || 'Cevianer*in';
@@ -202,6 +255,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           birthDate = parsedBirthday;
         }
       }
+
+      const now = new Date();
 
       // Benutzer in DB finden oder erstellen
       let user = await fastify.prisma.user.findFirst({
@@ -219,6 +274,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             lastName,
             ceviName,
             birthDate,
+            ceviDbData: profile,
+            ceviDbSyncedAt: now,
           },
         });
       } else {
@@ -230,8 +287,18 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             firstName: firstName || user.firstName,
             lastName: lastName || user.lastName,
             birthDate: birthDate || user.birthDate,
+            ceviDbData: profile,
+            ceviDbSyncedAt: now,
           },
         });
+      }
+
+      if (!user.isGlobalAdmin && typeof ceviDbId === 'number' && bootstrapAdminCeviDbIds().has(ceviDbId)) {
+        user = await fastify.prisma.user.update({
+          where: { id: user.id },
+          data: { isGlobalAdmin: true },
+        });
+        fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
       }
 
       // Falls Subdomain aktiv, als Helfer der Abteilung eintragen
@@ -535,6 +602,42 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
         isGlobalAdmin: user.isGlobalAdmin,
         departmentRole: currentMembership ? currentMembership.role : null,
+        ceviDbId: user.ceviDbId,
+        ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
+        hasCeviDb: Boolean(user.ceviDbId),
+      };
+    }
+  );
+
+  // 6b. Cevi.DB Rohdaten / Debug-Profil des aktuellen Users
+  fastify.get(
+    '/api/auth/cevidb/debug-profile',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: request.user.id },
+      });
+
+      if (!user) {
+        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+      }
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          ceviName: user.ceviName,
+          phone: user.phone,
+          birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
+          isGlobalAdmin: user.isGlobalAdmin,
+          ceviDbId: user.ceviDbId,
+          ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
+          hasCeviDb: Boolean(user.ceviDbId),
+        },
+        hasCeviDb: Boolean(user.ceviDbId),
+        ceviDbData: user.ceviDbData ?? null,
       };
     }
   );

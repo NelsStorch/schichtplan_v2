@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarDays, LogIn, LogOut, Ticket, UserRound } from 'lucide-react';
+import { CalendarDays, Database, LogIn, LogOut, Ticket, UserRound } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -188,6 +188,9 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
       <div className="mt-4 grid gap-2">
         <Link href="/meine-schichten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
           <Ticket /> Meine Schichten
+        </Link>
+        <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
+          <Database /> Cevi.DB Daten & Profil
         </Link>
         <Button variant="ghost" onClick={logout}>
           <LogOut /> Abmelden

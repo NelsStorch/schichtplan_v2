@@ -30,10 +30,11 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan}:${DB_PASSWORD:-cevi_schichtplan_dev_pw}@db:5432/${DB_NAME:-cevi_schichtplan_dev}?schema=public
       JWT_SECRET: ${JWT_SECRET:-super-secret-development-key-min-32-chars}
-      CORS_ORIGIN: "http://localhost:3000,http://localhost:3001,http://localhost:3002"
+      CORS_ORIGIN: "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
       CEVIDB_BASE_URL: ${CEVIDB_BASE_URL:-https://db.cevi.ch}
       CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}
       CEVIDB_CLIENT_SECRET: ${CEVIDB_CLIENT_SECRET:-}
+      GLOBAL_ADMIN_CEVIDB_IDS: ${GLOBAL_ADMIN_CEVIDB_IDS:-}
       CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-http://localhost:3002/api/auth/cevidb/callback}
     ports:
       - "4000:4000"
@@ -118,6 +119,30 @@ services:
       - /app/node_modules
       - /app/apps/login/node_modules
       - /app/apps/login/.next
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      target: development
+    container_name: schichtplan-dev-admin
+    restart: unless-stopped
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      # Bind-Mounts unter Windows/macOS liefern keine FS-Events -> Polling für HMR & Tailwind
+      WATCHPACK_POLLING: "true"
+      INTERNAL_API_URL: http://backend:4000
+    ports:
+      - "3003:3003"
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/admin/node_modules
+      - /app/apps/admin/.next
 
 volumes:
   postgres_dev_data:
