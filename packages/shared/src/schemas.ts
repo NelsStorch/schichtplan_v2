@@ -1,16 +1,18 @@
 import { z } from 'zod';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX, SIGNUP_MODES } from './constants.js';
 
+const DepartmentSlugSchema = z
+  .string()
+  .min(3, 'Subdomain muss mindestens 3 Zeichen lang sein')
+  .max(30, 'Subdomain darf maximal 30 Zeichen lang sein')
+  .regex(SUBDOMAIN_REGEX, 'Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt')
+  .refine((val: string) => !RESERVED_SUBDOMAINS.includes(val as any), {
+    message: 'Diese Subdomain ist reserviert und kann nicht verwendet werden',
+  });
+
 export const RegisterDepartmentSchema = z.object({
   departmentName: z.string().min(2, 'Name muss mindestens 2 Zeichen lang sein'),
-  slug: z
-    .string()
-    .min(3, 'Subdomain muss mindestens 3 Zeichen lang sein')
-    .max(30, 'Subdomain darf maximal 30 Zeichen lang sein')
-    .regex(SUBDOMAIN_REGEX, 'Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt')
-    .refine((val: string) => !RESERVED_SUBDOMAINS.includes(val as any), {
-      message: 'Diese Subdomain ist reserviert und kann nicht verwendet werden',
-    }),
+  slug: DepartmentSlugSchema,
   adminFirstName: z.string().min(2, 'Vorname ist erforderlich'),
   adminLastName: z.string().min(2, 'Nachname ist erforderlich'),
   adminCeviName: z.string().optional(),
@@ -20,6 +22,14 @@ export const RegisterDepartmentSchema = z.object({
 });
 
 export type RegisterDepartmentInput = z.infer<typeof RegisterDepartmentSchema>;
+
+/** Abteilung anlegen als angemeldete Abteilungsleitung (Cevi.DB): ohne Passwort, Admin ist die angemeldete Person. */
+export const CreateDepartmentFromCeviDbSchema = z.object({
+  departmentName: z.string().trim().min(2, 'Name muss mindestens 2 Zeichen lang sein').max(80),
+  slug: DepartmentSlugSchema,
+});
+
+export type CreateDepartmentFromCeviDbInput = z.infer<typeof CreateDepartmentFromCeviDbSchema>;
 
 export const LoginSchema = z.object({
   email: z.string().email('Ungültige E-Mail-Adresse'),

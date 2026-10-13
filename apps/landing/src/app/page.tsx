@@ -15,7 +15,7 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
-import type { RegisterDepartmentInput } from '@schichtplan/shared';
+import type { DepartmentCreationEligibilityDto, RegisterDepartmentInput } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
 import { Button, buttonClasses, Dialog, Input } from '@schichtplan/ui';
 import { Campfire3DCanvas } from '@/components/Campfire3DCanvas';
@@ -59,6 +59,9 @@ export default function LandingPage() {
   }>({
     loading: false,
   });
+  // Abteilungsleitung aus Cevi.DB darf ohne Passwort anlegen ('anonymous' = nicht angemeldet)
+  const [eligibility, setEligibility] = useState<DepartmentCreationEligibilityDto | 'anonymous' | null>(null);
+  const ceviDbCreate = eligibility !== null && eligibility !== 'anonymous' && eligibility.eligible;
 
   useEffect(() => {
     async function loadDepts() {
@@ -77,15 +80,57 @@ export default function LandingPage() {
     loadDepts();
   }, []);
 
+  // Nach dem Cevi.DB-Login (return_to=/?registrieren=1) den Dialog gleich wieder öffnen
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('registrieren')) {
+      setShowRegisterModal(true);
+      url.searchParams.delete('registrieren');
+      window.history.replaceState(null, '', url);
+    }
+  }, []);
+
+  // Beim Öffnen prüfen, ob die angemeldete Person als Abteilungsleitung (Cevi.DB) anlegen darf
+  useEffect(() => {
+    if (!showRegisterModal) return;
+    let cancelled = false;
+    fetch('/api/departments/creation-eligibility')
+      .then(async (res) => (res.ok ? ((await res.json()) as DepartmentCreationEligibilityDto) : 'anonymous'))
+      .catch(() => 'anonymous' as const)
+      .then((result) => {
+        if (!cancelled) setEligibility(result);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showRegisterModal]);
+
+  const departmentUrl = (slug: string) =>
+    window.location.hostname.includes('localhost')
+      ? `http://${slug}.localhost:3000`
+      : `https://${slug}.cevi-schichtplan.ch`;
+
+  /** Zentrales Cevi.DB-Login, danach zurück auf diese Seite mit geöffnetem Dialog. */
+  const ceviDbLoginUrl = () => {
+    const { hostname, protocol, origin } = window.location;
+    const returnTo = encodeURIComponent(`${origin}/?registrieren=1`);
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return `http://localhost:3002/?return_to=${returnTo}`;
+    const rootDomain = hostname.split('.').slice(-2).join('.');
+    return `${protocol}//login.${rootDomain}/?return_to=${returnTo}`;
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterStatus({ loading: true });
 
     try {
-      const res = await fetch('/api/departments', {
+      // Abteilungsleitung (Cevi.DB): ohne Passwort, Admin ist die angemeldete Person
+      const res = await fetch(ceviDbCreate ? '/api/departments/cevidb' : '/api/departments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(
+          ceviDbCreate ? { departmentName: formData.departmentName, slug: formData.slug } : formData
+        ),
       });
 
       const data = await res.json();
@@ -99,10 +144,7 @@ export default function LandingPage() {
       });
 
       setTimeout(() => {
-        const domain = window.location.hostname.includes('localhost')
-          ? `http://${data.department.slug}.localhost:3000`
-          : `https://${data.department.slug}.cevi-schichtplan.ch`;
-        window.location.href = domain;
+        window.location.href = departmentUrl(data.department.slug);
       }, 1500);
     } catch (err: any) {
       setRegisterStatus({ loading: false, error: err.message });
@@ -545,6 +587,53 @@ export default function LandingPage() {
           </div>
         )}
 
+        {ceviDbCreate && (
+          <div className="p-3 mb-4 rounded-tile bg-accent/8 text-fg-muted text-xs border border-accent/20 flex items-start gap-2">
+            <CheckCircle2 className="size-4 shrink-0 mt-px text-accent-ink" />
+            <span>
+              Du bist über Cevi.DB als Abteilungsleiter*in
+              {eligibility?.leaderGroupName
+                ? ` (${eligibility.leaderGroupName})`
+                : ''}{' '}
+              angemeldet. Die Abteilung wird mit deiner Ortsgruppe verknüpft: Alle aus deiner Ortsgruppe
+              werden beim Login automatisch zugeordnet. Du wirst Admin, ein Passwort brauchst du nicht.
+            </span>
+          </div>
+        )}
+
+        {eligibility !== null && eligibility !== 'anonymous' && eligibility.reason === 'EXISTS' && (
+          <div className="p-3 mb-4 rounded-tile bg-surface-2 text-fg-muted text-xs border border-line flex items-start gap-2">
+            <AlertCircle className="size-4 shrink-0 mt-px" />
+            <span>
+              Für deine Ortsgruppe gibt es bereits die Abteilung{' '}
+              {eligibility.existingDepartment ? (
+                <a
+                  href={departmentUrl(eligibility.existingDepartment.slug)}
+                  className="font-semibold text-accent-ink underline underline-offset-2"
+                >
+                  {eligibility.existingDepartment.name}
+                </a>
+              ) : (
+                'angelegt'
+              )}
+              . Wer sich mit Cevi.DB anmeldet, wird ihr automatisch zugeordnet.
+            </span>
+          </div>
+        )}
+
+        {(eligibility === 'anonymous' || (eligibility !== null && eligibility.reason === 'NOT_CEVIDB')) && (
+          <a
+            href={ceviDbLoginUrl()}
+            className="mb-4 flex items-center justify-between gap-3 rounded-tile border border-accent/25 bg-accent/8 p-3 text-xs transition hover:bg-accent/12"
+          >
+            <span className="text-fg-muted">
+              <span className="block font-semibold text-fg">Du bist Abteilungsleiter*in?</span>
+              Mit Cevi.DB anmelden: ohne Passwort, deine Ortsgruppe wird automatisch verknüpft.
+            </span>
+            <ArrowRight className="size-4 shrink-0 text-accent-ink" />
+          </a>
+        )}
+
         <form onSubmit={handleRegister} className="space-y-4 pt-1">
           <div>
             <label className="block text-xs font-semibold text-fg mb-1">
@@ -588,6 +677,7 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {!ceviDbCreate && (
           <div className="pt-3 border-t border-line">
             <h4 className="text-xs font-bold text-fg mb-3">
               Hauptverantwortliche Person (Admin)
@@ -641,6 +731,7 @@ export default function LandingPage() {
               />
             </div>
           </div>
+          )}
 
           <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-line">
             <Button

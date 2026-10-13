@@ -1,4 +1,5 @@
-import { FastifyPluginAsync, FastifyReply } from 'fastify';
+import { FastifyInstance, FastifyPluginAsync, FastifyReply } from 'fastify';
+import { parseCeviDbGroupId } from '../services/cevidb.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import {
@@ -59,6 +60,19 @@ function bootstrapAdminCeviDbIds(): Set<number> {
     .map((part) => Number(part.trim()))
     .filter((id) => Number.isInteger(id) && id > 0);
   return new Set(ids);
+}
+
+/** Trägt die Person als Helfer ein. Eine bestehende Mitgliedschaft (und ihre Rolle) bleibt unverändert. */
+async function ensureHelperMembership(
+  prisma: FastifyInstance['prisma'],
+  departmentId: string,
+  userId: string
+) {
+  await prisma.departmentMember.upsert({
+    where: { departmentId_userId: { departmentId, userId } },
+    update: {},
+    create: { departmentId, userId, role: 'HELPER' },
+  });
 }
 
 function clearAuthCookie(reply: FastifyReply) {
@@ -301,31 +315,26 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
       }
 
-      // Falls Subdomain aktiv, als Helfer der Abteilung eintragen
+      // Die eigene Abteilung kommt aus Cevi.DB: Ortsgruppe der Person -> Abteilung mit gleicher ceviDbGroupId
+      const ortsgruppeId = parseCeviDbGroupId(profile.ortsgruppe_id);
+      if (ortsgruppeId !== null) {
+        const homeDepartment = await fastify.prisma.department.findUnique({
+          where: { ceviDbGroupId: ortsgruppeId },
+          select: { id: true },
+        });
+        if (homeDepartment) {
+          await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
+        }
+      }
+
+      // Kommt die Person von einer Abteilungs-Subdomain, dort ebenfalls als Helfer eintragen
       if (tenantSlug) {
         const department = await fastify.prisma.department.findUnique({
           where: { slug: tenantSlug },
+          select: { id: true },
         });
-
         if (department) {
-          const existingMember = await fastify.prisma.departmentMember.findUnique({
-            where: {
-              departmentId_userId: {
-                departmentId: department.id,
-                userId: user.id,
-              },
-            },
-          });
-
-          if (!existingMember) {
-            await fastify.prisma.departmentMember.create({
-              data: {
-                departmentId: department.id,
-                userId: user.id,
-                role: 'HELPER',
-              },
-            });
-          }
+          await ensureHelperMembership(fastify.prisma, department.id, user.id);
         }
       }
 
@@ -609,13 +618,18 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // 6b. Cevi.DB Rohdaten / Debug-Profil des aktuellen Users
-  fastify.get(
+  // 6b. Cevi.DB Rohdaten / Debug-Profil (Streng geschützt: NUR globale Admins in der DB)
+  fastify.get<{ Querystring: { userId?: string } }>(
     '/api/auth/cevidb/debug-profile',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.requireGlobalAdmin] },
     async (request, reply) => {
+      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+
+      // Admin kann eigenes Profil oder das Profil eines beliebigen anderen Benutzers ansehen
+      const targetUserId = request.query.userId?.trim() || request.user.id;
+
       const user = await fastify.prisma.user.findUnique({
-        where: { id: request.user.id },
+        where: { id: targetUserId },
       });
 
       if (!user) {
@@ -638,6 +652,39 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         },
         hasCeviDb: Boolean(user.ceviDbId),
         ceviDbData: user.ceviDbData ?? null,
+      };
+    }
+  );
+
+  // 6c. Liste aller Benutzer mit Cevi.DB Profil (NUR globale Admins)
+  fastify.get(
+    '/api/auth/cevidb/users',
+    { preHandler: [fastify.requireGlobalAdmin] },
+    async (_request, reply) => {
+      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+
+      const users = await fastify.prisma.user.findMany({
+        where: {
+          ceviDbId: { not: null },
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          ceviName: true,
+          email: true,
+          ceviDbId: true,
+          isGlobalAdmin: true,
+          ceviDbSyncedAt: true,
+        },
+        orderBy: [{ ceviName: 'asc' }, { firstName: 'asc' }],
+      });
+
+      return {
+        users: users.map((u) => ({
+          ...u,
+          ceviDbSyncedAt: u.ceviDbSyncedAt ? u.ceviDbSyncedAt.toISOString() : null,
+        })),
       };
     }
   );

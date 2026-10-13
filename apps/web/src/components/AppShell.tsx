@@ -189,9 +189,11 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
         <Link href="/meine-schichten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
           <Ticket /> Meine Schichten
         </Link>
-        <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
-          <Database /> Cevi.DB Daten & Profil
-        </Link>
+        {user.isGlobalAdmin && (
+          <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
+            <Database /> Cevi.DB Daten & Profil
+          </Link>
+        )}
         <Button variant="ghost" onClick={logout}>
           <LogOut /> Abmelden
         </Button>

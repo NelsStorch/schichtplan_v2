@@ -94,7 +94,19 @@ export function UserDialog({
     >
       {user && (
         <>
-          <LoginMethodBadges methods={user.loginMethods} isAdmin={user.isGlobalAdmin} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <LoginMethodBadges methods={user.loginMethods} isAdmin={user.isGlobalAdmin} />
+            {user.ceviDbId && (
+              <a
+                href={`https://login.cevi-schichtplan.ch/cevidb-daten?userId=${encodeURIComponent(user.id)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
+              >
+                Cevi.DB Rohdaten prüfen ↗
+              </a>
+            )}
+          </div>
 
           <div className="mt-6">
             <Section title="Kontakt">

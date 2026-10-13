@@ -132,6 +132,17 @@ export interface CeviDbDebugResponseDto {
   ceviDbData: CeviDbProfileDto | null;
 }
 
+export interface CeviDbUserSummaryDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  ceviName: string | null;
+  email: string | null;
+  ceviDbId: number | null;
+  isGlobalAdmin: boolean;
+  ceviDbSyncedAt: string | null;
+}
+
 export interface QuickLoginDto {
   ceviName: string;
   firstName?: string;
@@ -234,4 +245,18 @@ export interface AdminOverviewDto {
   departments: number;
   events: number;
   signups: number;
+}
+
+/** Darf die angemeldete Person eine Abteilung (Subdomain) für ihre Ortsgruppe anlegen? */
+export interface DepartmentCreationEligibilityDto {
+  eligible: boolean;
+  /**
+   * Warum nicht: NOT_CEVIDB (nicht mit Cevi.DB angemeldet), NOT_LEADER (keine Abteilungsleitung),
+   * NO_ORTSGRUPPE (Cevi.DB liefert keine Ortsgruppe), EXISTS (Ortsgruppe hat schon eine Abteilung)
+   */
+  reason: 'NOT_CEVIDB' | 'NOT_LEADER' | 'NO_ORTSGRUPPE' | 'EXISTS' | null;
+  ortsgruppeId: number | null;
+  /** Name der Cevi.DB-Gruppe, in der die Person Abteilungsleitung ist (z. B. "JS Illnau") */
+  leaderGroupName: string | null;
+  existingDepartment: { name: string; slug: string } | null;
 }

@@ -14,14 +14,17 @@ import {
   ExternalLink,
   FileJson,
   KeyRound,
+  Lock,
   LogOut,
   Mail,
   MapPin,
   RefreshCw,
   Search,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   User,
+  UserCheck,
   Users,
 } from 'lucide-react';
 import {
@@ -36,7 +39,7 @@ import {
   buttonClasses,
   cn,
 } from '@schichtplan/ui';
-import type { CeviDbDebugResponseDto, CeviDbRoleDto } from '@schichtplan/shared';
+import type { CeviDbDebugResponseDto, CeviDbRoleDto, CeviDbUserSummaryDto } from '@schichtplan/shared';
 
 function calculateAge(birthDateString?: string | null): number | null {
   if (!birthDateString) return null;
@@ -111,22 +114,37 @@ function FactRow({
 
 export default function CeviDbDataPage() {
   const [data, setData] = useState<CeviDbDebugResponseDto | null>(null);
+  const [userList, setUserList] = useState<CeviDbUserSummaryDto[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState<'ok' | 'unauthenticated' | 'forbidden'>('ok');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showRawJson, setShowRawJson] = useState(true);
 
-  const fetchProfile = async () => {
+  // 1. Profil abrufen (optional für einen bestimmten User)
+  const fetchProfile = async (userId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/cevidb/debug-profile', {
+      const url = userId
+        ? `/api/auth/cevidb/debug-profile?userId=${encodeURIComponent(userId)}`
+        : '/api/auth/cevidb/debug-profile';
+
+      const res = await fetch(url, {
         headers: { Accept: 'application/json' },
       });
 
       if (res.status === 401) {
-        // Nicht angemeldet
+        setAuthStatus('unauthenticated');
+        setData(null);
+        setLoading(false);
+        return;
+      }
+
+      if (res.status === 403) {
+        setAuthStatus('forbidden');
         setData(null);
         setLoading(false);
         return;
@@ -138,7 +156,11 @@ export default function CeviDbDataPage() {
       }
 
       const resData = (await res.json()) as CeviDbDebugResponseDto;
+      setAuthStatus('ok');
       setData(resData);
+      if (!selectedUserId && resData.user?.id) {
+        setSelectedUserId(resData.user.id);
+      }
     } catch (err: any) {
       setError(err.message || 'Fehler beim Laden der Cevi.DB-Daten');
     } finally {
@@ -146,9 +168,30 @@ export default function CeviDbDataPage() {
     }
   };
 
+  // 2. Liste aller Benutzer mit Cevi.DB laden (nur für Admins möglich)
+  const fetchUserList = async () => {
+    try {
+      const res = await fetch('/api/auth/cevidb/users', {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { users: CeviDbUserSummaryDto[] };
+        setUserList(body.users || []);
+      }
+    } catch {
+      // Ignorieren falls nicht authorisiert
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
+    fetchUserList();
   }, []);
+
+  const handleUserSelect = (newUserId: string) => {
+    setSelectedUserId(newUserId);
+    fetchProfile(newUserId);
+  };
 
   const handleCopyJson = () => {
     if (!data?.ceviDbData) return;
@@ -205,6 +248,9 @@ export default function CeviDbDataPage() {
               <span className="font-display text-[15px] font-bold tracking-tight text-fg">
                 Cevi.DB Daten-Inspektor
               </span>
+              <Badge tone="accent" className="hidden sm:inline-flex text-2xs gap-1">
+                <Lock className="size-2.5" /> Streng geschützt
+              </Badge>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -239,30 +285,51 @@ export default function CeviDbDataPage() {
             </div>
             <Skeleton className="h-96 rounded-2xl" />
           </div>
-        ) : error ? (
-          <Callout tone="danger" className="my-6">
-            <p className="font-medium">Fehler: {error}</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={fetchProfile}
-              className="mt-3"
-            >
-              <RefreshCw className="size-3.5" /> Erneut versuchen
-            </Button>
-          </Callout>
-        ) : !data?.user ? (
-          /* Nicht angemeldet */
-          <div className="mx-auto max-w-xl text-center">
-            <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-              <Database className="size-8" />
+        ) : authStatus === 'forbidden' ? (
+          /* 403 KEIN ZUGRIFF: Benutzer ist kein globaler Admin */
+          <div className="mx-auto max-w-lg text-center animate-fade-in py-12">
+            <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 ring-1 ring-rose-500/20">
+              <ShieldAlert className="size-9" />
             </div>
             <h1 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-              Cevi.DB Daten einsehen
+              Zugriff verweigert (403)
+            </h1>
+            <p className="mt-3 text-sm leading-relaxed text-fg-muted">
+              Diese Seite enthält vertrauliche Personendaten und OAuth-Rohdaten der Cevi.DB. Sie ist
+              <strong> ausschliesslich für globale Plattform-Administratoren</strong> freigeschaltet.
+            </p>
+            <div className="mt-6 rounded-2xl border border-line/70 bg-surface-1 p-5 text-left text-xs text-fg-muted">
+              <p className="font-semibold text-fg flex items-center gap-1.5">
+                <Lock className="size-3.5 text-accent" /> Sicherheits-Richtlinie:
+              </p>
+              <p className="mt-1">
+                Die Berechtigungsprüfung erfolgt serverseitig direkt in der PostgreSQL-Datenbank
+                (<code className="font-mono text-fg">users.isGlobalAdmin === true</code>), nicht über Cookies oder Tokens.
+              </p>
+            </div>
+            <div className="mt-8 flex justify-center">
+              <Link
+                href="/"
+                className={buttonClasses({
+                  variant: 'secondary',
+                  size: 'md',
+                })}
+              >
+                Zurück zur Startseite
+              </Link>
+            </div>
+          </div>
+        ) : authStatus === 'unauthenticated' ? (
+          /* Nicht angemeldet */
+          <div className="mx-auto max-w-xl text-center py-12">
+            <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <Lock className="size-8" />
+            </div>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">
+              Admin-Authentifizierung erforderlich
             </h1>
             <p className="mt-3 text-base text-fg-muted">
-              Melde dich mit deinem Cevi.DB (Hitobito) Account an, um alle Felder, Rollen,
-              Berechtigungen und Rohdaten zu sehen, die Cevi.DB über die OAuth 2.0 Schnittstelle bereitstellt.
+              Bitte melde dich mit deinem autorisierten Administrator-Konto via Cevi.DB an, um die Daten einzusehen.
             </p>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -275,7 +342,7 @@ export default function CeviDbDataPage() {
                 })}
               >
                 <Database className="size-4" />
-                Mit Cevi.DB anmelden & Daten abrufen
+                Als Admin mit Cevi.DB anmelden
               </a>
               <Link
                 href="/"
@@ -285,72 +352,78 @@ export default function CeviDbDataPage() {
                   className: 'w-full sm:w-auto',
                 })}
               >
-                Zurück zur Anmeldung
+                Zurück
               </Link>
             </div>
-
-            <div className="mt-12 rounded-2xl border border-line/70 bg-surface-1 p-6 text-left shadow-sm">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-fg">
-                <Sparkles className="size-4 text-accent" />
-                Was liefert die Cevi.DB?
-              </h2>
-              <ul className="mt-3 space-y-2 text-xs text-fg-muted">
-                <li>
-                  <strong className="text-fg">Scopes:</strong> <code>email name with_roles</code>
-                </li>
-                <li>
-                  <strong className="text-fg">Basisdaten:</strong> Cevi-Name (nickname), Vorname, Nachname, E-Mail, Geburtsdatum, Geschlecht, Stammgruppe
-                </li>
-                <li>
-                  <strong className="text-fg">Rollen & Gruppen:</strong> Alle aktiven Gruppenleitungen, Abteilungsleitungen und Verbandsrollen
-                </li>
-                <li>
-                  <strong className="text-fg">Adresse:</strong> Strasse, PLZ, Ort, Land (falls in Cevi.DB gepflegt)
-                </li>
-              </ul>
-            </div>
           </div>
-        ) : !data.hasCeviDb || !data.ceviDbData ? (
-          /* Angemeldet, aber nicht mit Cevi.DB */
-          <div className="mx-auto max-w-xl text-center">
-            <Callout tone="info" className="text-left">
-              <p className="font-semibold text-fg">
-                Aktuell angemeldet als: {data.user.ceviName || data.user.firstName} ({data.user.email || 'keine E-Mail'})
-              </p>
-              <p className="mt-1 text-sm text-fg-muted">
-                Dieses Konto wurde mit <strong>Passwort</strong> oder <strong>Cevi-Name Schnell-Login</strong> registriert und ist noch nicht mit Cevi.DB verknüpft. Daher liegen aktuell keine Cevi.DB Rohdaten vor.
-              </p>
-            </Callout>
-
-            <div className="mt-6">
-              <a
-                href="/api/auth/cevidb/login?returnTo=/cevidb-daten"
-                className={buttonClasses({
-                  variant: 'primary',
-                  size: 'lg',
-                  className: 'gap-2',
-                })}
-              >
-                <Database className="size-4" />
-                Jetzt mit Cevi.DB anmelden & Daten verknüpfen
-              </a>
-            </div>
+        ) : error ? (
+          <Callout tone="danger" className="my-6">
+            <p className="font-medium">Fehler: {error}</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fetchProfile(selectedUserId)}
+              className="mt-3"
+            >
+              <RefreshCw className="size-3.5" /> Erneut versuchen
+            </Button>
+          </Callout>
+        ) : !data?.user ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-fg-muted">Keine Benutzerdaten verfügbar.</p>
           </div>
         ) : (
-          /* Vollständige Cevi.DB Datenanzeige */
+          /* Vollständige Cevi.DB Datenanzeige für Admins */
           <div className="space-y-8 animate-fade-in">
+            {/* Admin User-Switcher Toolbar */}
+            {userList.length > 0 && (
+              <div className="flex flex-col gap-3 rounded-2xl border border-line/80 bg-surface-2/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="size-4 text-accent shrink-0" />
+                  <span className="text-xs font-semibold text-fg">
+                    Admin-Inspektor: Benutzer auswählen
+                  </span>
+                  <Badge tone="accent" className="text-2xs">
+                    {userList.length} Cevi.DB Konten
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => handleUserSelect(e.target.value)}
+                    className="rounded-xl border border-line bg-surface-1 py-1.5 pl-3 pr-8 text-xs font-medium text-fg focus:border-accent focus:outline-none"
+                  >
+                    {userList.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.ceviName ? `«${u.ceviName}» ` : ''}
+                        {u.firstName} {u.lastName} (ID #{u.ceviDbId})
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => fetchProfile(selectedUserId)}
+                    title="Aktualisieren"
+                  >
+                    <RefreshCw className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Top Card: Profil Header */}
             <div className="flex flex-col gap-6 rounded-3xl border border-line/70 bg-surface-1 p-6 shadow-sm md:flex-row md:items-center md:justify-between md:p-8">
               <div className="flex items-center gap-4">
                 <Avatar
-                  name={profile?.nickname || `${profile?.first_name} ${profile?.last_name}`}
+                  name={profile?.nickname || `${data.user.firstName} ${data.user.lastName}`}
                   size="lg"
                   highlight
                 />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-                      {profile?.nickname || `${profile?.first_name} ${profile?.last_name}`}
+                      {profile?.nickname || `${data.user.firstName} ${data.user.lastName}`}
                     </h1>
                     <Badge tone="accent" className="gap-1">
                       <ShieldCheck className="size-3" /> Cevi.DB verifiziert
@@ -360,10 +433,10 @@ export default function CeviDbDataPage() {
                     )}
                   </div>
                   <p className="mt-1 text-sm text-fg-muted">
-                    {profile?.first_name} {profile?.last_name}
-                    {profile?.id && (
+                    {profile?.first_name || data.user.firstName} {profile?.last_name || data.user.lastName}
+                    {(profile?.id || data.user.ceviDbId) && (
                       <span className="ml-2 inline-flex items-center gap-1 font-mono text-xs text-fg-subtle">
-                        ID: #{profile.id}
+                        ID: #{profile?.id || data.user.ceviDbId}
                       </span>
                     )}
                   </p>
@@ -402,11 +475,11 @@ export default function CeviDbDataPage() {
                     className: 'gap-1.5',
                   })}
                 >
-                  <RefreshCw className="size-3.5" /> Neu von Cevi.DB abrufen
+                  <RefreshCw className="size-3.5" /> Eigenes Profil neu abrufen
                 </a>
-                {profile?.id && (
+                {(profile?.id || data.user.ceviDbId) && (
                   <a
-                    href={`https://db.cevi.ch/people/${profile.id}`}
+                    href={`https://db.cevi.ch/people/${profile?.id || data.user.ceviDbId}`}
                     target="_blank"
                     rel="noreferrer"
                     className={buttonClasses({
@@ -428,7 +501,7 @@ export default function CeviDbDataPage() {
                   <User className="size-3.5 text-accent" /> Cevi-Name
                 </span>
                 <p className="mt-2 text-2xl font-bold tracking-tight text-fg">
-                  {profile?.nickname || '–'}
+                  {profile?.nickname || data.user.ceviName || '–'}
                 </p>
                 <p className="mt-1 text-xs text-fg-muted">
                   Offizieller Pfadiname / Spitzname
@@ -440,10 +513,10 @@ export default function CeviDbDataPage() {
                   <Calendar className="size-3.5 text-accent" /> Alter & Geburtstag
                 </span>
                 <p className="mt-2 text-2xl font-bold tracking-tight text-fg">
-                  {age !== null ? `${age} Jahre` : '–'}
+                  {age !== null ? `${age} Jahre` : data.user.birthDate ? `${calculateAge(data.user.birthDate)} Jahre` : '–'}
                 </p>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Geboren am {formatDate(profile?.birthday)}
+                  Geboren am {formatDate(profile?.birthday || data.user.birthDate)}
                 </p>
               </Card>
 
@@ -486,30 +559,39 @@ export default function CeviDbDataPage() {
                   <FactRow
                     label="Cevi-Name"
                     field="nickname"
-                    value={profile?.nickname}
+                    value={profile?.nickname || data.user.ceviName}
                   />
                   <FactRow
                     label="Vorname"
                     field="first_name / given_name"
-                    value={profile?.first_name || profile?.given_name}
+                    value={profile?.first_name || profile?.given_name || data.user.firstName}
                   />
                   <FactRow
                     label="Nachname"
                     field="last_name / family_name"
-                    value={profile?.last_name || profile?.family_name}
+                    value={profile?.last_name || profile?.family_name || data.user.lastName}
                   />
                   <FactRow
                     label="E-Mail"
                     field="email"
                     icon={Mail}
-                    value={profile?.email}
+                    value={profile?.email || data.user.email}
                   />
                   <FactRow
                     label="Geburtsdatum"
                     field="birthday"
                     icon={Calendar}
-                    value={profile?.birthday ? `${formatDate(profile.birthday)} (${age} Jahre)` : null}
-                    badge={age !== null && age >= 18 ? 'Volljährig (18+)' : undefined}
+                    value={
+                      profile?.birthday || data.user.birthDate
+                        ? `${formatDate(profile?.birthday || data.user.birthDate)} (${age || calculateAge(data.user.birthDate)} Jahre)`
+                        : null
+                    }
+                    badge={
+                      (age !== null && age >= 18) ||
+                      (data.user.birthDate && (calculateAge(data.user.birthDate) ?? 0) >= 18)
+                        ? 'Volljährig (18+)'
+                        : undefined
+                    }
                   />
                   <FactRow
                     label="Geschlecht"
@@ -529,7 +611,7 @@ export default function CeviDbDataPage() {
                   <FactRow
                     label="Cevi.DB Person ID"
                     field="id"
-                    value={profile?.id ? `#${profile.id}` : null}
+                    value={profile?.id || data.user.ceviDbId ? `#${profile?.id || data.user.ceviDbId}` : null}
                   />
                 </div>
               </div>
@@ -602,7 +684,7 @@ export default function CeviDbDataPage() {
 
               {roles.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-line p-8 text-center text-sm text-fg-muted">
-                  Keine Gruppen-Rollen zurückgegeben.
+                  Keine Gruppen-Rollen im Profil vorhanden oder noch nicht synchronisiert.
                 </div>
               ) : (
                 <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -708,7 +790,7 @@ export default function CeviDbDataPage() {
 
                   <div className="relative overflow-hidden rounded-xl border border-line/70 bg-[#0d1117] p-4 text-xs">
                     <pre className="max-h-[500px] overflow-auto font-mono text-[#c9d1d9] leading-relaxed select-all">
-                      {filteredJsonString}
+                      {filteredJsonString || 'Keine Rohdaten vorhanden'}
                     </pre>
                   </div>
                 </div>

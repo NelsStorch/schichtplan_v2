@@ -14,6 +14,9 @@ model Department {
   logoUrl      String?
   primaryColor String?            @default("#e11d48")
   contactEmail String?
+  // Cevi.DB-Gruppen-ID der Ortsgruppe (Feld `ortsgruppe_id` im Cevi.DB-Profil).
+  // Wer sich mit Cevi.DB anmeldet und zu dieser Ortsgruppe gehört, wird automatisch Mitglied.
+  ceviDbGroupId Int?              @unique
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   events       Event[]

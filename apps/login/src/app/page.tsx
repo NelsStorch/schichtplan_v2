@@ -259,15 +259,6 @@ function LoginContent() {
                 Du meldest dich auf <span className="font-mono text-fg-muted">db.cevi.ch</span> an
                 und kommst danach automatisch hierher zurück.
               </p>
-              <div className="pt-1 px-1">
-                <Link
-                  href="/cevidb-daten"
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
-                >
-                  <Database className="size-3.5" />
-                  <span>Cevi.DB Daten-Inspektor (alle gelieferten Felder anzeigen)</span>
-                </Link>
-              </div>
             </div>
 
             <div className="my-9 flex items-center gap-4 text-xs text-fg-subtle">
