@@ -127,6 +127,7 @@ ENVEOF
 fi
 
 # Rolling Build & Restart
+echo "Docker Images werden gebaut und gestartet (das kann 1-2 Minuten dauern)..."
 log=`$(mktemp)
 if ! docker compose -f "$ComposeFile" -p "$ProjectName" up -d --build > "`$log" 2>&1; then
   tail -n 60 "`$log"; rm -f "`$log"
@@ -179,13 +180,13 @@ echo "DEPLOY_SUCCESS=1"
 [IO.File]::WriteAllText((Join-Path $PSScriptRoot $RemoteScript), ($remote -replace "`r`n", "`n"))
 
 Step "2. Hochladen"
-ssh $Server "mkdir -p $RemoteDir"
+ssh -n $Server "mkdir -p $RemoteDir"
 if ($LASTEXITCODE -ne 0) { Stop-Deploy "Keine Verbindung zum Server." }
 scp -q $ArchiveName $RemoteScript "${Server}:${RemoteDir}/"
 if ($LASTEXITCODE -ne 0) { Stop-Deploy "Das Hochladen hat nicht geklappt." }
 
 Step "3. Backup, Build und unterbruchfreier Neustart auf dem Server"
-ssh $Server "bash $RemoteDir/$RemoteScript; code=`$?; rm -f $RemoteDir/$RemoteScript; exit `$code"
+ssh -n $Server "bash $RemoteDir/$RemoteScript; code=`$?; rm -f $RemoteDir/$RemoteScript; exit `$code"
 $result = $LASTEXITCODE
 
 Remove-Item $ArchiveName, $RemoteScript -ErrorAction SilentlyContinue
