@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, CalendarPlus, CalendarX2, Clock, Plus, Settings2 } from 'lucide-react';
 import type { EventDto } from '@schichtplan/shared';
-import { Button, Card, EmptyState, Skeleton, buttonClasses } from '@schichtplan/ui';
+import { Button, Card, EmptyState, NotFoundView, Skeleton, buttonClasses } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { DepartmentSettingsDialog } from '@/components/DepartmentSettingsDialog';
 import { EventFormDialog } from '@/components/EventFormDialog';
@@ -201,18 +201,20 @@ function NextShiftCard({ shift }: { shift: MyShift }) {
 
 function TenantNotFound() {
   return (
-    <div className="grain flex min-h-[100dvh] items-center justify-center bg-campfire px-4">
-      <EmptyState
-        className="w-full max-w-md border-solid bg-surface"
-        icon={<CalendarX2 />}
-        title="Abteilung nicht gefunden"
-        description="Unter dieser Adresse gibt es keinen Schichtplan. Prüfe den Link oder such deine Abteilung auf der Hauptseite."
-        action={
-          <a href="https://cevi-schichtplan.ch" className={buttonClasses()}>
-            Zur Hauptseite <ArrowRight />
-          </a>
-        }
-      />
-    </div>
+    <NotFoundView
+      badge="Abteilung unbekannt"
+      title="Abteilung nicht gefunden"
+      description="Unter dieser Adresse ist noch kein Schichtplan eingerichtet. Prüfe die Web-Adresse oder such deine Abteilung auf dem Hauptportal."
+      homeHref="https://cevi-schichtplan.ch"
+      homeLabel="Zum Hauptportal"
+      showBackStep={false}
+      secondaryActions={[
+        {
+          label: 'Neue Abteilung registrieren',
+          href: 'https://cevi-schichtplan.ch/?registrieren=1',
+          external: true,
+        },
+      ]}
+    />
   );
 }

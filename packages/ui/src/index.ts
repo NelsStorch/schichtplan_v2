@@ -31,3 +31,8 @@ export {
   type SlotStatus,
 } from './components/Display';
 export { CeviLogo } from './components/CeviLogo';
+export {
+  NotFoundView,
+  type NotFoundViewProps,
+  type NotFoundAction,
+} from './components/NotFoundView';

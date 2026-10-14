@@ -10,6 +10,7 @@ import {
   CeviLogo,
   Chip,
   EmptyState,
+  NotFoundView,
   ProgressRing,
   Skeleton,
   buttonClasses,
@@ -111,20 +112,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   if (error) {
     return (
-      <AppShell>
-        <div className="mx-auto max-w-xl px-4 pt-16">
-          <EmptyState
-            icon={<CalendarSearch />}
-            title="Anlass nicht gefunden"
-            description={error}
-            action={
-              <Link href="/" className={buttonClasses()}>
-                Alle Anlässe
-              </Link>
-            }
-          />
-        </div>
-      </AppShell>
+      <NotFoundView
+        badge="Anlass nicht gefunden"
+        title="Diesen Anlass gibt es nicht"
+        description={error}
+        homeHref="/"
+        homeLabel="Alle Anlässe anschauen"
+        departmentName={department?.name}
+        departmentLogoUrl={department?.logoUrl}
+        secondaryActions={[
+          {
+            label: 'Meine Schichten',
+            href: '/meine-schichten',
+            icon: <CalendarDays className="size-3.5" />,
+          },
+        ]}
+      />
     );
   }
 
