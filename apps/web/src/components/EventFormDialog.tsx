@@ -336,7 +336,7 @@ function EventForm({
             <Field label="Adresse (Slug)" required hint={`…/events/${form.slug || 'chilbi-2026'}`} className="sm:col-span-2">
               <Input
                 value={form.slug}
-                pattern="[a-z0-9-]+"
+                pattern="[-a-z0-9]+"
                 onChange={(e) => set('slug', slugify(e.target.value))}
                 className="font-mono"
               />

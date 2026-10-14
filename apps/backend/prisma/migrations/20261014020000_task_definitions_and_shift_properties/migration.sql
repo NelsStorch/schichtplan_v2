@@ -52,7 +52,9 @@ GROUP BY e."departmentId", st."title";
 -- Connect existing shift_tasks to their corresponding task_definition
 UPDATE "shift_tasks" st
 SET "task_definition_id" = td."id"
-FROM "shifts" s
-JOIN "events" e ON e."id" = s."eventId"
-JOIN "task_definitions" td ON td."department_id" = e."departmentId" AND td."title" = st."title"
-WHERE st."shiftId" = s."id" AND st."task_definition_id" IS NULL;
+FROM "shifts" s, "events" e, "task_definitions" td
+WHERE st."shiftId" = s."id"
+  AND e."id" = s."eventId"
+  AND td."department_id" = e."departmentId"
+  AND td."title" = st."title"
+  AND st."task_definition_id" IS NULL;
