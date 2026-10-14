@@ -1,9 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
 import {
   AlertCircle,
-  CalendarDays,
+  Calendar,
   Check,
   Clock,
   Edit,
@@ -74,19 +73,20 @@ export function ShiftDetailsDialog({
     : null;
   const isMine = Boolean(mySignupInShift);
 
-  const tasks = shift.tasks && shift.tasks.length > 0
-    ? shift.tasks
-    : [
-        {
-          id: 'default',
-          shiftId: shift.id,
-          title: shift.title,
-          description: shift.description,
-          requiredSlots: shift.requiredSlots,
-          minAge: shift.minAge,
-          ageRequirementType: 'ALL' as const,
-        },
-      ];
+  const tasks =
+    shift.tasks && shift.tasks.length > 0
+      ? shift.tasks
+      : [
+          {
+            id: 'default',
+            shiftId: shift.id,
+            title: shift.title,
+            description: shift.description,
+            requiredSlots: shift.requiredSlots,
+            minAge: shift.minAge,
+            ageRequirementType: 'ALL' as const,
+          },
+        ];
 
   return (
     <Dialog
@@ -94,16 +94,18 @@ export function ShiftDetailsDialog({
       onClose={onClose}
       size="lg"
       title={
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">
+            <h2 className="font-display text-xl font-extrabold tracking-tight text-fg text-balance sm:text-2xl">
               {shift.title}
-            </span>
+            </h2>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge>{shift.category}</Badge>
             {shift.minAge && (
-              <Badge tone="warning">Schicht ab {shift.minAge} J.</Badge>
+              <Badge tone="warning">
+                <Shield className="size-3" /> Schicht ab {shift.minAge} J.
+              </Badge>
             )}
             {isMine && (
               <Badge tone="success">
@@ -117,8 +119,8 @@ export function ShiftDetailsDialog({
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-fg-muted">
-            <span className="font-semibold text-fg">{filled}</span> von{' '}
-            <span className="font-semibold text-fg">{total}</span> Plätzen besetzt
+            <span className="tabular font-mono font-bold text-fg">{filled}</span> von{' '}
+            <span className="tabular font-mono font-bold text-fg">{total}</span> Plätzen besetzt
           </div>
           <div className="flex items-center gap-2">
             {canManage && onAssignHelper && (
@@ -150,28 +152,29 @@ export function ShiftDetailsDialog({
       }
     >
       <div className="space-y-6 pt-1">
-        {/* Zeit & Datum Kachel */}
-        <div className="rounded-card border border-line bg-surface-2/60 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-accent/12 text-accent-ink">
+        {/* Zeit, Datum & Gesamtkapazität (Double-Bezel Card) */}
+        <div className="rounded-card border border-line bg-surface-2/60 p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-tile border border-accent/20 bg-accent/12 text-accent-ink shadow-sm">
                 <Clock className="size-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-fg sm:text-base">
+                <p className="font-display text-sm font-bold text-fg sm:text-base">
                   {fmtWeekday(shift.startTime)}, {fmtDayMonth(shift.startTime)}
                 </p>
                 <p className="font-mono text-xs text-fg-muted sm:text-sm">
-                  {fmtTime(shift.startTime)} – {fmtTime(shift.endTime)} Uhr ({fmtDuration(shift.startTime, shift.endTime)})
+                  {fmtTime(shift.startTime)} – {fmtTime(shift.endTime)} Uhr{' '}
+                  <span className="text-fg-subtle">({fmtDuration(shift.startTime, shift.endTime)})</span>
                 </p>
               </div>
             </div>
 
-            <div className="text-right max-sm:w-full max-sm:border-t max-sm:border-line max-sm:pt-2">
+            <div className="text-right max-sm:w-full max-sm:border-t max-sm:border-line max-sm:pt-3">
               <SlotMeter filled={filled} total={total} className="w-32 max-sm:w-full" />
               <p
                 className={cn(
-                  'mt-1 text-xs font-semibold',
+                  'mt-1.5 text-xs font-semibold',
                   status === 'full'
                     ? 'text-success-ink'
                     : status === 'last'
@@ -195,25 +198,25 @@ export function ShiftDetailsDialog({
           )}
         </div>
 
-        {/* Arbeiten in dieser Schicht */}
+        {/* Liste aller Arbeiten & Zuteilungen */}
         <div>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between">
             <h3 className="font-display text-base font-bold text-fg sm:text-lg">
               Arbeiten in dieser Schicht
             </h3>
-            <span className="text-xs font-semibold text-fg-subtle">
+            <span className="font-mono text-xs font-semibold text-fg-subtle">
               {tasks.length} {tasks.length === 1 ? 'Arbeit' : 'Arbeiten'}
             </span>
           </div>
 
           <p className="mb-4 text-xs text-fg-muted">
-            Wähle die passende Arbeit aus, um dich einzutragen. Jede Arbeit hat spezifische Aufgaben und Jugendschutz-Regeln.
+            Wähle eine konkrete Arbeit aus, um dich einzutragen. Die Anforderungen und Jugendschutz-Regeln gelten pro Arbeit.
           </p>
 
-          <div className="grid gap-3.5 sm:grid-cols-1">
+          <div className="grid gap-3.5">
             {tasks.map((task) => {
               const taskSignups = signups.filter(
-                (s) => (s.taskId === task.id) || (tasks.length === 1 && !s.taskId)
+                (s) => s.taskId === task.id || (tasks.length === 1 && !s.taskId)
               );
               const taskFilled = taskSignups.length;
               const taskTotal = task.requiredSlots;
@@ -228,18 +231,19 @@ export function ShiftDetailsDialog({
                 <div
                   key={task.id}
                   className={cn(
-                    'relative flex flex-col justify-between gap-3.5 rounded-card border p-4 transition-all sm:p-5',
+                    'group relative flex flex-col justify-between gap-4 rounded-card border p-4 transition-all duration-300 sm:p-5',
+                    'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]',
                     isMineInThisTask
-                      ? 'border-accent/60 bg-[linear-gradient(135deg,rgb(var(--accent)/0.08),transparent_65%)] shadow-glow'
+                      ? 'border-accent/60 bg-[linear-gradient(135deg,rgb(var(--accent)/0.10),transparent_65%)] shadow-glow ring-1 ring-accent/30'
                       : 'border-line bg-surface hover:border-line-strong'
                   )}
                 >
-                  <div className="space-y-2">
-                    {/* Titel & Status */}
+                  <div className="space-y-2.5">
+                    {/* Titel & Status-Badge */}
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-base font-bold text-fg sm:text-lg">
+                          <h4 className="font-display text-base font-bold text-fg sm:text-lg">
                             {task.title}
                           </h4>
                           {isMineInThisTask && (
@@ -258,7 +262,7 @@ export function ShiftDetailsDialog({
                       <div className="text-right shrink-0">
                         <span
                           className={cn(
-                            'inline-block rounded-full px-2.5 py-1 font-mono text-xs font-semibold',
+                            'inline-block rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold',
                             taskFull
                               ? 'bg-success/15 text-success-ink'
                               : 'bg-surface-2 text-fg-muted'
@@ -269,17 +273,17 @@ export function ShiftDetailsDialog({
                       </div>
                     </div>
 
-                    {/* Jugendschutz / Mindestalter */}
+                    {/* Jugendschutz / Mindestalter Regelungen */}
                     {task.minAge ? (
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                         <Badge tone="warning" size="sm">
                           {task.ageRequirementType === 'ALL' ? (
                             <>
-                              <AlertCircle className="size-3" /> Mindestalter ab {task.minAge} Jahren (alle Helfer)
+                              <AlertCircle className="size-3" /> Mindestalter ab {task.minAge} Jahren (alle Helfer dieser Arbeit)
                             </>
                           ) : (
                             <>
-                              <Shield className="size-3" /> Mindestalter ab {task.minAge} Jahren (mind. 1 Person in Schicht)
+                              <Shield className="size-3" /> Mindestalter ab {task.minAge} Jahren (mindestens 1 Person in Schicht)
                             </>
                           )}
                         </Badge>
@@ -305,7 +309,7 @@ export function ShiftDetailsDialog({
                             <li
                               key={s.id}
                               className={cn(
-                                'inline-flex h-7 items-center gap-1.5 rounded-full pl-1 pr-2.5 text-xs font-medium',
+                                'inline-flex h-7 items-center gap-1.5 rounded-full pl-1 pr-2.5 text-xs font-medium transition-colors',
                                 isCurrentUser
                                   ? 'border border-accent/40 bg-accent/15 text-accent-ink font-semibold'
                                   : 'bg-surface text-fg border border-line'
@@ -336,42 +340,51 @@ export function ShiftDetailsDialog({
                     )}
                   </div>
 
-                  {/* Aktions-Button */}
+                  {/* Aktions-Button mit Button-in-Button Muster */}
                   {!over && (
-                    <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-line/60">
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-line/60">
                       {isMineInThisTask ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
+                        <button
+                          type="button"
                           onClick={() => onCancel(taskMineSignup?.id)}
-                          loading={busy}
+                          disabled={busy}
+                          className="group inline-flex items-center gap-2 rounded-full border border-danger/40 bg-danger/15 py-1.5 pl-3.5 pr-2 text-xs font-semibold text-danger-ink transition-all duration-200 hover:bg-danger/25 active:scale-[0.98]"
                         >
-                          <UserMinus className="size-3.5" /> Aus dieser Arbeit austragen
-                        </Button>
+                          <span>Aus dieser Arbeit austragen</span>
+                          <span className="flex size-5 items-center justify-center rounded-full bg-danger/20 transition-transform duration-200 group-hover:scale-110">
+                            <UserMinus className="size-3" />
+                          </span>
+                        </button>
                       ) : isMineInOtherTask ? (
                         <div className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
                           <Check className="size-3.5 text-accent-ink" /> Du bist bereits für eine andere Arbeit eingeteilt
                         </div>
                       ) : taskFull ? (
-                        <Button disabled variant="secondary" size="sm">
+                        <span className="rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted border border-line">
                           Voll besetzt
-                        </Button>
+                        </span>
                       ) : needsLogin ? (
                         <a
                           href={loginUrl()}
-                          className="inline-flex items-center gap-1.5 rounded-button bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg transition hover:brightness-110"
+                          className="group inline-flex items-center gap-2 rounded-full bg-accent py-1.5 pl-3.5 pr-2 text-xs font-semibold text-accent-fg transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
                         >
-                          <Lock className="size-3.5" /> Anmelden &amp; eintragen
+                          <span>Anmelden &amp; eintragen</span>
+                          <span className="flex size-5 items-center justify-center rounded-full bg-black/20 transition-transform duration-200 group-hover:scale-110">
+                            <Lock className="size-3" />
+                          </span>
                         </a>
                       ) : (
-                        <Button
-                          variant="primary"
-                          size="sm"
+                        <button
+                          type="button"
                           onClick={() => onSignup(task)}
-                          loading={busy}
+                          disabled={busy}
+                          className="group inline-flex items-center gap-2 rounded-full bg-accent py-1.5 pl-3.5 pr-2 text-xs font-semibold text-accent-fg shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
                         >
-                          <UserPlus className="size-3.5" /> Für diese Arbeit eintragen
-                        </Button>
+                          <span>Für diese Arbeit eintragen</span>
+                          <span className="flex size-5 items-center justify-center rounded-full bg-black/20 transition-transform duration-200 group-hover:scale-110">
+                            <UserPlus className="size-3" />
+                          </span>
+                        </button>
                       )}
                     </div>
                   )}

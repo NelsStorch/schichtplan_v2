@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronRight, Edit, UserCheck, X } from 'lucide-react';
+import { Check, ChevronRight, Edit } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import { Avatar, Badge, Button, SlotMeter, cn, slotStatus } from '@schichtplan/ui';
 import { fmtDuration, fmtTime, isPast } from '@/lib/format';
@@ -26,10 +26,10 @@ const STATUS_TEXT = {
 };
 
 /**
- * Eine Schicht als interaktives "Ticket":
- * Links die Zeit als Abriss mit Perforation.
+ * Eine Schicht als interaktives "Ticket" im Schweizer Präzisions-Design:
+ * Links der Zeit-Abriss mit Perforations-Kerben.
  * Rechts Kategorie, Titel, Vorschau der Arbeiten und Belegung.
- * Beim Klick auf das Ticket öffnen sich die detaillierten Arbeiten & Anmeldung (ShiftDetailsDialog).
+ * Beim Klick öffnet sich der ShiftDetailsDialog mit allen Arbeiten.
  */
 export function ShiftTicket({
   shift,
@@ -51,19 +51,20 @@ export function ShiftTicket({
   const free = Math.max(0, total - filled);
   const over = isPast(shift.endTime);
 
-  const tasks = shift.tasks && shift.tasks.length > 0
-    ? shift.tasks
-    : [
-        {
-          id: 'default',
-          shiftId: shift.id,
-          title: shift.title,
-          description: shift.description,
-          requiredSlots: shift.requiredSlots,
-          minAge: shift.minAge,
-          ageRequirementType: 'ALL' as const,
-        },
-      ];
+  const tasks =
+    shift.tasks && shift.tasks.length > 0
+      ? shift.tasks
+      : [
+          {
+            id: 'default',
+            shiftId: shift.id,
+            title: shift.title,
+            description: shift.description,
+            requiredSlots: shift.requiredSlots,
+            minAge: shift.minAge,
+            ageRequirementType: 'ALL' as const,
+          },
+        ];
 
   const handleCardClick = () => {
     if (onSelect) {
@@ -85,22 +86,24 @@ export function ShiftTicket({
       tabIndex={0}
       aria-label={`Schicht ${shift.title}, ${fmtTime(shift.startTime)} bis ${fmtTime(shift.endTime)}, ${STATUS_TEXT[status](free)}`}
       className={cn(
-        'group relative grid animate-fade-up stagger grid-cols-[5.25rem_1fr] cursor-pointer rounded-card border bg-surface text-left shadow-inset-hi transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:grid-cols-[7rem_1fr]',
+        'group relative grid animate-fade-up stagger grid-cols-[5.25rem_1fr] cursor-pointer rounded-card border text-left',
+        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 active:scale-[0.99] sm:grid-cols-[7rem_1fr]',
         isMine
-          ? 'border-accent/60 bg-[linear-gradient(135deg,rgb(var(--accent)/0.09),transparent_60%)] shadow-glow hover:border-accent'
-          : 'border-line hover:border-line-strong hover:bg-surface-2/40 hover:shadow-soft',
+          ? 'border-accent/60 bg-[linear-gradient(135deg,rgb(var(--accent)/0.10),transparent_60%)] shadow-glow hover:border-accent'
+          : 'border-line bg-surface hover:border-line-strong hover:bg-surface-2/50 hover:shadow-soft',
         over && 'opacity-65'
       )}
     >
       {/* Zeit-Abriss */}
       <div className="relative flex flex-col items-center justify-center border-r border-dashed border-line-strong px-2 py-5 text-center sm:items-start sm:px-5 sm:text-left">
-        <span className="tabular font-mono text-xl font-semibold tracking-tight text-fg sm:text-2xl">
+        <span className="tabular font-mono text-xl font-bold tracking-tight text-fg sm:text-2xl">
           {fmtTime(shift.startTime)}
         </span>
         <span className="tabular font-mono text-xs text-fg-subtle">
           bis {fmtTime(shift.endTime)}
         </span>
-        <span className="mt-2 rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-semibold text-fg-muted">
+        <span className="mt-2.5 rounded-full border border-line/60 bg-surface-2 px-2.5 py-0.5 font-mono text-2xs font-semibold text-fg-muted">
           {fmtDuration(shift.startTime, shift.endTime)}
         </span>
 
@@ -123,7 +126,7 @@ export function ShiftTicket({
 
       {/* Haupt-Bereich */}
       <div className="flex min-w-0 flex-col gap-3 p-4 sm:p-5">
-        {/* Badges & Edit */}
+        {/* Badges & Edit-Button */}
         <div className="flex flex-wrap items-center justify-between gap-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge>{shift.category}</Badge>
@@ -165,7 +168,7 @@ export function ShiftTicket({
           )}
         </div>
 
-        {/* Arbeiten-Vorschau (Tasks Preview) */}
+        {/* Arbeiten-Vorschau (Pills mit Einteilungszähler) */}
         <div className="space-y-1.5 rounded-field border border-line/70 bg-surface-2/40 p-2.5">
           <div className="flex items-center justify-between text-2xs font-bold uppercase tracking-wider text-fg-subtle">
             <span>
@@ -186,15 +189,15 @@ export function ShiftTicket({
                 <span
                   key={t.id}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
                     isTaskFull
                       ? 'border-line/80 bg-surface text-fg-muted'
                       : 'border-accent/30 bg-accent/10 text-accent-ink'
                   )}
                 >
-                  <span className="truncate max-w-[140px] sm:max-w-[200px]">{t.title}</span>
+                  <span className="truncate max-w-[130px] sm:max-w-[180px]">{t.title}</span>
                   {t.minAge && (
-                    <span className="text-2xs text-warning-ink font-semibold">
+                    <span className="rounded bg-warning/20 px-1 py-0.2 text-[10px] font-bold text-warning-ink">
                       {t.minAge}+
                     </span>
                   )}
@@ -230,8 +233,8 @@ export function ShiftTicket({
           </div>
         )}
 
-        {/* Footer mit SlotMeter und Action Button */}
-        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-1 border-t border-line/60">
+        {/* Footer mit SlotMeter und Action-Button im Island-Format */}
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-2 border-t border-line/60">
           <div className="min-w-0">
             <SlotMeter filled={filled} total={total} className="w-28 sm:w-36" />
             <p
@@ -244,21 +247,33 @@ export function ShiftTicket({
                   : 'text-fg-muted'
               )}
             >
-              <span className="tabular">
+              <span className="tabular font-mono">
                 {filled}/{total}
               </span>{' '}
               · {STATUS_TEXT[status](free)}
             </p>
           </div>
 
-          <Button
-            size="sm"
-            variant={isMine ? 'secondary' : status === 'full' ? 'secondary' : 'primary'}
-            className="group-hover:translate-x-0.5 transition-transform"
+          <div
+            className={cn(
+              'inline-flex items-center gap-2 rounded-full py-1 pl-3 pr-1.5 text-xs font-semibold transition-all duration-300',
+              isMine
+                ? 'bg-surface-2 text-fg border border-line group-hover:border-line-strong'
+                : status === 'full'
+                ? 'bg-surface-2 text-fg-muted border border-line'
+                : 'bg-accent text-accent-fg shadow-sm group-hover:brightness-105'
+            )}
           >
-            Arbeiten anzeigen
-            <ChevronRight className="size-3.5" />
-          </Button>
+            <span>Arbeiten anzeigen</span>
+            <span
+              className={cn(
+                'flex size-5 items-center justify-center rounded-full transition-transform duration-300 group-hover:translate-x-0.5',
+                isMine || status === 'full' ? 'bg-line/60 text-fg' : 'bg-black/20 text-accent-fg'
+              )}
+            >
+              <ChevronRight className="size-3.5" />
+            </span>
+          </div>
         </div>
       </div>
     </article>
