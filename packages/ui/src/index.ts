@@ -36,3 +36,8 @@ export {
   type NotFoundViewProps,
   type NotFoundAction,
 } from './components/NotFoundView';
+export {
+  ErrorView,
+  type ErrorViewProps,
+  type ErrorAction,
+} from './components/ErrorView';
