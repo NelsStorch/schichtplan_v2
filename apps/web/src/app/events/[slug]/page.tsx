@@ -20,8 +20,9 @@ import {
 import { AppShell } from '@/components/AppShell';
 import { EventFormDialog } from '@/components/EventFormDialog';
 import { SignupModeBadge } from '@/components/event-meta';
-import { GuestSignupDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
+import { AssignHelperDialog, GuestSignupDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { ShiftTicket } from '@/components/ShiftTicket';
+import { ShiftDetailsDialog } from '@/components/ShiftDetailsDialog';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
 import {
   dayKeyToIso,
@@ -51,12 +52,25 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [busyShift, setBusyShift] = useState<string | null>(null);
 
+  const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
+  const [assigningShift, setAssigningShift] = useState<ShiftDto | null>(null);
+  const [assigningTask, setAssigningTask] = useState<ShiftTaskDto | null>(null);
   const [guestShift, setGuestShift] = useState<ShiftDto | null>(null);
   const [guestTask, setGuestTask] = useState<ShiftTaskDto | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOkForm, setShowOkForm] = useState(false);
+
+  // Deep-Link Unterstützung via ?schicht=ID oder ?shift=ID
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const shiftParam = searchParams.get('schicht') || searchParams.get('shift');
+    if (shiftParam) {
+      setSelectedShiftId(shiftParam);
+    }
+  }, []);
 
   // Favicon: Event-Logo (falls vorhanden), sonst Abteilungs-Logo
   useDynamicFavicon(event?.logoUrl || department?.logoUrl, department?.logoUrl);
@@ -107,6 +121,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const filled = event.shifts.reduce((sum, s) => sum + Math.min(s.signups?.length ?? 0, s.requiredSlots), 0);
   const free = Math.max(0, total - filled);
   const percent = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+  const selectedShift = useMemo(
+    () => event?.shifts.find((s) => s.id === selectedShiftId) ?? null,
+    [event, selectedShiftId]
+  );
 
   const visibleDays = days
     .filter((d) => day === 'ALL' || d.key === day)
@@ -448,6 +467,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                           onSignup={(task) => signup(shift, task)}
                           onCancel={(signupId) => cancel(shift, signupId)}
                           onRemoveHelper={(signupId, name) => cancel(shift, signupId, name)}
+                          onSelect={(s) => setSelectedShiftId(s.id)}
                           onEdit={() => {
                             setEditingShift(shift);
                             setShowShiftForm(true);
@@ -462,6 +482,52 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           </div>
         )}
       </div>
+
+      {/* Detail-Dialog für Schicht & Arbeiten (wie v1 nur in besserem Design) */}
+      <ShiftDetailsDialog
+        shift={selectedShift}
+        event={event}
+        isOpen={Boolean(selectedShift)}
+        onClose={() => setSelectedShiftId(null)}
+        currentUser={user}
+        needsLogin={needsLogin}
+        canManage={canManageShifts}
+        busy={Boolean(selectedShift && busyShift === selectedShift.id)}
+        onSignup={(task) => {
+          if (selectedShift) signup(selectedShift, task);
+        }}
+        onCancel={(signupId) => {
+          if (selectedShift) cancel(selectedShift, signupId);
+        }}
+        onRemoveHelper={(signupId, name) => {
+          if (selectedShift) cancel(selectedShift, signupId, name);
+        }}
+        onAssignHelper={(shift, task) => {
+          setAssigningShift(shift);
+          setAssigningTask(task ?? null);
+        }}
+        onEditShift={(shift) => {
+          setSelectedShiftId(null);
+          setEditingShift(shift);
+          setShowShiftForm(true);
+        }}
+      />
+
+      {/* Helfer manuell durch OK einteilen */}
+      <AssignHelperDialog
+        open={Boolean(assigningShift)}
+        shift={assigningShift}
+        task={assigningTask}
+        onClose={() => {
+          setAssigningShift(null);
+          setAssigningTask(null);
+        }}
+        onAssigned={async () => {
+          setAssigningShift(null);
+          setAssigningTask(null);
+          await load();
+        }}
+      />
 
       <GuestSignupDialog
         shift={guestShift}
