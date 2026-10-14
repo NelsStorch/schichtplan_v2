@@ -111,8 +111,27 @@ export const AddEventOrganizerSchema = z.object({
 
 export type AddEventOrganizerInput = z.infer<typeof AddEventOrganizerSchema>;
 
+export const CreateTaskDefinitionSchema = z.object({
+  title: z.string().min(2, 'Titel der Arbeit erforderlich'),
+  description: z.string().optional().nullable(),
+  minAge: z.number().int().min(0).optional().nullable(),
+  ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']).default('ALL'),
+});
+
+export type CreateTaskDefinitionInput = z.infer<typeof CreateTaskDefinitionSchema>;
+
+export const UpdateTaskDefinitionSchema = z.object({
+  title: z.string().min(2).optional(),
+  description: z.string().optional().nullable(),
+  minAge: z.number().int().min(0).optional().nullable(),
+  ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']).optional(),
+});
+
+export type UpdateTaskDefinitionInput = z.infer<typeof UpdateTaskDefinitionSchema>;
+
 export const CreateShiftTaskSchema = z.object({
   id: z.string().uuid().optional(),
+  taskDefinitionId: z.string().uuid().optional().nullable(),
   title: z.string().min(2, 'Titel der Arbeit erforderlich'),
   description: z.string().optional().nullable(),
   requiredSlots: z.number().int().min(1, 'Mindestens 1 Helfer benötigt').default(1),
@@ -125,7 +144,8 @@ export type CreateShiftTaskInput = z.infer<typeof CreateShiftTaskSchema>;
 export const CreateShiftSchema = z.object({
   eventId: z.string().uuid(),
   title: z.string().min(2, 'Titel erforderlich'),
-  category: z.string().min(2, 'Kategorie erforderlich'),
+  category: z.string().optional().nullable(),
+  isSetupTeardown: z.boolean().optional().default(false),
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
   requiredSlots: z.number().int().min(1).optional(),
@@ -138,7 +158,8 @@ export type CreateShiftInput = z.infer<typeof CreateShiftSchema>;
 
 export const UpdateShiftSchema = z.object({
   title: z.string().min(2).optional(),
-  category: z.string().min(2).optional(),
+  category: z.string().optional().nullable(),
+  isSetupTeardown: z.boolean().optional(),
   startTime: z.string().datetime().optional(),
   endTime: z.string().datetime().optional(),
   requiredSlots: z.number().int().min(1).optional(),

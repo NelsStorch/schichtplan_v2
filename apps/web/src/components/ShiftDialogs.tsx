@@ -13,7 +13,7 @@ import {
   UserCheck,
   UserPlus,
 } from 'lucide-react';
-import type { ShiftDto, ShiftTaskDto, AgeRequirementType } from '@schichtplan/shared';
+import type { ShiftDto, ShiftTaskDto, TaskDefinitionDto, AgeRequirementType } from '@schichtplan/shared';
 import { DEFAULT_SHIFT_CATEGORIES } from '@schichtplan/shared';
 import {
   Avatar,
@@ -202,6 +202,7 @@ function GuestSignupForm({
 
 export interface TaskFormItem {
   id?: string;
+  taskDefinitionId?: string | null;
   title: string;
   requiredSlots: number;
   minAge: number;
@@ -250,11 +251,18 @@ function ShiftForm({
 }) {
   const toast = useToast();
   const isEdit = Boolean(shift);
-  const categories = Array.from(new Set([...DEFAULT_SHIFT_CATEGORIES, ...event.shifts.map((s) => s.category)]));
+
+  const [availableTasks, setAvailableTasks] = useState<TaskDefinitionDto[]>([]);
+  useEffect(() => {
+    api<TaskDefinitionDto[]>('/api/tasks')
+      .then((data) => setAvailableTasks(data))
+      .catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     title: shift?.title || '',
-    category: shift?.category || (categories[0] as string),
+    category: shift?.category || '',
+    isSetupTeardown: shift?.isSetupTeardown ?? false,
     startTime: shift ? toLocalInput(shift.startTime) : toLocalInput(event.startDate),
     endTime: shift ? toLocalInput(shift.endTime) : '',
     minAge: shift?.minAge || 0,
@@ -265,6 +273,7 @@ function ShiftForm({
     if (shift?.tasks && shift.tasks.length > 0) {
       return shift.tasks.map((t) => ({
         id: t.id,
+        taskDefinitionId: t.taskDefinitionId || null,
         title: t.title,
         requiredSlots: t.requiredSlots,
         minAge: t.minAge || 0,
@@ -292,6 +301,49 @@ function ShiftForm({
     if (!isEdit && tasks.length === 1 && (tasks[0].title === 'Helfer*in' || tasks[0].title === form.title)) {
       setTasks((prev) => [{ ...prev[0], title: newTitle }]);
     }
+  };
+
+  const addFromCatalog = (catalogItem: TaskDefinitionDto) => {
+    // Falls nur 1 Task vorhanden ist und er noch leer/Standard ist, überschreiben
+    if (tasks.length === 1 && (!tasks[0].title.trim() || tasks[0].title === 'Helfer*in')) {
+      setTasks([
+        {
+          taskDefinitionId: catalogItem.id,
+          title: catalogItem.title,
+          requiredSlots: 1,
+          minAge: catalogItem.minAge || 0,
+          ageRequirementType: catalogItem.ageRequirementType || 'ALL',
+          description: catalogItem.description || '',
+        },
+      ]);
+      if (!form.title.trim()) {
+        setForm((prev) => ({ ...prev, title: catalogItem.title }));
+      }
+      return;
+    }
+
+    // Prüfen ob diese Arbeit schon in der Schicht ist -> dann Slots erhöhen
+    const existingIdx = tasks.findIndex(
+      (t) => (t.taskDefinitionId && t.taskDefinitionId === catalogItem.id) || t.title.toLowerCase() === catalogItem.title.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      updateTask(existingIdx, { requiredSlots: tasks[existingIdx].requiredSlots + 1 });
+      toast({ title: `${catalogItem.title}: Plätze auf ${tasks[existingIdx].requiredSlots + 1} erhöht` });
+      return;
+    }
+
+    // Ansonsten neue Arbeit hinzufügen
+    setTasks((prev) => [
+      ...prev,
+      {
+        taskDefinitionId: catalogItem.id,
+        title: catalogItem.title,
+        requiredSlots: 1,
+        minAge: catalogItem.minAge || 0,
+        ageRequirementType: catalogItem.ageRequirementType || 'ALL',
+        description: catalogItem.description || '',
+      },
+    ]);
   };
 
   const addTask = () => {
@@ -335,7 +387,8 @@ function ShiftForm({
     try {
       const payload = {
         title: form.title.trim(),
-        category: form.category,
+        category: form.category || undefined,
+        isSetupTeardown: form.isSetupTeardown,
         startTime: new Date(form.startTime).toISOString(),
         endTime: new Date(form.endTime).toISOString(),
         requiredSlots: totalSlots,
@@ -343,6 +396,7 @@ function ShiftForm({
         description: form.description.trim() || undefined,
         tasks: tasks.map((t) => ({
           id: t.id,
+          taskDefinitionId: t.taskDefinitionId || undefined,
           title: t.title.trim(),
           requiredSlots: t.requiredSlots || 1,
           minAge: t.minAge || undefined,
@@ -379,25 +433,33 @@ function ShiftForm({
     <form onSubmit={submit} className="space-y-5">
       {error && <Callout tone="danger">{error}</Callout>}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Schichttitel" required>
-          <Input
-            value={form.title}
-            autoFocus
-            placeholder="z.B. Bar & Grill Samstagabend"
-            onChange={(e) => handleTitleChange(e.target.value)}
-          />
-        </Field>
+      <Field label="Schichttitel" required>
+        <Input
+          value={form.title}
+          autoFocus
+          placeholder="z.B. Bar & Grill Samstagabend"
+          onChange={(e) => handleTitleChange(e.target.value)}
+        />
+      </Field>
 
-        <Field label="Kategorie" required>
-          <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
-        </Field>
+      {/* Eigenschaften der Schicht */}
+      <div className="rounded-field border border-line bg-surface-2 p-3.5">
+        <label className="flex cursor-pointer items-start gap-3 select-none">
+          <input
+            type="checkbox"
+            checked={form.isSetupTeardown}
+            onChange={(e) => setForm({ ...form, isSetupTeardown: e.target.checked })}
+            className="mt-0.5 size-4 rounded border-line text-accent focus:ring-accent"
+          />
+          <div className="space-y-0.5">
+            <span className="text-sm font-bold text-fg flex items-center gap-1.5">
+              🛠️ Aufbau- / Abbau-Schicht
+            </span>
+            <p className="text-xs text-fg-muted">
+              Kennzeichnet diese Schicht speziell als Auf- oder Abbauarbeit für gezielte Helfer-Filter.
+            </p>
+          </div>
+        </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -442,18 +504,55 @@ function ShiftForm({
       </div>
 
       {/* Arbeiten (Tasks) Konfigurator */}
-      <div className="space-y-3 rounded-card border border-line bg-surface p-4">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 rounded-card border border-line bg-surface p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h4 className="text-sm font-bold text-fg">Arbeiten in dieser Schicht</h4>
             <p className="text-xs text-fg-muted">
-              Jede Arbeit definiert Aufgaben und Altersregeln ({totalSlots} Helfer:innen total).
+              Wähle Arbeiten aus dem Katalog oder trage neue ein ({totalSlots} Helfer:innen total).
             </p>
           </div>
           <Button type="button" size="sm" variant="secondary" onClick={addTask}>
-            <Plus className="size-3.5" /> Arbeit
+            <Plus className="size-3.5" /> Neue Arbeit
           </Button>
         </div>
+
+        {/* Schnell-Auswahl aus dem Vorlagen-Katalog */}
+        {availableTasks.length > 0 && (
+          <div className="rounded-field border border-line/70 bg-surface-2/60 p-3">
+            <span className="mb-2 block text-2xs font-bold uppercase tracking-wider text-fg-subtle">
+              Katalog-Arbeiten schnell hinzufügen:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {availableTasks.map((at) => {
+                const inShift = tasks.some(
+                  (t) => (t.taskDefinitionId && t.taskDefinitionId === at.id) || t.title.toLowerCase() === at.title.toLowerCase()
+                );
+                return (
+                  <button
+                    key={at.id}
+                    type="button"
+                    onClick={() => addFromCatalog(at)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition active:scale-95',
+                      inShift
+                        ? 'border-accent/40 bg-accent/15 text-accent-ink hover:bg-accent/25'
+                        : 'border-line/80 bg-surface text-fg hover:border-accent hover:bg-accent/10 hover:text-accent-ink'
+                    )}
+                  >
+                    <Plus className="size-3 text-accent-ink" />
+                    <span>{at.title}</span>
+                    {at.minAge && (
+                      <span className="rounded bg-warning/20 px-1 py-0.2 text-[10px] font-bold text-warning-ink">
+                        {at.minAge}+
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3">
           {tasks.map((task, idx) => (

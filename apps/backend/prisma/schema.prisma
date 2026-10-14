@@ -22,6 +22,7 @@ model Department {
   events       Event[]
   members      DepartmentMember[]
   templates    EventTemplate[]
+  taskDefinitions TaskDefinition[]
 
   @@map("departments")
 }
@@ -101,35 +102,53 @@ model EventOrganizer {
 }
 
 model Shift {
-  id            String        @id @default(uuid())
-  eventId       String
-  title         String
-  category      String
-  description   String?
-  startTime     DateTime
-  endTime       DateTime
-  requiredSlots Int           @default(1)
-  minAge        Int?          // Mindestalter für die gesamte Schicht
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  event         Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  tasks         ShiftTask[]
-  signups       ShiftSignup[]
+  id              String        @id @default(uuid())
+  eventId         String
+  title           String
+  category        String?
+  isSetupTeardown Boolean       @default(false) @map("is_setup_teardown")
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  requiredSlots   Int           @default(1)
+  minAge          Int?          // Mindestalter für die gesamte Schicht
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  event           Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tasks           ShiftTask[]
+  signups         ShiftSignup[]
 
   @@map("shifts")
 }
 
-model ShiftTask {
-  id                 String        @id @default(uuid())
-  shiftId            String
-  title              String        // z.B. "Grill", "Kasse", "Ausschank / Bar"
+model TaskDefinition {
+  id                 String      @id @default(uuid())
+  departmentId       String      @map("department_id")
+  title              String      // z.B. "Grill", "Kasse", "Bar", "Aufbau"
   description        String?
-  requiredSlots      Int           @default(1)
-  minAge             Int?          // Mindestalter für diese Arbeit
-  ageRequirementType String        @default("ALL") // "ALL" oder "AT_LEAST_ONE"
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  shift              Shift         @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  minAge             Int?        @map("min_age")
+  ageRequirementType String      @default("ALL") @map("age_requirement_type") // "ALL" oder "AT_LEAST_ONE"
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  department         Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  shiftTasks         ShiftTask[]
+
+  @@map("task_definitions")
+}
+
+model ShiftTask {
+  id                 String          @id @default(uuid())
+  shiftId            String
+  taskDefinitionId   String?         @map("task_definition_id")
+  title              String          // z.B. "Grill", "Kasse", "Ausschank / Bar"
+  description        String?
+  requiredSlots      Int             @default(1)
+  minAge             Int?            // Mindestalter für diese Arbeit
+  ageRequirementType String          @default("ALL") // "ALL" oder "AT_LEAST_ONE"
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  shift              Shift           @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  taskDefinition     TaskDefinition? @relation(fields: [taskDefinitionId], references: [id], onDelete: SetNull)
   signups            ShiftSignup[]
 
   @@map("shift_tasks")

@@ -101,7 +101,12 @@ export function ShiftDetailsDialog({
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge>{shift.category}</Badge>
+            {shift.isSetupTeardown && (
+              <Badge tone="warning" className="border-warning/30 bg-warning/15 font-bold text-warning-ink">
+                🛠️ Aufbau- / Abbau-Schicht
+              </Badge>
+            )}
+            {shift.category ? <Badge>{shift.category}</Badge> : null}
             {shift.minAge && (
               <Badge tone="warning">
                 <Shield className="size-3" /> Schicht ab {shift.minAge} J.

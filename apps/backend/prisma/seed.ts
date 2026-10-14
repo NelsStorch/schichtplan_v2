@@ -184,6 +184,34 @@ async function main() {
 
   console.log(`Events angelegt: ${chilbi.title}, ${sola.title}`);
 
+  // 4b. Reusable Arbeiten (Task Definitions) für die Abteilung anlegen
+  const standardTasks = [
+    { title: 'Zeltbau & Schwere Arbeiten', description: 'Gerüst aufstellen, Planen spannen', minAge: 16, ageRequirementType: 'ALL' },
+    { title: 'Material & Deko', description: 'Tische, Bänke und Deko einrichten', minAge: null, ageRequirementType: 'ALL' },
+    { title: 'Grillleitung', description: 'Fleisch und Grill bedienen', minAge: 16, ageRequirementType: 'ALL' },
+    { title: 'Ausgabe & Chnoblibrot', description: 'Bestellungen zusammenstellen und ausgeben', minAge: null, ageRequirementType: 'ALL' },
+    { title: 'Bar & Ausschank', description: 'Getränke ausgeben und Gläser abwaschen', minAge: 18, ageRequirementType: 'AT_LEAST_ONE' },
+    { title: 'Kasse & Bons', description: 'Bedienung der Kasse und Abrechnung', minAge: 16, ageRequirementType: 'ALL' },
+    { title: 'Abbau & Aufräumen', description: 'Zelt und Stand abbauen, Material verstauen', minAge: null, ageRequirementType: 'ALL' },
+  ];
+
+  for (const st of standardTasks) {
+    const existing = await prisma.taskDefinition.findFirst({
+      where: { departmentId: department.id, title: st.title },
+    });
+    if (!existing) {
+      await prisma.taskDefinition.create({
+        data: {
+          departmentId: department.id,
+          title: st.title,
+          description: st.description,
+          minAge: st.minAge,
+          ageRequirementType: st.ageRequirementType,
+        },
+      });
+    }
+  }
+
   // 5. Schichten für die Chilbi (nur beim ersten Seed: echte Schichten & Anmeldungen bleiben unangetastet)
   if ((await prisma.shift.count({ where: { eventId: chilbi.id } })) > 0) {
     console.log('Chilbi hat bereits Schichten, Beispielschichten werden übersprungen.');
@@ -194,6 +222,7 @@ async function main() {
     {
       title: 'Standaufbau & Zeltmontage',
       category: 'Aufbau & Vorbereitung',
+      isSetupTeardown: true,
       description: 'Zelt aufstellen, Grill und Tische platzieren, Beleuchtung installieren.',
       startTime: new Date('2026-10-16T13:00:00Z'),
       endTime: new Date('2026-10-16T16:30:00Z'),
@@ -312,6 +341,7 @@ async function main() {
     {
       title: 'Chilbi Abbau & Endreinigung',
       category: 'Abbau & Aufräumen',
+      isSetupTeardown: true,
       description: 'Alles abbauen, Material im Cevi-Kasten verstauen, Platz sauber wischen.',
       startTime: new Date('2026-10-18T18:00:00Z'),
       endTime: new Date('2026-10-18T21:30:00Z'),
@@ -335,6 +365,7 @@ async function main() {
         eventId: chilbi.id,
         title: s.title,
         category: s.category,
+        isSetupTeardown: s.isSetupTeardown ?? false,
         description: s.description,
         startTime: s.startTime,
         endTime: s.endTime,

@@ -186,7 +186,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             data: {
               eventId: ev.id,
               title: s.title,
-              category: s.category,
+              category: s.category || null,
+              isSetupTeardown: s.isSetupTeardown ?? false,
               description: s.description || null,
               minAge: s.minAge || null,
               startTime: shiftStart,

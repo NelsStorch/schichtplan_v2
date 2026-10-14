@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useMemo, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -22,13 +22,15 @@ import {
   UserMinus,
   UserPlus,
   Users,
+  Wrench,
   X,
 } from 'lucide-react';
-import type { ShiftDto, ShiftTaskDto, EventTemplateDto } from '@schichtplan/shared';
+import type { ShiftDto, ShiftTaskDto, EventTemplateDto, TaskDefinitionDto, AgeRequirementType } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
   Button,
+  Callout,
   Card,
   Chip,
   Dialog,
@@ -90,11 +92,12 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   const [error, setError] = useState<string | null>(null);
 
   // Tabs
-  const [tab, setTab] = useState<'shifts' | 'helpers' | 'templates'>('shifts');
+  const [tab, setTab] = useState<'shifts' | 'helpers' | 'tasks' | 'templates'>('shifts');
 
   // Filter Schichten
   const [day, setDay] = useState<string>('ALL');
-  const [category, setCategory] = useState<string>('ALL');
+  const [taskFilter, setTaskFilter] = useState<string>('ALL');
+  const [propertyFilter, setPropertyFilter] = useState<'ALL' | 'EVENT' | 'SETUP_TEARDOWN'>('ALL');
   const [search, setSearch] = useState('');
   const [onlyOpen, setOnlyOpen] = useState(false);
 
@@ -113,6 +116,12 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   const [showOrganizerDialog, setShowOrganizerDialog] = useState(false);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
 
+  // Arbeiten-Katalog (Task Definitions)
+  const [taskDefinitions, setTaskDefinitions] = useState<TaskDefinitionDto[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskDefinitionDto | null>(null);
+
   // Vorlagen
   const [templates, setTemplates] = useState<EventTemplateDto[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -128,6 +137,18 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
     }
   }, [slug]);
 
+  const loadTasks = useCallback(async () => {
+    setLoadingTasks(true);
+    try {
+      const data = await api<TaskDefinitionDto[]>('/api/tasks');
+      setTaskDefinitions(data);
+    } catch {
+      // Fehler ignorieren
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, []);
+
   const loadTemplates = useCallback(async () => {
     setLoadingTemplates(true);
     try {
@@ -142,16 +163,34 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadTasks();
+  }, [load, loadTasks]);
 
   useEffect(() => {
     if (tab === 'templates') {
       loadTemplates();
     }
-  }, [tab, loadTemplates]);
+    if (tab === 'tasks') {
+      loadTasks();
+    }
+  }, [tab, loadTemplates, loadTasks]);
 
   const days = useMemo(() => groupByBusinessDay(event?.shifts ?? []), [event]);
-  const categories = useMemo(() => Array.from(new Set(event?.shifts.map((s) => s.category))), [event]);
+  const distinctTasks = useMemo(() => {
+    if (!event?.shifts) return [];
+    const titles = new Set<string>();
+    for (const s of event.shifts) {
+      if (s.tasks) {
+        for (const t of s.tasks) {
+          if (t.title?.trim()) titles.add(t.title.trim());
+        }
+      }
+    }
+    return Array.from(titles);
+  }, [event]);
+  const hasSetupTeardownShifts = useMemo(() => {
+    return event?.shifts?.some((s) => s.isSetupTeardown) ?? false;
+  }, [event]);
 
   // Berechnungen für Statistiken
   const totalSlots = event?.shifts.reduce((sum, s) => sum + s.requiredSlots, 0) ?? 0;
@@ -346,6 +385,25 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
     }
   };
 
+  // Arbeit (TaskDefinition) löschen
+  const handleDeleteTaskDefinition = async (td: TaskDefinitionDto) => {
+    const ok = await confirm({
+      title: `Arbeit "${td.title}" löschen?`,
+      description: 'Diese Arbeit wird aus dem Vorlagen-Katalog entfernt. Bereits erstellte Schichten bleiben unverändert.',
+      confirmLabel: 'Arbeit löschen',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await api(`/api/tasks/${td.id}`, { method: 'DELETE' });
+      toast({ title: 'Arbeit gelöscht', description: td.title });
+      await loadTasks();
+    } catch (err) {
+      toast({ title: 'Löschen fehlgeschlagen', description: errorMessage(err), tone: 'error' });
+    }
+  };
+
   // Vorlage löschen
   const handleDeleteTemplate = async (template: EventTemplateDto) => {
     const ok = await confirm({
@@ -371,13 +429,19 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
     .map((d) => ({
       ...d,
       items: d.items.filter((s) => {
-        const matchesCategory = category === 'ALL' || s.category === category;
+        const matchesProperty =
+          propertyFilter === 'ALL' ||
+          (propertyFilter === 'SETUP_TEARDOWN' && s.isSetupTeardown) ||
+          (propertyFilter === 'EVENT' && !s.isSetupTeardown);
+        const matchesTask =
+          taskFilter === 'ALL' ||
+          s.tasks?.some((t) => t.title.toLowerCase() === taskFilter.toLowerCase());
         const matchesSearch =
           !search ||
           s.title.toLowerCase().includes(search.toLowerCase()) ||
           s.tasks?.some((t) => t.title.toLowerCase().includes(search.toLowerCase()));
         const matchesOpen = !onlyOpen || (s.signups?.length ?? 0) < s.requiredSlots;
-        return matchesCategory && matchesSearch && matchesOpen;
+        return matchesProperty && matchesTask && matchesSearch && matchesOpen;
       }),
     }))
     .filter((d) => d.items.length > 0);
@@ -514,6 +578,18 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
           </button>
           <button
             type="button"
+            onClick={() => setTab('tasks')}
+            className={cn(
+              'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              tab === 'tasks'
+                ? 'border-accent text-accent-ink'
+                : 'border-transparent text-fg-muted hover:text-fg'
+            )}
+          >
+            <Wrench className="size-4" /> Arbeiten-Katalog ({taskDefinitions.length})
+          </button>
+          <button
+            type="button"
             onClick={() => setTab('templates')}
             className={cn(
               'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
@@ -559,12 +635,31 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                 Nur offene Schichten
               </Chip>
 
-              {categories.length > 1 &&
-                categories.map((c) => (
-                  <Chip key={c} selected={category === c} onClick={() => setCategory(category === c ? 'ALL' : c)}>
-                    {c}
-                  </Chip>
-                ))}
+              {/* Aufbau / Abbau Eigenschaft */}
+              {hasSetupTeardownShifts && (
+                <Chip
+                  selected={propertyFilter === 'SETUP_TEARDOWN'}
+                  onClick={() => setPropertyFilter(propertyFilter === 'SETUP_TEARDOWN' ? 'ALL' : 'SETUP_TEARDOWN')}
+                >
+                  🛠️ Nur Auf- &amp; Abbau
+                </Chip>
+              )}
+
+              {/* Spezifische Arbeiten Filter */}
+              {distinctTasks.length > 0 && (
+                <>
+                  <span className="mx-1 h-4 w-px bg-line" />
+                  {distinctTasks.map((title) => (
+                    <Chip
+                      key={title}
+                      selected={taskFilter === title}
+                      onClick={() => setTaskFilter(taskFilter === title ? 'ALL' : title)}
+                    >
+                      {title}
+                    </Chip>
+                  ))}
+                </>
+              )}
             </div>
 
             {/* Schichten-Liste */}
@@ -589,7 +684,8 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                     variant="secondary"
                     onClick={() => {
                       setDay('ALL');
-                      setCategory('ALL');
+                      setTaskFilter('ALL');
+                      setPropertyFilter('ALL');
                       setSearch('');
                       setOnlyOpen(false);
                     }}
@@ -627,7 +723,12 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                                    <Badge>{shift.category}</Badge>
+                                    {shift.isSetupTeardown && (
+                                      <Badge tone="warning" className="border-warning/30 bg-warning/15 font-bold text-warning-ink">
+                                        🛠️ Aufbau / Abbau
+                                      </Badge>
+                                    )}
+                                    {shift.category ? <Badge>{shift.category}</Badge> : null}
                                     {shift.minAge ? (
                                       <Badge tone="warning">Schicht ab {shift.minAge} J.</Badge>
                                     ) : null}
@@ -896,7 +997,138 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
           </div>
         )}
 
-        {/* ----------------- TAB 3: EVENT-VORLAGEN ----------------- */}
+        {/* ----------------- TAB 3: ARBEITEN-KATALOG ----------------- */}
+        {tab === 'tasks' && (
+          <div className="py-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-fg">Wiederverwendbare Arbeiten (Katalog)</h3>
+                <p className="text-xs text-fg-muted">
+                  Definiere Arbeiten (z.B. Bar, Grill, Kasse, Zeltbau) einmalig und füge sie mit 1 Klick in beliebig viele Schichten ein.
+                </p>
+              </div>
+              <Button size="sm" onClick={() => { setEditingTask(null); setShowTaskDialog(true); }}>
+                <Plus className="size-4" /> Neue Arbeit anlegen
+              </Button>
+            </div>
+
+            {loadingTasks ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Skeleton className="h-44 rounded-card" />
+                <Skeleton className="h-44 rounded-card" />
+                <Skeleton className="h-44 rounded-card" />
+              </div>
+            ) : taskDefinitions.length === 0 ? (
+              <EmptyState
+                icon={<Wrench />}
+                title="Noch keine Arbeiten im Katalog"
+                description="Lege typische Arbeiten deiner Abteilung an, um Schichten künftig in Sekunden zu erstellen."
+                action={
+                  <Button onClick={() => { setEditingTask(null); setShowTaskDialog(true); }}>
+                    <Plus className="size-4" /> Erste Arbeit anlegen
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {taskDefinitions.map((taskDef) => {
+                  const activeInShifts = event.shifts.filter((s) =>
+                    s.tasks?.some(
+                      (t) =>
+                        (t.taskDefinitionId && t.taskDefinitionId === taskDef.id) ||
+                        t.title.toLowerCase() === taskDef.title.toLowerCase()
+                    )
+                  );
+
+                  return (
+                    <Card key={taskDef.id} className="relative flex flex-col justify-between p-5 shadow-soft hover:border-line-strong transition">
+                      <div>
+                        {/* Header: Icon, Titel & Actions */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-accent/20 bg-accent/10 text-accent-ink">
+                              <Wrench className="size-4" />
+                            </div>
+                            <h4 className="font-display text-base font-bold text-fg">{taskDef.title}</h4>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingTask(taskDef);
+                                setShowTaskDialog(true);
+                              }}
+                              aria-label="Arbeit bearbeiten"
+                            >
+                              <Edit className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteTaskDefinition(taskDef)}
+                              className="text-fg-subtle hover:text-danger-ink"
+                              aria-label="Arbeit löschen"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Beschreibung */}
+                        {taskDef.description ? (
+                          <p className="mt-3 text-xs leading-relaxed text-fg-muted">
+                            {taskDef.description}
+                          </p>
+                        ) : (
+                          <p className="mt-3 text-xs italic text-fg-subtle">Keine Beschreibung hinterlegt</p>
+                        )}
+
+                        {/* Badges: Altersrichtlinie */}
+                        <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+                          {taskDef.minAge ? (
+                            <Badge tone="warning">
+                              ab {taskDef.minAge} J.{' '}
+                              {taskDef.ageRequirementType === 'AT_LEAST_ONE'
+                                ? '(mind. 1 in Schicht)'
+                                : '(alle Helfer)'}
+                            </Badge>
+                          ) : (
+                            <Badge tone="neutral">Kein Mindestalter</Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Footer: Verwendung & Schnellaktion */}
+                      <div className="mt-5 border-t border-line/80 pt-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-fg-subtle">
+                            {activeInShifts.length === 0
+                              ? 'In diesem Event noch unbenutzt'
+                              : `In ${activeInShifts.length} Schicht(en) aktiv`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowShiftForm(true);
+                              setEditingShift(null);
+                            }}
+                            className="font-bold text-accent-ink hover:underline"
+                          >
+                            + Schicht erstellen
+                          </button>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ----------------- TAB 4: EVENT-VORLAGEN ----------------- */}
         {tab === 'templates' && (
           <div className="py-6 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1068,6 +1300,192 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
           await load();
         }}
       />
+
+      <TaskDefinitionDialog
+        open={showTaskDialog}
+        task={editingTask}
+        onClose={() => {
+          setShowTaskDialog(false);
+          setEditingTask(null);
+        }}
+        onSaved={async () => {
+          setShowTaskDialog(false);
+          setEditingTask(null);
+          await loadTasks();
+        }}
+      />
     </AppShell>
+  );
+}
+
+function TaskDefinitionDialog({
+  open,
+  task,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  task: TaskDefinitionDto | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = Boolean(task);
+  const toast = useToast();
+  const [title, setTitle] = useState(task?.title || '');
+  const [description, setDescription] = useState(task?.description || '');
+  const [minAge, setMinAge] = useState(task?.minAge || 0);
+  const [ageRequirementType, setAgeRequirementType] = useState<AgeRequirementType>(task?.ageRequirementType || 'ALL');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title);
+      setDescription(task.description || '');
+      setMinAge(task.minAge || 0);
+      setAgeRequirementType(task.ageRequirementType || 'ALL');
+    } else {
+      setTitle('');
+      setDescription('');
+      setMinAge(0);
+      setAgeRequirementType('ALL');
+    }
+    setError(null);
+  }, [task, open]);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      setError('Bitte einen Namen für die Arbeit angeben.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+
+    try {
+      const payload = {
+        title: title.trim(),
+        description: description.trim() || null,
+        minAge: minAge > 0 ? minAge : null,
+        ageRequirementType,
+      };
+
+      if (isEdit && task) {
+        await api(`/api/tasks/${task.id}`, {
+          method: 'PATCH',
+          json: payload,
+        });
+        toast({ title: 'Arbeit aktualisiert', description: title });
+      } else {
+        await api('/api/tasks', {
+          method: 'POST',
+          json: payload,
+        });
+        toast({ title: 'Arbeit angelegt', description: title });
+      }
+      onSaved();
+    } catch (err) {
+      setError(errorMessage(err));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      icon={<Wrench />}
+      title={isEdit ? 'Arbeit bearbeiten' : 'Neue Arbeit definieren'}
+      description="Wiederverwendbare Arbeit für alle Schichten deiner Abteilung."
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {error && <Callout tone="danger">{error}</Callout>}
+
+        <Field label="Titel der Arbeit" required>
+          <Input
+            value={title}
+            autoFocus
+            placeholder="z.B. Bar, Grill, Kasse, Zeltbau, Küche"
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Field>
+
+        <Field label="Beschreibung / Aufgaben">
+          <Textarea
+            rows={2}
+            value={description}
+            placeholder="Aufgabenbeschreibung für Helfer..."
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </Field>
+
+        {/* Mindestalter */}
+        <div className="flex flex-col gap-1.5 rounded-field border border-line bg-surface-2 p-3">
+          <span className="text-[13px] font-semibold text-fg">Mindestalter für diese Arbeit</span>
+          <div className="mt-1 grid h-9 grid-cols-4 gap-1">
+            {[0, 14, 16, 18].map((age) => (
+              <button
+                key={age}
+                type="button"
+                onClick={() => setMinAge(age)}
+                className={cn(
+                  'rounded-[0.5rem] text-xs font-semibold transition',
+                  minAge === age ? 'bg-surface text-fg shadow-soft' : 'text-fg-muted hover:text-fg'
+                )}
+              >
+                {age === 0 ? 'Keins' : `ab ${age}`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {minAge > 0 && (
+          <div className="flex flex-col gap-1.5 rounded-field border border-line bg-surface-2 p-3">
+            <span className="text-[13px] font-semibold text-fg">Alters-Anforderung in der Schicht</span>
+            <div className="mt-1 grid h-9 grid-cols-2 gap-1 rounded-field border border-line bg-surface p-0.5">
+              <button
+                type="button"
+                onClick={() => setAgeRequirementType('ALL')}
+                className={cn(
+                  'rounded-[0.4rem] text-xs font-semibold transition',
+                  ageRequirementType === 'ALL'
+                    ? 'bg-accent/15 text-accent-ink font-bold'
+                    : 'text-fg-muted hover:text-fg'
+                )}
+              >
+                Alle Helfer
+              </button>
+              <button
+                type="button"
+                onClick={() => setAgeRequirementType('AT_LEAST_ONE')}
+                className={cn(
+                  'rounded-[0.4rem] text-xs font-semibold transition',
+                  ageRequirementType === 'AT_LEAST_ONE'
+                    ? 'bg-accent/15 text-accent-ink font-bold'
+                    : 'text-fg-muted hover:text-fg'
+                )}
+                title="Mindestens 1 Person in der Schicht muss das Alter haben"
+              >
+                Mind. 1 in Schicht
+              </button>
+            </div>
+            <p className="text-2xs text-fg-muted mt-1">
+              {ageRequirementType === 'ALL'
+                ? 'Jede:r Helfer:in für diese Arbeit muss mindestens das Mindestalter erfüllen.'
+                : 'Nur die letzte offene Stelle wird gesperrt, falls noch niemand in der Schicht das Alter erfüllt.'}
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={onClose} type="button">
+            Abbrechen
+          </Button>
+          <Button type="submit" loading={saving}>
+            {isEdit ? 'Änderungen speichern' : 'Arbeit anlegen'}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

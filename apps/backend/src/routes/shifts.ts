@@ -21,7 +21,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
 
-      const { eventId, title, category, startTime, endTime, requiredSlots: reqSlots, description, minAge, tasks } =
+      const { eventId, title, category, isSetupTeardown, startTime, endTime, requiredSlots: reqSlots, description, minAge, tasks } =
         parse.data;
 
       // Event & Abteilung prüfen
@@ -63,6 +63,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                 requiredSlots: reqSlots || 1,
                 minAge: minAge || null,
                 ageRequirementType: 'ALL' as const,
+                taskDefinitionId: null,
               },
             ];
 
@@ -72,7 +73,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           eventId,
           title,
-          category,
+          category: category || null,
+          isSetupTeardown: isSetupTeardown ?? false,
           startTime: new Date(startTime),
           endTime: new Date(endTime),
           requiredSlots: totalRequiredSlots,
@@ -80,6 +82,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           minAge: minAge || null,
           tasks: {
             create: resolvedTasks.map((t) => ({
+              taskDefinitionId: t.taskDefinitionId || null,
               title: t.title,
               description: t.description || null,
               requiredSlots: t.requiredSlots || 1,
@@ -139,7 +142,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten dieser Schicht' });
       }
 
-      const { title, category, startTime, endTime, description, minAge, tasks } = parse.data;
+      const { title, category, isSetupTeardown, startTime, endTime, description, minAge, tasks } = parse.data;
 
       // Falls tasks übergeben wurden: Synchronisieren
       if (tasks && tasks.length > 0) {
@@ -164,6 +167,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               await tx.shiftTask.update({
                 where: { id: t.id },
                 data: {
+                  taskDefinitionId: t.taskDefinitionId !== undefined ? t.taskDefinitionId : undefined,
                   title: t.title,
                   description: t.description || null,
                   requiredSlots: t.requiredSlots || 1,
@@ -175,6 +179,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               await tx.shiftTask.create({
                 data: {
                   shiftId,
+                  taskDefinitionId: t.taskDefinitionId || null,
                   title: t.title,
                   description: t.description || null,
                   requiredSlots: t.requiredSlots || 1,
@@ -190,7 +195,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             where: { id: shiftId },
             data: {
               title: title !== undefined ? title : undefined,
-              category: category !== undefined ? category : undefined,
+              category: category !== undefined ? (category || null) : undefined,
+              isSetupTeardown: isSetupTeardown !== undefined ? isSetupTeardown : undefined,
               startTime: startTime ? new Date(startTime) : undefined,
               endTime: endTime ? new Date(endTime) : undefined,
               description: description !== undefined ? description : undefined,
@@ -204,7 +210,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: shiftId },
           data: {
             title: title !== undefined ? title : undefined,
-            category: category !== undefined ? category : undefined,
+            category: category !== undefined ? (category || null) : undefined,
+            isSetupTeardown: isSetupTeardown !== undefined ? isSetupTeardown : undefined,
             startTime: startTime ? new Date(startTime) : undefined,
             endTime: endTime ? new Date(endTime) : undefined,
             description: description !== undefined ? description : undefined,
@@ -310,6 +317,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           eventId: shift.eventId,
           title: body.title || `${shift.title} (Kopie)`,
           category: shift.category,
+          isSetupTeardown: shift.isSetupTeardown,
           startTime: newStartTime,
           endTime: newEndTime,
           requiredSlots: shift.requiredSlots,
@@ -317,6 +325,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           minAge: shift.minAge,
           tasks: {
             create: shift.tasks.map((t) => ({
+              taskDefinitionId: t.taskDefinitionId || null,
               title: t.title,
               description: t.description,
               requiredSlots: t.requiredSlots,

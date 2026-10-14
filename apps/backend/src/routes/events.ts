@@ -179,6 +179,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           return {
             id: t.id,
             shiftId: t.shiftId,
+            taskDefinitionId: t.taskDefinitionId || null,
             title: t.title,
             description: t.description,
             requiredSlots: t.requiredSlots,
@@ -194,6 +195,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           eventId: s.eventId,
           title: s.title,
           category: s.category,
+          isSetupTeardown: s.isSetupTeardown,
           description: s.description,
           startTime: s.startTime.toISOString(),
           endTime: s.endTime.toISOString(),
@@ -701,6 +703,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return {
           title: s.title,
           category: s.category,
+          isSetupTeardown: s.isSetupTeardown,
           description: s.description,
           minAge: s.minAge,
           dayOffset,

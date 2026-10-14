@@ -49,6 +49,7 @@ const sampleShift = (filled: number, total: number, extra: Partial<ShiftDto> = {
   eventId: 'demo',
   title: 'Bar & Ausschank',
   category: 'Bar & Getränke',
+  isSetupTeardown: false,
   description: 'Getränke ausgeben, Zapfanlage bedienen, Gläser abwaschen.',
   startTime: iso(48),
   endTime: iso(52.5),

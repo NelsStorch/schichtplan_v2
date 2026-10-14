@@ -45,9 +45,21 @@ export interface EventDto {
 
 export type AgeRequirementType = 'ALL' | 'AT_LEAST_ONE';
 
+export interface TaskDefinitionDto {
+  id: string;
+  departmentId: string;
+  title: string;
+  description?: string | null;
+  minAge?: number | null;
+  ageRequirementType: AgeRequirementType;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ShiftTaskDto {
   id: string;
   shiftId: string;
+  taskDefinitionId?: string | null;
   title: string;
   description?: string | null;
   requiredSlots: number;
@@ -61,7 +73,8 @@ export interface ShiftDto {
   id: string;
   eventId: string;
   title: string;
-  category: string;
+  category?: string | null;
+  isSetupTeardown?: boolean;
   startTime: string;
   endTime: string;
   requiredSlots: number;
@@ -101,7 +114,8 @@ export interface ShiftTaskTemplateItem {
 
 export interface ShiftTemplateItem {
   title: string;
-  category: string;
+  category?: string | null;
+  isSetupTeardown?: boolean;
   description?: string | null;
   minAge?: number | null;
   dayOffset: number;
@@ -273,7 +287,7 @@ export interface AdminUserOrganizerDto {
 export interface AdminUserSignupDto {
   id: string;
   shiftTitle: string;
-  shiftCategory: string;
+  shiftCategory?: string | null;
   startTime: string;
   endTime: string;
   eventTitle: string;

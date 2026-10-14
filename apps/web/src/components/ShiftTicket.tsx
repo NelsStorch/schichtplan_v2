@@ -129,7 +129,12 @@ export function ShiftTicket({
         {/* Badges & Edit-Button */}
         <div className="flex flex-wrap items-center justify-between gap-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge>{shift.category}</Badge>
+            {shift.isSetupTeardown && (
+              <Badge tone="warning" className="border-warning/30 bg-warning/15 font-bold text-warning-ink">
+                🛠️ Aufbau / Abbau
+              </Badge>
+            )}
+            {shift.category ? <Badge>{shift.category}</Badge> : null}
             {shift.minAge ? (
               <Badge tone="warning">Schicht ab {shift.minAge} J.</Badge>
             ) : null}

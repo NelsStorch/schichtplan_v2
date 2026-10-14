@@ -48,7 +48,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   // Nicht ladbares Event-Logo -> Cevi-Standardlogo
   const [brokenLogo, setBrokenLogo] = useState<string | null>(null);
   const [day, setDay] = useState<string>('ALL');
-  const [category, setCategory] = useState<string>('ALL');
+  const [taskFilter, setTaskFilter] = useState<string>('ALL');
+  const [propertyFilter, setPropertyFilter] = useState<'ALL' | 'EVENT' | 'SETUP_TEARDOWN'>('ALL');
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [busyShift, setBusyShift] = useState<string | null>(null);
 
@@ -88,7 +89,21 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   }, [load]);
 
   const days = useMemo(() => groupByBusinessDay(event?.shifts ?? []), [event]);
-  const categories = useMemo(() => Array.from(new Set(event?.shifts.map((s) => s.category))), [event]);
+  const distinctTasks = useMemo(() => {
+    if (!event?.shifts) return [];
+    const titles = new Set<string>();
+    for (const s of event.shifts) {
+      if (s.tasks) {
+        for (const t of s.tasks) {
+          if (t.title?.trim()) titles.add(t.title.trim());
+        }
+      }
+    }
+    return Array.from(titles);
+  }, [event]);
+  const hasSetupTeardownShifts = useMemo(() => {
+    return event?.shifts?.some((s) => s.isSetupTeardown) ?? false;
+  }, [event]);
   const selectedShift = useMemo(
     () => event?.shifts.find((s) => s.id === selectedShiftId) ?? null,
     [event, selectedShiftId]
@@ -130,11 +145,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     .filter((d) => day === 'ALL' || d.key === day)
     .map((d) => ({
       ...d,
-      items: d.items.filter(
-        (s) =>
-          (category === 'ALL' || s.category === category) &&
-          (!onlyOpen || (s.signups?.length ?? 0) < s.requiredSlots)
-      ),
+      items: d.items.filter((s) => {
+        const matchesOpen = !onlyOpen || (s.signups?.length ?? 0) < s.requiredSlots;
+        const matchesProperty =
+          propertyFilter === 'ALL' ||
+          (propertyFilter === 'SETUP_TEARDOWN' && s.isSetupTeardown) ||
+          (propertyFilter === 'EVENT' && !s.isSetupTeardown);
+        const matchesTask =
+          taskFilter === 'ALL' ||
+          s.tasks?.some((t) => t.title.toLowerCase() === taskFilter.toLowerCase());
+
+        return matchesOpen && matchesProperty && matchesTask;
+      }),
     }))
     .filter((d) => d.items.length > 0);
 
@@ -380,12 +402,32 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
             <Chip selected={onlyOpen} onClick={() => setOnlyOpen((v) => !v)}>
               Nur mit freien Plätzen
             </Chip>
-            {categories.length > 1 &&
-              categories.map((c) => (
-                <Chip key={c} selected={category === c} onClick={() => setCategory(category === c ? 'ALL' : c)}>
-                  {c}
-                </Chip>
-              ))}
+
+            {/* Aufbau / Abbau Eigenschaft */}
+            {hasSetupTeardownShifts && (
+              <Chip
+                selected={propertyFilter === 'SETUP_TEARDOWN'}
+                onClick={() => setPropertyFilter(propertyFilter === 'SETUP_TEARDOWN' ? 'ALL' : 'SETUP_TEARDOWN')}
+              >
+                🛠️ Nur Auf- &amp; Abbau
+              </Chip>
+            )}
+
+            {/* Spezifische Arbeiten */}
+            {distinctTasks.length > 0 && (
+              <>
+                <span aria-hidden className="mx-1 w-px shrink-0 bg-line" />
+                {distinctTasks.map((title) => (
+                  <Chip
+                    key={title}
+                    selected={taskFilter === title}
+                    onClick={() => setTaskFilter(taskFilter === title ? 'ALL' : title)}
+                  >
+                    {title}
+                  </Chip>
+                ))}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -419,7 +461,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                 variant="secondary"
                 onClick={() => {
                   setDay('ALL');
-                  setCategory('ALL');
+                  setTaskFilter('ALL');
+                  setPropertyFilter('ALL');
                   setOnlyOpen(false);
                 }}
               >
