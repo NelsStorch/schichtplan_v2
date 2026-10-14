@@ -89,6 +89,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   const days = useMemo(() => groupByBusinessDay(event?.shifts ?? []), [event]);
   const categories = useMemo(() => Array.from(new Set(event?.shifts.map((s) => s.category))), [event]);
+  const selectedShift = useMemo(
+    () => event?.shifts.find((s) => s.id === selectedShiftId) ?? null,
+    [event, selectedShiftId]
+  );
 
   if (error) {
     return (
@@ -121,11 +125,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const filled = event.shifts.reduce((sum, s) => sum + Math.min(s.signups?.length ?? 0, s.requiredSlots), 0);
   const free = Math.max(0, total - filled);
   const percent = total > 0 ? Math.round((filled / total) * 100) : 0;
-
-  const selectedShift = useMemo(
-    () => event?.shifts.find((s) => s.id === selectedShiftId) ?? null,
-    [event, selectedShiftId]
-  );
 
   const visibleDays = days
     .filter((d) => day === 'ALL' || d.key === day)
