@@ -3,22 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Search,
-  ArrowRight,
   Plus,
   LogIn,
   Flame,
   ExternalLink,
-  ChevronRight,
   CheckCircle2,
-  X,
   Sparkles,
 } from 'lucide-react';
 import {
-  getDepartmentUrl,
   getLoginUrl,
   getLandingUrl,
-  getRootDomain,
   type UserDto,
 } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
@@ -32,19 +26,7 @@ import { MultiEventIsometricGraphic } from '@/components/MultiEventIsometricGrap
 import { MobilePwaIsometricGraphic } from '@/components/MobilePwaIsometricGraphic';
 import { CampsiteNightGraphic } from '@/components/CampsiteNightGraphic';
 
-interface DepartmentItem {
-  id: string;
-  name: string;
-  slug: string;
-  logoUrl?: string | null;
-  primaryColor?: string | null;
-  activeEventsCount?: number;
-}
-
 export default function LandingPage() {
-  const [departments, setDepartments] = useState<DepartmentItem[]>([]);
-  const [loadingDepts, setLoadingDepts] = useState(true);
-  const [search, setSearch] = useState('');
   // Angemeldete Person (Cookie gilt für alle Subdomains): Name statt «Anmelden» im Kopf
   const [me, setMe] = useState<UserDto | null>(null);
 
@@ -55,34 +37,10 @@ export default function LandingPage() {
       .catch(() => setMe(null));
   }, []);
 
-  useEffect(() => {
-    async function loadDepts() {
-      try {
-        const res = await fetch('/api/departments');
-        if (res.ok) {
-          const data = await res.json();
-          setDepartments(data);
-        }
-      } catch (err) {
-        console.error('Fehler beim Laden der Abteilungen:', err);
-      } finally {
-        setLoadingDepts(false);
-      }
-    }
-    loadDepts();
-  }, []);
-
-  const departmentUrl = (slug: string) => getDepartmentUrl(slug);
-
   /** Abteilung anlegen passiert im Login-Portal (nur Abteilungsleitung mit Cevi.DB) */
   const goCreateDepartment = () => {
     window.location.href = getLoginUrl(getLandingUrl(), '/abteilung-erstellen');
   };
-
-  const filteredDepartments = departments.filter((d) =>
-    d.name.toLowerCase().includes(search.toLowerCase()) ||
-    d.slug.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="relative min-h-[100dvh] flex flex-col bg-canvas text-fg selection:bg-accent selection:text-white overflow-x-hidden">
@@ -168,18 +126,8 @@ export default function LandingPage() {
 
                 {/* CTAs */}
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                  <a
-                    href="#abteilungen"
-                    className="group inline-flex items-center justify-between sm:justify-center gap-3 rounded-full bg-accent px-6 py-3.5 text-sm font-semibold text-accent-fg shadow-glow hover:brightness-110 active:scale-[0.98] transition"
-                  >
-                    <span>Abteilung finden</span>
-                    <span className="flex size-7 items-center justify-center rounded-full bg-white/20 transition-transform duration-200 group-hover:translate-x-0.5">
-                      <ArrowRight className="size-4" />
-                    </span>
-                  </a>
-
                   <Button
-                    variant="secondary"
+                    variant="primary"
                     size="md"
                     onClick={goCreateDepartment}
                     className="justify-center text-sm font-semibold h-12"
@@ -381,125 +329,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Section 4: Abteilungen im Überblick (Directory & Live Search) */}
-        <section id="abteilungen" className="py-20 md:py-28 bg-canvas relative">
-          <div className="mx-auto max-w-5xl px-4">
-            <div className="text-center max-w-xl mx-auto mb-10">
-              <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">
-                Abteilung finden
-              </h2>
-              <p className="mt-2 text-sm sm:text-base text-fg-muted">
-                Wähle deine Cevi-Abteilung und gelange direkt zum Schichtplan deiner nächsten Anlässe.
-              </p>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative mb-8 max-w-xl mx-auto">
-              <Search className="size-5 text-fg-subtle absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Name oder Ort suchen (z. B. Illnau, Uster, Winterthur)..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-10 py-3.5 bg-surface border border-line rounded-full text-sm text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/15 transition shadow-soft"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-fg-subtle hover:text-fg"
-                  aria-label="Suche zurücksetzen"
-                >
-                  <X className="size-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Department Directory Grid */}
-            {loadingDepts ? (
-              <div className="text-center py-12 text-sm text-fg-subtle">
-                Abteilungen werden geladen...
-              </div>
-            ) : filteredDepartments.length === 0 ? (
-              <div className="rounded-card border border-line/80 bg-surface/50 p-8 text-center max-w-lg mx-auto">
-                <p className="text-sm text-fg-muted mb-4">
-                  Keine Cevi-Abteilung mit dem Suchbegriff «{search}» gefunden.
-                </p>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={goCreateDepartment}
-                >
-                  <Plus className="size-3.5" />
-                  <span>Jetzt {search ? `«${search}»` : 'neue Abteilung'} anlegen</span>
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredDepartments.map((dept) => {
-                  const href = departmentUrl(dept.slug);
-
-                  return (
-                    <Card3DTilt key={dept.id} maxTilt={4} glare={false}>
-                      <a
-                        href={href}
-                        className="group rounded-card border border-line bg-surface p-2 hover:border-line-strong transition shadow-soft flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3.5 p-3 min-w-0">
-                          <div
-                            className="size-11 rounded-tile flex items-center justify-center font-bold text-white text-base shadow-sm shrink-0"
-                            style={{ backgroundColor: dept.primaryColor || '#e11d48' }}
-                          >
-                            {dept.name.charAt(0)}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-display text-sm font-bold text-fg group-hover:text-accent-ink transition truncate">
-                              {dept.name}
-                            </h4>
-                            <div className="flex items-center gap-2 mt-0.5 font-mono text-2xs text-fg-subtle">
-                              <span>{dept.slug}.{typeof window !== 'undefined' ? getRootDomain() : 'cevi-schichtplan.ch'}</span>
-                              {dept.activeEventsCount !== undefined && dept.activeEventsCount > 0 && (
-                                <span className="rounded-full bg-surface-2 px-1.5 py-0.2 text-[10px] text-fg-muted font-sans">
-                                  {dept.activeEventsCount} {dept.activeEventsCount === 1 ? 'Event' : 'Events'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="pr-4 shrink-0">
-                          <span className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-fg-subtle group-hover:bg-accent group-hover:text-accent-fg group-hover:translate-x-0.5 transition-all">
-                            <ArrowRight className="size-4" />
-                          </span>
-                        </div>
-                      </a>
-                    </Card3DTilt>
-                  );
-                })}
-
-                {/* "Eigene Abteilung anlegen" Action Card */}
-                <button
-                  onClick={goCreateDepartment}
-                  className="rounded-card border border-dashed border-line hover:border-accent/60 bg-surface/30 hover:bg-accent/5 p-5 text-left transition flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className="size-11 rounded-tile border border-dashed border-line flex items-center justify-center text-fg-muted group-hover:border-accent group-hover:text-accent-ink transition shrink-0">
-                      <Plus className="size-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-display text-sm font-bold text-fg group-hover:text-accent-ink transition">
-                        Deine Abteilung fehlt?
-                      </h4>
-                      <p className="text-2xs text-fg-subtle mt-0.5">
-                        In 2 Minuten kostenlos und unverbindlich anlegen
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="size-4 text-fg-subtle group-hover:translate-x-1 group-hover:text-accent transition" />
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
       </main>
 
 
