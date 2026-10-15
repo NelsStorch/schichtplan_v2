@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarDays, Database, LogIn, LogOut, Ticket, UserRound } from 'lucide-react';
+import { Building2, CalendarDays, Database, LogIn, LogOut, Ticket, UserRound } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -14,7 +14,7 @@ import {
   buttonClasses,
   cn,
 } from '@schichtplan/ui';
-import { useLoginHref } from '@/lib/api';
+import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 
 const NAV = [
@@ -82,6 +82,20 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
           </div>
         </div>
       </header>
+
+      {user?.needsDepartmentSetup && (
+        <div className="border-b border-warning/25 bg-warning/10">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm sm:px-6">
+            <p className="text-fg">
+              <span className="font-semibold">Zu welcher Abteilung gehörst du?</span>{' '}
+              <span className="text-fg-muted">Manche Anlässe sind nur für eine Abteilung oder Stufe.</span>
+            </p>
+            <a href={departmentSetupUrl()} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
+              <Building2 /> Abteilung angeben
+            </a>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-20">{children}</main>
 
@@ -174,6 +188,10 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <p className="truncate text-sm text-fg-muted">
             {user.firstName} {user.lastName}
           </p>
+          <p className="truncate text-xs text-fg-subtle">
+            {user.homeDepartment ? user.homeDepartment.name : user.needsDepartmentSetup ? 'Abteilung fehlt' : 'Keine Abteilung'}
+            {user.stufen?.length ? ` · ${user.stufen.map((s) => s.name).join(', ')}` : ''}
+          </p>
           <Badge tone="accent" className="mt-2">
             {role}
           </Badge>
@@ -189,6 +207,9 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
         <Link href="/meine-schichten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
           <Ticket /> Meine Schichten
         </Link>
+        <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary' })}>
+          <Building2 /> Abteilung &amp; Stufen
+        </a>
         {user.isGlobalAdmin && (
           <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
             <Database /> Cevi.DB Daten & Profil

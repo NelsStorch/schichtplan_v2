@@ -1,4 +1,10 @@
-import type { ShiftDto, SignupMode } from '@schichtplan/shared';
+import type {
+  EventAccessType,
+  EventQuestionDto,
+  EventViewerDto,
+  RequiredProfileField,
+  ShiftDto,
+} from '@schichtplan/shared';
 
 /** Antwort von GET /api/shifts/my */
 export interface MyShift {
@@ -40,9 +46,16 @@ export interface EventDetails {
   bannerUrl?: string | null;
   startDate: string;
   endDate: string;
-  signupMode: SignupMode;
-  requireEmailForGuests?: boolean;
-  requirePhoneForGuests?: boolean;
+  allowPublicSignup: boolean;
+  accessType: EventAccessType;
+  leadersOnly: boolean;
+  requiredFields: RequiredProfileField[];
+  /** Wer sich eintragen darf, als Satz (z. B. «Cevi Illnau (Hiskia), nur Leitende») */
+  audience: string;
+  allowedDepartments: { id: string; name: string }[];
+  allowedStufen: { id: string; name: string; departmentId: string }[];
+  questions: EventQuestionDto[];
+  viewer: EventViewerDto;
   organizers?: EventOrganizer[];
   shifts: ShiftDto[];
 }

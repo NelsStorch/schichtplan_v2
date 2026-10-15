@@ -68,7 +68,9 @@ async function main() {
   }));
 
   const helperUsers = [];
-  for (const h of helpersData) {
+  for (const [index, h] of helpersData.entries()) {
+    // Helfer 1 und 2 haben die Demo-Abteilung angegeben, Helfer 3 noch nicht (wird beim Login gefragt)
+    const declared = index < 2;
     const user = await prisma.user.upsert({
       where: { email: h.email },
       update: {},
@@ -79,6 +81,9 @@ async function main() {
         ceviName: h.ceviName,
         birthDate: h.birthDate,
         passwordHash: defaultPasswordHash,
+        homeDepartmentId: declared ? department.id : null,
+        homeDepartmentSource: declared ? 'SELF' : null,
+        departmentSetupAt: declared ? new Date() : null,
       },
     });
 
@@ -101,7 +106,7 @@ async function main() {
   }
 
   // 4. Demo-Events
-  // Event A: Chilbi 2026 (Demonstriert "NAME_ONLY" - Kein Passwort nötig!)
+  // Event A: Chilbi 2026 (öffentlich, Handynummer Pflicht)
   const chilbi = await prisma.event.upsert({
     where: {
       departmentId_slug: {
@@ -122,7 +127,8 @@ async function main() {
       bannerUrl: '/images/banners/chilbi.svg',
       isPublished: true,
       allowPublicSignup: true,
-      signupMode: 'NAME_ONLY',
+      accessType: 'PUBLIC',
+      requiredFields: ['PHONE'],
     },
   });
 
@@ -159,7 +165,7 @@ async function main() {
     },
   });
 
-  // Event B: Sommerlager 2026 (Demonstriert "LOGIN_REQUIRED")
+  // Event B: Sommerlager 2026 (abteilungs-intern mit Pflichtangaben und eigener Frage)
   const sola = await prisma.event.upsert({
     where: {
       departmentId_slug: {
@@ -178,9 +184,22 @@ async function main() {
       endDate: new Date('2026-07-18T18:00:00Z'),
       isPublished: true,
       allowPublicSignup: true,
-      signupMode: 'LOGIN_REQUIRED',
+      accessType: 'DEPARTMENT',
+      requiredFields: ['PHONE', 'BIRTH_DATE'],
+      questions: {
+        create: [{ label: 'Allergien oder Unverträglichkeiten', type: 'TEXT', required: false, sortOrder: 0 }],
+      },
     },
   });
+
+  // Stufen der Demo-Abteilung
+  for (const [index, name] of ['Fröschli', 'Hiskia', 'Leiterteam'].entries()) {
+    await prisma.departmentStufe.upsert({
+      where: { departmentId_name: { departmentId: department.id, name } },
+      update: {},
+      create: { departmentId: department.id, name, sortOrder: index },
+    });
+  }
 
   console.log(`Events angelegt: ${chilbi.title}, ${sola.title}`);
 
@@ -423,9 +442,8 @@ async function main() {
       departmentId: department.id,
       title: 'Muster-Vorlage: 3-Tage Chilbi',
       description: 'Standard-Schichten und Arbeiten für einen 3-tägigen Chilbistand (Aufbau, Bar, Grill, Kasse, Abbau).',
-      signupMode: 'NAME_ONLY',
-      requireEmailForGuests: false,
-      requirePhoneForGuests: false,
+      accessType: 'PUBLIC',
+      requiredFields: ['PHONE'],
       data: {
         shifts: shiftsData.map((s) => ({
           title: s.title,

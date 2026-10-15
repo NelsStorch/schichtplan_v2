@@ -1,5 +1,34 @@
 import { z } from 'zod';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX, SIGNUP_MODES } from './constants.js';
+import {
+  EVENT_ACCESS_TYPE_KEYS,
+  REQUIRED_PROFILE_FIELD_KEYS,
+  RESERVED_SUBDOMAINS,
+  SUBDOMAIN_REGEX,
+} from './constants.js';
+
+const EventQuestionInputSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    label: z.string().trim().min(2, 'Frage braucht einen Text').max(200),
+    type: z.enum(['TEXT', 'YES_NO', 'CHOICE']).default('TEXT'),
+    options: z.array(z.string().trim().min(1).max(100)).max(30).default([]),
+    required: z.boolean().default(false),
+  })
+  .refine((q) => q.type !== 'CHOICE' || q.options.length >= 2, {
+    message: 'Eine Auswahl-Frage braucht mindestens zwei Antworten',
+  });
+
+export type EventQuestionInput = z.infer<typeof EventQuestionInputSchema>;
+
+/** Zugang & Pflichtangaben eines Anlasses (gleich beim Erstellen, Bearbeiten und für Vorlagen) */
+const EventAccessFields = {
+  accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).default('PUBLIC'),
+  leadersOnly: z.boolean().default(false),
+  requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).default([]),
+  allowedDepartmentIds: z.array(z.string().uuid()).max(100).default([]),
+  allowedStufeIds: z.array(z.string().uuid()).max(100).default([]),
+  questions: z.array(EventQuestionInputSchema).max(30).default([]),
+};
 
 const DepartmentSlugSchema = z
   .string()
@@ -83,14 +112,85 @@ export const CreateEventSchema = z.object({
   bannerUrl: z.string().optional().nullable(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
-  signupMode: z.enum(['NAME_ONLY', 'OPEN', 'LOGIN_REQUIRED', 'CEVIDB_ONLY']).default('OPEN'),
-  requireEmailForGuests: z.boolean().default(false),
-  requirePhoneForGuests: z.boolean().default(false),
+  ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
   organizers: z.array(CreateEventOrganizerItemSchema).optional(),
 });
 
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
+
+/** Anlass bearbeiten: alle Felder optional. Listen (Whitelist, Stufen, Fragen) ersetzen die bisherigen. */
+export const UpdateEventSchema = z.object({
+  title: z.string().min(2, 'Titel ist erforderlich').optional(),
+  description: z.string().optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
+  bannerUrl: z.string().optional().nullable(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  allowPublicSignup: z.boolean().optional(),
+  accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
+  leadersOnly: z.boolean().optional(),
+  requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).optional(),
+  allowedDepartmentIds: z.array(z.string().uuid()).max(100).optional(),
+  allowedStufeIds: z.array(z.string().uuid()).max(100).optional(),
+  questions: z.array(EventQuestionInputSchema).max(30).optional(),
+});
+
+export type UpdateEventInput = z.infer<typeof UpdateEventSchema>;
+
+/** Profilangaben, die eine Person für einen Anlass nachträgt (nur gesetzte Felder werden geändert) */
+export const UpdateProfileSchema = z.object({
+  firstName: z.string().trim().min(2, 'Vorname ist zu kurz').max(80).optional(),
+  lastName: z.string().trim().min(2, 'Nachname ist zu kurz').max(80).optional(),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9 ()\/-]{7,25}$/, 'Bitte eine gültige Handynummer angeben')
+    .optional(),
+  email: z.string().trim().email('Ungültige E-Mail-Adresse').optional(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Geburtsdatum im Format JJJJ-MM-TT').optional(),
+  address: z.string().trim().min(5, 'Bitte Strasse, PLZ und Ort angeben').max(200).optional(),
+});
+
+export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
+
+export const EventParticipationSchema = z.object({
+  profile: UpdateProfileSchema.optional(),
+  answers: z.record(z.string().uuid(), z.string().trim().max(1000)).optional(),
+});
+
+export type EventParticipationInput = z.infer<typeof EventParticipationSchema>;
+
+export const CreateAccessLinkSchema = z.object({
+  label: z.string().trim().min(2, 'Bitte angeben, für wen der Link ist').max(100),
+  kind: z.enum(['PERSONAL', 'GROUP']).default('PERSONAL'),
+  expiresAt: z.string().datetime().optional().nullable(),
+});
+
+export type CreateAccessLinkInput = z.infer<typeof CreateAccessLinkSchema>;
+
+export const RedeemAccessLinkSchema = z.object({
+  token: z.string().min(10).max(100),
+});
+
+/** Heimabteilung und Stufen beim Login angeben. departmentId null = keine Abteilung. */
+export const SetHomeDepartmentSchema = z.object({
+  departmentId: z.string().uuid().nullable(),
+  stufen: z
+    .array(z.object({ stufeId: z.string().uuid(), role: z.enum(['LEITUNG', 'TEILNEHMER']) }))
+    .max(20)
+    .default([]),
+});
+
+export type SetHomeDepartmentInput = z.infer<typeof SetHomeDepartmentSchema>;
+
+export const StufeInputSchema = z.object({
+  name: z.string().trim().min(2, 'Name der Stufe ist zu kurz').max(60),
+  ceviDbGroupId: z.number().int().positive().max(2_147_483_647).optional().nullable(),
+  sortOrder: z.number().int().min(0).max(1000).optional(),
+});
+
+export type StufeInput = z.infer<typeof StufeInputSchema>;
 
 export const UpdateDepartmentSchema = z.object({
   name: z.string().min(2).optional(),
@@ -174,6 +274,7 @@ export const SignupShiftSchema = z.object({
   shiftId: z.string().uuid(),
   taskId: z.string().uuid().optional().nullable(),
   userId: z.string().uuid().optional().nullable(), // Ermöglicht dem OK, ein Abteilungsmitglied einzuteilen
+  // Nur für das OK: Person ohne Konto von Hand eintragen (Selbsteintragung braucht immer ein Konto)
   guestName: z.string().min(2, 'Bitte Cevi-Name oder Vorname angeben').optional().nullable(),
   guestEmail: z.string().email('Ungültige E-Mail').optional().or(z.literal('')).nullable(),
   guestPhone: z.string().optional().nullable(),
@@ -200,9 +301,7 @@ export const InstantiateTemplateSchema = z.object({
   bannerUrl: z.string().optional().nullable(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
-  signupMode: z.enum(['NAME_ONLY', 'OPEN', 'LOGIN_REQUIRED', 'CEVIDB_ONLY']).default('OPEN'),
-  requireEmailForGuests: z.boolean().default(false),
-  requirePhoneForGuests: z.boolean().default(false),
+  ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
 });
 
@@ -215,3 +314,14 @@ export const UnregisterHelperSchema = z.object({
 
 export type UnregisterHelperInput = z.infer<typeof UnregisterHelperSchema>;
 
+
+/** Abteilungsleitung bearbeitet eine Person: Stufen (selbst angegebene) und Rolle im Schichtplan */
+export const UpdateDepartmentPersonSchema = z.object({
+  stufen: z
+    .array(z.object({ stufeId: z.string().uuid(), role: z.enum(['LEITUNG', 'TEILNEHMER']) }))
+    .max(20)
+    .optional(),
+  departmentRole: z.enum(['ADMIN', 'PLANNER', 'HELPER']).optional(),
+});
+
+export type UpdateDepartmentPersonInput = z.infer<typeof UpdateDepartmentPersonSchema>;

@@ -12,6 +12,7 @@ import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
 import departmentRoutes from './routes/departments.js';
 import eventRoutes from './routes/events.js';
+import eventParticipationRoutes from './routes/eventParticipation.js';
 import shiftRoutes from './routes/shifts.js';
 import adminRoutes from './routes/admin.js';
 import uploadRoutes from './routes/uploads.js';
@@ -69,6 +70,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes);
   await app.register(departmentRoutes);
   await app.register(eventRoutes);
+  await app.register(eventParticipationRoutes);
   await app.register(shiftRoutes);
   await app.register(eventTemplateRoutes);
   await app.register(taskDefinitionRoutes);

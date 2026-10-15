@@ -1,13 +1,38 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
   CreateDepartmentFromCeviDbSchema,
   RegisterDepartmentSchema,
+  StufeInputSchema,
+  UpdateDepartmentPersonSchema,
   type DepartmentCreationEligibilityDto,
+  type DepartmentDirectoryItemDto,
+  type DepartmentPersonDto,
+  type DepartmentStufeDto,
+  type StufeSuggestionDto,
 } from '@schichtplan/shared';
 import { cevidbConfig } from '../config/cevidb.js';
-import { ceviDbLeadership } from '../services/cevidb.js';
+import { ceviDbLeadership, ceviDbStufen } from '../services/cevidb.js';
+import { backfillCeviDbStufen } from '../services/homeDepartment.js';
+import { personLabel } from '../services/profile.js';
+
+const toStufeDto = (s: {
+  id: string;
+  departmentId: string;
+  name: string;
+  ceviDbGroupId: number | null;
+  sortOrder: number;
+}): DepartmentStufeDto => ({
+  id: s.id,
+  departmentId: s.departmentId,
+  name: s.name,
+  ceviDbGroupId: s.ceviDbGroupId,
+  sortOrder: s.sortOrder,
+});
+
+const isUniqueViolation = (err: unknown) =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 
 const NOT_ELIGIBLE_MESSAGES = {
   NOT_CEVIDB: 'Um eine Abteilung anzulegen, melde dich bitte mit Cevi.DB an.',
@@ -68,9 +93,313 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       logoUrl: request.tenant.logoUrl,
       primaryColor: request.tenant.primaryColor,
       contactEmail: request.tenant.contactEmail,
+      ceviDbGroupId: request.tenant.ceviDbGroupId,
       createdAt: request.tenant.createdAt.toISOString(),
     };
   });
+
+  // Alle Abteilungen mit ihren Stufen (Auswahl im Login, Whitelist und Stufen-Filter bei Anlässen)
+  fastify.get('/api/departments/directory', async (_request, reply) => {
+    reply.header('Cache-Control', 'public, max-age=60');
+    const departments = await fastify.prisma.department.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        stufen: { select: { id: true, name: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] },
+      },
+      orderBy: { name: 'asc' },
+    });
+    return departments satisfies DepartmentDirectoryItemDto[];
+  });
+
+  /** Nur Abteilungsleitung (oder globale Admins, laut DB) der aktuellen Subdomain */
+  async function requireDeptAdmin(request: FastifyRequest, reply: FastifyReply) {
+    if (!request.tenant) {
+      reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      return null;
+    }
+    const [member, dbUser] = await Promise.all([
+      fastify.prisma.departmentMember.findUnique({
+        where: { departmentId_userId: { departmentId: request.tenant.id, userId: request.user.id } },
+        select: { role: true },
+      }),
+      fastify.prisma.user.findUnique({ where: { id: request.user.id }, select: { isGlobalAdmin: true } }),
+    ]);
+    if (member?.role !== 'ADMIN' && !dbUser?.isGlobalAdmin) {
+      reply.status(403).send({ error: 'Nur die Abteilungsleitung' });
+      return null;
+    }
+    return request.tenant;
+  }
+
+  // Stufen der aktuellen Abteilung
+  fastify.get('/api/departments/current/stufen', async (request, reply) => {
+    if (!request.tenant) return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+    const stufen = await fastify.prisma.departmentStufe.findMany({
+      where: { departmentId: request.tenant.id },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    return stufen.map(toStufeDto);
+  });
+
+  fastify.post('/api/departments/current/stufen', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const tenant = await requireDeptAdmin(request, reply);
+    if (!tenant) return;
+    const parse = StufeInputSchema.safeParse(request.body);
+    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+
+    try {
+      const count = await fastify.prisma.departmentStufe.count({ where: { departmentId: tenant.id } });
+      const stufe = await fastify.prisma.departmentStufe.create({
+        data: {
+          departmentId: tenant.id,
+          name: parse.data.name,
+          ceviDbGroupId: parse.data.ceviDbGroupId ?? null,
+          sortOrder: parse.data.sortOrder ?? count,
+        },
+      });
+      if (stufe.ceviDbGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);
+      return reply.status(201).send(toStufeDto(stufe));
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return reply.status(409).send({ error: 'Diese Stufe (Name oder Cevi.DB-Gruppe) gibt es schon' });
+      }
+      throw err;
+    }
+  });
+
+  fastify.patch<{ Params: { id: string } }>(
+    '/api/departments/current/stufen/:id',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const tenant = await requireDeptAdmin(request, reply);
+      if (!tenant) return;
+      const parse = StufeInputSchema.partial().safeParse(request.body);
+      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+
+      const existing = await fastify.prisma.departmentStufe.findFirst({
+        where: { id: request.params.id, departmentId: tenant.id },
+      });
+      if (!existing) return reply.status(404).send({ error: 'Stufe nicht gefunden' });
+
+      try {
+        const stufe = await fastify.prisma.departmentStufe.update({
+          where: { id: existing.id },
+          data: {
+            name: parse.data.name,
+            ceviDbGroupId: parse.data.ceviDbGroupId,
+            sortOrder: parse.data.sortOrder,
+          },
+        });
+        if (parse.data.ceviDbGroupId !== undefined && parse.data.ceviDbGroupId !== existing.ceviDbGroupId) {
+          // Zuordnungen aus Cevi.DB zur alten Gruppe gelten nicht mehr
+          await fastify.prisma.userStufe.deleteMany({ where: { stufeId: stufe.id, source: 'CEVIDB' } });
+          if (stufe.ceviDbGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);
+        }
+        return toStufeDto(stufe);
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          return reply.status(409).send({ error: 'Diese Stufe (Name oder Cevi.DB-Gruppe) gibt es schon' });
+        }
+        throw err;
+      }
+    }
+  );
+
+  fastify.delete<{ Params: { id: string } }>(
+    '/api/departments/current/stufen/:id',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const tenant = await requireDeptAdmin(request, reply);
+      if (!tenant) return;
+      const deleted = await fastify.prisma.departmentStufe.deleteMany({
+        where: { id: request.params.id, departmentId: tenant.id },
+      });
+      if (deleted.count === 0) return reply.status(404).send({ error: 'Stufe nicht gefunden' });
+      return { message: 'Stufe gelöscht' };
+    }
+  );
+
+  // Vorschläge: Stufen-Gruppen aus Cevi.DB, die bei Personen dieser Abteilung vorkommen und noch fehlen
+  fastify.get(
+    '/api/departments/current/stufen/suggestions',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const tenant = await requireDeptAdmin(request, reply);
+      if (!tenant) return;
+      const [users, existing] = await Promise.all([
+        fastify.prisma.user.findMany({
+          where: { homeDepartmentId: tenant.id, homeDepartmentSource: 'CEVIDB' },
+          select: { ceviDbData: true },
+        }),
+        fastify.prisma.departmentStufe.findMany({
+          where: { departmentId: tenant.id, ceviDbGroupId: { not: null } },
+          select: { ceviDbGroupId: true },
+        }),
+      ]);
+      const linked = new Set(existing.map((s) => s.ceviDbGroupId));
+      const byGroup = new Map<number, StufeSuggestionDto>();
+      for (const user of users) {
+        for (const stufe of ceviDbStufen(user.ceviDbData)) {
+          if (linked.has(stufe.groupId)) continue;
+          const entry = byGroup.get(stufe.groupId);
+          if (entry) entry.personCount++;
+          else byGroup.set(stufe.groupId, { ceviDbGroupId: stufe.groupId, name: stufe.groupName, personCount: 1 });
+        }
+      }
+      return [...byGroup.values()].sort(
+        (a, b) => b.personCount - a.personCount || a.name.localeCompare(b.name, 'de')
+      );
+    }
+  );
+
+  // Personen der Abteilung: Heimabteilung hier oder Rolle Abteilungsleitung/Planung
+  fastify.get('/api/departments/current/people', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const tenant = await requireDeptAdmin(request, reply);
+    if (!tenant) return;
+    reply.header('Cache-Control', 'no-store');
+    const users = await fastify.prisma.user.findMany({
+      where: {
+        OR: [
+          { homeDepartmentId: tenant.id },
+          { memberships: { some: { departmentId: tenant.id, role: { in: ['ADMIN', 'PLANNER'] } } } },
+        ],
+      },
+      select: {
+        id: true,
+        ceviName: true,
+        firstName: true,
+        lastName: true,
+        ceviDbId: true,
+        ceviDbData: true,
+        homeDepartmentId: true,
+        homeDepartmentSource: true,
+        memberships: { where: { departmentId: tenant.id }, select: { role: true } },
+        stufen: {
+          where: { stufe: { departmentId: tenant.id } },
+          select: { stufeId: true, role: true, source: true, stufe: { select: { name: true, sortOrder: true } } },
+        },
+      },
+      orderBy: [{ ceviName: 'asc' }, { firstName: 'asc' }],
+    });
+    const role = (r: string | undefined) => (r === 'ADMIN' || r === 'PLANNER' || r === 'HELPER' ? r : null);
+    return users.map((u): DepartmentPersonDto => {
+      const isHome = u.homeDepartmentId === tenant.id;
+      return {
+        userId: u.id,
+        displayName: personLabel(u),
+        ceviName: u.ceviName,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        isHomeDepartment: isHome,
+        source: isHome ? (u.homeDepartmentSource === 'CEVIDB' ? 'CEVIDB' : 'SELF') : null,
+        departmentRole: role(u.memberships[0]?.role),
+        isCeviDbDepartmentLeader: u.ceviDbId !== null && ceviDbLeadership(u.ceviDbData).isLeader,
+        stufen: u.stufen
+          .sort((a, b) => a.stufe.sortOrder - b.stufe.sortOrder)
+          .map((s) => ({
+            stufeId: s.stufeId,
+            name: s.stufe.name,
+            role: s.role === 'LEITUNG' ? 'LEITUNG' : 'TEILNEHMER',
+            source: s.source === 'CEVIDB' ? 'CEVIDB' : 'SELF',
+          })),
+      };
+    });
+  });
+
+  // Person bearbeiten: selbst angegebene Stufen ersetzen (Cevi.DB-Stufen bleiben) und Rolle im Schichtplan
+  fastify.patch<{ Params: { userId: string } }>(
+    '/api/departments/current/people/:userId',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const tenant = await requireDeptAdmin(request, reply);
+      if (!tenant) return;
+      const parse = UpdateDepartmentPersonSchema.safeParse(request.body);
+      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+      const { stufen, departmentRole } = parse.data;
+      const userId = request.params.userId;
+
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, homeDepartmentId: true },
+      });
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+
+      if (departmentRole && userId === request.user.id && departmentRole !== 'ADMIN') {
+        return reply.status(400).send({ error: 'Du kannst dir die Abteilungsleitung nicht selbst entziehen.' });
+      }
+
+      if (stufen) {
+        if (user.homeDepartmentId !== tenant.id) {
+          return reply.status(400).send({ error: 'Stufen gibt es nur für Personen, die zu dieser Abteilung gehören.' });
+        }
+        const ids = [...new Set(stufen.map((s) => s.stufeId))];
+        const found = await fastify.prisma.departmentStufe.count({ where: { id: { in: ids }, departmentId: tenant.id } });
+        if (found !== ids.length) return reply.status(400).send({ error: 'Eine Stufe gehört nicht zu dieser Abteilung' });
+      }
+
+      await fastify.prisma.$transaction(async (tx) => {
+        if (stufen) {
+          const locked = new Set(
+            (
+              await tx.userStufe.findMany({
+                where: { userId, source: 'CEVIDB', stufe: { departmentId: tenant.id } },
+                select: { stufeId: true },
+              })
+            ).map((s) => s.stufeId)
+          );
+          await tx.userStufe.deleteMany({ where: { userId, source: 'SELF', stufe: { departmentId: tenant.id } } });
+          const own = stufen.filter((s) => !locked.has(s.stufeId));
+          if (own.length) {
+            await tx.userStufe.createMany({
+              data: own.map((s) => ({ userId, stufeId: s.stufeId, role: s.role, source: 'SELF' })),
+              skipDuplicates: true,
+            });
+          }
+        }
+        if (departmentRole) {
+          await tx.departmentMember.upsert({
+            where: { departmentId_userId: { departmentId: tenant.id, userId } },
+            update: { role: departmentRole },
+            create: { departmentId: tenant.id, userId, role: departmentRole },
+          });
+        }
+      });
+      return { message: 'Gespeichert' };
+    }
+  );
+
+  // Selbst angegebene Zugehörigkeit entfernen (Angaben aus Cevi.DB lassen sich hier nicht ändern)
+  fastify.delete<{ Params: { userId: string } }>(
+    '/api/departments/current/people/:userId',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const tenant = await requireDeptAdmin(request, reply);
+      if (!tenant) return;
+      const user = await fastify.prisma.user.findFirst({
+        where: { id: request.params.userId, homeDepartmentId: tenant.id },
+        select: { id: true, homeDepartmentSource: true },
+      });
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+      if (user.homeDepartmentSource === 'CEVIDB') {
+        return reply
+          .status(400)
+          .send({ error: 'Diese Zuordnung kommt aus Cevi.DB und lässt sich hier nicht ändern.' });
+      }
+      await fastify.prisma.$transaction([
+        fastify.prisma.userStufe.deleteMany({
+          where: { userId: user.id, source: 'SELF', stufe: { departmentId: tenant.id } },
+        }),
+        fastify.prisma.user.update({
+          where: { id: user.id },
+          data: { homeDepartmentId: null, homeDepartmentSource: null, departmentSetupAt: null },
+        }),
+      ]);
+      return { message: 'Zugehörigkeit entfernt' };
+    }
+  );
 
   // Mitglieder der aktuellen Abteilung (für OK-Auswahl, Helferliste etc.)
   fastify.get(

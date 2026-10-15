@@ -2,11 +2,13 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
-import type { SignupMode, EventTemplateDto } from '@schichtplan/shared';
+import type { EventTemplateDto } from '@schichtplan/shared';
 import { Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
-import { BANNER_PRESETS, SIGNUP_MODE_INFO } from './event-meta';
+import type { EventDetails } from '@/lib/types';
+import { BANNER_PRESETS } from './event-meta';
+import { EMPTY_ACCESS, EventAccessFields, accessPayload, type EventAccessValues } from './EventAccessFields';
 import { ImageUpload } from './ImageUpload';
 
 export interface EventFormValues {
@@ -17,9 +19,34 @@ export interface EventFormValues {
   bannerUrl: string;
   startDate: string;
   endDate: string;
-  signupMode: SignupMode;
-  requireEmailForGuests: boolean;
-  requirePhoneForGuests: boolean;
+  /** false = Eintragen geschlossen (nur noch das OK teilt ein) */
+  allowPublicSignup: boolean;
+  access: EventAccessValues;
+}
+
+/** Startwerte für «Design & Einstellungen» eines bestehenden Anlasses */
+export function eventFormInitial(event: EventDetails): Partial<EventFormValues> {
+  return {
+    title: event.title,
+    description: event.description ?? '',
+    logoUrl: event.logoUrl ?? '',
+    bannerUrl: event.bannerUrl ?? '',
+    allowPublicSignup: event.allowPublicSignup,
+    access: {
+      accessType: event.accessType,
+      leadersOnly: event.leadersOnly,
+      requiredFields: event.requiredFields,
+      allowedDepartmentIds: event.allowedDepartments.map((d) => d.id),
+      allowedStufeIds: event.allowedStufen.map((s) => s.id),
+      questions: event.questions.map((q) => ({
+        id: q.id,
+        label: q.label,
+        type: q.type,
+        optionsText: q.options.join('\n'),
+        required: q.required,
+      })),
+    },
+  };
 }
 
 export interface FormOrganizer {
@@ -50,9 +77,8 @@ const EMPTY: EventFormValues = {
   bannerUrl: BANNER_PRESETS[0].url,
   startDate: '',
   endDate: '',
-  signupMode: 'OPEN',
-  requireEmailForGuests: false,
-  requirePhoneForGuests: false,
+  allowPublicSignup: true,
+  access: EMPTY_ACCESS,
 };
 
 const slugify = (value: string) =>
@@ -89,8 +115,8 @@ export function EventFormDialog({
       title={mode === 'create' ? 'Neuer Anlass' : 'Design & Einstellungen'}
       description={
         mode === 'create'
-          ? 'Lege Titel, Daten, Anmeldemodus und das OK fest. Schichten fügst du danach hinzu.'
-          : 'Banner, Logo und Anmeldemodus dieses Anlasses anpassen.'
+          ? 'Lege Titel, Daten, Zugang und das OK fest. Schichten fügst du danach hinzu.'
+          : 'Zugang, Pflichtangaben, Banner und Logo dieses Anlasses anpassen.'
       }
     >
       <EventForm mode={mode} initial={initial} eventSlug={eventSlug} onCancel={onClose} onSaved={onSaved} />
@@ -213,9 +239,7 @@ function EventForm({
         description: form.description.trim() || undefined,
         logoUrl: form.logoUrl.trim() || null,
         bannerUrl: form.bannerUrl.trim() || null,
-        signupMode: form.signupMode,
-        requireEmailForGuests: form.requireEmailForGuests,
-        requirePhoneForGuests: form.requirePhoneForGuests,
+        ...accessPayload(form.access),
       };
       if (mode === 'create') {
         if (selectedTemplateId) {
@@ -259,7 +283,10 @@ function EventForm({
         }
         onSaved(form.slug);
       } else {
-        await api(`/api/events/${eventSlug}`, { method: 'PATCH', json: shared });
+        await api(`/api/events/${eventSlug}`, {
+          method: 'PATCH',
+          json: { ...shared, description: form.description.trim() || null, allowPublicSignup: form.allowPublicSignup },
+        });
         toast({ title: 'Einstellungen gespeichert' });
         onSaved(eventSlug ?? '');
       }
@@ -299,9 +326,19 @@ function EventForm({
                       title: cleanTitle,
                       slug: slugify(cleanTitle),
                       description: found.description || '',
-                      signupMode: found.signupMode,
-                      requireEmailForGuests: found.requireEmailForGuests,
-                      requirePhoneForGuests: found.requirePhoneForGuests,
+                      access: {
+                        accessType: found.accessType,
+                        leadersOnly: found.leadersOnly,
+                        requiredFields: found.requiredFields,
+                        allowedDepartmentIds: found.data.allowedDepartmentIds ?? [],
+                        allowedStufeIds: found.data.allowedStufeIds ?? [],
+                        questions: (found.data.questions ?? []).map((q) => ({
+                          label: q.label,
+                          type: q.type,
+                          optionsText: q.options.join('\n'),
+                          required: q.required,
+                        })),
+                      },
                     }));
                   }
                 }
@@ -494,56 +531,16 @@ function EventForm({
         </fieldset>
       )}
 
-      <fieldset>
-        <legend className="mb-3 text-[13px] font-semibold text-fg">Anmeldemodus</legend>
-        <div className="grid gap-2.5 sm:grid-cols-2">
-          {(Object.keys(SIGNUP_MODE_INFO) as SignupMode[]).map((key) => {
-            const info = SIGNUP_MODE_INFO[key];
-            const Icon = info.icon;
-            const selected = form.signupMode === key;
-            return (
-              <label
-                key={key}
-                className={cn(
-                  'relative flex cursor-pointer gap-3 rounded-field border p-4 transition-colors',
-                  selected ? 'border-accent bg-accent/8' : 'border-line hover:border-line-strong'
-                )}
-              >
-                <input
-                  type="radio"
-                  name="signupMode"
-                  value={key}
-                  checked={selected}
-                  onChange={() => set('signupMode', key)}
-                  className="sr-only"
-                />
-                <Icon className={cn('mt-0.5 size-5 shrink-0', selected ? 'text-accent-ink' : 'text-fg-subtle')} />
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-fg">{info.label}</span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-fg-muted">{info.description}</span>
-                </span>
-                {selected && <Check className="absolute right-3 top-3 size-4 text-accent-ink" />}
-              </label>
-            );
-          })}
-        </div>
-        {(form.signupMode === 'NAME_ONLY' || form.signupMode === 'OPEN') && (
-          <div className="mt-4 space-y-4 rounded-field bg-surface-2 p-4">
-            <Switch
-              checked={form.requireEmailForGuests}
-              onChange={(v) => set('requireEmailForGuests', v)}
-              label="E-Mail von Gästen verlangen"
-              description="Für Erinnerungen und Rückfragen"
-            />
-            <Switch
-              checked={form.requirePhoneForGuests}
-              onChange={(v) => set('requirePhoneForGuests', v)}
-              label="Handynummer von Gästen verlangen"
-              description="Damit das OK kurzfristig erreichen kann"
-            />
-          </div>
-        )}
-      </fieldset>
+      {mode === 'edit' && (
+        <Switch
+          checked={form.allowPublicSignup}
+          onChange={(v) => set('allowPublicSignup', v)}
+          label="Eintragen offen"
+          description="Ausgeschaltet können nur noch das OK und die Abteilungsleitung Personen einteilen."
+        />
+      )}
+
+      <EventAccessFields values={form.access} onChange={(access) => set('access', access)} />
 
       <fieldset className="space-y-5">
         <div>

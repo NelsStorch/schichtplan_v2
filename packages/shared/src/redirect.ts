@@ -67,15 +67,20 @@ export function getRootDomain(hostname?: string): string {
 /**
  * Erzeugt die zentrale SSO-Login-URL (login.<rootDomain>) für den aktuellen Kontext.
  */
-export function getLoginUrl(targetUrl?: string): string {
+export function getLoginUrl(targetUrl?: string, path = '/'): string {
   if (typeof window === 'undefined') return '/login';
   const { hostname, protocol, href } = window.location;
   const target = encodeURIComponent(targetUrl || href);
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) {
-    return `http://localhost:3002/?return_to=${target}`;
+    return `http://localhost:3002${path}?return_to=${target}`;
   }
   const root = getRootDomain(hostname);
-  return `${protocol}//login.${root}/?return_to=${target}`;
+  return `${protocol}//login.${root}${path}?return_to=${target}`;
+}
+
+/** Seite im Login-Portal, auf der man Abteilung und Stufen angibt (mit Rücksprung) */
+export function getDepartmentSetupUrl(targetUrl?: string): string {
+  return getLoginUrl(targetUrl, '/abteilung');
 }
 
 /**

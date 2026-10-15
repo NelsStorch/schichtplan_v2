@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getLoginUrl } from '@schichtplan/shared';
+import { getDepartmentSetupUrl, getLoginUrl } from '@schichtplan/shared';
 
 export class ApiError extends Error {
   constructor(
     message: string,
-    public status: number
+    public status: number,
+    /** Ganze Fehlerantwort des Backends (z. B. code, missingFields) */
+    public data: Record<string, unknown> = {}
   ) {
     super(message);
   }
@@ -20,7 +22,7 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(data?.error || data?.message || 'Etwas ist schiefgelaufen', res.status);
+    throw new ApiError(data?.error || data?.message || 'Etwas ist schiefgelaufen', res.status, data ?? {});
   }
   return data as T;
 }
@@ -41,4 +43,9 @@ export function useLoginHref() {
 /** Zentrales SSO-Login (login.<domain>) mit Rücksprung auf die aktuelle Seite. */
 export function loginUrl(returnTo?: string) {
   return getLoginUrl(returnTo);
+}
+
+/** Login-Portal: Abteilung und Stufen angeben, danach zurück auf die aktuelle Seite */
+export function departmentSetupUrl(returnTo?: string) {
+  return getDepartmentSetupUrl(returnTo);
 }

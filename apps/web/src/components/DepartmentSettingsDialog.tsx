@@ -5,26 +5,56 @@ import { Check, Settings2 } from 'lucide-react';
 import { Button, Callout, Dialog, Field, Input, applyAccent, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
+import { DepartmentPeoplePanel } from './DepartmentPeoplePanel';
+import { DepartmentStufenPanel } from './DepartmentStufenPanel';
 import { ImageUpload } from './ImageUpload';
 
 // Kuratierte Akzentfarben, alle mit ausreichendem Kontrast in beiden Modi
 const SWATCHES = ['#e11d48', '#dc2626', '#ea580c', '#d97706', '#16a34a', '#0d9488', '#2563eb', '#7c3aed'];
 
+const TABS = [
+  { key: 'general', label: 'Allgemein' },
+  { key: 'stufen', label: 'Stufen' },
+  { key: 'people', label: 'Personen' },
+] as const;
+
 export function DepartmentSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { department } = usePortal();
+  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('general');
   const close = () => {
     applyAccent(department?.primaryColor); // Live-Vorschau zurücksetzen
+    setTab('general');
     onClose();
   };
   return (
     <Dialog
       open={open}
       onClose={close}
+      size="lg"
       icon={<Settings2 />}
       title="Abteilung"
-      description="Name, Logo und Farbe gelten für alle Anlässe dieser Abteilung."
+      description="Name, Logo, Farbe und Stufen gelten für alle Anlässe dieser Abteilung."
     >
-      <DepartmentForm onDone={onClose} onCancel={close} />
+      <div role="tablist" aria-label="Bereiche" className="-mt-1 mb-6 flex gap-1 rounded-full bg-surface-2 p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'h-9 flex-1 rounded-full text-sm font-semibold transition',
+              tab === t.key ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'general' && <DepartmentForm onDone={onClose} onCancel={close} />}
+      {tab === 'stufen' && <DepartmentStufenPanel />}
+      {tab === 'people' && <DepartmentPeoplePanel />}
     </Dialog>
   );
 }

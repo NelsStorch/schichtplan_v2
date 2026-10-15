@@ -1,4 +1,10 @@
-import { UserRole, SignupMode } from './constants.js';
+import type {
+  EventAccessType,
+  EventQuestionType,
+  RequiredProfileField,
+  StufeRole,
+  UserRole,
+} from './constants.js';
 
 export interface DepartmentDto {
   id: string;
@@ -7,6 +13,8 @@ export interface DepartmentDto {
   logoUrl?: string | null;
   primaryColor?: string | null;
   contactEmail?: string | null;
+  /** Cevi.DB-Ortsgruppe; ohne sie funktionieren die Cevi.DB-Zugangstypen nicht */
+  ceviDbGroupId?: number | null;
   createdAt: string;
 }
 
@@ -34,12 +42,15 @@ export interface EventDto {
   startDate: string;
   endDate: string;
   isPublished: boolean;
-  signupMode: SignupMode;
-  requireEmailForGuests?: boolean;
-  requirePhoneForGuests?: boolean;
+  accessType: EventAccessType;
+  leadersOnly: boolean;
+  requiredFields: RequiredProfileField[];
   allowPublicSignup: boolean;
   createdAt: string;
   shiftCount?: number;
+  /** Summe der benötigten bzw. besetzten Plätze über alle Schichten */
+  totalSlots?: number;
+  filledSlots?: number;
   organizers?: EventOrganizerDto[];
 }
 
@@ -126,6 +137,9 @@ export interface ShiftTemplateItem {
 
 export interface EventTemplateData {
   shifts: ShiftTemplateItem[];
+  questions?: Omit<EventQuestionDto, 'id'>[];
+  allowedDepartmentIds?: string[];
+  allowedStufeIds?: string[];
 }
 
 export interface EventTemplateDto {
@@ -133,9 +147,9 @@ export interface EventTemplateDto {
   departmentId: string;
   title: string;
   description?: string | null;
-  signupMode: SignupMode;
-  requireEmailForGuests: boolean;
-  requirePhoneForGuests: boolean;
+  accessType: EventAccessType;
+  leadersOnly: boolean;
+  requiredFields: RequiredProfileField[];
   shiftCount: number;
   data: EventTemplateData;
   createdAt: string;
@@ -149,12 +163,150 @@ export interface UserDto {
   lastName: string;
   ceviName?: string | null;
   phone?: string | null;
+  address?: string | null;
   birthDate?: string | null;
   isGlobalAdmin: boolean;
   departmentRole?: UserRole | null;
   ceviDbId?: number | null;
   ceviDbSyncedAt?: string | null;
   hasCeviDb?: boolean;
+  homeDepartment?: HomeDepartmentDto | null;
+  /** Abteilung kommt aus Cevi.DB und ist dort festgelegt */
+  homeDepartmentFromCeviDb?: boolean;
+  stufen?: UserStufeDto[];
+  /** Hat die Abteilung noch nicht angegeben (auch nicht «keine») */
+  needsDepartmentSetup?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Abteilung & Stufen einer Person
+// ---------------------------------------------------------------------------
+
+export interface HomeDepartmentDto {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface DepartmentStufeDto {
+  id: string;
+  departmentId: string;
+  name: string;
+  ceviDbGroupId: number | null;
+  sortOrder: number;
+}
+
+export interface UserStufeDto {
+  stufeId: string;
+  name: string;
+  departmentId: string;
+  role: StufeRole;
+  /** CEVIDB = aus Cevi.DB abgeglichen (nicht selbst änderbar) */
+  source: 'SELF' | 'CEVIDB';
+}
+
+/** Abteilungsverzeichnis für die Auswahl im Login (öffentlich) */
+export interface DepartmentDirectoryItemDto {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  stufen: { id: string; name: string }[];
+}
+
+/** Vorschlag für eine Stufe: Cevi.DB-Gruppe, die bei Mitgliedern der Abteilung vorkommt */
+export interface StufeSuggestionDto {
+  ceviDbGroupId: number;
+  name: string;
+  personCount: number;
+}
+
+/** Person, die eine Abteilung als Heimabteilung angegeben hat (Sicht der Abteilungsleitung) */
+export interface DepartmentPersonDto {
+  userId: string;
+  displayName: string;
+  ceviName: string | null;
+  firstName: string;
+  lastName: string;
+  /** Heimabteilung ist diese Abteilung (sonst nur wegen einer Rolle in der Liste) */
+  isHomeDepartment: boolean;
+  source: 'SELF' | 'CEVIDB' | null;
+  /** Rolle im Schichtplan dieser Abteilung */
+  departmentRole: 'ADMIN' | 'PLANNER' | 'HELPER' | null;
+  /** Hat in Cevi.DB eine Abteilungsleitungs-Rolle (CEVIDB_DEPARTMENT_LEADER_ROLES) */
+  isCeviDbDepartmentLeader: boolean;
+  stufen: { stufeId: string; name: string; role: StufeRole; source: 'SELF' | 'CEVIDB' }[];
+}
+
+// ---------------------------------------------------------------------------
+// Zugang zu Anlässen
+// ---------------------------------------------------------------------------
+
+/** Warum sich jemand nicht eintragen kann */
+export type EventAccessReason =
+  | 'LOGIN_REQUIRED'
+  | 'CEVIDB_REQUIRED'
+  | 'NO_DEPARTMENT'
+  | 'WRONG_DEPARTMENT'
+  | 'WRONG_STUFE'
+  | 'LEADERS_ONLY'
+  | 'SIGNUP_CLOSED';
+
+export interface EventAccessDto {
+  canSignup: boolean;
+  /** MANAGER = Abteilungsleitung/OK, RULES = erfüllt die Regeln, LINK = über Zugangs-Link */
+  via: 'MANAGER' | 'RULES' | 'LINK' | null;
+  reason: EventAccessReason | null;
+  message: string | null;
+  /** Namen der Helfer*innen sichtbar */
+  canSeeNames: boolean;
+  /** Kontaktangaben und Antworten sichtbar (nur Abteilungsleitung / OK) */
+  isManager: boolean;
+}
+
+export interface EventQuestionDto {
+  id: string;
+  label: string;
+  type: EventQuestionType;
+  options: string[];
+  required: boolean;
+}
+
+/** Was der angemeldeten Person beim Anlass noch fehlt bzw. was sie angegeben hat */
+export interface EventViewerDto {
+  access: EventAccessDto;
+  missingFields: RequiredProfileField[];
+  /** Pflichtfragen ohne Antwort */
+  missingQuestionIds: string[];
+  answers: Record<string, string>;
+}
+
+export interface EventAccessLinkDto {
+  id: string;
+  label: string;
+  kind: 'PERSONAL' | 'GROUP';
+  token: string;
+  expiresAt: string | null;
+  createdAt: string;
+  isExpired: boolean;
+  /** Personen, die den Link eingelöst haben */
+  redeemedBy: { userId: string; displayName: string; redeemedAt: string }[];
+}
+
+/** Angaben einer eingetragenen Person für das OK */
+export interface EventParticipantDto {
+  userId: string | null;
+  displayName: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  birthDate: string | null;
+  homeDepartmentName: string | null;
+  viaLink: boolean;
+  shiftCount: number;
+  answers: Record<string, string>;
 }
 
 export interface CeviDbRoleDto {

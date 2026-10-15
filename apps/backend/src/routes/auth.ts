@@ -1,13 +1,18 @@
 import { FastifyInstance, FastifyPluginAsync, FastifyReply } from 'fastify';
-import { ortsgruppeIdFromProfile } from '../services/cevidb.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import {
   LoginSchema,
   RegisterHelperSchema,
   CeviNameQuickLoginSchema,
+  SetHomeDepartmentSchema,
+  UpdateProfileSchema,
   safeReturnTo,
+  type UserDto,
 } from '@schichtplan/shared';
+import { syncCeviDbHomeDepartment, toUserStufeDto } from '../services/homeDepartment.js';
+import { ceviDbProfileFields } from '../services/profile.js';
+import { applyProfileUpdate } from '../services/profileUpdate.js';
 
 function getCookieDomain(): string | undefined {
   if (process.env.COOKIE_DOMAIN) {
@@ -60,6 +65,51 @@ function bootstrapAdminCeviDbIds(): Set<number> {
     .map((part) => Number(part.trim()))
     .filter((id) => Number.isInteger(id) && id > 0);
   return new Set(ids);
+}
+
+/** Login-Seite (login.<domain>), z. B. für die Abfrage der Abteilung nach dem Cevi.DB-Login */
+function loginPageUrl(path: string, returnTo: string) {
+  const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
+  return `${base}${path}?return_to=${encodeURIComponent(returnTo)}`;
+}
+
+/** Profil der angemeldeten Person inkl. Heimabteilung und Stufen (GET /api/auth/me) */
+async function loadUserDto(
+  prisma: FastifyInstance['prisma'],
+  userId: string,
+  tenantId: string | null
+): Promise<UserDto | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      memberships: tenantId ? { where: { departmentId: tenantId } } : { take: 0 },
+      homeDepartment: { select: { id: true, name: true, slug: true } },
+      stufen: { include: { stufe: { select: { name: true, departmentId: true, sortOrder: true } } } },
+    },
+  });
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    ceviName: user.ceviName,
+    phone: user.phone,
+    address: user.address,
+    birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
+    isGlobalAdmin: user.isGlobalAdmin,
+    departmentRole: (user.memberships[0]?.role as UserDto['departmentRole']) ?? null,
+    ceviDbId: user.ceviDbId,
+    ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
+    hasCeviDb: Boolean(user.ceviDbId),
+    homeDepartment: user.homeDepartment,
+    homeDepartmentFromCeviDb: user.homeDepartmentSource === 'CEVIDB',
+    stufen: user.stufen
+      .sort((a, b) => a.stufe.sortOrder - b.stufe.sortOrder || a.stufe.name.localeCompare(b.stufe.name, 'de'))
+      .map(toUserStufeDto),
+    needsDepartmentSetup: user.departmentSetupAt === null,
+  };
 }
 
 /** Trägt die Person als Helfer ein. Eine bestehende Mitgliedschaft (und ihre Rolle) bleibt unverändert. */
@@ -279,6 +329,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
+      // Adresse und Handynummer aus Cevi.DB übernehmen, ohne selbst erfasste Werte zu überschreiben
+      const extra = ceviDbProfileFields(profile);
+
       if (!user) {
         user = await fastify.prisma.user.create({
           data: {
@@ -288,6 +341,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             lastName,
             ceviName,
             birthDate,
+            address: extra.address,
+            phone: extra.phone,
             ceviDbData: profile,
             ceviDbSyncedAt: now,
           },
@@ -301,6 +356,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             firstName: firstName || user.firstName,
             lastName: lastName || user.lastName,
             birthDate: birthDate || user.birthDate,
+            address: user.address || extra.address,
+            phone: user.phone || extra.phone,
             ceviDbData: profile,
             ceviDbSyncedAt: now,
           },
@@ -315,16 +372,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
       }
 
-      // Die eigene Abteilung kommt aus Cevi.DB: Ortsgruppe der Person -> Abteilung mit gleicher ceviDbGroupId
-      const ortsgruppeId = ortsgruppeIdFromProfile(profile);
-      if (ortsgruppeId !== null) {
-        const homeDepartment = await fastify.prisma.department.findUnique({
-          where: { ceviDbGroupId: ortsgruppeId },
-          select: { id: true },
-        });
-        if (homeDepartment) {
-          await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
-        }
+      // Die eigene Abteilung kommt aus Cevi.DB: Ortsgruppe der Person -> Abteilung mit gleicher ceviDbGroupId.
+      // Stufen werden über die Cevi.DB-Gruppen der Rollen abgeglichen.
+      const homeDepartmentId = await syncCeviDbHomeDepartment(fastify.prisma, user, profile);
+      if (homeDepartmentId) {
+        await ensureHelperMembership(fastify.prisma, homeDepartmentId, user.id);
       }
 
       // Kommt die Person von einer Abteilungs-Subdomain, dort ebenfalls als Helfer eintragen
@@ -347,6 +399,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       reply.clearCookie('cevidb_oauth_state', { path: '/' });
       setAuthCookie(reply, token);
 
+      // Ortsgruppe ohne Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen
+      if (!homeDepartmentId && !user.departmentSetupAt) {
+        return reply.redirect(loginPageUrl('/abteilung', returnTo));
+      }
       return reply.redirect(returnTo);
     }
   );
@@ -460,16 +516,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       token,
       redirectUrl: cleanReturnTo(returnTo),
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        ceviName: user.ceviName,
-        phone: user.phone,
-        birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
-        isGlobalAdmin: user.isGlobalAdmin,
-      },
+      user: await loadUserDto(fastify.prisma, user.id, request.tenant?.id ?? null),
     };
   });
 
@@ -504,16 +551,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        ceviName: user.ceviName,
-        phone: user.phone,
-        birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
-        isGlobalAdmin: user.isGlobalAdmin,
-      },
+      user: await loadUserDto(fastify.prisma, user.id, request.tenant?.id ?? null),
     };
   });
 
@@ -565,16 +603,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        ceviName: user.ceviName,
-        phone: user.phone,
-        birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
-        isGlobalAdmin: false,
-      },
+      user: await loadUserDto(fastify.prisma, user.id, request.tenant?.id ?? null),
     };
   });
 
@@ -583,38 +612,93 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/auth/me',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
-      const user = await fastify.prisma.user.findUnique({
-        where: { id: request.user.id },
-        include: {
-          memberships: {
-            where: request.tenant ? { departmentId: request.tenant.id } : undefined,
-            include: { department: true },
-          },
-        },
-      });
-
+      reply.header('Cache-Control', 'no-store');
+      const user = await loadUserDto(fastify.prisma, request.user.id, request.tenant?.id ?? null);
       if (!user) {
         return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
       }
+      return user;
+    }
+  );
 
-      const currentMembership = request.tenant
-        ? user.memberships.find((m) => m.departmentId === request.tenant!.id)
-        : null;
+  // 6a. Eigene Profilangaben ergänzen (Handynummer, Adresse, ...)
+  fastify.patch(
+    '/api/auth/me',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const parse = UpdateProfileSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+      const result = await applyProfileUpdate(fastify.prisma, request.user.id, parse.data);
+      if ('error' in result) return reply.status(result.status).send({ error: result.error });
+      return loadUserDto(fastify.prisma, request.user.id, request.tenant?.id ?? null);
+    }
+  );
 
-      return {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        ceviName: user.ceviName,
-        phone: user.phone,
-        birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
-        isGlobalAdmin: user.isGlobalAdmin,
-        departmentRole: currentMembership ? currentMembership.role : null,
-        ceviDbId: user.ceviDbId,
-        ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
-        hasCeviDb: Boolean(user.ceviDbId),
-      };
+  // 6b. Heimabteilung und Stufen angeben (departmentId null = keine Abteilung).
+  // Kommt die Abteilung aus Cevi.DB, bleibt sie fest; Stufen aus Cevi.DB ebenfalls.
+  fastify.put(
+    '/api/auth/me/department',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const parse = SetHomeDepartmentSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+      const userId = request.user.id;
+      const current = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        select: { homeDepartmentId: true, homeDepartmentSource: true },
+      });
+      if (!current) return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+
+      const fromCeviDb = current.homeDepartmentSource === 'CEVIDB';
+      const departmentId = fromCeviDb ? current.homeDepartmentId : parse.data.departmentId;
+
+      if (departmentId && !fromCeviDb) {
+        const exists = await fastify.prisma.department.count({ where: { id: departmentId } });
+        if (!exists) return reply.status(400).send({ error: 'Diese Abteilung gibt es nicht' });
+      }
+
+      const wanted = departmentId ? parse.data.stufen : [];
+      const stufen = wanted.length
+        ? await fastify.prisma.departmentStufe.findMany({
+            where: { id: { in: wanted.map((s) => s.stufeId) }, departmentId: departmentId ?? undefined },
+            select: { id: true },
+          })
+        : [];
+      if (stufen.length !== new Set(wanted.map((s) => s.stufeId)).size) {
+        return reply.status(400).send({ error: 'Eine Stufe gehört nicht zu dieser Abteilung' });
+      }
+
+      await fastify.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            homeDepartmentId: departmentId,
+            homeDepartmentSource: departmentId ? (fromCeviDb ? 'CEVIDB' : 'SELF') : null,
+            departmentSetupAt: new Date(),
+          },
+        });
+        // Selbst angegebene Stufen ersetzen; Stufen aus Cevi.DB bleiben
+        const ceviDbStufen = await tx.userStufe.findMany({
+          where: { userId, source: 'CEVIDB' },
+          select: { stufeId: true },
+        });
+        const locked = new Set(ceviDbStufen.map((s) => s.stufeId));
+        await tx.userStufe.deleteMany({ where: { userId, source: 'SELF' } });
+        const selfStufen = wanted.filter((s) => !locked.has(s.stufeId));
+        if (selfStufen.length) {
+          await tx.userStufe.createMany({
+            data: selfStufen.map((s) => ({ userId, stufeId: s.stufeId, role: s.role, source: 'SELF' })),
+            skipDuplicates: true,
+          });
+        }
+      });
+
+      if (departmentId) await ensureHelperMembership(fastify.prisma, departmentId, userId);
+      return loadUserDto(fastify.prisma, userId, request.tenant?.id ?? null);
     }
   );
 

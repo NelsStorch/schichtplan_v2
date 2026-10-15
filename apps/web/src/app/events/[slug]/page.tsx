@@ -2,16 +2,32 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, CalendarSearch, Crown, Palette, Plus, Shield, UserPlus, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  CalendarDays,
+  CalendarSearch,
+  Check,
+  Crown,
+  KeyRound,
+  LayoutGrid,
+  List,
+  LogIn,
+  Palette,
+  Plus,
+  Shield,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import {
   Avatar,
   Button,
+  Callout,
   CeviLogo,
   Chip,
   EmptyState,
   NotFoundView,
-  ProgressRing,
   Skeleton,
   buttonClasses,
   cn,
@@ -19,12 +35,16 @@ import {
   useToast,
 } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
-import { EventFormDialog } from '@/components/EventFormDialog';
-import { SignupModeBadge } from '@/components/event-meta';
-import { AssignHelperDialog, GuestSignupDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
-import { ShiftTicket } from '@/components/ShiftTicket';
+import { EventFormDialog, eventFormInitial } from '@/components/EventFormDialog';
+import { AccessTypeBadge } from '@/components/event-meta';
+import { AccessNotice } from '@/components/event/AccessNotice';
+import { ParticipationDialog } from '@/components/event/ParticipationDialog';
+import { ShiftGrid } from '@/components/event/ShiftGrid';
+import { NeededShifts, ShiftRows, type ShiftActions } from '@/components/event/ShiftList';
+import { shiftStats, shiftTasks } from '@/components/event/shift-utils';
+import { AssignHelperDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { ShiftDetailsDialog } from '@/components/ShiftDetailsDialog';
-import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
+import { ApiError, api, errorMessage, loginUrl, useLoginHref } from '@/lib/api';
 import {
   dayKeyToIso,
   fmtDateRange,
@@ -38,41 +58,60 @@ import { usePortal } from '@/lib/portal';
 import { useDynamicFavicon } from '@/lib/favicon';
 import type { EventDetails } from '@/lib/types';
 
+type View = 'list' | 'grid';
+const VIEW_STORAGE_KEY = 'schichtplan.eventView';
+
 export default function EventDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const { user, department, isDeptAdmin, isPlanner } = usePortal();
+  const { user, department, isDeptAdmin, isPlanner, loading: portalLoading } = usePortal();
   const toast = useToast();
   const confirm = useConfirm();
+  const loginHref = useLoginHref();
 
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Nicht ladbares Event-Logo -> Cevi-Standardlogo
   const [brokenLogo, setBrokenLogo] = useState<string | null>(null);
+  const [view, setView] = useState<View>('list');
   const [day, setDay] = useState<string>('ALL');
   const [taskFilter, setTaskFilter] = useState<string>('ALL');
-  const [propertyFilter, setPropertyFilter] = useState<'ALL' | 'EVENT' | 'SETUP_TEARDOWN'>('ALL');
+  const [onlySetup, setOnlySetup] = useState(false);
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [busyShift, setBusyShift] = useState<string | null>(null);
+  // Einladungs-Link (?zugang=...), der noch eingelöst werden muss
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
 
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [assigningShift, setAssigningShift] = useState<ShiftDto | null>(null);
   const [assigningTask, setAssigningTask] = useState<ShiftTaskDto | null>(null);
-  const [guestShift, setGuestShift] = useState<ShiftDto | null>(null);
-  const [guestTask, setGuestTask] = useState<ShiftTaskDto | null>(null);
+  const [participationFor, setParticipationFor] = useState<{ shift: ShiftDto; task?: ShiftTaskDto } | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOkForm, setShowOkForm] = useState(false);
 
-  // Deep-Link Unterstützung via ?schicht=ID oder ?shift=ID
+  // Deep-Link (?schicht=ID), Einladungs-Link (?zugang=TOKEN) und gespeicherte Ansicht
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     const searchParams = new URLSearchParams(window.location.search);
     const shiftParam = searchParams.get('schicht') || searchParams.get('shift');
-    if (shiftParam) {
-      setSelectedShiftId(shiftParam);
+    if (shiftParam) setSelectedShiftId(shiftParam);
+    setPendingToken(searchParams.get('zugang'));
+    try {
+      const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (stored === 'grid' || stored === 'list') setView(stored);
+    } catch {
+      // Speicher gesperrt: Standardansicht
     }
   }, []);
+
+  const changeView = (next: View) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // egal
+    }
+  };
 
   // Favicon: Event-Logo (falls vorhanden), sonst Abteilungs-Logo
   useDynamicFavicon(event?.logoUrl || department?.logoUrl, department?.logoUrl);
@@ -89,21 +128,27 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     load();
   }, [load]);
 
+  // Einladungs-Link einlösen, sobald jemand angemeldet ist
+  useEffect(() => {
+    if (!pendingToken || portalLoading || !user) return;
+    const token = pendingToken;
+    setPendingToken(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('zugang');
+    window.history.replaceState(null, '', url);
+    api<{ message: string }>(`/api/events/${slug}/access-links/redeem`, { method: 'POST', json: { token } })
+      .then((res) => {
+        toast({ title: res.message, description: 'Du kannst dich jetzt eintragen.' });
+        return load();
+      })
+      .catch((err) => toast({ title: 'Link funktioniert nicht', description: errorMessage(err), tone: 'error' }));
+  }, [pendingToken, portalLoading, user, slug, load, toast]);
+
   const days = useMemo(() => groupByBusinessDay(event?.shifts ?? []), [event]);
   const distinctTasks = useMemo(() => {
-    if (!event?.shifts) return [];
     const titles = new Set<string>();
-    for (const s of event.shifts) {
-      if (s.tasks) {
-        for (const t of s.tasks) {
-          if (t.title?.trim()) titles.add(t.title.trim());
-        }
-      }
-    }
+    for (const s of event?.shifts ?? []) for (const t of shiftTasks(s)) if (t.title.trim()) titles.add(t.title.trim());
     return Array.from(titles);
-  }, [event]);
-  const hasSetupTeardownShifts = useMemo(() => {
-    return event?.shifts?.some((s) => s.isSetupTeardown) ?? false;
   }, [event]);
   const selectedShift = useMemo(
     () => event?.shifts.find((s) => s.id === selectedShiftId) ?? null,
@@ -133,64 +178,94 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   if (!event) return <EventSkeleton />;
 
+  const { access } = event.viewer;
   const isEventOk = Boolean(user && event.organizers?.some((o) => o.userId === user.id));
   const isOkLead = Boolean(user && event.organizers?.some((o) => o.userId === user.id && o.role === 'OK_LEAD'));
   const canManageShifts = isPlanner || isEventOk;
   const canManageEvent = isDeptAdmin || isOkLead;
-  const needsLogin = !user && (event.signupMode === 'LOGIN_REQUIRED' || event.signupMode === 'CEVIDB_ONLY');
+  const needsLogin = !user;
+  // Eintragen-Knöpfe zeigen, wenn es geht oder nur noch der Login fehlt
+  const showSignup = access.canSignup || access.reason === 'LOGIN_REQUIRED';
+  const isMine = (shift: ShiftDto) => Boolean(user && shift.signups?.some((s) => s.userId === user.id));
+  const myShiftCount = event.shifts.filter(isMine).length;
 
   const total = event.shifts.reduce((sum, s) => sum + s.requiredSlots, 0);
-  const filled = event.shifts.reduce((sum, s) => sum + Math.min(s.signups?.length ?? 0, s.requiredSlots), 0);
+  const filled = event.shifts.reduce((sum, s) => sum + shiftStats(s).filled, 0);
   const free = Math.max(0, total - filled);
   const percent = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+  const filtersActive = day !== 'ALL' || taskFilter !== 'ALL' || onlySetup || onlyOpen;
+  const resetFilters = () => {
+    setDay('ALL');
+    setTaskFilter('ALL');
+    setOnlySetup(false);
+    setOnlyOpen(false);
+  };
 
   const visibleDays = days
     .filter((d) => day === 'ALL' || d.key === day)
     .map((d) => ({
       ...d,
       items: d.items.filter((s) => {
-        const matchesOpen = !onlyOpen || (s.signups?.length ?? 0) < s.requiredSlots;
-        const matchesProperty =
-          propertyFilter === 'ALL' ||
-          (propertyFilter === 'SETUP_TEARDOWN' && s.isSetupTeardown) ||
-          (propertyFilter === 'EVENT' && !s.isSetupTeardown);
-        const matchesTask =
-          taskFilter === 'ALL' ||
-          s.tasks?.some((t) => t.title.toLowerCase() === taskFilter.toLowerCase());
-
-        return matchesOpen && matchesProperty && matchesTask;
+        const matchesOpen = !onlyOpen || shiftStats(s).free > 0;
+        const matchesSetup = !onlySetup || s.isSetupTeardown;
+        const matchesTask = taskFilter === 'ALL' || shiftTasks(s).some((t) => t.title === taskFilter);
+        return matchesOpen && matchesSetup && matchesTask;
       }),
     }))
     .filter((d) => d.items.length > 0);
 
-  const signup = async (shift: ShiftDto, task?: ShiftTaskDto) => {
-    if (needsLogin) {
-      window.location.href = loginUrl();
-      return;
-    }
-    if (!user) {
-      setGuestShift(shift);
-      setGuestTask(task || null);
-      return;
-    }
+  const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto) => {
     setBusyShift(shift.id);
     try {
       await api(`/api/shifts/${shift.id}/signup`, {
         method: 'POST',
-        json: {
-          taskId: task?.id,
-        },
+        json: { taskId: task && task.id !== 'default' ? task.id : undefined },
       });
       toast({
         title: 'Du bist eingetragen!',
-        description: `${shift.title}${task ? ` · ${task.title}` : ''}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
+        description: `${shift.title}${task && task.title !== shift.title ? ` · ${task.title}` : ''}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
       });
       await load();
     } catch (err) {
-      toast({ title: 'Eintragen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+      if (err instanceof ApiError && err.data.code === 'MISSING_INFO') {
+        await load();
+        setParticipationFor({ shift, task });
+      } else {
+        toast({ title: 'Eintragen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+      }
     } finally {
       setBusyShift(null);
     }
+  };
+
+  const signup = async (shift: ShiftDto, task?: ShiftTaskDto) => {
+    if (!user) {
+      window.location.href = loginUrl();
+      return;
+    }
+    if (!access.canSignup) {
+      toast({ title: 'Eintragen nicht möglich', description: access.message ?? undefined, tone: 'error' });
+      return;
+    }
+    const firstTime = myShiftCount === 0 && Object.keys(event.viewer.answers).length === 0;
+    const needsInfo =
+      event.viewer.missingFields.length > 0 ||
+      event.viewer.missingQuestionIds.length > 0 ||
+      (firstTime && event.questions.length > 0);
+    if (needsInfo) {
+      setSelectedShiftId(null);
+      setParticipationFor({ shift, task });
+      return;
+    }
+    await doSignup(shift, task);
+  };
+
+  // Schnell eintragen: eine offene Arbeit -> direkt, mehrere -> Auswahl im Detail-Dialog
+  const quickSignup = (shift: ShiftDto) => {
+    const open = shiftTasks(shift).filter((t) => t.filled < t.requiredSlots);
+    if (open.length === 1) signup(shift, open[0]);
+    else setSelectedShiftId(shift.id);
   };
 
   const cancel = async (shift: ShiftDto, signupId?: string, name?: string) => {
@@ -233,15 +308,20 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     }
   };
 
+  const actions: ShiftActions = {
+    canSignup: showSignup,
+    isMine,
+    busyShiftId: busyShift,
+    onOpen: (shift) => setSelectedShiftId(shift.id),
+    onQuickSignup: quickSignup,
+  };
+
   return (
     <AppShell
       actions={
         canManageShifts && (
           <div className="flex items-center gap-2">
-            <Link
-              href={`/events/${slug}/ok`}
-              className={buttonClasses({ variant: 'secondary', size: 'sm' })}
-            >
+            <Link href={`/events/${slug}/ok`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
               <Shield className="size-4" /> <span className="hidden sm:inline">OK-Dashboard</span>
             </Link>
             <Button
@@ -258,27 +338,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         )
       }
     >
-      <div className="mx-auto max-w-6xl px-4 pt-5 sm:px-6 sm:pt-8">
+      <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 sm:pt-6">
         <Link
           href="/"
-          className="mb-4 inline-flex items-center gap-1.5 rounded-full py-1 text-sm font-semibold text-fg-muted transition hover:text-fg"
+          className="mb-3 inline-flex items-center gap-1.5 rounded-full py-1 text-sm font-semibold text-fg-muted transition hover:text-fg"
         >
           <ArrowLeft className="size-4" /> Alle Anlässe
         </Link>
 
-        {/* Hero */}
-        <section className="relative isolate flex min-h-[24rem] animate-fade-up flex-col justify-end overflow-hidden rounded-card bg-stone-900 text-white shadow-lift sm:min-h-[28rem]">
+        {/* Kopf: kompakt, damit die Schichten schnell sichtbar sind */}
+        <section className="relative isolate animate-fade-up overflow-hidden rounded-card bg-stone-900 text-white shadow-lift">
           {event.bannerUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={event.bannerUrl} alt="" className="absolute inset-0 -z-10 size-full object-cover" />
           )}
-          <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 via-black/55 to-black/10" />
-          <div className="absolute inset-0 -z-10 hidden bg-gradient-to-r from-black/50 to-transparent lg:block" />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 via-black/70 to-black/30" />
 
-          <div className="grid gap-6 p-5 sm:p-10 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-10">
+          <div className="flex flex-col gap-5 p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
             <div className="min-w-0">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-tile border border-white/20 bg-black/40 backdrop-blur-md sm:size-16">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-tile border border-white/20 bg-black/40 backdrop-blur-md">
                   {event.logoUrl && event.logoUrl !== brokenLogo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -288,52 +367,82 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                       className="size-full object-cover"
                     />
                   ) : (
-                    <CeviLogo className="size-10" alt="" />
+                    <CeviLogo className="size-8" alt="" />
                   )}
                 </span>
-                <div className="flex flex-wrap gap-1.5">
-                  <SignupModeBadge mode={event.signupMode} tone="glass" />
-                </div>
+                <AccessTypeBadge type={event.accessType} leadersOnly={event.leadersOnly} tone="glass" />
               </div>
-              <h1 className="font-display text-[2.5rem] font-extrabold leading-[0.92] tracking-[-0.04em] text-balance sm:text-6xl lg:text-7xl">
+              <h1 className="font-display text-[2rem] font-extrabold leading-[0.95] tracking-[-0.035em] text-balance sm:text-5xl">
                 {event.title}
               </h1>
-              {event.description && (
-                <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-white/80 sm:text-base">{event.description}</p>
-              )}
-              <p className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white/85">
-                <CalendarDays className="size-4" />
-                {fmtDateRange(event.startDate, event.endDate)}
+              <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-white/85">
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="size-4" />
+                  {fmtDateRange(event.startDate, event.endDate)}
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-white/70">
+                  <Users className="size-4" />
+                  Für {event.audience}
+                </span>
               </p>
+              {event.description && (
+                <p className="mt-3 line-clamp-3 max-w-2xl text-[15px] leading-relaxed text-white/75 sm:line-clamp-none">
+                  {event.description}
+                </p>
+              )}
             </div>
 
             {total > 0 && (
-              <div className="flex items-center gap-5 rounded-card border border-white/15 bg-black/40 p-4 backdrop-blur-xl sm:p-5">
-                <ProgressRing
-                  value={filled}
-                  max={total}
-                  size={104}
-                  stroke={10}
-                  label={`${percent}%`}
-                  sublabel="belegt"
-                  tone={free === 0 ? 'success' : 'accent'}
-                  trackClassName="text-white/15"
-                />
-                <div>
-                  <p className="tabular font-display text-4xl font-extrabold leading-none tracking-tight">{free}</p>
-                  <p className="mt-1 text-sm font-semibold text-white/80">{free === 1 ? 'Platz frei' : 'Plätze frei'}</p>
-                  <p className="tabular mt-2 text-xs text-white/60">
-                    {filled} von {total} besetzt
+              <div className="w-full shrink-0 rounded-card border border-white/15 bg-black/40 p-4 backdrop-blur-xl sm:p-5 lg:w-72">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p>
+                    <span className="tabular font-display text-4xl font-extrabold leading-none tracking-tight">
+                      {free}
+                    </span>
+                    <span className="ml-2 text-sm font-semibold text-white/80">
+                      {free === 1 ? 'Platz frei' : 'Plätze frei'}
+                    </span>
                   </p>
+                  <span className="tabular text-sm font-semibold text-white/70">{percent}%</span>
                 </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className={cn('h-full rounded-full', free === 0 ? 'bg-success' : 'bg-accent')}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+                <p className="tabular mt-2 text-xs text-white/60">
+                  {filled} von {total} besetzt
+                </p>
+                {myShiftCount > 0 && (
+                  <Link
+                    href="/meine-schichten"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-success/25 px-3 py-1 text-xs font-semibold text-white transition hover:bg-success/35"
+                  >
+                    <Check className="size-3.5" /> Du bist {myShiftCount}× eingetragen
+                  </Link>
+                )}
               </div>
             )}
           </div>
         </section>
 
+        {/* Hinweise: Einladungs-Link und Zugang */}
+        <div className="mt-4 space-y-3">
+          {pendingToken && !user && !portalLoading && (
+            <Callout tone="info" title="Du hast einen Einladungs-Link">
+              <p>Melde dich an, damit der Link gilt. Ein Cevi-Name ohne Passwort reicht.</p>
+              <a href={loginHref} className={buttonClasses({ size: 'sm', className: 'mt-3' })}>
+                <LogIn /> Anmelden
+              </a>
+            </Callout>
+          )}
+          {!(pendingToken && !user) && <AccessNotice event={event} loggedIn={Boolean(user)} />}
+        </div>
+
         {/* Organisationskomitee */}
         {(event.organizers?.length || canManageEvent) && (
-          <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center" aria-label="Organisationskomitee">
+          <section className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center" aria-label="Organisationskomitee">
             <h2 className="shrink-0 text-sm font-semibold text-fg-subtle">OK</h2>
             <ul className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:px-0">
               {event.organizers?.map((org) => {
@@ -367,28 +476,67 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
             </ul>
             {canManageEvent && (
               <div className="flex flex-wrap gap-2 sm:ml-auto">
-                <Link
-                  href={`/events/${event.slug}/ok`}
-                  className={buttonClasses({ variant: 'primary', size: 'sm' })}
-                >
-                  <Shield className="size-4" /> OK-Verwaltung
-                </Link>
                 <Button variant="secondary" size="sm" onClick={() => setShowOkForm(true)}>
                   <UserPlus /> OK ernennen
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => setShowSettings(true)}>
-                  <Palette /> Design
+                  <Palette /> Einstellungen
                 </Button>
+                <Link href={`/events/${event.slug}/ok`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+                  <KeyRound className="size-4" /> Links
+                </Link>
               </div>
             )}
           </section>
         )}
+
+        {/* Noch gesucht (nur Listenansicht ohne Filter) */}
+        {view === 'list' && !filtersActive && event.shifts.length > 0 && (
+          <div className="mt-8">
+            <NeededShifts
+              shifts={event.shifts}
+              actions={actions}
+              onShowAll={() => {
+                setOnlyOpen(true);
+                document.getElementById('schichten')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Filter: klebt unter dem Header */}
+      {/* Werkzeugleiste: Ansicht und Filter, klebt unter dem Header */}
       {event.shifts.length > 0 && (
-        <div className="sticky top-16 z-20 mt-8 border-b border-line/70 bg-canvas/85 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-6xl snap-x gap-2 overflow-x-auto px-4 py-3 scrollbar-none sm:px-6">
+        <div id="schichten" className="sticky top-16 z-20 mt-8 scroll-mt-16 border-b border-line/70 bg-canvas/85 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-6xl items-center gap-2 overflow-x-auto px-4 py-3 scrollbar-none sm:px-6">
+            <div role="radiogroup" aria-label="Ansicht" className="flex shrink-0 rounded-full border border-line bg-surface p-0.5">
+              {(
+                [
+                  { value: 'list', label: 'Liste', icon: List },
+                  { value: 'grid', label: 'Raster', icon: LayoutGrid },
+                ] as const
+              ).map((option) => {
+                const Icon = option.icon;
+                const active = view === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => changeView(option.value)}
+                    className={cn(
+                      'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition',
+                      active ? 'bg-fg text-canvas' : 'text-fg-muted hover:text-fg'
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    <span className="hidden sm:inline">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <span aria-hidden className="mx-1 h-6 w-px shrink-0 bg-line" />
             {days.length > 1 && (
               <>
                 <Chip selected={day === 'ALL'} onClick={() => setDay('ALL')}>
@@ -399,51 +547,40 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                     {fmtShortWeekday(dayKeyToIso(d.key))} {fmtDayMonth(dayKeyToIso(d.key)).replace(/ \S+$/, '')}
                   </Chip>
                 ))}
-                <span aria-hidden className="mx-1 w-px shrink-0 bg-line" />
+                <span aria-hidden className="mx-1 h-6 w-px shrink-0 bg-line" />
               </>
             )}
             <Chip selected={onlyOpen} onClick={() => setOnlyOpen((v) => !v)}>
               Nur mit freien Plätzen
             </Chip>
-
-            {/* Aufbau / Abbau Eigenschaft */}
-            {hasSetupTeardownShifts && (
-              <Chip
-                selected={propertyFilter === 'SETUP_TEARDOWN'}
-                onClick={() => setPropertyFilter(propertyFilter === 'SETUP_TEARDOWN' ? 'ALL' : 'SETUP_TEARDOWN')}
-              >
-                🛠️ Nur Auf- &amp; Abbau
+            {event.shifts.some((s) => s.isSetupTeardown) && (
+              <Chip selected={onlySetup} onClick={() => setOnlySetup((v) => !v)}>
+                Auf- &amp; Abbau
               </Chip>
             )}
-
-            {/* Spezifische Arbeiten */}
-            {distinctTasks.length > 0 && (
-              <>
-                <span aria-hidden className="mx-1 w-px shrink-0 bg-line" />
-                {distinctTasks.map((title) => (
-                  <Chip
-                    key={title}
-                    selected={taskFilter === title}
-                    onClick={() => setTaskFilter(taskFilter === title ? 'ALL' : title)}
-                  >
-                    {title}
-                  </Chip>
-                ))}
-              </>
-            )}
+            {distinctTasks.length > 1 &&
+              distinctTasks.map((title) => (
+                <Chip
+                  key={title}
+                  selected={taskFilter === title}
+                  onClick={() => setTaskFilter(taskFilter === title ? 'ALL' : title)}
+                >
+                  {title}
+                </Chip>
+              ))}
           </div>
         </div>
       )}
 
       {/* Schichten nach Tag */}
-      <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
         {event.shifts.length === 0 ? (
           <EmptyState
             icon={<CalendarDays />}
             title="Noch keine Schichten"
             description={
               canManageShifts
-                ? 'Lege die erste Schicht an. Helfer:innen können sich danach sofort eintragen.'
+                ? 'Lege die erste Schicht an. Helfer*innen können sich danach sofort eintragen.'
                 : 'Das OK plant die Schichten noch. Schau bald wieder vorbei.'
             }
             action={
@@ -460,67 +597,41 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
             title="Keine passenden Schichten"
             description="Mit diesen Filtern bleibt nichts übrig."
             action={
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setDay('ALL');
-                  setTaskFilter('ALL');
-                  setPropertyFilter('ALL');
-                  setOnlyOpen(false);
-                }}
-              >
+              <Button variant="secondary" onClick={resetFilters}>
                 Filter zurücksetzen
               </Button>
             }
           />
         ) : (
-          <div className="space-y-12">
+          <div className="space-y-10">
             {visibleDays.map((group) => {
               const dayTotal = group.items.reduce((s, x) => s + x.requiredSlots, 0);
-              const dayFilled = group.items.reduce((s, x) => s + Math.min(x.signups?.length ?? 0, x.requiredSlots), 0);
+              const dayFilled = group.items.reduce((s, x) => s + shiftStats(x).filled, 0);
+              const dayFree = dayTotal - dayFilled;
               const iso = dayKeyToIso(group.key);
               return (
                 <section key={group.key} aria-labelledby={`day-${group.key}`}>
-                  <header className="mb-5 flex items-end justify-between gap-4 border-b border-line pb-3">
-                    <h2 id={`day-${group.key}`} className="flex flex-wrap items-baseline gap-x-3">
-                      <span className="font-display text-3xl font-extrabold tracking-[-0.03em] text-fg sm:text-4xl">
+                  <header className="mb-3 flex items-end justify-between gap-4">
+                    <h2 id={`day-${group.key}`} className="flex flex-wrap items-baseline gap-x-2.5">
+                      <span className="font-display text-2xl font-extrabold tracking-[-0.03em] text-fg sm:text-3xl">
                         {fmtWeekday(iso)}
                       </span>
-                      <span className="text-base font-semibold text-fg-subtle">{fmtDayMonth(iso)}</span>
+                      <span className="text-sm font-semibold text-fg-subtle">{fmtDayMonth(iso)}</span>
                     </h2>
                     <span
                       className={cn(
-                        'tabular shrink-0 text-sm font-semibold',
-                        dayFilled >= dayTotal ? 'text-success-ink' : 'text-fg-muted'
+                        'tabular shrink-0 rounded-full px-2.5 py-1 text-xs font-bold',
+                        dayFree === 0 ? 'bg-success/12 text-success-ink' : 'bg-accent/10 text-accent-ink'
                       )}
                     >
-                      {dayFilled}/{dayTotal} belegt
+                      {dayFree === 0 ? 'Alles besetzt' : `${dayFree} frei`} · {dayFilled}/{dayTotal}
                     </span>
                   </header>
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    {group.items.map((shift, i) => {
-                      const mine = shift.signups?.find((s) => user && s.userId === user.id);
-                      return (
-                        <ShiftTicket
-                          key={shift.id}
-                          shift={shift}
-                          index={i}
-                          isMine={Boolean(mine)}
-                          canManage={canManageShifts}
-                          needsLogin={needsLogin}
-                          busy={busyShift === shift.id}
-                          onSignup={(task) => signup(shift, task)}
-                          onCancel={(signupId) => cancel(shift, signupId)}
-                          onRemoveHelper={(signupId, name) => cancel(shift, signupId, name)}
-                          onSelect={(s) => setSelectedShiftId(s.id)}
-                          onEdit={() => {
-                            setEditingShift(shift);
-                            setShowShiftForm(true);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
+                  {view === 'grid' ? (
+                    <ShiftGrid shifts={group.items} isMine={isMine} onOpen={(s) => setSelectedShiftId(s.id)} />
+                  ) : (
+                    <ShiftRows shifts={group.items} actions={actions} />
+                  )}
                 </section>
               );
             })}
@@ -528,7 +639,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         )}
       </div>
 
-      {/* Detail-Dialog für Schicht & Arbeiten (wie v1 nur in besserem Design) */}
+      {/* Detail-Dialog für Schicht & Arbeiten */}
       <ShiftDetailsDialog
         shift={selectedShift}
         event={event}
@@ -536,6 +647,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         onClose={() => setSelectedShiftId(null)}
         currentUser={user}
         needsLogin={needsLogin}
+        blockedReason={user && !access.canSignup ? access.message : null}
         canManage={canManageShifts}
         busy={Boolean(selectedShift && busyShift === selectedShift.id)}
         onSignup={(task) => {
@@ -558,6 +670,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         }}
       />
 
+      <ParticipationDialog
+        open={Boolean(participationFor)}
+        event={event}
+        onClose={() => setParticipationFor(null)}
+        onSaved={async () => {
+          const pending = participationFor;
+          setParticipationFor(null);
+          if (pending) await doSignup(pending.shift, pending.task);
+          else await load();
+        }}
+      />
+
       {/* Helfer manuell durch OK einteilen */}
       <AssignHelperDialog
         open={Boolean(assigningShift)}
@@ -574,24 +698,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         }}
       />
 
-      <GuestSignupDialog
-        shift={guestShift}
-        task={guestTask}
-        event={event}
-        onClose={() => {
-          setGuestShift(null);
-          setGuestTask(null);
-        }}
-        onSignedUp={async (shift) => {
-          setGuestShift(null);
-          setGuestTask(null);
-          toast({
-            title: 'Du bist eingetragen!',
-            description: `${shift.title}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
-          });
-          await load();
-        }}
-      />
       <ShiftFormDialog
         open={showShiftForm}
         event={event}
@@ -619,15 +725,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         open={showSettings}
         mode="edit"
         eventSlug={event.slug}
-        initial={{
-          title: event.title,
-          description: event.description ?? '',
-          logoUrl: event.logoUrl ?? '',
-          bannerUrl: event.bannerUrl ?? '',
-          signupMode: event.signupMode,
-          requireEmailForGuests: event.requireEmailForGuests ?? false,
-          requirePhoneForGuests: event.requirePhoneForGuests ?? false,
-        }}
+        initial={eventFormInitial(event)}
         onClose={() => setShowSettings(false)}
         onSaved={async () => {
           setShowSettings(false);
@@ -641,13 +739,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 function EventSkeleton() {
   return (
     <AppShell>
-      <div className="mx-auto max-w-6xl px-4 pt-5 sm:px-6 sm:pt-8">
-        <Skeleton className="mb-4 h-6 w-32" />
-        <Skeleton className="h-[24rem] rounded-card sm:h-[28rem]" />
-        <Skeleton className="mt-10 h-10 w-56" />
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 sm:pt-6">
+        <Skeleton className="mb-3 h-6 w-32" />
+        <Skeleton className="h-64 rounded-card sm:h-72" />
+        <Skeleton className="mt-8 h-8 w-48" />
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-44 rounded-card" />
+            <Skeleton key={i} className="h-20 rounded-card" />
           ))}
         </div>
       </div>

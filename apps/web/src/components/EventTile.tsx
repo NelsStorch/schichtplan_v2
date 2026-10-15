@@ -3,7 +3,7 @@ import { ArrowRight, CalendarDays, Layers } from 'lucide-react';
 import type { EventDto } from '@schichtplan/shared';
 import { Badge, CeviLogo, cn } from '@schichtplan/ui';
 import { fmtRelativeDay, fmtShortDate, fmtShortWeekday, isPast } from '@/lib/format';
-import { SignupModeBadge } from './event-meta';
+import { AccessTypeBadge } from './event-meta';
 
 export function eventStatus(event: Pick<EventDto, 'startDate' | 'endDate'>) {
   if (isPast(event.endDate)) return 'past' as const;
@@ -53,7 +53,14 @@ export function EventTile({ event, featured, index = 0 }: { event: EventDto; fea
               {status === 'upcoming' && <span className="font-medium text-white/70">· {fmtRelativeDay(event.startDate)}</span>}
             </Badge>
           )}
-          <SignupModeBadge mode={event.signupMode} tone="glass" />
+          <AccessTypeBadge type={event.accessType} leadersOnly={event.leadersOnly} tone="glass" />
+          {status !== 'past' && event.totalSlots ? (
+            <Badge tone="glass">
+              {event.totalSlots - (event.filledSlots ?? 0) > 0
+                ? `${event.totalSlots - (event.filledSlots ?? 0)} Plätze frei`
+                : 'Alles besetzt'}
+            </Badge>
+          ) : null}
         </div>
 
         <div className="flex items-end gap-4">

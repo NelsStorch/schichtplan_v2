@@ -34,6 +34,11 @@ function cleanReturnTo(raw: string | null): string {
   return safeReturnTo(raw, host.replace(/^login\./, ''), { allowLocalhost: isLocal });
 }
 
+/** Wer seine Abteilung noch nicht angegeben hat, kommt zuerst auf /abteilung */
+function afterLogin(user: { needsDepartmentSetup?: boolean } | null | undefined, target: string): string {
+  return user?.needsDepartmentSetup ? `/abteilung?return_to=${encodeURIComponent(target)}` : target;
+}
+
 /** Hostname des Ziels (z. B. illnau.cevi-schichtplan.ch), damit sichtbar ist, wohin es nach dem Login geht. */
 function destinationHost(returnTo: string): string | null {
   try {
@@ -127,7 +132,7 @@ function LoginContent() {
 
       setSuccess(`Hallo ${data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
       setTimeout(() => {
-        window.location.href = data.redirectUrl || returnTo;
+        window.location.href = afterLogin(data.user, data.redirectUrl || returnTo);
       }, 700);
     } catch (err: any) {
       setError(err.message || 'Ein Fehler ist aufgetreten');
@@ -173,7 +178,7 @@ function LoginContent() {
           : 'Konto erstellt. Du wirst weitergeleitet …'
       );
       setTimeout(() => {
-        window.location.href = returnTo;
+        window.location.href = afterLogin(data.user, returnTo);
       }, 700);
     } catch (err: any) {
       setError(err.message || 'Ein Fehler ist aufgetreten');

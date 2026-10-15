@@ -1,5 +1,13 @@
 import { FastifyPluginAsync } from 'fastify';
 import { CreateShiftSchema, UpdateShiftSchema, SignupShiftSchema } from '@schichtplan/shared';
+import {
+  accessEventInclude,
+  accessUserSelect,
+  evaluateEventAccess,
+  hasValidGrant,
+  managerFlags,
+} from '../services/eventAccess.js';
+import { missingProfileFields } from '../services/profile.js';
 
 function calculateAge(birthDate: Date, targetDate: Date): number {
   let age = targetDate.getFullYear() - birthDate.getFullYear();
@@ -364,39 +372,31 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             include: { user: true },
           },
           event: {
-            include: { organizers: true },
+            include: {
+              ...accessEventInclude,
+              department: { select: { name: true } },
+              questions: { select: { id: true, required: true } },
+            },
           },
         },
       });
 
-      if (!shift) {
+      if (!shift || (request.tenant && shift.event.departmentId !== request.tenant.id)) {
         return reply.status(404).send({ error: 'Schicht nicht gefunden' });
       }
 
       const event = shift.event;
 
-      // Berechtigung für OK-Aktionen prüfen
-      let isOkOrAdmin = false;
-      if (request.user) {
-        const member = await fastify.prisma.departmentMember.findUnique({
-          where: {
-            departmentId_userId: {
-              departmentId: event.departmentId,
-              userId: request.user.id,
-            },
-          },
+      // Selbsteintragung braucht immer ein Konto (ein Cevi-Name-Profil reicht)
+      if (!request.user) {
+        return reply.status(401).send({
+          error: 'Zum Eintragen brauchst du ein Konto. Ein Cevi-Name ohne Passwort reicht.',
+          requiresLogin: true,
         });
-        const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-        const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
-        isOkOrAdmin = Boolean(isDeptAdmin || isEventOk || request.user.isGlobalAdmin);
       }
 
-      // Falls keine öffentliche Selbsteintragung erlaubt ist und der Aufrufer kein OK-Mitglied ist:
-      if (!event.allowPublicSignup && !isOkOrAdmin) {
-        return reply
-          .status(403)
-          .send({ error: 'Für dieses Event sind keine Selbsteintragungen mehr möglich' });
-      }
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      const isOkOrAdmin = flags.isManager;
 
       // Body parsen
       const parse = SignupShiftSchema.safeParse({ ...(request.body as object), shiftId });
@@ -425,50 +425,47 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         guestName = reqGuestName.trim();
         guestEmail = reqGuestEmail?.trim() || null;
         guestPhone = reqGuestPhone?.trim() || null;
-      } else if (request.user) {
-        // Angemeldeter Benutzer trägt sich selbst ein
+      } else {
+        // Angemeldete Person trägt sich selbst ein: Zugang, Pflichtangaben und Pflichtfragen prüfen
         targetUserId = request.user.id;
-        targetUser = await fastify.prisma.user.findUnique({ where: { id: targetUserId } });
-        if (!targetUser) {
+        const self = await fastify.prisma.user.findUnique({
+          where: { id: targetUserId },
+          select: {
+            ...accessUserSelect,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            address: true,
+            birthDate: true,
+          },
+        });
+        if (!self) {
           return reply.status(401).send({ error: 'Benutzerkonto nicht gefunden' });
         }
+        targetUser = self;
 
-        // Modus CEVIDB_ONLY
-        if (event.signupMode === 'CEVIDB_ONLY' && !targetUser.ceviDbId) {
-          return reply.status(403).send({
-            error:
-              'Für dieses Event sind nur verifizierte Cevi.DB-Konten zugelassen. Bitte mit Cevi.DB anmelden.',
+        const hasGrant = await hasValidGrant(fastify.prisma, event.id, self.id);
+        const access = evaluateEventAccess(event, event.department.name, self, flags, hasGrant);
+        if (!access.canSignup) {
+          return reply.status(403).send({ error: access.message, reason: access.reason });
+        }
+
+        const missingFields = missingProfileFields(self, event.requiredFields);
+        const answered = await fastify.prisma.eventAnswer.findMany({
+          where: { eventId: event.id, userId: self.id },
+          select: { questionId: true, value: true },
+        });
+        const missingQuestionIds = event.questions
+          .filter((q) => q.required && !answered.some((a) => a.questionId === q.id && a.value.trim()))
+          .map((q) => q.id);
+        if (missingFields.length > 0 || missingQuestionIds.length > 0) {
+          return reply.status(400).send({
+            error: 'Für diesen Anlass fehlen noch Angaben.',
+            code: 'MISSING_INFO',
+            missingFields,
+            missingQuestionIds,
           });
-        }
-      } else {
-        // Nicht eingeloggt: Gast-Anmeldung
-        if (event.signupMode === 'LOGIN_REQUIRED' || event.signupMode === 'CEVIDB_ONLY') {
-          return reply.status(401).send({
-            error: 'Für dieses Event ist ein Login erforderlich. Bitte melde dich an.',
-            requiresLogin: true,
-          });
-        }
-
-        guestName = reqGuestName?.trim() || null;
-        guestEmail = reqGuestEmail?.trim() || null;
-        guestPhone = reqGuestPhone?.trim() || null;
-
-        if (!guestName || guestName.length < 2) {
-          return reply
-            .status(400)
-            .send({ error: 'Bitte gib deinen Cevi-Namen oder Namen ein (mind. 2 Zeichen)' });
-        }
-
-        if (event.requireEmailForGuests && !guestEmail) {
-          return reply
-            .status(400)
-            .send({ error: 'Für dieses Event ist eine E-Mail-Adresse erforderlich' });
-        }
-
-        if (event.requirePhoneForGuests && !guestPhone) {
-          return reply
-            .status(400)
-            .send({ error: 'Für dieses Event ist eine Telefonnummer erforderlich' });
         }
       }
 

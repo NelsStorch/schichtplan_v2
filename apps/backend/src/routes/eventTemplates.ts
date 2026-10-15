@@ -1,5 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
-import { InstantiateTemplateSchema, type EventTemplateData } from '@schichtplan/shared';
+import { InstantiateTemplateSchema, toEventAccessType, type EventTemplateData } from '@schichtplan/shared';
+import { cleanRequiredFields } from '../services/profile.js';
+import { replaceAccessLists, resolveAccessLists, syncQuestions } from './events.js';
 
 const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Event-Vorlagen der Abteilung
@@ -21,9 +23,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         departmentId: t.departmentId,
         title: t.title,
         description: t.description,
-        signupMode: t.signupMode,
-        requireEmailForGuests: t.requireEmailForGuests,
-        requirePhoneForGuests: t.requirePhoneForGuests,
+        accessType: toEventAccessType(t.accessType),
+        leadersOnly: t.leadersOnly,
+        requiredFields: cleanRequiredFields(t.requiredFields),
         shiftCount: shifts.length,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
@@ -52,9 +54,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
       departmentId: template.departmentId,
       title: template.title,
       description: template.description,
-      signupMode: template.signupMode,
-      requireEmailForGuests: template.requireEmailForGuests,
-      requirePhoneForGuests: template.requirePhoneForGuests,
+      accessType: toEventAccessType(template.accessType),
+      leadersOnly: template.leadersOnly,
+      requiredFields: cleanRequiredFields(template.requiredFields),
       shiftCount: data?.shifts?.length || 0,
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
@@ -105,9 +107,12 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         bannerUrl,
         startDate,
         endDate,
-        signupMode,
-        requireEmailForGuests,
-        requirePhoneForGuests,
+        accessType,
+        leadersOnly,
+        requiredFields,
+        allowedDepartmentIds,
+        allowedStufeIds,
+        questions,
         allowPublicSignup,
       } = parse.data;
 
@@ -124,6 +129,17 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         return reply
           .status(409)
           .send({ error: 'Ein Event mit diesem Slug existiert bereits in dieser Abteilung' });
+      }
+
+      const lists = await resolveAccessLists(
+        fastify.prisma,
+        request.tenant.id,
+        accessType,
+        allowedDepartmentIds,
+        allowedStufeIds
+      );
+      if ('error' in lists) {
+        return reply.status(400).send({ error: lists.error });
       }
 
       const templateData = template.data as unknown as EventTemplateData;
@@ -149,9 +165,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             bannerUrl: bannerUrl || null,
             startDate: new Date(startDate),
             endDate: new Date(endDate),
-            signupMode,
-            requireEmailForGuests,
-            requirePhoneForGuests,
+            accessType,
+            leadersOnly,
+            requiredFields,
             allowPublicSignup,
             organizers: {
               create: [
@@ -164,6 +180,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             },
           },
         });
+        await replaceAccessLists(tx, ev.id, lists.departmentIds, lists.stufeIds);
+        await syncQuestions(tx, ev.id, questions);
 
         for (const s of templateShifts) {
           const shiftDay = new Date(baseYear, baseMonth, baseDate + (s.dayOffset || 0));

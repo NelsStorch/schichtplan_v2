@@ -35,6 +35,8 @@ export interface ShiftDetailsDialogProps {
   onClose: () => void;
   currentUser: { id: string; ceviName?: string | null; firstName?: string } | null;
   needsLogin: boolean;
+  /** Angemeldet, aber nicht freigeschaltet: Grund statt Eintragen-Knopf */
+  blockedReason?: string | null;
   canManage: boolean;
   busy?: boolean;
   onSignup: (task?: ShiftTaskDto) => void;
@@ -51,6 +53,7 @@ export function ShiftDetailsDialog({
   onClose,
   currentUser,
   needsLogin,
+  blockedReason,
   canManage,
   busy,
   onSignup,
@@ -304,7 +307,7 @@ export function ShiftDetailsDialog({
 
                     {taskSignups.length === 0 ? (
                       <p className="text-xs italic text-fg-subtle">
-                        Noch niemand eingetragen – melde dich als Erste/r an!
+                        Noch niemand eingetragen. Sei die erste Person!
                       </p>
                     ) : (
                       <ul className="flex flex-wrap gap-1.5" aria-label="Eingetragene Helfer">
@@ -367,6 +370,13 @@ export function ShiftDetailsDialog({
                       ) : taskFull ? (
                         <span className="rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted border border-line">
                           Voll besetzt
+                        </span>
+                      ) : blockedReason ? (
+                        <span
+                          title={blockedReason}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted"
+                        >
+                          <Lock className="size-3" /> Für dich nicht freigeschaltet
                         </span>
                       ) : needsLogin ? (
                         <a

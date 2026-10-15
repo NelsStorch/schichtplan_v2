@@ -13,6 +13,7 @@ import {
   Copy,
   Edit,
   FileText,
+  KeyRound,
   Filter,
   Plus,
   Search,
@@ -26,6 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto, EventTemplateDto, TaskDefinitionDto, AgeRequirementType } from '@schichtplan/shared';
+import { EVENT_ACCESS_TYPES } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -46,8 +48,9 @@ import {
   useToast,
 } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
-import { EventFormDialog } from '@/components/EventFormDialog';
-import { SignupModeBadge } from '@/components/event-meta';
+import { EventFormDialog, eventFormInitial } from '@/components/EventFormDialog';
+import { AccessTypeBadge } from '@/components/event-meta';
+import { EventAccessPanel } from '@/components/EventAccessPanel';
 import {
   AssignHelperDialog,
   DuplicateShiftDialog,
@@ -92,7 +95,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   const [error, setError] = useState<string | null>(null);
 
   // Tabs
-  const [tab, setTab] = useState<'shifts' | 'helpers' | 'tasks' | 'templates'>('shifts');
+  const [tab, setTab] = useState<'shifts' | 'helpers' | 'access' | 'tasks' | 'templates'>('shifts');
 
   // Filter Schichten
   const [day, setDay] = useState<string>('ALL');
@@ -492,7 +495,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                 <Badge tone="accent">
                   <Shield className="size-3" /> OK-Dashboard
                 </Badge>
-                <SignupModeBadge mode={event.signupMode} />
+                <AccessTypeBadge type={event.accessType} leadersOnly={event.leadersOnly} />
               </div>
               <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">
                 {event.title}
@@ -551,12 +554,12 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
         </section>
 
         {/* Tab-Auswahl */}
-        <div className="mt-8 flex gap-2 border-b border-line pb-px">
+        <div className="-mx-4 mt-8 flex gap-2 overflow-x-auto border-b border-line px-4 pb-px scrollbar-none sm:mx-0 sm:px-0">
           <button
             type="button"
             onClick={() => setTab('shifts')}
             className={cn(
-              'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
               tab === 'shifts'
                 ? 'border-accent text-accent-ink'
                 : 'border-transparent text-fg-muted hover:text-fg'
@@ -568,7 +571,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
             type="button"
             onClick={() => setTab('helpers')}
             className={cn(
-              'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
               tab === 'helpers'
                 ? 'border-accent text-accent-ink'
                 : 'border-transparent text-fg-muted hover:text-fg'
@@ -578,9 +581,21 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
           </button>
           <button
             type="button"
+            onClick={() => setTab('access')}
+            className={cn(
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              tab === 'access'
+                ? 'border-accent text-accent-ink'
+                : 'border-transparent text-fg-muted hover:text-fg'
+            )}
+          >
+            <KeyRound className="size-4" /> Zugang &amp; Angaben
+          </button>
+          <button
+            type="button"
             onClick={() => setTab('tasks')}
             className={cn(
-              'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
               tab === 'tasks'
                 ? 'border-accent text-accent-ink'
                 : 'border-transparent text-fg-muted hover:text-fg'
@@ -592,7 +607,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
             type="button"
             onClick={() => setTab('templates')}
             className={cn(
-              'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
               tab === 'templates'
                 ? 'border-accent text-accent-ink'
                 : 'border-transparent text-fg-muted hover:text-fg'
@@ -998,6 +1013,8 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
         )}
 
         {/* ----------------- TAB 3: ARBEITEN-KATALOG ----------------- */}
+        {tab === 'access' && <EventAccessPanel event={event} />}
+
         {tab === 'tasks' && (
           <div className="py-6 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1168,7 +1185,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                         <div>
                           <h4 className="text-base font-bold text-fg">{tpl.title}</h4>
                           <p className="text-xs text-fg-muted mt-0.5">
-                            {tpl.shiftCount} Schichten hinterlegt · Modus: {tpl.signupMode}
+                            {tpl.shiftCount} Schichten hinterlegt · Zugang: {EVENT_ACCESS_TYPES[tpl.accessType]?.short ?? 'Öffentlich'}
                           </p>
                         </div>
                         <Button
@@ -1275,15 +1292,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
         open={showEventSettings}
         mode="edit"
         eventSlug={event.slug}
-        initial={{
-          title: event.title,
-          description: event.description ?? '',
-          logoUrl: event.logoUrl ?? '',
-          bannerUrl: event.bannerUrl ?? '',
-          signupMode: event.signupMode,
-          requireEmailForGuests: event.requireEmailForGuests ?? false,
-          requirePhoneForGuests: event.requirePhoneForGuests ?? false,
-        }}
+        initial={eventFormInitial(event)}
         onClose={() => setShowEventSettings(false)}
         onSaved={async () => {
           setShowEventSettings(false);

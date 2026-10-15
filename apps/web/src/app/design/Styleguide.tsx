@@ -24,7 +24,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { SignupModeBadge } from '@/components/event-meta';
+import { AccessTypeBadge } from '@/components/event-meta';
 import { ShiftTicket } from '@/components/ShiftTicket';
 
 const COLORS = [
@@ -149,8 +149,8 @@ export function Styleguide() {
             <Badge tone="warning">ab 18 Jahren</Badge>
             <Badge tone="danger">Abgesagt</Badge>
             <Badge tone="outline">Outline</Badge>
-            <SignupModeBadge mode="NAME_ONLY" />
-            <SignupModeBadge mode="CEVIDB_ONLY" />
+            <AccessTypeBadge type="PUBLIC" />
+            <AccessTypeBadge type="DEPARTMENT_CEVIDB" leadersOnly />
           </div>
           <ChipRow className="mt-5">
             {['Alle', 'Fr 16.', 'Sa 17.', 'So 18.'].map((c) => (

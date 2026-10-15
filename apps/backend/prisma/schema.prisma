@@ -23,8 +23,46 @@ model Department {
   members      DepartmentMember[]
   templates    EventTemplate[]
   taskDefinitions TaskDefinition[]
+  stufen       DepartmentStufe[]
+  // Personen, die diese Abteilung als Heimabteilung haben (selbst angegeben oder aus Cevi.DB)
+  homeUsers    User[]             @relation("UserHomeDepartment")
+  // Anlässe anderer Abteilungen, die diese Abteilung freigeschaltet haben (Whitelist)
+  allowedInEvents EventAllowedDepartment[]
 
   @@map("departments")
+}
+
+// Stufen einer Abteilung (z. B. «Hiskia», «Fröschli»). Gepflegt von der Abteilungsleitung.
+model DepartmentStufe {
+  id            String              @id @default(uuid())
+  departmentId  String              @map("department_id")
+  name          String
+  // Cevi.DB-Gruppe der Stufe: Cevi.DB-Personen mit einer Rolle in dieser Gruppe werden automatisch zugeordnet
+  ceviDbGroupId Int?                @map("cevidb_group_id")
+  sortOrder     Int                 @default(0) @map("sort_order")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  department    Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  members       UserStufe[]
+  events        EventAllowedStufe[]
+
+  @@unique([departmentId, name])
+  @@unique([departmentId, ceviDbGroupId])
+  @@map("department_stufen")
+}
+
+// Stufe einer Person mit Rolle. Quelle CEVIDB wird bei jedem Cevi.DB-Login neu abgeglichen.
+model UserStufe {
+  id        String          @id @default(uuid())
+  userId    String          @map("user_id")
+  stufeId   String          @map("stufe_id")
+  role      String          @default("TEILNEHMER") // "LEITUNG", "TEILNEHMER"
+  source    String          @default("SELF") // "SELF", "CEVIDB"
+  createdAt DateTime        @default(now()) @map("created_at")
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stufe     DepartmentStufe @relation(fields: [stufeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stufeId])
+  @@map("user_stufen")
 }
 
 model User {
@@ -36,15 +74,25 @@ model User {
   lastName      String
   ceviName      String?
   phone         String?
+  address       String?            // Eine Zeile, z. B. "Dorfstrasse 1, 8307 Effretikon"
   birthDate     DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
   isGlobalAdmin Boolean            @default(false)
   ceviDbData    Json?              // Vollständiges Cevi.DB (Hitobito) Profil inkl. Rollen, Gruppen, etc.
   ceviDbSyncedAt DateTime?         // Zeitstempel der letzten Cevi.DB Synchronisation
+  // Heimabteilung: aus Cevi.DB (Ortsgruppe) oder beim Login selbst angegeben
+  homeDepartmentId     String?     @map("home_department_id")
+  homeDepartmentSource String?     @map("home_department_source") // "CEVIDB", "SELF"
+  // Gesetzt, sobald die Person ihre Abteilung angegeben hat (auch «keine Abteilung»). Null = nachfragen.
+  departmentSetupAt    DateTime?   @map("department_setup_at")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
+  homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
   memberships   DepartmentMember[]
+  stufen        UserStufe[]
   signups       ShiftSignup[]
   organizedEvents EventOrganizer[]
+  eventAnswers  EventAnswer[]
+  eventAccessGrants EventAccessGrant[]
 
   @@map("users")
 }
@@ -73,18 +121,107 @@ model Event {
   startDate         DateTime
   endDate           DateTime
   isPublished       Boolean           @default(true)
-  allowPublicSignup Boolean           @default(true)
-  signupMode        String            @default("OPEN") // "NAME_ONLY", "OPEN", "LOGIN_REQUIRED", "CEVIDB_ONLY"
-  requireEmailForGuests Boolean       @default(false)
-  requirePhoneForGuests Boolean       @default(false)
+  allowPublicSignup Boolean           @default(true) // false = Eintragen geschlossen, nur noch das OK teilt ein
+  // Wer darf sich eintragen? Schlüssel aus EVENT_ACCESS_TYPES (packages/shared/src/constants.ts)
+  accessType        String            @default("PUBLIC") @map("access_type")
+  leadersOnly       Boolean           @default(false) @map("leaders_only")
+  // Pflichtangaben aus REQUIRED_PROFILE_FIELDS, z. B. ["PHONE", "EMAIL"]
+  requiredFields    String[]          @default([]) @map("required_fields")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   department        Department        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   shifts            Shift[]
   organizers        EventOrganizer[]  // Event-spezifisches Organisationskomitee (OK)
+  allowedDepartments EventAllowedDepartment[] // Whitelist: zusätzliche Abteilungen
+  allowedStufen     EventAllowedStufe[] // Stufen-Filter (leer = alle Stufen)
+  questions         EventQuestion[]
+  answers           EventAnswer[]
+  accessLinks       EventAccessLink[]
+  accessGrants      EventAccessGrant[]
 
   @@unique([departmentId, slug])
   @@map("events")
+}
+
+model EventAllowedDepartment {
+  eventId      String     @map("event_id")
+  departmentId String     @map("department_id")
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, departmentId])
+  @@map("event_allowed_departments")
+}
+
+model EventAllowedStufe {
+  eventId String          @map("event_id")
+  stufeId String          @map("stufe_id")
+  event   Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  stufe   DepartmentStufe @relation(fields: [stufeId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, stufeId])
+  @@map("event_allowed_stufen")
+}
+
+// Eigene Frage eines Anlasses, z. B. «Allergien» oder «T-Shirt-Grösse»
+model EventQuestion {
+  id        String        @id @default(uuid())
+  eventId   String        @map("event_id")
+  label     String
+  type      String        @default("TEXT") // "TEXT", "YES_NO", "CHOICE"
+  options   String[]      @default([])
+  required  Boolean       @default(false)
+  sortOrder Int           @default(0) @map("sort_order")
+  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  answers   EventAnswer[]
+
+  @@map("event_questions")
+}
+
+model EventAnswer {
+  id         String        @id @default(uuid())
+  eventId    String        @map("event_id")
+  questionId String        @map("question_id")
+  userId     String        @map("user_id")
+  value      String
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  question   EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, userId])
+  @@map("event_answers")
+}
+
+// Zugangs-Link: gibt Zugang zum Anlass, auch wenn die Person die Regeln nicht erfüllt (Login bleibt nötig)
+model EventAccessLink {
+  id          String             @id @default(uuid())
+  eventId     String             @map("event_id")
+  token       String             @unique
+  label       String             // z. B. «Mami von Falk» oder «Elternchat Hiskia»
+  kind        String             @default("PERSONAL") // "PERSONAL" (erstes Konto) oder "GROUP" (alle mit dem Link)
+  boundUserId String?            @map("bound_user_id") // PERSONAL: Konto, das den Link eingelöst hat
+  expiresAt   DateTime?          @map("expires_at")
+  createdById String?            @map("created_by_id")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  grants      EventAccessGrant[]
+
+  @@map("event_access_links")
+}
+
+model EventAccessGrant {
+  id        String          @id @default(uuid())
+  eventId   String          @map("event_id")
+  userId    String          @map("user_id")
+  linkId    String          @map("link_id")
+  createdAt DateTime        @default(now()) @map("created_at")
+  event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  link      EventAccessLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_access_grants")
 }
 
 model EventOrganizer {
@@ -177,10 +314,10 @@ model EventTemplate {
   departmentId          String
   title                 String     // Name der Vorlage, z.B. "Chilbi Festzelt (3 Tage)"
   description           String?
-  signupMode            String     @default("OPEN")
-  requireEmailForGuests Boolean    @default(false)
-  requirePhoneForGuests Boolean    @default(false)
-  data                  Json       // Gespeicherte relative Struktur für Schichten und Arbeiten
+  accessType            String     @default("PUBLIC") @map("access_type")
+  leadersOnly           Boolean    @default(false) @map("leaders_only")
+  requiredFields        String[]   @default([]) @map("required_fields")
+  data                  Json       // Relative Struktur für Schichten und Arbeiten, dazu eigene Fragen und Zugangslisten
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
   department            Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)

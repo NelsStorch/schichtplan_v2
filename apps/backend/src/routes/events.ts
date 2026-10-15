@@ -1,11 +1,114 @@
 import { FastifyPluginAsync } from 'fastify';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import {
-  CreateEventSchema,
+  accessTypeConfig,
+  toEventAccessType,
   AddEventOrganizerSchema,
-  SignupMode,
+  CreateEventSchema,
   SaveAsTemplateSchema,
   UnregisterHelperSchema,
+  UpdateEventSchema,
+  type EventQuestionInput,
+  type EventQuestionType,
 } from '@schichtplan/shared';
+import {
+  accessEventInclude,
+  accessUserSelect,
+  audienceLabel,
+  evaluateEventAccess,
+  hasValidGrant,
+  managerFlags,
+} from '../services/eventAccess.js';
+import { cleanRequiredFields, missingProfileFields } from '../services/profile.js';
+
+type Tx = Prisma.TransactionClient;
+
+function calculateAge(birthDate: Date, targetDate: Date): number {
+  let age = targetDate.getFullYear() - birthDate.getFullYear();
+  const m = targetDate.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && targetDate.getDate() < birthDate.getDate())) age--;
+  return age;
+}
+
+export function toQuestionDto(q: { id: string; label: string; type: string; options: string[]; required: boolean }) {
+  return {
+    id: q.id,
+    label: q.label,
+    type: (['TEXT', 'YES_NO', 'CHOICE'].includes(q.type) ? q.type : 'TEXT') as EventQuestionType,
+    options: q.options,
+    required: q.required,
+  };
+}
+
+/**
+ * Whitelist und Stufen-Filter prüfen: Whitelist nur bei Typen mit `whitelist`, Stufen nur bei
+ * abteilungsbezogenen Typen und nur aus der eigenen oder einer freigeschalteten Abteilung.
+ */
+export async function resolveAccessLists(
+  prisma: Pick<PrismaClient, 'department' | 'departmentStufe'> | Tx,
+  departmentId: string,
+  accessType: string,
+  allowedDepartmentIds: string[],
+  allowedStufeIds: string[]
+): Promise<{ departmentIds: string[]; stufeIds: string[] } | { error: string }> {
+  const cfg = accessTypeConfig(accessType);
+  const departmentIds = cfg.whitelist
+    ? [...new Set(allowedDepartmentIds)].filter((id) => id !== departmentId)
+    : [];
+  if (cfg.whitelist && departmentIds.length === 0) {
+    return { error: 'Bitte mindestens eine weitere Abteilung freischalten oder einen anderen Typ wählen.' };
+  }
+  if (departmentIds.length > 0) {
+    const found = await prisma.department.count({ where: { id: { in: departmentIds } } });
+    if (found !== departmentIds.length) return { error: 'Eine der gewählten Abteilungen gibt es nicht' };
+  }
+
+  const stufeIds = cfg.scope === 'DEPARTMENT' ? [...new Set(allowedStufeIds)] : [];
+  if (stufeIds.length > 0) {
+    const allowedDepartments = [departmentId, ...departmentIds];
+    const found = await prisma.departmentStufe.count({
+      where: { id: { in: stufeIds }, departmentId: { in: allowedDepartments } },
+    });
+    if (found !== stufeIds.length) return { error: 'Eine der gewählten Stufen gehört nicht zu den Abteilungen' };
+  }
+  return { departmentIds, stufeIds };
+}
+
+/** Fragen abgleichen: bestehende (mit id) ändern, neue anlegen, fehlende löschen (samt Antworten). */
+async function syncQuestions(tx: Tx, eventId: string, questions: EventQuestionInput[]) {
+  const existing = await tx.eventQuestion.findMany({ where: { eventId }, select: { id: true } });
+  const existingIds = new Set(existing.map((q) => q.id));
+  const keepIds = questions.map((q) => q.id).filter((id): id is string => Boolean(id && existingIds.has(id)));
+  await tx.eventQuestion.deleteMany({ where: { eventId, id: { notIn: keepIds } } });
+
+  for (const [index, q] of questions.entries()) {
+    const data = {
+      label: q.label,
+      type: q.type,
+      options: q.type === 'CHOICE' ? q.options : [],
+      required: q.required,
+      sortOrder: index,
+    };
+    if (q.id && existingIds.has(q.id)) {
+      await tx.eventQuestion.update({ where: { id: q.id }, data });
+    } else {
+      await tx.eventQuestion.create({ data: { ...data, eventId } });
+    }
+  }
+}
+
+async function replaceAccessLists(tx: Tx, eventId: string, departmentIds: string[], stufeIds: string[]) {
+  await tx.eventAllowedDepartment.deleteMany({ where: { eventId } });
+  await tx.eventAllowedStufe.deleteMany({ where: { eventId } });
+  if (departmentIds.length) {
+    await tx.eventAllowedDepartment.createMany({
+      data: departmentIds.map((departmentId) => ({ eventId, departmentId })),
+    });
+  }
+  if (stufeIds.length) {
+    await tx.eventAllowedStufe.createMany({ data: stufeIds.map((stufeId) => ({ eventId, stufeId })) });
+  }
+}
 
 const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Events der aktuellen Abteilung
@@ -20,9 +123,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         isPublished: true,
       },
       include: {
-        _count: {
-          select: { shifts: true },
-        },
+        shifts: { select: { requiredSlots: true, _count: { select: { signups: true } } } },
       },
       orderBy: { startDate: 'asc' },
     });
@@ -39,177 +140,204 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       endDate: e.endDate.toISOString(),
       isPublished: e.isPublished,
       allowPublicSignup: e.allowPublicSignup,
-      signupMode: e.signupMode as SignupMode,
-      requireEmailForGuests: e.requireEmailForGuests,
-      requirePhoneForGuests: e.requirePhoneForGuests,
-      shiftCount: e._count.shifts,
+      accessType: toEventAccessType(e.accessType),
+      leadersOnly: e.leadersOnly,
+      requiredFields: cleanRequiredFields(e.requiredFields),
+      createdAt: e.createdAt.toISOString(),
+      shiftCount: e.shifts.length,
+      totalSlots: e.shifts.reduce((sum, s) => sum + s.requiredSlots, 0),
+      filledSlots: e.shifts.reduce((sum, s) => sum + Math.min(s._count.signups, s.requiredSlots), 0),
     }));
   });
 
-  // Event Details anhand von Slug
-  fastify.get<{ Params: { slug: string } }>('/api/events/:slug', async (request, reply) => {
-    if (!request.tenant) {
-      return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
-    }
+  // Event Details anhand von Slug. Namen und Kontaktangaben je nach Berechtigung.
+  fastify.get<{ Params: { slug: string } }>(
+    '/api/events/:slug',
+    { preHandler: [fastify.optionalAuthenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      reply.header('Cache-Control', 'no-store');
 
-    const event = await fastify.prisma.event.findUnique({
-      where: {
-        departmentId_slug: {
-          departmentId: request.tenant.id,
-          slug: request.params.slug,
-        },
-      },
-      include: {
-        organizers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                ceviName: true,
-              },
-            },
+      const event = await fastify.prisma.event.findUnique({
+        where: {
+          departmentId_slug: {
+            departmentId: request.tenant.id,
+            slug: request.params.slug,
           },
-          orderBy: { createdAt: 'asc' },
         },
-        shifts: {
-          include: {
-            tasks: {
-              include: {
-                signups: true,
-              },
-              orderBy: { createdAt: 'asc' },
+        include: {
+          ...accessEventInclude,
+          organizers: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true, ceviName: true } },
             },
-            signups: {
-              include: {
-                task: true,
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    ceviName: true,
-                    birthDate: true,
+            orderBy: { createdAt: 'asc' },
+          },
+          questions: { orderBy: { sortOrder: 'asc' } },
+          shifts: {
+            include: {
+              tasks: { orderBy: { createdAt: 'asc' } },
+              signups: {
+                include: {
+                  task: true,
+                  user: {
+                    select: { id: true, firstName: true, lastName: true, ceviName: true, birthDate: true },
                   },
                 },
+                orderBy: { createdAt: 'asc' },
               },
-              orderBy: { createdAt: 'asc' },
             },
+            orderBy: { startTime: 'asc' },
           },
-          orderBy: { startTime: 'asc' },
         },
-      },
-    });
+      });
 
-    if (!event) {
-      return reply.status(404).send({ error: 'Event nicht gefunden' });
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+
+      const viewer = request.user
+        ? await fastify.prisma.user.findUnique({
+            where: { id: request.user.id },
+            select: {
+              ...accessUserSelect,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              address: true,
+              birthDate: true,
+              eventAnswers: { where: { eventId: event.id }, select: { questionId: true, value: true } },
+            },
+          })
+        : null;
+
+      const flags = await managerFlags(fastify.prisma, event, viewer);
+      const hasGrant = viewer ? await hasValidGrant(fastify.prisma, event.id, viewer.id) : false;
+      const access = evaluateEventAccess(event, request.tenant.name, viewer, flags, hasGrant);
+
+      const answers = Object.fromEntries((viewer?.eventAnswers ?? []).map((a) => [a.questionId, a.value]));
+      const missingQuestionIds = event.questions
+        .filter((q) => q.required && !answers[q.id]?.trim())
+        .map((q) => q.id);
+
+      return {
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        description: event.description,
+        logoUrl: event.logoUrl,
+        bannerUrl: event.bannerUrl,
+        startDate: event.startDate.toISOString(),
+        endDate: event.endDate.toISOString(),
+        isPublished: event.isPublished,
+        allowPublicSignup: event.allowPublicSignup,
+        accessType: toEventAccessType(event.accessType),
+        leadersOnly: event.leadersOnly,
+        requiredFields: cleanRequiredFields(event.requiredFields),
+        audience: audienceLabel(event, request.tenant.name),
+        allowedDepartments: event.allowedDepartments.map((a) => ({
+          id: a.departmentId,
+          name: a.department.name,
+        })),
+        allowedStufen: event.allowedStufen.map((a) => ({
+          id: a.stufeId,
+          name: a.stufe.name,
+          departmentId: a.stufe.departmentId,
+        })),
+        questions: event.questions.map(toQuestionDto),
+        viewer: {
+          access,
+          missingFields: viewer ? missingProfileFields(viewer, event.requiredFields) : [],
+          missingQuestionIds: viewer ? missingQuestionIds : [],
+          answers,
+        },
+        organizers: event.organizers.map((o) => ({
+          id: o.id,
+          eventId: o.eventId,
+          userId: o.userId,
+          userFirstName: o.user.firstName,
+          userLastName: o.user.lastName,
+          userCeviName: o.user.ceviName,
+          displayName: o.user.ceviName
+            ? `${o.user.firstName} / ${o.user.ceviName}`
+            : `${o.user.firstName} ${o.user.lastName}`,
+          role: o.role,
+          roleTitle: o.roleTitle,
+          createdAt: o.createdAt.toISOString(),
+        })),
+        shifts: event.shifts.map((s) => {
+          const signups = s.signups.map((su) => {
+            const isOwn = Boolean(viewer && su.userId === viewer.id);
+            const showName = access.canSeeNames || isOwn;
+            const displayName = showName
+              ? su.user?.ceviName ||
+                (su.user ? `${su.user.firstName} ${su.user.lastName}`.trim() : null) ||
+                su.guestName ||
+                'Helfer*in'
+              : 'Belegt';
+            const userAge =
+              access.isManager && su.user?.birthDate ? calculateAge(su.user.birthDate, s.startTime) : null;
+
+            return {
+              id: su.id,
+              shiftId: su.shiftId,
+              taskId: su.taskId || null,
+              taskTitle: su.task?.title || null,
+              userId: showName ? su.user?.id || null : null,
+              guestName: showName ? su.guestName : null,
+              guestEmail: access.isManager ? su.guestEmail : null,
+              guestPhone: access.isManager ? su.guestPhone : null,
+              displayName,
+              userFirstName: showName ? su.user?.firstName || null : null,
+              userLastName: showName ? su.user?.lastName || null : null,
+              userCeviName: showName ? su.user?.ceviName || null : null,
+              userBirthDate: access.isManager && su.user?.birthDate ? su.user.birthDate.toISOString() : null,
+              userAge,
+              createdAt: su.createdAt.toISOString(),
+              isConfirmed: su.isConfirmed,
+            };
+          });
+
+          const tasks = s.tasks.map((t) => {
+            const taskSignups = signups.filter((su) => su.taskId === t.id);
+            return {
+              id: t.id,
+              shiftId: t.shiftId,
+              taskDefinitionId: t.taskDefinitionId || null,
+              title: t.title,
+              description: t.description,
+              requiredSlots: t.requiredSlots,
+              freeSlots: Math.max(0, t.requiredSlots - taskSignups.length),
+              minAge: t.minAge,
+              ageRequirementType: t.ageRequirementType as 'ALL' | 'AT_LEAST_ONE',
+              signups: taskSignups,
+            };
+          });
+
+          return {
+            id: s.id,
+            eventId: s.eventId,
+            title: s.title,
+            category: s.category,
+            isSetupTeardown: s.isSetupTeardown,
+            description: s.description,
+            startTime: s.startTime.toISOString(),
+            endTime: s.endTime.toISOString(),
+            requiredSlots: s.requiredSlots,
+            freeSlots: Math.max(0, s.requiredSlots - signups.length),
+            minAge: s.minAge,
+            tasks,
+            signups,
+          };
+        }),
+      };
     }
+  );
 
-    return {
-      id: event.id,
-      title: event.title,
-      slug: event.slug,
-      description: event.description,
-      logoUrl: event.logoUrl,
-      bannerUrl: event.bannerUrl,
-      startDate: event.startDate.toISOString(),
-      endDate: event.endDate.toISOString(),
-      isPublished: event.isPublished,
-      allowPublicSignup: event.allowPublicSignup,
-      signupMode: event.signupMode as SignupMode,
-      requireEmailForGuests: event.requireEmailForGuests,
-      requirePhoneForGuests: event.requirePhoneForGuests,
-      organizers: event.organizers.map((o) => ({
-        id: o.id,
-        eventId: o.eventId,
-        userId: o.userId,
-        userFirstName: o.user.firstName,
-        userLastName: o.user.lastName,
-        userCeviName: o.user.ceviName,
-        displayName: o.user.ceviName
-          ? `${o.user.firstName} / ${o.user.ceviName}`
-          : `${o.user.firstName} ${o.user.lastName}`,
-        role: o.role,
-        roleTitle: o.roleTitle,
-        createdAt: o.createdAt.toISOString(),
-      })),
-      shifts: event.shifts.map((s) => {
-        const signups = s.signups.map((su) => {
-          const displayName =
-            su.user?.ceviName ||
-            (su.user ? `${su.user.firstName} ${su.user.lastName}`.trim() : null) ||
-            su.guestName ||
-            'Helfer*in';
-
-          const userBirthDate = su.user?.birthDate ? su.user.birthDate.toISOString() : null;
-          let userAge: number | null = null;
-          if (su.user?.birthDate) {
-            const shiftDate = new Date(s.startTime);
-            const bDate = new Date(su.user.birthDate);
-            userAge = shiftDate.getFullYear() - bDate.getFullYear();
-            const m = shiftDate.getMonth() - bDate.getMonth();
-            if (m < 0 || (m === 0 && shiftDate.getDate() < bDate.getDate())) {
-              userAge--;
-            }
-          }
-
-          return {
-            id: su.id,
-            shiftId: su.shiftId,
-            taskId: su.taskId || null,
-            taskTitle: su.task?.title || null,
-            userId: su.user?.id || null,
-            guestName: su.guestName,
-            guestEmail: su.guestEmail,
-            guestPhone: su.guestPhone,
-            displayName,
-            userFirstName: su.user?.firstName || null,
-            userLastName: su.user?.lastName || null,
-            userCeviName: su.user?.ceviName || null,
-            userBirthDate,
-            userAge,
-            createdAt: su.createdAt.toISOString(),
-            isConfirmed: su.isConfirmed,
-          };
-        });
-
-        const tasks = s.tasks.map((t) => {
-          const taskSignups = signups.filter((su) => su.taskId === t.id);
-          return {
-            id: t.id,
-            shiftId: t.shiftId,
-            taskDefinitionId: t.taskDefinitionId || null,
-            title: t.title,
-            description: t.description,
-            requiredSlots: t.requiredSlots,
-            freeSlots: Math.max(0, t.requiredSlots - taskSignups.length),
-            minAge: t.minAge,
-            ageRequirementType: t.ageRequirementType as 'ALL' | 'AT_LEAST_ONE',
-            signups: taskSignups,
-          };
-        });
-
-        return {
-          id: s.id,
-          eventId: s.eventId,
-          title: s.title,
-          category: s.category,
-          isSetupTeardown: s.isSetupTeardown,
-          description: s.description,
-          startTime: s.startTime.toISOString(),
-          endTime: s.endTime.toISOString(),
-          requiredSlots: s.requiredSlots,
-          freeSlots: Math.max(0, s.requiredSlots - signups.length),
-          minAge: s.minAge,
-          tasks,
-          signups,
-        };
-      }),
-    };
-  });
-
-  // Neues Event erstellen (Erfordert Authentifizierung & Abteilungsleitung / Planner Rolle)
+  // Neues Event erstellen (Abteilungsleitung / Planer*in)
   fastify.post(
     '/api/events',
     { preHandler: [fastify.authenticate] },
@@ -218,7 +346,6 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
-      // Prüfe Rolle des Users in dieser Abteilung
       const member = await fastify.prisma.departmentMember.findUnique({
         where: {
           departmentId_userId: {
@@ -228,7 +355,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      if (!member || (member.role !== 'ADMIN' && member.role !== 'PLANNER' && !request.user.isGlobalAdmin)) {
+      if (!request.user.isGlobalAdmin && (!member || (member.role !== 'ADMIN' && member.role !== 'PLANNER'))) {
         return reply.status(403).send({ error: 'Nur die Abteilungsleitung darf Events erstellen' });
       }
 
@@ -246,9 +373,12 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         startDate,
         endDate,
         allowPublicSignup,
-        signupMode,
-        requireEmailForGuests,
-        requirePhoneForGuests,
+        accessType,
+        leadersOnly,
+        requiredFields,
+        allowedDepartmentIds,
+        allowedStufeIds,
+        questions,
         organizers: requestedOrganizers,
       } = parse.data;
 
@@ -265,6 +395,17 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply
           .status(409)
           .send({ error: 'Ein Event mit diesem Slug existiert bereits in dieser Abteilung' });
+      }
+
+      const lists = await resolveAccessLists(
+        fastify.prisma,
+        request.tenant.id,
+        accessType,
+        allowedDepartmentIds,
+        allowedStufeIds
+      );
+      if ('error' in lists) {
+        return reply.status(400).send({ error: lists.error });
       }
 
       // OK-Mitglieder auflösen
@@ -322,24 +463,30 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const event = await fastify.prisma.event.create({
-        data: {
-          departmentId: request.tenant.id,
-          title,
-          slug,
-          description: description || null,
-          logoUrl: logoUrl || null,
-          bannerUrl: bannerUrl || null,
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
-          allowPublicSignup,
-          signupMode,
-          requireEmailForGuests,
-          requirePhoneForGuests,
-          organizers: {
-            create: organizersToCreate,
+      const departmentId = request.tenant.id;
+      const event = await fastify.prisma.$transaction(async (tx) => {
+        const created = await tx.event.create({
+          data: {
+            departmentId,
+            title,
+            slug,
+            description: description || null,
+            logoUrl: logoUrl || null,
+            bannerUrl: bannerUrl || null,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            allowPublicSignup,
+            accessType,
+            leadersOnly,
+            requiredFields,
+            organizers: {
+              create: organizersToCreate,
+            },
           },
-        },
+        });
+        await replaceAccessLists(tx, created.id, lists.departmentIds, lists.stufeIds);
+        await syncQuestions(tx, created.id, questions);
+        return created;
       });
 
       return {
@@ -350,7 +497,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         bannerUrl: event.bannerUrl,
         startDate: event.startDate.toISOString(),
         endDate: event.endDate.toISOString(),
-        signupMode: event.signupMode,
+        accessType: event.accessType,
       };
     }
   );
@@ -373,6 +520,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         },
         include: {
           organizers: true,
+          allowedDepartments: { select: { departmentId: true } },
+          allowedStufen: { select: { stufeId: true } },
         },
       });
 
@@ -380,43 +529,52 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
 
-      // Prüfe Berechtigung: Abteilungsleitung (ADMIN) ODER Mitglied des Event-OKs
-      const deptMember = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      const isDeptAdmin = deptMember && deptMember.role === 'ADMIN';
+      const flags = await managerFlags(fastify.prisma, event, request.user);
       const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      if (!flags.isDeptAdmin && !isEventOk) {
         return reply
           .status(403)
           .send({ error: 'Nur die Abteilungsleitung oder das Event-OK dürfen dieses Event bearbeiten' });
       }
 
-      const body = request.body as any;
-      const updated = await fastify.prisma.event.update({
-        where: { id: event.id },
-        data: {
-          title: body.title !== undefined ? body.title : undefined,
-          description: body.description !== undefined ? body.description : undefined,
-          logoUrl: body.logoUrl !== undefined ? body.logoUrl : undefined,
-          bannerUrl: body.bannerUrl !== undefined ? body.bannerUrl : undefined,
-          signupMode: body.signupMode !== undefined ? body.signupMode : undefined,
-          startDate: body.startDate ? new Date(body.startDate) : undefined,
-          endDate: body.endDate ? new Date(body.endDate) : undefined,
-          allowPublicSignup:
-            body.allowPublicSignup !== undefined ? body.allowPublicSignup : undefined,
-          requireEmailForGuests:
-            body.requireEmailForGuests !== undefined ? body.requireEmailForGuests : undefined,
-          requirePhoneForGuests:
-            body.requirePhoneForGuests !== undefined ? body.requirePhoneForGuests : undefined,
-        },
+      const parse = UpdateEventSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+      const body = parse.data;
+
+      // Listen immer zum (evtl. neuen) Typ passend neu bestimmen
+      const accessType = body.accessType ?? event.accessType;
+      const lists = await resolveAccessLists(
+        fastify.prisma,
+        event.departmentId,
+        accessType,
+        body.allowedDepartmentIds ?? event.allowedDepartments.map((a) => a.departmentId),
+        body.allowedStufeIds ?? event.allowedStufen.map((a) => a.stufeId)
+      );
+      if ('error' in lists) {
+        return reply.status(400).send({ error: lists.error });
+      }
+
+      const updated = await fastify.prisma.$transaction(async (tx) => {
+        const saved = await tx.event.update({
+          where: { id: event.id },
+          data: {
+            title: body.title,
+            description: body.description,
+            logoUrl: body.logoUrl,
+            bannerUrl: body.bannerUrl,
+            startDate: body.startDate ? new Date(body.startDate) : undefined,
+            endDate: body.endDate ? new Date(body.endDate) : undefined,
+            allowPublicSignup: body.allowPublicSignup,
+            accessType: body.accessType,
+            leadersOnly: body.leadersOnly,
+            requiredFields: body.requiredFields,
+          },
+        });
+        await replaceAccessLists(tx, event.id, lists.departmentIds, lists.stufeIds);
+        if (body.questions) await syncQuestions(tx, event.id, body.questions);
+        return saved;
       });
 
       return {
@@ -425,7 +583,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         slug: updated.slug,
         logoUrl: updated.logoUrl,
         bannerUrl: updated.bannerUrl,
-        signupMode: updated.signupMode,
+        accessType: updated.accessType,
       };
     }
   );
@@ -454,21 +612,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Nur Abteilungsleitung oder OK_LEAD darf OK-Mitglieder verwalten
-      const deptMember = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      const isDeptAdmin = deptMember && deptMember.role === 'ADMIN';
-      const isOkLead = event.organizers.some(
-        (o) => o.userId === request.user.id && o.role === 'OK_LEAD'
-      );
-
-      if (!isDeptAdmin && !isOkLead && !request.user.isGlobalAdmin) {
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isDeptAdmin && !flags.isOkLead) {
         return reply.status(403).send({ error: 'Keine Berechtigung zur OK-Verwaltung' });
       }
 
@@ -532,7 +677,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Mitglied aus dem Event-OK entfernen
+  // Mitglied aus dem Event-OK entfernen (Abteilungsleitung oder OK-Leitung)
   fastify.delete<{ Params: { slug: string; organizerId: string } }>(
     '/api/events/:slug/organizers/:organizerId',
     { preHandler: [fastify.authenticate] },
@@ -541,11 +686,16 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       const existing = await fastify.prisma.eventOrganizer.findUnique({
         where: { id: organizerId },
-        include: { event: true },
+        include: { event: { include: { organizers: true } } },
       });
 
-      if (!existing) {
+      if (!existing || (request.tenant && existing.event.departmentId !== request.tenant.id)) {
         return reply.status(404).send({ error: 'OK-Mitglied nicht gefunden' });
+      }
+
+      const flags = await managerFlags(fastify.prisma, existing.event, request.user);
+      if (!flags.isDeptAdmin && !flags.isOkLead) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zur OK-Verwaltung' });
       }
 
       await fastify.prisma.eventOrganizer.delete({
@@ -579,20 +729,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
 
-      // Berechtigung prüfen: Admin, Planner oder Event-OK
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isManager) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Abmelden von Helfern' });
       }
 
@@ -607,7 +745,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'userId oder guestName erforderlich' });
       }
 
-      const whereClause: any = {
+      const whereClause: Prisma.ShiftSignupWhereInput = {
         shift: { eventId: event.id },
       };
 
@@ -646,6 +784,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         },
         include: {
           organizers: true,
+          allowedDepartments: { select: { departmentId: true } },
+          allowedStufen: { select: { stufeId: true } },
+          questions: { orderBy: { sortOrder: 'asc' } },
           shifts: {
             include: {
               tasks: {
@@ -661,19 +802,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isManager) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Vorlagen' });
       }
 
@@ -724,11 +854,17 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           departmentId: request.tenant.id,
           title: templateTitle,
           description: templateDescription,
-          signupMode: event.signupMode,
-          requireEmailForGuests: event.requireEmailForGuests,
-          requirePhoneForGuests: event.requirePhoneForGuests,
+          accessType: event.accessType,
+          leadersOnly: event.leadersOnly,
+          requiredFields: event.requiredFields,
           data: {
             shifts: shiftTemplates,
+            questions: event.questions.map((q) => {
+              const { id: _id, ...rest } = toQuestionDto(q);
+              return rest;
+            }),
+            allowedDepartmentIds: event.allowedDepartments.map((a) => a.departmentId),
+            allowedStufeIds: event.allowedStufen.map((a) => a.stufeId),
           },
         },
       });
@@ -744,4 +880,5 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   );
 };
 
+export { syncQuestions, replaceAccessLists };
 export default eventRoutes;
