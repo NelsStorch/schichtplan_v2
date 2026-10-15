@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { Check, Settings2 } from 'lucide-react';
-import { Button, Callout, Dialog, Field, Input, applyAccent, cn, useToast } from '@schichtplan/ui';
+import { Button, Callout, Dialog, Field, Input, Switch, applyAccent, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 import { DepartmentPeoplePanel } from './DepartmentPeoplePanel';
@@ -67,6 +67,7 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
     logoUrl: department?.logoUrl ?? '',
     contactEmail: department?.contactEmail ?? '',
     primaryColor: department?.primaryColor ?? SWATCHES[0],
+    membersOnly: department?.membersOnly ?? false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +89,7 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
           logoUrl: form.logoUrl.trim() || null,
           contactEmail: form.contactEmail.trim() || null,
           primaryColor: form.primaryColor,
+          membersOnly: form.membersOnly,
         },
       });
       await refresh();
@@ -123,6 +125,13 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
           onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
         />
       </Field>
+
+      <Switch
+        checked={form.membersOnly}
+        onChange={(v) => setForm({ ...form, membersOnly: v })}
+        label="Startseite nur für Mitglieder"
+        description="Aussenstehende sehen die Liste der Anlässe nicht. Öffentliche Anlässe bleiben über ihren Link erreichbar, interne nur mit Zugangs-Link."
+      />
 
       <fieldset>
         <legend className="mb-3 text-[13px] font-semibold text-fg">Abteilungsfarbe</legend>

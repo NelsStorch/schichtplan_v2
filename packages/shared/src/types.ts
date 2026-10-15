@@ -16,6 +16,10 @@ export interface DepartmentDto {
   contactEmail?: string | null;
   /** Cevi.DB-Ortsgruppe; ohne sie funktionieren die Cevi.DB-Zugangstypen nicht */
   ceviDbGroupId?: number | null;
+  /** Startseite nur für Mitglieder (öffentliche Anlässe bleiben per Link erreichbar) */
+  membersOnly?: boolean;
+  /** Angemeldete Person gehört dazu (Heimabteilung, Rolle, OK) und sieht die Startseite */
+  viewerIsMember?: boolean;
   createdAt: string;
 }
 

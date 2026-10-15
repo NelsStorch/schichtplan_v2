@@ -12,6 +12,7 @@ import {
 } from '@schichtplan/shared';
 import { autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
+import { isDepartmentInsider } from '../services/departmentVisibility.js';
 
 const toStufeDto = (s: {
   id: string;
@@ -88,10 +89,11 @@ async function departmentCreationEligibility(
 
 const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Current department (auf Subdomain)
-  fastify.get('/api/departments/current', async (request, reply) => {
+  fastify.get('/api/departments/current', { preHandler: [fastify.optionalAuthenticate] }, async (request, reply) => {
     if (!request.tenant) {
       return reply.status(404).send({ error: 'Keine Abteilung für diese Subdomain gefunden' });
     }
+    reply.header('Cache-Control', 'no-store');
 
     return {
       id: request.tenant.id,
@@ -101,6 +103,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       primaryColor: request.tenant.primaryColor,
       contactEmail: request.tenant.contactEmail,
       ceviDbGroupId: request.tenant.ceviDbGroupId,
+      membersOnly: request.tenant.membersOnly,
+      viewerIsMember: await isDepartmentInsider(fastify.prisma, request.tenant.id, request.user?.id),
       createdAt: request.tenant.createdAt.toISOString(),
     };
   });
@@ -612,6 +616,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           logoUrl: parse.data.logoUrl !== undefined ? parse.data.logoUrl : undefined,
           primaryColor: parse.data.primaryColor !== undefined ? parse.data.primaryColor : undefined,
           contactEmail: parse.data.contactEmail !== undefined ? parse.data.contactEmail : undefined,
+          membersOnly: parse.data.membersOnly,
         },
       });
 

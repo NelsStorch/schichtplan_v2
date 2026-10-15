@@ -188,6 +188,7 @@ export const UpdateDepartmentSchema = z.object({
   logoUrl: z.string().optional().nullable(),
   primaryColor: z.string().optional().nullable(),
   contactEmail: z.string().email().optional().nullable(),
+  membersOnly: z.boolean().optional(),
 });
 
 export type UpdateDepartmentInput = z.infer<typeof UpdateDepartmentSchema>;

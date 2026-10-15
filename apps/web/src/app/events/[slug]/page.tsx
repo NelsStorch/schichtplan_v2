@@ -122,7 +122,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   const load = useCallback(async () => {
     try {
-      setEvent(await api<EventDetails>(`/api/events/${slug}`));
+      // Ein noch nicht eingelöster Einladungs-Link erlaubt das Ansehen auch bei «nur für Mitglieder»
+      const token = new URLSearchParams(window.location.search).get('zugang');
+      setEvent(
+        await api<EventDetails>(`/api/events/${slug}${token ? `?zugang=${encodeURIComponent(token)}` : ''}`)
+      );
     } catch (err) {
       setError(err instanceof ApiError && err.status === 404 ? 'Diesen Anlass gibt es nicht (mehr).' : errorMessage(err));
     }
@@ -345,12 +349,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       }
     >
       <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 sm:pt-6">
-        <Link
-          href="/"
-          className="mb-3 inline-flex items-center gap-1.5 rounded-full py-1 text-sm font-semibold text-fg-muted transition hover:text-fg"
-        >
-          <ArrowLeft className="size-4" /> Alle Anlässe
-        </Link>
+        {/* Bei «nur für Mitglieder» sehen Aussenstehende die Startseite nicht */}
+        {!(department?.membersOnly && !department.viewerIsMember) && (
+          <Link
+            href="/"
+            className="mb-3 inline-flex items-center gap-1.5 rounded-full py-1 text-sm font-semibold text-fg-muted transition hover:text-fg"
+          >
+            <ArrowLeft className="size-4" /> Alle Anlässe
+          </Link>
+        )}
 
         {/* Kopf: kompakt, damit die Schichten schnell sichtbar sind */}
         <section className="relative isolate animate-fade-up overflow-hidden rounded-card bg-stone-900 text-white shadow-lift">

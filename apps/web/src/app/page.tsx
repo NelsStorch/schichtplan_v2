@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, CalendarPlus, CalendarX2, Clock, Plus, Settings2 } from 'lucide-react';
+import { ArrowRight, Building2, CalendarPlus, CalendarX2, Clock, Lock, LogIn, Plus, Settings2 } from 'lucide-react';
 import type { EventDto } from '@schichtplan/shared';
 import { Button, Card, EmptyState, NotFoundView, Skeleton, buttonClasses } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { DepartmentSettingsDialog } from '@/components/DepartmentSettingsDialog';
 import { EventFormDialog } from '@/components/EventFormDialog';
 import { EventTile, eventStatus } from '@/components/EventTile';
-import { api } from '@/lib/api';
+import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { fmtDayMonth, fmtRelativeDay, fmtShortDate, fmtTime, fmtWeekday } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
 import type { MyShift } from '@/lib/types';
@@ -29,12 +29,14 @@ export default function DepartmentHomePage() {
     }
   }, []);
 
+  const lockedOut = Boolean(department?.membersOnly && !department.viewerIsMember);
+
   useEffect(() => {
-    if (!department) return;
+    if (!department || lockedOut) return;
     api<EventDto[]>('/api/events')
       .then(setEvents)
       .catch(() => setEvents([]));
-  }, [department]);
+  }, [department, lockedOut]);
 
   useEffect(() => {
     if (!user) return;
@@ -50,6 +52,7 @@ export default function DepartmentHomePage() {
   }, [user]);
 
   if (!loading && (error || !department)) return <TenantNotFound />;
+  if (department && lockedOut) return <MembersOnlyView loggedIn={Boolean(user)} />;
 
   const sorted = [...(events ?? [])].sort((a, b) => +new Date(a.startDate) - +new Date(b.startDate));
   const current = sorted.filter((e) => eventStatus(e) !== 'past');
@@ -216,5 +219,37 @@ function TenantNotFound() {
         },
       ]}
     />
+  );
+}
+
+/** Startseite «nur für Mitglieder»: Aussenstehende sehen nur, dass es die Abteilung gibt. */
+function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
+  const { department } = usePortal();
+  const loginHref = useLoginHref();
+  return (
+    <AppShell>
+      <div className="mx-auto max-w-xl px-4 pt-16 sm:px-6 sm:pt-24">
+        <EmptyState
+          icon={<Lock />}
+          title={department?.name ?? 'Abteilung'}
+          description={
+            loggedIn
+              ? 'Diese Abteilung zeigt ihre Anlässe nur Mitgliedern. Gehörst du dazu, gib deine Abteilung an. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.'
+              : 'Diese Abteilung zeigt ihre Anlässe nur Mitgliedern. Melde dich an, um zu sehen, ob du dazugehörst. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.'
+          }
+          action={
+            loggedIn ? (
+              <a href={departmentSetupUrl()} className={buttonClasses({})}>
+                <Building2 /> Abteilung angeben
+              </a>
+            ) : (
+              <a href={loginHref} className={buttonClasses({})}>
+                <LogIn /> Anmelden
+              </a>
+            )
+          }
+        />
+      </div>
+    </AppShell>
   );
 }

@@ -20,6 +20,7 @@ import {
   hasValidGrant,
   managerFlags,
 } from '../services/eventAccess.js';
+import { isDepartmentInsider } from '../services/departmentVisibility.js';
 import { cleanRequiredFields, missingProfileFields } from '../services/profile.js';
 
 type Tx = Prisma.TransactionClient;
@@ -121,10 +122,27 @@ async function replaceAccessLists(tx: Tx, eventId: string, departmentIds: string
 }
 
 const eventRoutes: FastifyPluginAsync = async (fastify) => {
+  /** Ungelöster Einladungs-Link (?zugang=) erlaubt das Ansehen, damit man ihn danach einlösen kann */
+  async function isValidLinkToken(eventId: string, token: string | undefined) {
+    if (!token || token.length > 100) return false;
+    const link = await fastify.prisma.eventAccessLink.findUnique({
+      where: { token },
+      select: { eventId: true, expiresAt: true },
+    });
+    return Boolean(link && link.eventId === eventId && (!link.expiresAt || link.expiresAt > new Date()));
+  }
+
   // Liste aller Events der aktuellen Abteilung
-  fastify.get('/api/events', async (request, reply) => {
+  fastify.get('/api/events', { preHandler: [fastify.optionalAuthenticate] }, async (request, reply) => {
     if (!request.tenant) {
       return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+    }
+    // Startseite nur für Mitglieder: Aussenstehende bekommen keine Liste
+    if (request.tenant.membersOnly && !(await isDepartmentInsider(fastify.prisma, request.tenant.id, request.user?.id))) {
+      reply.header('Cache-Control', 'no-store');
+      return reply
+        .status(403)
+        .send({ error: 'Diese Abteilung zeigt ihre Anlässe nur Mitgliedern.', code: 'MEMBERS_ONLY' });
     }
 
     const events = await fastify.prisma.event.findMany({
@@ -161,7 +179,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Event Details anhand von Slug. Namen und Kontaktangaben je nach Berechtigung.
-  fastify.get<{ Params: { slug: string } }>(
+  fastify.get<{ Params: { slug: string }; Querystring: { zugang?: string } }>(
     '/api/events/:slug',
     { preHandler: [fastify.optionalAuthenticate] },
     async (request, reply) => {
@@ -227,6 +245,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       const flags = await managerFlags(fastify.prisma, event, viewer);
       const hasGrant = viewer ? await hasValidGrant(fastify.prisma, event.id, viewer.id) : false;
       const access = evaluateEventAccess(event, request.tenant.name, viewer, flags, hasGrant);
+
+      // «Nur für Mitglieder»: interne Anlässe sind für Aussenstehende unsichtbar (404), ausser mit Zugangs-Link.
+      // Öffentliche Anlässe (scope ANY) bleiben über ihren direkten Link für alle erreichbar.
+      if (
+        request.tenant.membersOnly &&
+        accessTypeConfig(event.accessType).scope !== 'ANY' &&
+        !flags.isManager &&
+        !hasGrant &&
+        !(await isValidLinkToken(event.id, request.query.zugang)) &&
+        !(await isDepartmentInsider(fastify.prisma, request.tenant.id, viewer?.id))
+      ) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
 
       const answers = Object.fromEntries((viewer?.eventAnswers ?? []).map((a) => [a.questionId, a.value]));
       const missingQuestionIds = event.questions
