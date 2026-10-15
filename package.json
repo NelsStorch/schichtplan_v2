@@ -20,7 +20,7 @@
     "db:studio": "npm run db:studio --workspace=apps/backend"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^7.0.2"
   },
   "allowScripts": {
     "@prisma/client": true,
