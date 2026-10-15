@@ -1,8 +1,12 @@
+import path from 'path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
   transpilePackages: ['@schichtplan/ui'],
+  turbopack: {
+    root: path.join(__dirname, '../..'),
+  },
   async headers() {
     return [
       {

@@ -31,6 +31,7 @@ CMD ["npm", "run", "dev"]
 FROM base AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+COPY package.json package-lock.json ./
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY packages/shared ./packages/shared
 COPY packages/ui ./packages/ui
