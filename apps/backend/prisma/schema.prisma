@@ -117,6 +117,7 @@ model User {
   organizedEvents EventOrganizer[]
   eventAnswers  EventAnswer[]
   eventAccessGrants EventAccessGrant[]
+  deregistrations EventDeregistration[]
 
   @@map("users")
 }
@@ -151,6 +152,7 @@ model Event {
   leadersOnly       Boolean           @default(false) @map("leaders_only")
   // Pflichtangaben aus REQUIRED_PROFILE_FIELDS, z. B. ["PHONE", "EMAIL"]
   requiredFields    String[]          @default([]) @map("required_fields")
+  minShiftsPerPerson Int?             @map("min_shifts_per_person")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   department        Department        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -162,6 +164,7 @@ model Event {
   answers           EventAnswer[]
   accessLinks       EventAccessLink[]
   accessGrants      EventAccessGrant[]
+  deregistrations   EventDeregistration[]
 
   @@unique([departmentId, slug])
   @@map("events")
@@ -358,12 +361,28 @@ model EventTemplate {
   accessType            String     @default("PUBLIC") @map("access_type")
   leadersOnly           Boolean    @default(false) @map("leaders_only")
   requiredFields        String[]   @default([]) @map("required_fields")
+  minShiftsPerPerson    Int?       @map("min_shifts_per_person")
   data                  Json       // Relative Struktur für Schichten und Arbeiten, dazu eigene Fragen und Zugangslisten
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
   department            Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
   @@map("event_templates")
+}
+
+// Abmeldung einer Person von einem Anlass: Person muss keine Schichten übernehmen (Soll entfällt)
+model EventDeregistration {
+  id          String   @id @default(uuid())
+  eventId     String   @map("event_id")
+  userId      String   @map("user_id")
+  reason      String?  // Optional: z. B. «Im Militär», «Verletzt», «Ferien»
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdById String?  @map("created_by_id")
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_deregistrations")
 }
 
 model Upload {

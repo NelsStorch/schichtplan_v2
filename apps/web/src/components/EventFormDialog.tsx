@@ -21,6 +21,7 @@ export interface EventFormValues {
   endDate: string;
   /** false = Eintragen geschlossen (nur noch das OK teilt ein) */
   allowPublicSignup: boolean;
+  minShiftsPerPerson: number | null;
   access: EventAccessValues;
 }
 
@@ -32,6 +33,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     logoUrl: event.logoUrl ?? '',
     bannerUrl: event.bannerUrl ?? '',
     allowPublicSignup: event.allowPublicSignup,
+    minShiftsPerPerson: event.minShiftsPerPerson ?? null,
     access: {
       accessType: event.accessType,
       leadersOnly: event.leadersOnly,
@@ -79,6 +81,7 @@ const EMPTY: EventFormValues = {
   startDate: '',
   endDate: '',
   allowPublicSignup: true,
+  minShiftsPerPerson: null,
   access: EMPTY_ACCESS,
 };
 
@@ -240,6 +243,7 @@ function EventForm({
         description: form.description.trim() || undefined,
         logoUrl: form.logoUrl.trim() || null,
         bannerUrl: form.bannerUrl.trim() || null,
+        minShiftsPerPerson: form.minShiftsPerPerson ?? null,
         ...accessPayload(form.access),
       };
       if (mode === 'create') {
@@ -533,14 +537,34 @@ function EventForm({
         </fieldset>
       )}
 
-      {mode === 'edit' && (
-        <Switch
-          checked={form.allowPublicSignup}
-          onChange={(v) => set('allowPublicSignup', v)}
-          label="Eintragen offen"
-          description="Ausgeschaltet können nur noch das OK und die Abteilungsleitung Personen einteilen."
-        />
-      )}
+      <div className="space-y-4 rounded-card border border-line bg-surface-2/60 p-4 sm:p-5">
+        <h4 className="text-[13px] font-semibold text-fg">Schichten &amp; Helfer-Soll</h4>
+        <Field
+          label="Mindestanzahl Schichten pro Person (optional)"
+          hint="Zeigt dem OK im Helfer-Pool an, wer sein Schicht-Soll bereits erfüllt hat (z. B. 2 Schichten pro Leiter:in). Leer lassen für kein Soll."
+        >
+          <Input
+            type="number"
+            min={1}
+            max={50}
+            placeholder="z. B. 2 (leer lassen = kein Soll)"
+            value={form.minShiftsPerPerson ?? ''}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              set('minShiftsPerPerson', val === '' ? null : Math.max(1, parseInt(val, 10) || 1));
+            }}
+          />
+        </Field>
+
+        {mode === 'edit' && (
+          <Switch
+            checked={form.allowPublicSignup}
+            onChange={(v) => set('allowPublicSignup', v)}
+            label="Eintragen für Helfer:innen offen"
+            description="Ausgeschaltet können nur noch das OK und die Abteilungsleitung Personen einteilen."
+          />
+        )}
+      </div>
 
       <EventAccessFields values={form.access} onChange={(access) => set('access', access)} />
 

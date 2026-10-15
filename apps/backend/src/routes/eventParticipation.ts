@@ -2,13 +2,35 @@ import crypto from 'crypto';
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import {
   CreateAccessLinkSchema,
+  EventDeregistrationSchema,
   EventParticipationSchema,
   RedeemAccessLinkSchema,
+  accessTypeConfig,
   type EventAccessLinkDto,
   type EventParticipantDto,
+  type EventRosterItemDto,
+  type EventRosterResponseDto,
 } from '@schichtplan/shared';
-import { managerFlags } from '../services/eventAccess.js';
+import {
+  audienceLabel,
+  checkRules,
+  managerFlags,
+  type AccessEvent,
+  type AccessUser,
+} from '../services/eventAccess.js';
+import { personLabel } from '../services/profile.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
+
+function calculateAge(birthDate: Date | null): number | null {
+  if (!birthDate) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
 
 /** Fehlermeldung bei ungültiger Antwort (Auswahl nicht in den Optionen, Ja/Nein falsch), sonst null */
 export function validateAnswers(
@@ -311,6 +333,269 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return [...byPerson.values()].sort((a, b) => a.displayName.localeCompare(b.displayName, 'de'));
+    }
+  );
+
+  // Helfer-Pool & Soll-Übersicht für das OK:
+  // Alle Personen, die Zugriff auf den Event haben (inkl. Cevi-Name, Abteilung, Stufe, Alter, Schichten, Abmelde-Status).
+  fastify.get<{ Params: { slug: string } }>(
+    '/api/events/:slug/roster',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+
+      const event = await fastify.prisma.event.findUnique({
+        where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
+        include: {
+          department: { select: { id: true, name: true } },
+          allowedDepartments: { include: { department: { select: { id: true, name: true } } } },
+          allowedStufen: { include: { stufe: { select: { id: true, name: true, departmentId: true } } } },
+          organizers: { select: { userId: true, role: true } },
+        },
+      });
+      if (!event) return reply.status(404).send({ error: 'Event nicht gefunden' });
+
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isManager) {
+        return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder das Event-OK' });
+      }
+      reply.header('Cache-Control', 'no-store');
+
+      const cfg = accessTypeConfig(event.accessType);
+      const hostDept = event.department;
+      const isWhitelist = cfg.whitelist;
+      const targetDepartments = [
+        hostDept,
+        ...(isWhitelist ? event.allowedDepartments.map((a) => a.department) : []),
+      ];
+      const targetDeptIds = targetDepartments.map((d) => d.id);
+      const isRestricted = cfg.scope === 'DEPARTMENT' || event.allowedStufen.length > 0;
+      const now = new Date();
+
+      // Kandidaten laden
+      const candidateUsers = await fastify.prisma.user.findMany({
+        where: {
+          OR: [
+            { homeDepartmentId: { in: targetDeptIds } },
+            { memberships: { some: { departmentId: { in: targetDeptIds } } } },
+            { stufen: { some: { stufe: { departmentId: { in: targetDeptIds } } } } },
+            { organizedEvents: { some: { eventId: event.id } } },
+            { eventAccessGrants: { some: { eventId: event.id } } },
+            { signups: { some: { shift: { eventId: event.id } } } },
+          ],
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          ceviName: true,
+          birthDate: true,
+          isGlobalAdmin: true,
+          ceviDbId: true,
+          ceviDbDepartmentLeader: true,
+          homeDepartmentId: true,
+          homeDepartmentSource: true,
+          homeDepartment: { select: { id: true, name: true } },
+          memberships: {
+            where: { departmentId: { in: targetDeptIds } },
+            select: { departmentId: true, role: true },
+          },
+          stufen: {
+            where: { stufe: { departmentId: { in: targetDeptIds } } },
+            select: {
+              stufeId: true,
+              role: true,
+              source: true,
+              stufe: { select: { id: true, name: true, departmentId: true, sortOrder: true } },
+            },
+          },
+          ceviDbStufen: { select: { kind: true } },
+          signups: {
+            where: { shift: { eventId: event.id } },
+            select: {
+              id: true,
+              shift: { select: { id: true, title: true, startTime: true, endTime: true } },
+              task: { select: { title: true } },
+            },
+          },
+          deregistrations: {
+            where: { eventId: event.id },
+            select: { id: true, reason: true, createdAt: true },
+          },
+          eventAccessGrants: {
+            where: { eventId: event.id },
+            select: { id: true, link: { select: { expiresAt: true } } },
+          },
+        },
+      });
+
+      const items: EventRosterItemDto[] = [];
+
+      for (const u of candidateUsers) {
+        const hasGrant = u.eventAccessGrants.some((g) => !g.link.expiresAt || g.link.expiresAt > now);
+        const isDeptAdmin =
+          u.isGlobalAdmin ||
+          u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');
+        const isPlanner = u.memberships.some(
+          (m) => m.departmentId === event.departmentId && m.role === 'PLANNER'
+        );
+        const isOrganizer = event.organizers.some((o) => o.userId === u.id);
+        const isMgr = isDeptAdmin || isPlanner || isOrganizer;
+        const hasSignups = u.signups.length > 0;
+
+        let hasAccess = isMgr || hasGrant || hasSignups;
+        if (!hasAccess) {
+          const accessUser: AccessUser = {
+            id: u.id,
+            isGlobalAdmin: u.isGlobalAdmin,
+            ceviDbId: u.ceviDbId,
+            ceviDbDepartmentLeader: u.ceviDbDepartmentLeader,
+            ceviDbStufen: u.ceviDbStufen,
+            homeDepartmentId: u.homeDepartmentId,
+            homeDepartmentSource: u.homeDepartmentSource,
+            stufen: u.stufen.map((s) => ({ stufeId: s.stufeId, role: s.role, source: s.source })),
+          };
+          const check = checkRules(event, accessUser, event.department.name);
+          hasAccess = check.ok;
+        }
+
+        if (!hasAccess) continue;
+
+        // Abteilung der Person ermitteln
+        let deptId = u.homeDepartmentId;
+        let deptName = u.homeDepartment?.name ?? null;
+
+        if (!deptId || !targetDeptIds.includes(deptId)) {
+          const stufeMatch = u.stufen.find((s) => targetDeptIds.includes(s.stufe.departmentId));
+          if (stufeMatch) {
+            deptId = stufeMatch.stufe.departmentId;
+            deptName = targetDepartments.find((d) => d.id === deptId)?.name ?? null;
+          } else {
+            const memberMatch = u.memberships.find((m) => targetDeptIds.includes(m.departmentId));
+            if (memberMatch) {
+              deptId = memberMatch.departmentId;
+              deptName = targetDepartments.find((d) => d.id === deptId)?.name ?? null;
+            } else {
+              deptId = hostDept.id;
+              deptName = hostDept.name;
+            }
+          }
+        }
+
+        const personStufen = u.stufen
+          .filter((s) => s.stufe.departmentId === deptId)
+          .sort((a, b) => a.stufe.sortOrder - b.stufe.sortOrder || a.stufe.name.localeCompare(b.stufe.name, 'de'))
+          .map((s) => ({
+            id: s.stufe.id,
+            name: s.stufe.name,
+            role: s.role,
+          }));
+
+        const dereg = u.deregistrations[0] ?? null;
+
+        items.push({
+          userId: u.id,
+          ceviName: u.ceviName,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          displayName: personLabel(u),
+          birthDate: u.birthDate ? u.birthDate.toISOString().slice(0, 10) : null,
+          age: calculateAge(u.birthDate),
+          departmentId: deptId,
+          departmentName: deptName,
+          stufen: personStufen,
+          shiftCount: u.signups.length,
+          shifts: u.signups.map((s) => ({
+            id: s.shift.id,
+            title: s.shift.title,
+            startTime: s.shift.startTime.toISOString(),
+            endTime: s.shift.endTime.toISOString(),
+            taskTitle: s.task?.title ?? null,
+          })),
+          isDeregistered: Boolean(dereg),
+          deregistrationReason: dereg?.reason ?? null,
+          deregisteredAt: dereg?.createdAt ? dereg.createdAt.toISOString() : null,
+        });
+      }
+
+      // Sortierung: Name aufsteigend
+      items.sort((a, b) => a.displayName.localeCompare(b.displayName, 'de'));
+
+      const distinctDeptIds = new Set(items.map((i) => i.departmentId).filter(Boolean));
+      const multipleDepartments = distinctDeptIds.size > 1;
+
+      return {
+        minShiftsPerPerson: event.minShiftsPerPerson ?? null,
+        isRestricted,
+        multipleDepartments,
+        scopeDescription: audienceLabel(event, event.department.name),
+        items,
+      } satisfies EventRosterResponseDto;
+    }
+  );
+
+  // Person als abgemeldet eintragen (heisst: muss an diesem Event keine Schichten übernehmen)
+  fastify.post<{ Params: { slug: string } }>(
+    '/api/events/:slug/deregistrations',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const event = await loadManagedEvent(request, reply);
+      if (!event) return;
+
+      const parse = EventDeregistrationSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: parse.data.userId },
+        select: { id: true, firstName: true, lastName: true, ceviName: true },
+      });
+      if (!user) {
+        return reply.status(404).send({ error: 'Person nicht gefunden' });
+      }
+
+      const dereg = await fastify.prisma.eventDeregistration.upsert({
+        where: { eventId_userId: { eventId: event.id, userId: user.id } },
+        update: {
+          reason: parse.data.reason?.trim() || null,
+          createdById: request.user.id,
+        },
+        create: {
+          eventId: event.id,
+          userId: user.id,
+          reason: parse.data.reason?.trim() || null,
+          createdById: request.user.id,
+        },
+      });
+
+      return {
+        message: `${personLabel(user)} als abgemeldet eingetragen`,
+        isDeregistered: true,
+        reason: dereg.reason,
+        deregisteredAt: dereg.createdAt.toISOString(),
+      };
+    }
+  );
+
+  // Abmeldung aufheben (Person nimmt wieder regulär teil)
+  fastify.delete<{ Params: { slug: string; userId: string } }>(
+    '/api/events/:slug/deregistrations/:userId',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const event = await loadManagedEvent(request, reply);
+      if (!event) return;
+
+      const deleted = await fastify.prisma.eventDeregistration.deleteMany({
+        where: { eventId: event.id, userId: request.params.userId },
+      });
+      if (deleted.count === 0) {
+        return reply.status(404).send({ error: 'Keine Abmeldung für diese Person gefunden' });
+      }
+
+      return { message: 'Abmeldung aufgehoben', isDeregistered: false };
     }
   );
 };

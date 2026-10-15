@@ -58,4 +58,5 @@ export interface EventDetails {
   viewer: EventViewerDto;
   organizers?: EventOrganizer[];
   shifts: ShiftDto[];
+  minShiftsPerPerson?: number | null;
 }

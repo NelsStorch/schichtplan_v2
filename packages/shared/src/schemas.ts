@@ -103,6 +103,7 @@ export const CreateEventSchema = z.object({
   endDate: z.string().datetime(),
   ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
+  minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
   organizers: z.array(CreateEventOrganizerItemSchema).optional(),
 });
 
@@ -117,6 +118,7 @@ export const UpdateEventSchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   allowPublicSignup: z.boolean().optional(),
+  minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
   requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).optional(),
@@ -294,6 +296,7 @@ export const InstantiateTemplateSchema = z.object({
   endDate: z.string().datetime(),
   ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
+  minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
 });
 
 export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;
@@ -304,6 +307,13 @@ export const UnregisterHelperSchema = z.object({
 });
 
 export type UnregisterHelperInput = z.infer<typeof UnregisterHelperSchema>;
+
+export const EventDeregistrationSchema = z.object({
+  userId: z.string().uuid('Ungültige Benutzer-ID'),
+  reason: z.string().trim().max(200, 'Grund darf maximal 200 Zeichen lang sein').optional(),
+});
+
+export type EventDeregistrationInput = z.infer<typeof EventDeregistrationSchema>;
 
 
 /** Abteilungsleitung bearbeitet eine Person: Stufen (selbst angegebene) und Rolle im Schichtplan */

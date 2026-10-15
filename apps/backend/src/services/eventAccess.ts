@@ -111,9 +111,9 @@ export function audienceLabel(event: AccessEvent, departmentName: string): strin
   return parts.join(', ');
 }
 
-type RuleResult = { ok: true } | { ok: false; reason: EventAccessReason; message: string };
+export type RuleResult = { ok: true } | { ok: false; reason: EventAccessReason; message: string };
 
-function checkRules(event: AccessEvent, user: AccessUser, departmentName: string): RuleResult {
+export function checkRules(event: AccessEvent, user: AccessUser, departmentName: string): RuleResult {
   const cfg = accessTypeConfig(event.accessType);
   const audience = audienceLabel(event, departmentName);
   const deny = (reason: EventAccessReason, message: string): RuleResult => ({ ok: false, reason, message });

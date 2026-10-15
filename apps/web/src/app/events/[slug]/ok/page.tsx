@@ -51,6 +51,7 @@ import { AppShell } from '@/components/AppShell';
 import { EventFormDialog, eventFormInitial } from '@/components/EventFormDialog';
 import { AccessTypeBadge } from '@/components/event-meta';
 import { EventAccessPanel } from '@/components/EventAccessPanel';
+import { EventRosterPanel } from '@/components/EventRosterPanel';
 import {
   AssignHelperDialog,
   DuplicateShiftDialog,
@@ -95,7 +96,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   const [error, setError] = useState<string | null>(null);
 
   // Tabs
-  const [tab, setTab] = useState<'shifts' | 'helpers' | 'access' | 'tasks' | 'templates'>('shifts');
+  const [tab, setTab] = useState<'shifts' | 'roster' | 'helpers' | 'access' | 'tasks' | 'templates'>('shifts');
 
   // Filter Schichten
   const [day, setDay] = useState<string>('ALL');
@@ -496,6 +497,11 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                   <Shield className="size-3" /> OK-Dashboard
                 </Badge>
                 <AccessTypeBadge type={event.accessType} leadersOnly={event.leadersOnly} />
+                {event.minShiftsPerPerson ? (
+                  <Badge tone="neutral" className="font-semibold text-fg">
+                    🎯 Soll: mind. {event.minShiftsPerPerson} Schichten/Person
+                  </Badge>
+                ) : null}
               </div>
               <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">
                 {event.title}
@@ -569,6 +575,18 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
           </button>
           <button
             type="button"
+            onClick={() => setTab('roster')}
+            className={cn(
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              tab === 'roster'
+                ? 'border-accent text-accent-ink'
+                : 'border-transparent text-fg-muted hover:text-fg'
+            )}
+          >
+            <UserCheck className="size-4" /> Helfer-Pool &amp; Soll
+          </button>
+          <button
+            type="button"
             onClick={() => setTab('helpers')}
             className={cn(
               'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
@@ -577,7 +595,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                 : 'border-transparent text-fg-muted hover:text-fg'
             )}
           >
-            <Users className="size-4" /> Alle Helfer ({uniqueHelpersCount})
+            <Users className="size-4" /> Eingetragene Helfer ({uniqueHelpersCount})
           </button>
           <button
             type="button"
@@ -910,6 +928,11 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
               </div>
             )}
           </div>
+        )}
+
+        {/* ----------------- TAB: HELFER-POOL & SOLL ----------------- */}
+        {tab === 'roster' && (
+          <EventRosterPanel event={event} onOpenSettings={() => setShowEventSettings(true)} />
         )}
 
         {/* ----------------- TAB 2: ALLE HELFER ----------------- */}

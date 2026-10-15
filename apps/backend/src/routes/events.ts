@@ -247,6 +247,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         accessType: toEventAccessType(event.accessType),
         leadersOnly: event.leadersOnly,
         requiredFields: cleanRequiredFields(event.requiredFields),
+        minShiftsPerPerson: event.minShiftsPerPerson ?? null,
         audience: audienceLabel(event, request.tenant.name),
         allowedDepartments: event.allowedDepartments.map((a) => ({
           id: a.departmentId,
@@ -386,6 +387,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         accessType,
         leadersOnly,
         requiredFields,
+        minShiftsPerPerson,
         allowedDepartmentIds,
         allowedStufeIds,
         questions,
@@ -489,6 +491,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             accessType,
             leadersOnly,
             requiredFields,
+            minShiftsPerPerson: minShiftsPerPerson ?? null,
             organizers: {
               create: organizersToCreate,
             },
@@ -580,6 +583,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             accessType: body.accessType,
             leadersOnly: body.leadersOnly,
             requiredFields: body.requiredFields,
+            minShiftsPerPerson: body.minShiftsPerPerson !== undefined ? body.minShiftsPerPerson : undefined,
           },
         });
         await replaceAccessLists(tx, event.id, lists.departmentIds, lists.stufeIds);
@@ -867,6 +871,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           accessType: event.accessType,
           leadersOnly: event.leadersOnly,
           requiredFields: event.requiredFields,
+          minShiftsPerPerson: event.minShiftsPerPerson ?? null,
           data: {
             shifts: shiftTemplates,
             questions: event.questions.map((q) => {

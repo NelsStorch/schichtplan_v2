@@ -57,6 +57,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
       accessType: toEventAccessType(template.accessType),
       leadersOnly: template.leadersOnly,
       requiredFields: cleanRequiredFields(template.requiredFields),
+      minShiftsPerPerson: template.minShiftsPerPerson ?? null,
       shiftCount: data?.shifts?.length || 0,
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
@@ -169,6 +170,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             leadersOnly,
             requiredFields,
             allowPublicSignup,
+            minShiftsPerPerson: parse.data.minShiftsPerPerson ?? template.minShiftsPerPerson ?? null,
             organizers: {
               create: [
                 {

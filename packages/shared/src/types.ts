@@ -47,6 +47,7 @@ export interface EventDto {
   leadersOnly: boolean;
   requiredFields: RequiredProfileField[];
   allowPublicSignup: boolean;
+  minShiftsPerPerson?: number | null;
   createdAt: string;
   shiftCount?: number;
   /** Summe der benötigten bzw. besetzten Plätze über alle Schichten */
@@ -151,6 +152,7 @@ export interface EventTemplateDto {
   accessType: EventAccessType;
   leadersOnly: boolean;
   requiredFields: RequiredProfileField[];
+  minShiftsPerPerson?: number | null;
   shiftCount: number;
   data: EventTemplateData;
   createdAt: string;
@@ -313,6 +315,46 @@ export interface EventParticipantDto {
   answers: Record<string, string>;
   /** Antworten auf Fragen mit scope PER_SIGNUP, pro Eintragung */
   signupAnswers: { shiftTitle: string; startTime: string; answers: Record<string, string> }[];
+}
+
+export interface EventRosterShiftDto {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  taskTitle?: string | null;
+}
+
+export interface EventRosterStufeDto {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface EventRosterItemDto {
+  userId: string;
+  ceviName: string | null;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  birthDate: string | null;
+  age: number | null;
+  departmentId: string | null;
+  departmentName: string | null;
+  stufen: EventRosterStufeDto[];
+  shiftCount: number;
+  shifts: EventRosterShiftDto[];
+  isDeregistered: boolean;
+  deregistrationReason: string | null;
+  deregisteredAt: string | null;
+}
+
+export interface EventRosterResponseDto {
+  minShiftsPerPerson: number | null;
+  isRestricted: boolean;
+  multipleDepartments: boolean;
+  scopeDescription: string;
+  items: EventRosterItemDto[];
 }
 
 export interface CeviDbRoleDto {
