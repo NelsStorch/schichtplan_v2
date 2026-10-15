@@ -11,7 +11,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./fonts": "./src/fonts.ts",
-    "./tailwind-preset": "./tailwind-preset.ts"
+    "./tailwind-preset": "./tailwind-preset.ts",
+    "./theme.css": "./theme.css"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -24,8 +25,9 @@
     "next": "^15.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/react": "^19.0.10",
-    "tailwindcss": "^3.4.17",
+    "tailwindcss": "^4.0.0",
     "typescript": "^5.7.3"
   }
 }
