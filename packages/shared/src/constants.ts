@@ -113,6 +113,13 @@ export const EVENT_QUESTION_TYPES = {
 
 export type EventQuestionType = keyof typeof EVENT_QUESTION_TYPES;
 
+export const EVENT_QUESTION_SCOPES = {
+  ONCE: 'Einmal pro Anlass',
+  PER_SIGNUP: 'Bei jeder Eintragung',
+} as const;
+
+export type EventQuestionScope = keyof typeof EVENT_QUESTION_SCOPES;
+
 export const STUFE_ROLES = {
   LEITUNG: 'Leitung',
   TEILNEHMER: 'Teilnehmer*in',

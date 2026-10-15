@@ -50,6 +50,23 @@ model DepartmentStufe {
   @@map("department_stufen")
 }
 
+// Stufen-Rollen einer Person laut Cevi.DB (Rollen mit Präfix Group::Stufe::), bei jedem Cevi.DB-Login ersetzt.
+// Unabhängig davon, ob eine Abteilung die Stufe schon erfasst hat (Vorschläge, «nur Leitende», Admin-Portal).
+model UserCeviDbStufe {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  groupId   Int      @map("group_id")
+  groupName String   @map("group_name")
+  kind      String   // "LEITUNG", "TEILNEHMER", "ANDERE"
+  roleNames String[] @default([]) @map("role_names")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+  @@map("user_cevidb_stufen")
+}
+
 // Stufe einer Person mit Rolle. Quelle CEVIDB wird bei jedem Cevi.DB-Login neu abgeglichen.
 model UserStufe {
   id        String          @id @default(uuid())
@@ -77,7 +94,13 @@ model User {
   address       String?            // Eine Zeile, z. B. "Dorfstrasse 1, 8307 Effretikon"
   birthDate     DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
   isGlobalAdmin Boolean            @default(false)
-  ceviDbData    Json?              // Vollständiges Cevi.DB (Hitobito) Profil inkl. Rollen, Gruppen, etc.
+  // Rohes Cevi.DB-Profil: nur zum Entwickeln (Debug-Seite), wird später entfernt. Code liest NIE daraus.
+  ceviDbData    Json?
+  // Aus dem Cevi.DB-Profil beim Login abgeleitet (siehe services/cevidb.ts)
+  ceviDbOrtsgruppeId      Int?     @map("cevidb_ortsgruppe_id")
+  ceviDbOrtsgruppeName    String?  @map("cevidb_ortsgruppe_name")
+  ceviDbDepartmentLeader  Boolean  @default(false) @map("cevidb_department_leader")
+  ceviDbLeaderGroupName   String?  @map("cevidb_leader_group_name")
   ceviDbSyncedAt DateTime?         // Zeitstempel der letzten Cevi.DB Synchronisation
   // Heimabteilung: aus Cevi.DB (Ortsgruppe) oder beim Login selbst angegeben
   homeDepartmentId     String?     @map("home_department_id")
@@ -89,6 +112,7 @@ model User {
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
   memberships   DepartmentMember[]
   stufen        UserStufe[]
+  ceviDbStufen  UserCeviDbStufe[]
   signups       ShiftSignup[]
   organizedEvents EventOrganizer[]
   eventAnswers  EventAnswer[]
@@ -171,9 +195,12 @@ model EventQuestion {
   type      String        @default("TEXT") // "TEXT", "YES_NO", "CHOICE"
   options   String[]      @default([])
   required  Boolean       @default(false)
+  // ONCE = einmal pro Anlass, PER_SIGNUP = bei jeder Eintragung neu (Antwort pro Schicht)
+  scope     String        @default("ONCE")
   sortOrder Int           @default(0) @map("sort_order")
   event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   answers   EventAnswer[]
+  signupAnswers ShiftSignupAnswer[]
 
   @@map("event_questions")
 }
@@ -191,6 +218,19 @@ model EventAnswer {
 
   @@unique([questionId, userId])
   @@map("event_answers")
+}
+
+// Antwort auf eine Frage mit scope PER_SIGNUP, gehört zu einer Eintragung
+model ShiftSignupAnswer {
+  id         String        @id @default(uuid())
+  signupId   String        @map("signup_id")
+  questionId String        @map("question_id")
+  value      String
+  signup     ShiftSignup   @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  question   EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([signupId, questionId])
+  @@map("shift_signup_answers")
 }
 
 // Zugangs-Link: gibt Zugang zum Anlass, auch wenn die Person die Regeln nicht erfüllt (Login bleibt nötig)
@@ -305,6 +345,7 @@ model ShiftSignup {
   shift       Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
   task        ShiftTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
   user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers     ShiftSignupAnswer[]
 
   @@map("shift_signups")
 }

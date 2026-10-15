@@ -84,7 +84,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [assigningShift, setAssigningShift] = useState<ShiftDto | null>(null);
   const [assigningTask, setAssigningTask] = useState<ShiftTaskDto | null>(null);
-  const [participationFor, setParticipationFor] = useState<{ shift: ShiftDto; task?: ShiftTaskDto } | null>(null);
+  const [participationFor, setParticipationFor] = useState<{
+    shift: ShiftDto;
+    task?: ShiftTaskDto;
+    showOnce: boolean;
+  } | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -215,12 +219,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     }))
     .filter((d) => d.items.length > 0);
 
-  const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto) => {
+  const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto, answers?: Record<string, string>) => {
     setBusyShift(shift.id);
     try {
       await api(`/api/shifts/${shift.id}/signup`, {
         method: 'POST',
-        json: { taskId: task && task.id !== 'default' ? task.id : undefined },
+        json: { taskId: task && task.id !== 'default' ? task.id : undefined, answers },
       });
       toast({
         title: 'Du bist eingetragen!',
@@ -230,7 +234,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     } catch (err) {
       if (err instanceof ApiError && err.data.code === 'MISSING_INFO') {
         await load();
-        setParticipationFor({ shift, task });
+        setParticipationFor({ shift, task, showOnce: true });
       } else {
         toast({ title: 'Eintragen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
       }
@@ -248,14 +252,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       toast({ title: 'Eintragen nicht möglich', description: access.message ?? undefined, tone: 'error' });
       return;
     }
+    // Fragen «einmal pro Anlass» beim ersten Eintragen (oder wenn eine Pflichtfrage fehlt),
+    // Fragen «bei jeder Eintragung» immer
     const firstTime = myShiftCount === 0 && Object.keys(event.viewer.answers).length === 0;
-    const needsInfo =
-      event.viewer.missingFields.length > 0 ||
-      event.viewer.missingQuestionIds.length > 0 ||
-      (firstTime && event.questions.length > 0);
-    if (needsInfo) {
+    const hasOnceQuestions = event.questions.some((q) => q.scope !== 'PER_SIGNUP');
+    const showOnce = event.viewer.missingQuestionIds.length > 0 || (firstTime && hasOnceQuestions);
+    const needsDialog =
+      event.viewer.missingFields.length > 0 || showOnce || event.questions.some((q) => q.scope === 'PER_SIGNUP');
+    if (needsDialog) {
       setSelectedShiftId(null);
-      setParticipationFor({ shift, task });
+      setParticipationFor({ shift, task, showOnce });
       return;
     }
     await doSignup(shift, task);
@@ -673,11 +679,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       <ParticipationDialog
         open={Boolean(participationFor)}
         event={event}
+        showOnceQuestions={participationFor?.showOnce ?? false}
+        shiftLabel={
+          participationFor
+            ? `${participationFor.shift.title}, ${fmtShortWeekday(participationFor.shift.startTime)} ${fmtTime(participationFor.shift.startTime)}`
+            : undefined
+        }
         onClose={() => setParticipationFor(null)}
-        onSaved={async () => {
+        onSaved={async (answers) => {
           const pending = participationFor;
           setParticipationFor(null);
-          if (pending) await doSignup(pending.shift, pending.task);
+          if (pending) await doSignup(pending.shift, pending.task, answers);
           else await load();
         }}
       />

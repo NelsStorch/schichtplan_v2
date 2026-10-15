@@ -14,7 +14,8 @@ import {
   buttonClasses,
   cn,
 } from '@schichtplan/ui';
-import { safeReturnTo } from '@schichtplan/shared/redirect';
+import { getLandingUrl } from '@schichtplan/shared/redirect';
+import { afterLogin, cleanReturnTo } from '@/lib/destination';
 
 type View = 'start' | 'ceviname' | 'password';
 
@@ -26,21 +27,9 @@ const loginErrors: Record<string, string> = {
   cevidb_failed: 'Die Anmeldung mit Cevi.DB hat nicht geklappt. Bitte versuche es nochmals.',
 };
 
-/** Weiterleitungsziel nur auf der eigenen Domain zulassen (login.<domain> → <domain> und Subdomains). */
-function cleanReturnTo(raw: string | null): string {
-  if (typeof window === 'undefined') return '/';
-  const host = window.location.hostname;
-  const isLocal = host === 'localhost' || host === '127.0.0.1';
-  return safeReturnTo(raw, host.replace(/^login\./, ''), { allowLocalhost: isLocal });
-}
-
-/** Wer seine Abteilung noch nicht angegeben hat, kommt zuerst auf /abteilung */
-function afterLogin(user: { needsDepartmentSetup?: boolean } | null | undefined, target: string): string {
-  return user?.needsDepartmentSetup ? `/abteilung?return_to=${encodeURIComponent(target)}` : target;
-}
-
 /** Hostname des Ziels (z. B. illnau.cevi-schichtplan.ch), damit sichtbar ist, wohin es nach dem Login geht. */
-function destinationHost(returnTo: string): string | null {
+function destinationHost(returnTo: string | null): string | null {
+  if (!returnTo) return null;
   try {
     return new URL(returnTo).host || null;
   } catch {
@@ -52,6 +41,8 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const returnTo = cleanReturnTo(searchParams.get('return_to'));
   const destination = destinationHost(returnTo);
+  const [landingHref, setLandingHref] = useState('/');
+  useEffect(() => setLandingHref(getLandingUrl()), []);
 
   const [view, setView] = useState<View>('start');
   const [redirecting, setRedirecting] = useState(false);
@@ -117,7 +108,7 @@ function LoginContent() {
           lastName: quickLastName.trim() || undefined,
           birthDate: quickBirthDate || undefined,
           phone: quickPhone.trim() || undefined,
-          returnTo,
+          returnTo: returnTo ?? undefined,
         }),
       });
 
@@ -132,7 +123,7 @@ function LoginContent() {
 
       setSuccess(`Hallo ${data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
       setTimeout(() => {
-        window.location.href = afterLogin(data.user, data.redirectUrl || returnTo);
+        window.location.href = afterLogin(data.user, returnTo);
       }, 700);
     } catch (err: any) {
       setError(err.message || 'Ein Fehler ist aufgetreten');
@@ -187,7 +178,9 @@ function LoginContent() {
     }
   };
 
-  const cevidbAuthUrl = `/api/auth/cevidb/login?returnTo=${encodeURIComponent(returnTo)}`;
+  const cevidbAuthUrl = returnTo
+    ? `/api/auth/cevidb/login?returnTo=${encodeURIComponent(returnTo)}`
+    : '/api/auth/cevidb/login';
 
   const feedback = (
     <>
@@ -520,7 +513,7 @@ function LoginContent() {
       <footer className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-fg-subtle sm:px-8">
         <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
         <a
-          href={returnTo}
+          href={returnTo ?? landingHref}
           className="inline-flex items-center gap-1.5 font-medium text-fg-muted transition hover:text-fg"
         >
           <ArrowLeft className="size-3.5" />

@@ -2,17 +2,50 @@
  * Heimabteilung und Stufen einer Person.
  * Cevi.DB-Personen: Abteilung aus der Ortsgruppe, Stufen aus den Rollen (Quelle CEVIDB, bei jedem Login neu).
  * Alle anderen geben beides beim Login selbst an (Quelle SELF).
+ * Grundlage sind die beim Login gespeicherten Spalten (users.ceviDb*) und user_cevidb_stufen, nie users.ceviDbData.
  */
 import type { PrismaClient } from '@prisma/client';
-import type { UserStufeDto, StufeRole } from '@schichtplan/shared';
-import { ceviDbStufen, ortsgruppeIdFromProfile } from './cevidb.js';
+import type { CeviDbStufeDto, StufeRole, UserStufeDto } from '@schichtplan/shared';
+import type { CeviDbDerived } from './cevidb.js';
 
-type Db = Pick<PrismaClient, 'department' | 'departmentStufe' | 'user' | 'userStufe' | '$transaction'>;
+type Db = Pick<
+  PrismaClient,
+  'department' | 'departmentStufe' | 'user' | 'userStufe' | 'userCeviDbStufe' | '$transaction'
+>;
 
-/** Stufen aus den Cevi.DB-Rollen abgleichen: nur Stufen, die eine Abteilung mit ihrer Cevi.DB-Gruppe verknüpft hat. */
-export async function syncCeviDbStufen(prisma: Db, userId: string, profile: unknown) {
-  const fromProfile = ceviDbStufen(profile);
-  const groupIds = fromProfile.map((s) => s.groupId);
+/** Cevi.DB-Angaben nach dem Login speichern (Spalten und Stufen-Rollen ersetzen) */
+export async function storeCeviDbFields(prisma: Db, userId: string, derived: CeviDbDerived) {
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        ceviDbOrtsgruppeId: derived.ortsgruppeId,
+        ceviDbOrtsgruppeName: derived.ortsgruppeName,
+        ceviDbDepartmentLeader: derived.isDepartmentLeader,
+        ceviDbLeaderGroupName: derived.leaderGroupName,
+      },
+    });
+    await tx.userCeviDbStufe.deleteMany({ where: { userId } });
+    if (derived.stufen.length) {
+      await tx.userCeviDbStufe.createMany({
+        data: derived.stufen.map((s) => ({
+          userId,
+          groupId: s.groupId,
+          groupName: s.groupName,
+          kind: s.kind,
+          roleNames: s.roleNames,
+          isPrimary: s.isPrimary,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  });
+}
+
+/** Stufen aus Cevi.DB abgleichen: nur Stufen, die eine Abteilung mit ihrer Cevi.DB-Gruppe verknüpft hat. */
+export async function syncCeviDbStufen(prisma: Db, userId: string) {
+  const fromCeviDb = await prisma.userCeviDbStufe.findMany({ where: { userId } });
+  const groupIds = fromCeviDb.map((s) => s.groupId);
   const linked = groupIds.length
     ? await prisma.departmentStufe.findMany({ where: { ceviDbGroupId: { in: groupIds } } })
     : [];
@@ -22,7 +55,7 @@ export async function syncCeviDbStufen(prisma: Db, userId: string, profile: unkn
       where: { userId, source: 'CEVIDB', stufeId: { notIn: linked.map((s) => s.id) } },
     });
     for (const stufe of linked) {
-      const kind = fromProfile.find((s) => s.groupId === stufe.ceviDbGroupId)?.kind;
+      const kind = fromCeviDb.find((s) => s.groupId === stufe.ceviDbGroupId)?.kind;
       const role: StufeRole = kind === 'LEITUNG' ? 'LEITUNG' : 'TEILNEHMER';
       await tx.userStufe.upsert({
         where: { userId_stufeId: { userId, stufeId: stufe.id } },
@@ -34,18 +67,17 @@ export async function syncCeviDbStufen(prisma: Db, userId: string, profile: unkn
 }
 
 /**
- * Nach dem Cevi.DB-Login: Heimabteilung aus der Ortsgruppe setzen (falls es dafür eine Abteilung gibt)
- * und Stufen abgleichen. Gibt die ID der Heimabteilung zurück.
+ * Nach dem Cevi.DB-Login: Heimabteilung aus der gespeicherten Ortsgruppe setzen (falls es dafür eine
+ * Abteilung gibt) und Stufen abgleichen. Gibt die Heimabteilung zurück.
  */
 export async function syncCeviDbHomeDepartment(
   prisma: Db,
   user: { id: string; homeDepartmentSource: string | null; departmentSetupAt: Date | null },
-  profile: unknown
-): Promise<string | null> {
-  const ortsgruppeId = ortsgruppeIdFromProfile(profile);
+  ortsgruppeId: number | null
+): Promise<{ id: string; slug: string } | null> {
   const department =
     ortsgruppeId !== null
-      ? await prisma.department.findUnique({ where: { ceviDbGroupId: ortsgruppeId }, select: { id: true } })
+      ? await prisma.department.findUnique({ where: { ceviDbGroupId: ortsgruppeId }, select: { id: true, slug: true } })
       : null;
 
   if (department) {
@@ -65,19 +97,35 @@ export async function syncCeviDbHomeDepartment(
     });
   }
 
-  await syncCeviDbStufen(prisma, user.id, profile);
-  return department?.id ?? null;
+  await syncCeviDbStufen(prisma, user.id);
+  return department;
 }
 
 /** Neu mit Cevi.DB verknüpfte Stufe: bereits angemeldete Cevi.DB-Personen der Abteilung gleich zuordnen. */
 export async function backfillCeviDbStufen(prisma: Db, departmentId: string) {
   const users = await prisma.user.findMany({
     where: { homeDepartmentId: departmentId, ceviDbId: { not: null } },
-    select: { id: true, ceviDbData: true },
+    select: { id: true },
   });
   for (const user of users) {
-    await syncCeviDbStufen(prisma, user.id, user.ceviDbData);
+    await syncCeviDbStufen(prisma, user.id);
   }
+}
+
+export function toCeviDbStufeDto(s: {
+  groupId: number;
+  groupName: string;
+  kind: string;
+  roleNames: string[];
+  isPrimary: boolean;
+}): CeviDbStufeDto {
+  return {
+    groupId: s.groupId,
+    groupName: s.groupName,
+    kind: s.kind === 'LEITUNG' || s.kind === 'TEILNEHMER' ? s.kind : 'ANDERE',
+    roleNames: s.roleNames,
+    isPrimary: s.isPrimary,
+  };
 }
 
 export function toUserStufeDto(entry: {

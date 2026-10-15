@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, Plus, Search, Trash2 } from 'lucide-react';
 import {
+  EVENT_QUESTION_SCOPES,
   EVENT_QUESTION_TYPES,
   REQUIRED_PROFILE_FIELDS,
   accessTypeConfig,
   type DepartmentDirectoryItemDto,
   type EventAccessType,
+  type EventQuestionScope,
   type EventQuestionType,
   type RequiredProfileField,
 } from '@schichtplan/shared';
@@ -23,6 +25,7 @@ export interface QuestionDraft {
   /** Antworten bei Auswahl-Fragen, eine pro Zeile */
   optionsText: string;
   required: boolean;
+  scope: EventQuestionScope;
 }
 
 export interface EventAccessValues {
@@ -66,6 +69,7 @@ export function accessPayload(values: EventAccessValues) {
                 .filter(Boolean)
             : [],
         required: q.required,
+        scope: q.scope,
       })),
   };
 }
@@ -306,7 +310,8 @@ export function EventAccessFields({
       <fieldset>
         <legend className="mb-1 text-[13px] font-semibold text-fg">Eigene Fragen</legend>
         <p className="mb-3 text-xs text-fg-muted">
-          Werden einmal pro Anlass gefragt, z. B. «Allergien» oder «T-Shirt-Grösse». Die Antworten sieht nur das OK.
+          «Einmal pro Anlass» z. B. für Allergien oder T-Shirt-Grösse, «Bei jeder Eintragung» für Angaben pro Schicht
+          (z. B. «Bringe ich ein Auto mit?»). Die Antworten sieht nur das OK.
         </p>
         <div className="space-y-3">
           {values.questions.map((q, index) => (
@@ -365,6 +370,18 @@ export function EventAccessFields({
                     </option>
                   ))}
                 </Select>
+                <Select
+                  value={q.scope}
+                  onChange={(e) => updateQuestion(index, { scope: e.target.value as EventQuestionScope })}
+                  aria-label="Wann wird gefragt?"
+                  className="h-10 w-52"
+                >
+                  {(Object.keys(EVENT_QUESTION_SCOPES) as EventQuestionScope[]).map((scope) => (
+                    <option key={scope} value={scope}>
+                      {EVENT_QUESTION_SCOPES[scope]}
+                    </option>
+                  ))}
+                </Select>
                 <label className="inline-flex items-center gap-2 text-sm text-fg">
                   <input
                     type="checkbox"
@@ -392,7 +409,10 @@ export function EventAccessFields({
             variant="outline"
             size="sm"
             onClick={() =>
-              set('questions', [...values.questions, { label: '', type: 'TEXT', optionsText: '', required: false }])
+              set('questions', [
+                ...values.questions,
+                { label: '', type: 'TEXT', optionsText: '', required: false, scope: 'ONCE' },
+              ])
             }
           >
             <Plus /> Frage hinzufügen

@@ -2,52 +2,84 @@
 
 import { useState, type FormEvent } from 'react';
 import { ClipboardList } from 'lucide-react';
-import { PLACEHOLDER_LAST_NAME, REQUIRED_PROFILE_FIELDS, type RequiredProfileField } from '@schichtplan/shared';
+import {
+  PLACEHOLDER_LAST_NAME,
+  REQUIRED_PROFILE_FIELDS,
+  type EventQuestionDto,
+  type RequiredProfileField,
+} from '@schichtplan/shared';
 import { Button, Callout, Dialog, Field, Input, Select, Textarea, cn } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 import type { EventDetails } from '@/lib/types';
 
 /**
- * Fragt vor dem ersten Eintragen fehlende Pflichtangaben und die Fragen des Anlasses ab.
- * Profilangaben werden im Konto gespeichert (gelten auch für andere Anlässe), Antworten nur für diesen Anlass.
+ * Fragt beim Eintragen ab, was das OK braucht:
+ * - fehlende Pflichtangaben (im Konto gespeichert, gelten auch für andere Anlässe)
+ * - Fragen «einmal pro Anlass» (beim ersten Eintragen bzw. wenn eine Pflichtfrage fehlt)
+ * - Fragen «bei jeder Eintragung» (jedes Mal neu, Antwort gehört zur Schicht)
+ * `onSaved` bekommt die Antworten pro Eintragung, die mit der Eintragung mitgeschickt werden.
  */
 export function ParticipationDialog({
   open,
   event,
+  showOnceQuestions,
+  shiftLabel,
   onClose,
   onSaved,
 }: {
   open: boolean;
   event: EventDetails;
+  showOnceQuestions: boolean;
+  /** Schicht, für die gerade eingetragen wird (für die Fragen pro Eintragung) */
+  shiftLabel?: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (signupAnswers: Record<string, string>) => void;
 }) {
+  const hasOnceStuff = event.viewer.missingFields.length > 0 || showOnceQuestions;
   return (
     <Dialog
       open={open}
       onClose={onClose}
       icon={<ClipboardList />}
-      title="Noch ein paar Angaben"
-      description={`Das OK von «${event.title}» braucht diese Angaben von dir. Du gibst sie nur einmal an.`}
+      title={hasOnceStuff ? 'Noch ein paar Angaben' : 'Angaben zur Eintragung'}
+      description={
+        hasOnceStuff
+          ? `Das OK von «${event.title}» braucht diese Angaben von dir.`
+          : shiftLabel
+            ? `Für ${shiftLabel}`
+            : undefined
+      }
     >
-      <ParticipationForm event={event} onCancel={onClose} onSaved={onSaved} />
+      <ParticipationForm
+        event={event}
+        showOnceQuestions={showOnceQuestions}
+        shiftLabel={shiftLabel}
+        onCancel={onClose}
+        onSaved={onSaved}
+      />
     </Dialog>
   );
 }
 
 function ParticipationForm({
   event,
+  showOnceQuestions,
+  shiftLabel,
   onCancel,
   onSaved,
 }: {
   event: EventDetails;
+  showOnceQuestions: boolean;
+  shiftLabel?: string;
   onCancel: () => void;
-  onSaved: () => void;
+  onSaved: (signupAnswers: Record<string, string>) => void;
 }) {
   const { user, refresh } = usePortal();
   const missing = new Set<RequiredProfileField>(event.viewer.missingFields);
-  // Alle Fragen zeigen (auch freiwillige), bereits gegebene Antworten vorausfüllen
+  const onceQuestions = showOnceQuestions ? event.questions.filter((q) => q.scope !== 'PER_SIGNUP') : [];
+  const signupQuestions = event.questions.filter((q) => q.scope === 'PER_SIGNUP');
+  // Bereits gegebene Antworten vorausfüllen (nur einmalige; pro Eintragung startet leer)
   const [answers, setAnswers] = useState<Record<string, string>>({ ...event.viewer.answers });
   const [profile, setProfile] = useState({
     firstName: user?.firstName && user.lastName !== PLACEHOLDER_LAST_NAME ? user.firstName : '',
@@ -77,19 +109,67 @@ function ParticipationForm({
     if (missing.has('ADDRESS')) profilePayload.address = profile.address.trim();
 
     try {
-      await api(`/api/events/${event.slug}/participation`, {
-        method: 'PUT',
-        json: {
-          profile: Object.keys(profilePayload).length ? profilePayload : undefined,
-          answers: Object.fromEntries(event.questions.map((q) => [q.id, (answers[q.id] ?? '').trim()])),
-        },
-      });
+      if (Object.keys(profilePayload).length || onceQuestions.length) {
+        await api(`/api/events/${event.slug}/participation`, {
+          method: 'PUT',
+          json: {
+            profile: Object.keys(profilePayload).length ? profilePayload : undefined,
+            answers: Object.fromEntries(onceQuestions.map((q) => [q.id, (answers[q.id] ?? '').trim()])),
+          },
+        });
+      }
       if (Object.keys(profilePayload).length) await refresh();
-      onSaved();
+      onSaved(
+        Object.fromEntries(
+          signupQuestions.map((q) => [q.id, (answers[q.id] ?? '').trim()]).filter(([, v]) => v)
+        )
+      );
     } catch (err) {
       setError(errorMessage(err));
       setSaving(false);
     }
+  };
+
+  const renderQuestion = (q: EventQuestionDto) => {
+    const value = answers[q.id] ?? '';
+    const set = (v: string) => setAnswers((a) => ({ ...a, [q.id]: v }));
+    return (
+      <Field key={q.id} label={q.label} required={q.required}>
+        {q.type === 'YES_NO' ? (
+          <div role="radiogroup" aria-label={q.label} className="flex gap-2">
+            {[
+              { v: 'JA', label: 'Ja' },
+              { v: 'NEIN', label: 'Nein' },
+            ].map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                role="radio"
+                aria-checked={value === o.v}
+                onClick={() => set(value === o.v && !q.required ? '' : o.v)}
+                className={cn(
+                  'h-11 flex-1 rounded-field border text-sm font-semibold transition',
+                  value === o.v ? 'border-accent bg-accent/12 text-accent-ink' : 'border-line text-fg-muted'
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        ) : q.type === 'CHOICE' ? (
+          <Select value={value} onChange={(e) => set(e.target.value)} required={q.required}>
+            <option value="">Bitte wählen</option>
+            {q.options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <Textarea rows={2} value={value} onChange={(e) => set(e.target.value)} required={q.required} />
+        )}
+      </Field>
+    );
   };
 
   return (
@@ -165,49 +245,17 @@ function ParticipationForm({
         </Field>
       )}
 
-      {event.questions.length > 0 && missing.size > 0 && <hr className="border-line" />}
+      {onceQuestions.length > 0 && missing.size > 0 && <hr className="border-line" />}
+      {onceQuestions.map(renderQuestion)}
 
-      {event.questions.map((q) => {
-        const value = answers[q.id] ?? '';
-        const set = (v: string) => setAnswers((a) => ({ ...a, [q.id]: v }));
-        return (
-          <Field key={q.id} label={q.label} required={q.required}>
-            {q.type === 'YES_NO' ? (
-              <div role="radiogroup" aria-label={q.label} className="flex gap-2">
-                {[
-                  { v: 'JA', label: 'Ja' },
-                  { v: 'NEIN', label: 'Nein' },
-                ].map((o) => (
-                  <button
-                    key={o.v}
-                    type="button"
-                    role="radio"
-                    aria-checked={value === o.v}
-                    onClick={() => set(value === o.v && !q.required ? '' : o.v)}
-                    className={cn(
-                      'h-11 flex-1 rounded-field border text-sm font-semibold transition',
-                      value === o.v ? 'border-accent bg-accent/12 text-accent-ink' : 'border-line text-fg-muted'
-                    )}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            ) : q.type === 'CHOICE' ? (
-              <Select value={value} onChange={(e) => set(e.target.value)} required={q.required}>
-                <option value="">Bitte wählen</option>
-                {q.options.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <Textarea rows={2} value={value} onChange={(e) => set(e.target.value)} required={q.required} />
-            )}
-          </Field>
-        );
-      })}
+      {signupQuestions.length > 0 && (
+        <div className="space-y-5 rounded-field border border-line bg-surface-2/60 p-4">
+          <p className="text-xs font-semibold text-fg-subtle">
+            Zu dieser Eintragung{shiftLabel ? ` (${shiftLabel})` : ''}
+          </p>
+          {signupQuestions.map(renderQuestion)}
+        </div>
+      )}
 
       <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
         <Button variant="ghost" onClick={onCancel}>
@@ -216,7 +264,9 @@ function ParticipationForm({
         <Button
           type="submit"
           loading={saving}
-          disabled={event.questions.some((q) => q.required && q.type === 'YES_NO' && !answers[q.id])}
+          disabled={[...onceQuestions, ...signupQuestions].some(
+            (q) => q.required && q.type === 'YES_NO' && !answers[q.id]
+          )}
         >
           Speichern und eintragen
         </Button>

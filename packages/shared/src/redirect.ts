@@ -95,3 +95,18 @@ export function getDepartmentUrl(slug: string, path = '/'): string {
   const root = getRootDomain(hostname);
   return `${protocol}//${slug}.${root}${path}`;
 }
+
+/** Landingpage (cevi-schichtplan.ch bzw. lokal Port 3001) */
+export function getLandingUrl(path = '/'): string {
+  if (typeof window === 'undefined') return path;
+  const { hostname, protocol } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) {
+    return `http://localhost:3001${path}`;
+  }
+  return `${protocol}//${getRootDomain(hostname)}${path}`;
+}
+
+/** Ziel nach dem Login ohne return_to: eigene Abteilung, sonst Landingpage (nie zurück aufs Login). */
+export function getDefaultDestination(homeDepartmentSlug?: string | null): string {
+  return homeDepartmentSlug ? getDepartmentUrl(homeDepartmentSlug) : getLandingUrl();
+}

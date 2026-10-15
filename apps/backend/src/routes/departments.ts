@@ -1,9 +1,7 @@
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
-import bcrypt from 'bcryptjs';
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
   CreateDepartmentFromCeviDbSchema,
-  RegisterDepartmentSchema,
   StufeInputSchema,
   UpdateDepartmentPersonSchema,
   type DepartmentCreationEligibilityDto,
@@ -12,8 +10,6 @@ import {
   type DepartmentStufeDto,
   type StufeSuggestionDto,
 } from '@schichtplan/shared';
-import { cevidbConfig } from '../config/cevidb.js';
-import { ceviDbLeadership, ceviDbStufen } from '../services/cevidb.js';
 import { backfillCeviDbStufen } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
 
@@ -54,29 +50,40 @@ async function departmentCreationEligibility(
     eligible: false,
     reason,
     ortsgruppeId: null,
+    ortsgruppeName: null,
     leaderGroupName: null,
     existingDepartment: null,
     ...extra,
   });
 
+  // Die ceviDb*-Spalten schreibt nur der Cevi.DB-Login, sie sind deshalb vertrauenswürdig
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { ceviDbId: true, ceviDbData: true },
+    select: {
+      ceviDbId: true,
+      ceviDbDepartmentLeader: true,
+      ceviDbOrtsgruppeId: true,
+      ceviDbOrtsgruppeName: true,
+      ceviDbLeaderGroupName: true,
+    },
   });
-  // ceviDbData wird nur vom Cevi.DB-Login geschrieben und ist deshalb vertrauenswürdig
-  if (!user || user.ceviDbId === null || !user.ceviDbData) return denied('NOT_CEVIDB');
+  if (!user || user.ceviDbId === null) return denied('NOT_CEVIDB');
 
-  const { isLeader, ortsgruppeId, leaderGroupName } = ceviDbLeadership(user.ceviDbData);
-  if (!isLeader) return denied('NOT_LEADER');
+  const ortsgruppeId = user.ceviDbOrtsgruppeId;
+  const ortsgruppeName = user.ceviDbOrtsgruppeName;
+  const leaderGroupName = user.ceviDbLeaderGroupName;
+  if (!user.ceviDbDepartmentLeader) return denied('NOT_LEADER');
   if (ortsgruppeId === null) return denied('NO_ORTSGRUPPE', { leaderGroupName });
 
   const existing = await prisma.department.findUnique({
     where: { ceviDbGroupId: ortsgruppeId },
     select: { name: true, slug: true },
   });
-  if (existing) return denied('EXISTS', { ortsgruppeId, leaderGroupName, existingDepartment: existing });
+  if (existing) {
+    return denied('EXISTS', { ortsgruppeId, ortsgruppeName, leaderGroupName, existingDepartment: existing });
+  }
 
-  return { eligible: true, reason: null, ortsgruppeId, leaderGroupName, existingDepartment: null };
+  return { eligible: true, reason: null, ortsgruppeId, ortsgruppeName, leaderGroupName, existingDepartment: null };
 }
 
 const departmentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -229,10 +236,10 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const tenant = await requireDeptAdmin(request, reply);
       if (!tenant) return;
-      const [users, existing] = await Promise.all([
-        fastify.prisma.user.findMany({
-          where: { homeDepartmentId: tenant.id, homeDepartmentSource: 'CEVIDB' },
-          select: { ceviDbData: true },
+      const [roles, existing] = await Promise.all([
+        fastify.prisma.userCeviDbStufe.findMany({
+          where: { user: { homeDepartmentId: tenant.id, homeDepartmentSource: 'CEVIDB' } },
+          select: { groupId: true, groupName: true },
         }),
         fastify.prisma.departmentStufe.findMany({
           where: { departmentId: tenant.id, ceviDbGroupId: { not: null } },
@@ -241,13 +248,11 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       ]);
       const linked = new Set(existing.map((s) => s.ceviDbGroupId));
       const byGroup = new Map<number, StufeSuggestionDto>();
-      for (const user of users) {
-        for (const stufe of ceviDbStufen(user.ceviDbData)) {
-          if (linked.has(stufe.groupId)) continue;
-          const entry = byGroup.get(stufe.groupId);
-          if (entry) entry.personCount++;
-          else byGroup.set(stufe.groupId, { ceviDbGroupId: stufe.groupId, name: stufe.groupName, personCount: 1 });
-        }
+      for (const stufe of roles) {
+        if (linked.has(stufe.groupId)) continue;
+        const entry = byGroup.get(stufe.groupId);
+        if (entry) entry.personCount++;
+        else byGroup.set(stufe.groupId, { ceviDbGroupId: stufe.groupId, name: stufe.groupName, personCount: 1 });
       }
       return [...byGroup.values()].sort(
         (a, b) => b.personCount - a.personCount || a.name.localeCompare(b.name, 'de')
@@ -272,8 +277,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         ceviName: true,
         firstName: true,
         lastName: true,
-        ceviDbId: true,
-        ceviDbData: true,
+        ceviDbDepartmentLeader: true,
         homeDepartmentId: true,
         homeDepartmentSource: true,
         memberships: { where: { departmentId: tenant.id }, select: { role: true } },
@@ -296,7 +300,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         isHomeDepartment: isHome,
         source: isHome ? (u.homeDepartmentSource === 'CEVIDB' ? 'CEVIDB' : 'SELF') : null,
         departmentRole: role(u.memberships[0]?.role),
-        isCeviDbDepartmentLeader: u.ceviDbId !== null && ceviDbLeadership(u.ceviDbData).isLeader,
+        isCeviDbDepartmentLeader: u.ceviDbDepartmentLeader,
         stufen: u.stufen
           .sort((a, b) => a.stufe.sortOrder - b.stufe.sortOrder)
           .map((s) => ({
@@ -522,17 +526,20 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
             data: { departmentId: created.id, userId: request.user.id, role: 'ADMIN' },
           });
 
-          // Alle bereits angemeldeten Cevi.DB-Personen dieser Ortsgruppe gleich als Helfer zuordnen
-          const ortsgruppeField = cevidbConfig().ortsgruppeField;
-          await tx.$executeRaw`
-            INSERT INTO "department_members" ("id", "departmentId", "userId", "role")
-            SELECT gen_random_uuid()::text, ${created.id}::text, u."id", 'HELPER'
-            FROM "users" u
-            WHERE CASE
-                    WHEN u."ceviDbData"->>${ortsgruppeField}::text ~ '^[0-9]{1,9}$'
-                    THEN (u."ceviDbData"->>${ortsgruppeField}::text)::integer
-                  END = ${ortsgruppeId}::integer
-            ON CONFLICT ("departmentId", "userId") DO NOTHING`;
+          // Alle bereits angemeldeten Cevi.DB-Personen dieser Ortsgruppe (inkl. der anlegenden Person)
+          // bekommen die neue Abteilung als Heimabteilung und werden Helfer*innen
+          const people = await tx.user.findMany({
+            where: { ceviDbOrtsgruppeId: ortsgruppeId },
+            select: { id: true },
+          });
+          await tx.user.updateMany({
+            where: { ceviDbOrtsgruppeId: ortsgruppeId },
+            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
+          });
+          await tx.departmentMember.createMany({
+            data: people.map((p) => ({ departmentId: created.id, userId: p.id, role: 'HELPER' })),
+            skipDuplicates: true,
+          });
 
           return created;
         });
@@ -559,92 +566,6 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   );
-
-  // Neue Abteilung registrieren (von Hauptseite aus)
-  fastify.post('/api/departments', async (request, reply) => {
-    const parse = RegisterDepartmentSchema.safeParse(request.body);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
-
-    const {
-      departmentName,
-      slug,
-      adminFirstName,
-      adminLastName,
-      adminCeviName,
-      adminEmail,
-      adminPassword,
-      adminPhone,
-    } = parse.data;
-
-    const normalizedSlug = slug.toLowerCase();
-
-    // Prüfen, ob Slug bereits existiert
-    const existingDept = await fastify.prisma.department.findUnique({
-      where: { slug: normalizedSlug },
-    });
-
-    if (existingDept) {
-      return reply.status(409).send({ error: 'Diese Subdomain ist bereits vergeben' });
-    }
-
-    const passwordHash = await bcrypt.hash(adminPassword, 10);
-
-    // Transaktion: Abteilung + Admin-User + Zuordnung anlegen
-    const result = await fastify.prisma.$transaction(async (tx) => {
-      let user = await tx.user.findUnique({
-        where: { email: adminEmail.toLowerCase() },
-      });
-
-      if (!user) {
-        user = await tx.user.create({
-          data: {
-            email: adminEmail.toLowerCase(),
-            passwordHash,
-            firstName: adminFirstName,
-            lastName: adminLastName,
-            ceviName: adminCeviName || null,
-            phone: adminPhone || null,
-          },
-        });
-      }
-
-      const department = await tx.department.create({
-        data: {
-          name: departmentName,
-          slug: normalizedSlug,
-          contactEmail: adminEmail.toLowerCase(),
-        },
-      });
-
-      await tx.departmentMember.create({
-        data: {
-          departmentId: department.id,
-          userId: user.id,
-          role: 'ADMIN',
-        },
-      });
-
-      return { department, user };
-    });
-
-    const token = fastify.jwt.sign({
-      id: result.user.id,
-      email: result.user.email,
-      isGlobalAdmin: result.user.isGlobalAdmin,
-    });
-
-    return {
-      department: {
-        id: result.department.id,
-        name: result.department.name,
-        slug: result.department.slug,
-      },
-      token,
-      message: 'Abteilung erfolgreich erstellt!',
-    };
-  });
 
   // Abteilungs-Einstellungen aktualisieren (Logo, Name, Kontakt) - nur Abteilungsleitung
   fastify.patch(

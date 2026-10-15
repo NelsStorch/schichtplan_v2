@@ -11,19 +11,18 @@ import {
   ExternalLink,
   ChevronRight,
   CheckCircle2,
-  AlertCircle,
   X,
   Sparkles,
 } from 'lucide-react';
 import {
   getDepartmentUrl,
   getLoginUrl,
+  getLandingUrl,
   getRootDomain,
-  type DepartmentCreationEligibilityDto,
-  type RegisterDepartmentInput,
+  type UserDto,
 } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
-import { Button, buttonClasses, Dialog, Input } from '@schichtplan/ui';
+import { Avatar, Button, buttonClasses } from '@schichtplan/ui';
 import { Campfire3DCanvas } from '@/components/Campfire3DCanvas';
 import { Card3DTilt } from '@/components/Card3DTilt';
 import { Hero3DStage } from '@/components/Hero3DStage';
@@ -46,28 +45,15 @@ export default function LandingPage() {
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const [loadingDepts, setLoadingDepts] = useState(true);
   const [search, setSearch] = useState('');
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  // Angemeldete Person (Cookie gilt für alle Subdomains): Name statt «Anmelden» im Kopf
+  const [me, setMe] = useState<UserDto | null>(null);
 
-  // Register Form State
-  const [formData, setFormData] = useState<Partial<RegisterDepartmentInput>>({
-    departmentName: '',
-    slug: '',
-    adminFirstName: '',
-    adminLastName: '',
-    adminCeviName: '',
-    adminEmail: '',
-    adminPassword: '',
-  });
-  const [registerStatus, setRegisterStatus] = useState<{
-    loading: boolean;
-    error?: string;
-    success?: string;
-  }>({
-    loading: false,
-  });
-  // Abteilungsleitung aus Cevi.DB darf ohne Passwort anlegen ('anonymous' = nicht angemeldet)
-  const [eligibility, setEligibility] = useState<DepartmentCreationEligibilityDto | 'anonymous' | null>(null);
-  const ceviDbCreate = eligibility !== null && eligibility !== 'anonymous' && eligibility.eligible;
+  useEffect(() => {
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setMe)
+      .catch(() => setMe(null));
+  }, []);
 
   useEffect(() => {
     async function loadDepts() {
@@ -86,69 +72,11 @@ export default function LandingPage() {
     loadDepts();
   }, []);
 
-  // Nach dem Cevi.DB-Login (return_to=/?registrieren=1) den Dialog gleich wieder öffnen
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('registrieren')) {
-      setShowRegisterModal(true);
-      url.searchParams.delete('registrieren');
-      window.history.replaceState(null, '', url);
-    }
-  }, []);
-
-  // Beim Öffnen prüfen, ob die angemeldete Person als Abteilungsleitung (Cevi.DB) anlegen darf
-  useEffect(() => {
-    if (!showRegisterModal) return;
-    let cancelled = false;
-    fetch('/api/departments/creation-eligibility')
-      .then(async (res) => (res.ok ? ((await res.json()) as DepartmentCreationEligibilityDto) : 'anonymous'))
-      .catch(() => 'anonymous' as const)
-      .then((result) => {
-        if (!cancelled) setEligibility(result);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showRegisterModal]);
-
   const departmentUrl = (slug: string) => getDepartmentUrl(slug);
 
-  /** Zentrales Cevi.DB-Login, danach zurück auf diese Seite mit geöffnetem Dialog. */
-  const ceviDbLoginUrl = () => {
-    if (typeof window === 'undefined') return '/login';
-    return getLoginUrl(`${window.location.origin}/?registrieren=1`);
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRegisterStatus({ loading: true });
-
-    try {
-      // Abteilungsleitung (Cevi.DB): ohne Passwort, Admin ist die angemeldete Person
-      const res = await fetch(ceviDbCreate ? '/api/departments/cevidb' : '/api/departments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          ceviDbCreate ? { departmentName: formData.departmentName, slug: formData.slug } : formData
-        ),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Registrierung fehlgeschlagen');
-      }
-
-      setRegisterStatus({
-        loading: false,
-        success: `Abteilung erfolgreich erstellt! Weiterleitung zu ${data.department.slug}...`,
-      });
-
-      setTimeout(() => {
-        window.location.href = departmentUrl(data.department.slug);
-      }, 1500);
-    } catch (err: any) {
-      setRegisterStatus({ loading: false, error: err.message });
-    }
+  /** Abteilung anlegen passiert im Login-Portal (nur Abteilungsleitung mit Cevi.DB) */
+  const goCreateDepartment = () => {
+    window.location.href = getLoginUrl(getLandingUrl(), '/abteilung-erstellen');
   };
 
   const filteredDepartments = departments.filter((d) =>
@@ -180,22 +108,33 @@ export default function LandingPage() {
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/login"
-              className={buttonClasses({
-                variant: 'ghost',
-                size: 'sm',
-                className: 'hidden sm:inline-flex gap-1.5 text-xs font-semibold',
-              })}
-            >
-              <LogIn className="size-3.5 text-fg-muted" />
-              <span>Anmelden</span>
-            </Link>
+            {me ? (
+              <Link
+                href="/profil"
+                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-xs font-semibold text-fg transition hover:bg-surface-2"
+                aria-label="Dein Profil"
+              >
+                <Avatar name={me.ceviName || me.firstName} size="sm" highlight className="size-7 text-[10px]" />
+                <span className="max-w-28 truncate">{me.ceviName || me.firstName}</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className={buttonClasses({
+                  variant: 'ghost',
+                  size: 'sm',
+                  className: 'gap-1.5 text-xs font-semibold',
+                })}
+              >
+                <LogIn className="size-3.5 text-fg-muted" />
+                <span className="hidden sm:inline">Anmelden</span>
+              </Link>
+            )}
 
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowRegisterModal(true)}
+              onClick={goCreateDepartment}
               className="text-xs font-semibold"
             >
               <Plus className="size-3.5" />
@@ -242,7 +181,7 @@ export default function LandingPage() {
                   <Button
                     variant="secondary"
                     size="md"
-                    onClick={() => setShowRegisterModal(true)}
+                    onClick={goCreateDepartment}
                     className="justify-center text-sm font-semibold h-12"
                   >
                     <span>Neue Abteilung anlegen</span>
@@ -488,7 +427,7 @@ export default function LandingPage() {
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => setShowRegisterModal(true)}
+                  onClick={goCreateDepartment}
                 >
                   <Plus className="size-3.5" />
                   <span>Jetzt {search ? `«${search}»` : 'neue Abteilung'} anlegen</span>
@@ -539,7 +478,7 @@ export default function LandingPage() {
 
                 {/* "Eigene Abteilung anlegen" Action Card */}
                 <button
-                  onClick={() => setShowRegisterModal(true)}
+                  onClick={goCreateDepartment}
                   className="rounded-card border border-dashed border-line hover:border-accent/60 bg-surface/30 hover:bg-accent/5 p-5 text-left transition flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3.5">
@@ -563,193 +502,6 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* Accessible Registration Dialog */}
-      <Dialog
-        open={showRegisterModal}
-        onClose={() => setShowRegisterModal(false)}
-        title="Neue Cevi-Abteilung registrieren"
-        description="Erstelle in wenigen Schritten den Schichtplan für deine Abteilung."
-        size="md"
-      >
-        {registerStatus.error && (
-          <div className="p-3 mb-4 rounded-tile bg-danger/10 text-danger-ink text-xs border border-danger/25 flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0" />
-            <span>{registerStatus.error}</span>
-          </div>
-        )}
-
-        {registerStatus.success && (
-          <div className="p-3 mb-4 rounded-tile bg-success/10 text-success-ink text-xs border border-success/25 flex items-center gap-2">
-            <CheckCircle2 className="size-4 shrink-0" />
-            <span>{registerStatus.success}</span>
-          </div>
-        )}
-
-        {ceviDbCreate && (
-          <div className="p-3 mb-4 rounded-tile bg-surface-2 text-fg-muted text-xs border border-line flex items-start gap-2">
-            <CheckCircle2 className="size-4 shrink-0 mt-px text-success-ink" />
-            <span>
-              Du bist über Cevi.DB als Abteilungsleiter*in
-              {eligibility?.leaderGroupName
-                ? ` (${eligibility.leaderGroupName})`
-                : ''}{' '}
-              angemeldet. Die Abteilung wird mit deiner Ortsgruppe verknüpft: Alle aus deiner Ortsgruppe
-              werden beim Login automatisch zugeordnet. Du wirst Admin, ein Passwort brauchst du nicht.
-            </span>
-          </div>
-        )}
-
-        {eligibility !== null && eligibility !== 'anonymous' && eligibility.reason === 'EXISTS' && (
-          <div className="p-3 mb-4 rounded-tile bg-surface-2 text-fg-muted text-xs border border-line flex items-start gap-2">
-            <AlertCircle className="size-4 shrink-0 mt-px" />
-            <span>
-              Für deine Ortsgruppe gibt es bereits die Abteilung{' '}
-              {eligibility.existingDepartment ? (
-                <a
-                  href={departmentUrl(eligibility.existingDepartment.slug)}
-                  className="font-semibold text-accent-ink underline underline-offset-2"
-                >
-                  {eligibility.existingDepartment.name}
-                </a>
-              ) : (
-                'angelegt'
-              )}
-              . Wer sich mit Cevi.DB anmeldet, wird ihr automatisch zugeordnet.
-            </span>
-          </div>
-        )}
-
-        {(eligibility === 'anonymous' || (eligibility !== null && eligibility.reason === 'NOT_CEVIDB')) && (
-          <a
-            href={ceviDbLoginUrl()}
-            className="mb-4 flex items-center justify-between gap-3 rounded-tile border border-accent/25 bg-accent/8 p-3 text-xs transition hover:bg-accent/12"
-          >
-            <span className="text-fg-muted">
-              <span className="block font-semibold text-fg">Du bist Abteilungsleiter*in?</span>
-              Mit Cevi.DB anmelden: ohne Passwort, deine Ortsgruppe wird automatisch verknüpft.
-            </span>
-            <ArrowRight className="size-4 shrink-0 text-accent-ink" />
-          </a>
-        )}
-
-        <form onSubmit={handleRegister} className="space-y-4 pt-1">
-          <div>
-            <label className="block text-xs font-semibold text-fg mb-1">
-              Name der Cevi-Abteilung
-            </label>
-            <Input
-              type="text"
-              required
-              placeholder="z. B. Cevi Uster"
-              value={formData.departmentName}
-              onChange={(e) => {
-                const name = e.target.value;
-                const autoSlug = name
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]/g, '-')
-                  .replace(/-+/g, '-')
-                  .replace(/^-|-$/g, '');
-                setFormData({ ...formData, departmentName: name, slug: autoSlug });
-              }}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-fg mb-1">
-              Gewünschte Subdomain
-            </label>
-            <div className="flex items-center">
-              <input
-                type="text"
-                required
-                placeholder="uster"
-                value={formData.slug}
-                onChange={(e) =>
-                  setFormData({ ...formData, slug: e.target.value.toLowerCase() })
-                }
-                className="flex-1 h-12 px-4 rounded-l-field border border-r-0 border-line bg-surface-2 text-sm text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent focus:bg-surface"
-              />
-              <span className="h-12 flex items-center px-3.5 bg-surface-3 border border-line text-xs text-fg-subtle rounded-r-field font-mono select-none">
-                .cevi-schichtplan.ch
-              </span>
-            </div>
-          </div>
-
-          {!ceviDbCreate && (
-          <div className="pt-3 border-t border-line">
-            <h4 className="text-xs font-bold text-fg mb-3">
-              Hauptverantwortliche Person (Admin)
-            </h4>
-            <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-              <Input
-                type="text"
-                required
-                placeholder="Vorname"
-                value={formData.adminFirstName}
-                onChange={(e) =>
-                  setFormData({ ...formData, adminFirstName: e.target.value })
-                }
-              />
-              <Input
-                type="text"
-                required
-                placeholder="Nachname"
-                value={formData.adminLastName}
-                onChange={(e) =>
-                  setFormData({ ...formData, adminLastName: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2.5">
-              <Input
-                type="text"
-                placeholder="Cevi-Name (optional, z. B. Falk)"
-                value={formData.adminCeviName}
-                onChange={(e) =>
-                  setFormData({ ...formData, adminCeviName: e.target.value })
-                }
-              />
-              <Input
-                type="email"
-                required
-                placeholder="E-Mail-Adresse"
-                value={formData.adminEmail}
-                onChange={(e) =>
-                  setFormData({ ...formData, adminEmail: e.target.value })
-                }
-              />
-              <Input
-                type="password"
-                required
-                placeholder="Sicheres Passwort (mind. 8 Zeichen)"
-                value={formData.adminPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, adminPassword: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          )}
-
-          <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-line">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowRegisterModal(false)}
-            >
-              Abbrechen
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              type="submit"
-              loading={registerStatus.loading}
-            >
-              Abteilung anlegen
-            </Button>
-          </div>
-        </form>
-      </Dialog>
 
       {/* Footer */}
       <footer className="border-t border-line/60 bg-surface/50 py-10 text-xs text-fg-subtle relative z-10">

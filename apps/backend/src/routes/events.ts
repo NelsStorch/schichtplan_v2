@@ -9,6 +9,7 @@ import {
   UnregisterHelperSchema,
   UpdateEventSchema,
   type EventQuestionInput,
+  type EventQuestionDto,
   type EventQuestionType,
 } from '@schichtplan/shared';
 import {
@@ -30,13 +31,21 @@ function calculateAge(birthDate: Date, targetDate: Date): number {
   return age;
 }
 
-export function toQuestionDto(q: { id: string; label: string; type: string; options: string[]; required: boolean }) {
+export function toQuestionDto(q: {
+  id: string;
+  label: string;
+  type: string;
+  options: string[];
+  required: boolean;
+  scope: string;
+}): EventQuestionDto {
   return {
     id: q.id,
     label: q.label,
     type: (['TEXT', 'YES_NO', 'CHOICE'].includes(q.type) ? q.type : 'TEXT') as EventQuestionType,
     options: q.options,
     required: q.required,
+    scope: q.scope === 'PER_SIGNUP' ? 'PER_SIGNUP' : 'ONCE',
   };
 }
 
@@ -87,6 +96,7 @@ async function syncQuestions(tx: Tx, eventId: string, questions: EventQuestionIn
       type: q.type,
       options: q.type === 'CHOICE' ? q.options : [],
       required: q.required,
+      scope: q.scope,
       sortOrder: index,
     };
     if (q.id && existingIds.has(q.id)) {
@@ -220,7 +230,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       const answers = Object.fromEntries((viewer?.eventAnswers ?? []).map((a) => [a.questionId, a.value]));
       const missingQuestionIds = event.questions
-        .filter((q) => q.required && !answers[q.id]?.trim())
+        .filter((q) => q.scope !== 'PER_SIGNUP' && q.required && !answers[q.id]?.trim())
         .map((q) => q.id);
 
       return {

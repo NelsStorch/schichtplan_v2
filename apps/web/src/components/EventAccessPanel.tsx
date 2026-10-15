@@ -23,7 +23,7 @@ import {
   useToast,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
-import { fmtFullDate } from '@/lib/format';
+import { fmtFullDate, fmtShortWeekday, fmtTime } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 import { AccessTypeBadge } from './event-meta';
 
@@ -331,6 +331,15 @@ function Participants({ event }: { event: EventDetails }) {
   const answerText = (question: EventDetails['questions'][number], value: string | undefined) =>
     !value ? '' : question.type === 'YES_NO' ? (value === 'JA' ? 'Ja' : 'Nein') : value;
 
+  /** Antworten pro Eintragung als «Schicht (Tag Zeit): Antwort» */
+  const perSignup = (question: EventDetails['questions'][number], person: EventParticipantDto) =>
+    person.signupAnswers
+      .filter((sa) => sa.answers[question.id])
+      .map((sa) => ({
+        label: `${sa.shiftTitle} (${fmtShortWeekday(sa.startTime)} ${fmtTime(sa.startTime)})`,
+        text: answerText(question, sa.answers[question.id]),
+      }));
+
   const download = () => {
     if (!people) return;
     const header = [
@@ -355,7 +364,13 @@ function Participants({ event }: { event: EventDetails }) {
       p.birthDate,
       p.homeDepartmentName,
       p.shiftCount,
-      ...event.questions.map((q) => answerText(q, p.answers[q.id])),
+      ...event.questions.map((q) =>
+        q.scope === 'PER_SIGNUP'
+          ? perSignup(q, p)
+              .map((a) => `${a.label}: ${a.text}`)
+              .join(' | ')
+          : answerText(q, p.answers[q.id])
+      ),
     ]);
     const csv = [header, ...rows].map((r) => r.map(csvCell).join(';')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' }));
@@ -439,7 +454,21 @@ function Participants({ event }: { event: EventDetails }) {
                   <td className="tabular px-4 py-3 text-fg">{p.shiftCount}</td>
                   {event.questions.map((q) => (
                     <td key={q.id} className="px-4 py-3 text-fg">
-                      {answerText(q, p.answers[q.id]) || <span className="text-fg-subtle">–</span>}
+                      {q.scope === 'PER_SIGNUP' ? (
+                        perSignup(q, p).length ? (
+                          <ul className="space-y-0.5">
+                            {perSignup(q, p).map((a, i) => (
+                              <li key={i}>
+                                <span className="text-xs text-fg-subtle">{a.label}:</span> {a.text}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-fg-subtle">–</span>
+                        )
+                      ) : (
+                        answerText(q, p.answers[q.id]) || <span className="text-fg-subtle">–</span>
+                      )}
                     </td>
                   ))}
                 </tr>

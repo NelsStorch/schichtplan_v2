@@ -10,7 +10,8 @@ import {
   safeReturnTo,
   type UserDto,
 } from '@schichtplan/shared';
-import { syncCeviDbHomeDepartment, toUserStufeDto } from '../services/homeDepartment.js';
+import { deriveCeviDbFields } from '../services/cevidb.js';
+import { storeCeviDbFields, syncCeviDbHomeDepartment, toUserStufeDto } from '../services/homeDepartment.js';
 import { ceviDbProfileFields } from '../services/profile.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
 
@@ -50,9 +51,23 @@ function cleanReturnTo(value: unknown, fallback = '/'): string {
 }
 
 /** Zurück zur Login-Seite mit Fehlercode, statt rohes JSON im Browser anzuzeigen. */
-function loginErrorUrl(code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_failed', returnTo: string) {
+function loginErrorUrl(
+  code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_failed',
+  returnTo: string | null
+) {
   const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
-  return `${base}/?error=${code}&return_to=${encodeURIComponent(returnTo)}`;
+  return `${base}/?error=${code}${returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : ''}`;
+}
+
+/**
+ * Ziel nach dem Login, wenn keines angegeben ist: die eigene Abteilung, sonst die Landingpage.
+ * (Früher ging es auf "/" der Login-Seite zurück, die dann wieder das Login zeigte.)
+ */
+function defaultDestination(homeDepartmentSlug: string | null): string {
+  if (process.env.NODE_ENV !== 'production') {
+    return homeDepartmentSlug ? `http://${homeDepartmentSlug}.localhost:3000/` : 'http://localhost:3001/';
+  }
+  return homeDepartmentSlug ? `https://${homeDepartmentSlug}.${rootDomain()}/` : `https://${rootDomain()}/`;
 }
 
 /**
@@ -147,10 +162,12 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const redirectUri =
         process.env.CEVIDB_REDIRECT_URI || `${protocol}://${host}/api/auth/cevidb/callback`;
 
-      const returnTo = cleanReturnTo(
-        request.query.returnTo,
-        request.tenant ? `${protocol}://${request.tenant.slug}.${host}` : '/'
-      );
+      // Ohne Ziel bestimmt der Callback die Weiterleitung (eigene Abteilung oder Landingpage)
+      const returnTo = request.query.returnTo
+        ? cleanReturnTo(request.query.returnTo)
+        : request.tenant
+          ? `${protocol}://${request.tenant.slug}.${host}`
+          : null;
 
       if (!CEVIDB_CLIENT_ID) {
         fastify.log.error('Cevi.DB OAuth ist nicht konfiguriert (CEVIDB_CLIENT_ID fehlt in der Umgebung)');
@@ -190,13 +207,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { code, state, error } = request.query;
 
-      let returnTo = '/';
+      // null = kein Ziel angegeben (direkt auf der Login-Seite angemeldet)
+      let returnTo: string | null = null;
       let tenantSlug: string | null = null;
 
       try {
         if (state) {
           const parsedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
-          returnTo = cleanReturnTo(parsedState.returnTo);
+          returnTo = parsedState.returnTo ? cleanReturnTo(parsedState.returnTo) : null;
           tenantSlug = parsedState.tenantSlug || null;
         }
       } catch (err) {
@@ -295,17 +313,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
       }
 
-      // Sicherstellen, dass DB-Spalten ceviDbData / ceviDbSyncedAt existieren
-      try {
-        await fastify.prisma.$executeRawUnsafe(`
-          ALTER TABLE "users"
-          ADD COLUMN IF NOT EXISTS "ceviDbData" JSONB,
-          ADD COLUMN IF NOT EXISTS "ceviDbSyncedAt" TIMESTAMP(3);
-        `);
-      } catch {
-        // Ignorieren falls Berechtigung fehlt oder Tabelle bereits angepasst
-      }
-
       const ceviDbId = profile.id;
       const email = (profile.email || `cevidb_${ceviDbId}@cevi-schichtplan.ch`).toLowerCase();
       const firstName = profile.first_name || profile.given_name || 'Cevianer*in';
@@ -372,11 +379,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
       }
 
-      // Die eigene Abteilung kommt aus Cevi.DB: Ortsgruppe der Person -> Abteilung mit gleicher ceviDbGroupId.
-      // Stufen werden über die Cevi.DB-Gruppen der Rollen abgeglichen.
-      const homeDepartmentId = await syncCeviDbHomeDepartment(fastify.prisma, user, profile);
-      if (homeDepartmentId) {
-        await ensureHelperMembership(fastify.prisma, homeDepartmentId, user.id);
+      // Was der Schichtplan aus Cevi.DB braucht, in eigene Spalten schreiben (ceviDbData wird nie gelesen).
+      // Die eigene Abteilung kommt aus der Ortsgruppe, Stufen über die Cevi.DB-Gruppen der Rollen.
+      const derived = deriveCeviDbFields(profile);
+      await storeCeviDbFields(fastify.prisma, user.id, derived);
+      const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, derived.ortsgruppeId);
+      if (homeDepartment) {
+        await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
       }
 
       // Kommt die Person von einer Abteilungs-Subdomain, dort ebenfalls als Helfer eintragen
@@ -399,11 +408,18 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       reply.clearCookie('cevidb_oauth_state', { path: '/' });
       setAuthCookie(reply, token);
 
-      // Ortsgruppe ohne Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen
-      if (!homeDepartmentId && !user.departmentSetupAt) {
-        return reply.redirect(loginPageUrl('/abteilung', returnTo));
+      // Ohne Ziel: Abteilungsseite, sonst Landingpage (nicht zurück auf die Login-Seite)
+      const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null);
+
+      // Abteilungsleitung, deren Ortsgruppe noch keinen Schichtplan hat: Abteilung anlegen anbieten
+      if (!homeDepartment && derived.isDepartmentLeader && derived.ortsgruppeId !== null) {
+        return reply.redirect(loginPageUrl('/abteilung-erstellen', target));
       }
-      return reply.redirect(returnTo);
+      // Ortsgruppe ohne Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen
+      if (!homeDepartment && !user.departmentSetupAt) {
+        return reply.redirect(loginPageUrl('/abteilung', target));
+      }
+      return reply.redirect(target);
     }
   );
 

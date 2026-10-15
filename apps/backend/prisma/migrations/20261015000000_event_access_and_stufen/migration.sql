@@ -196,12 +196,3 @@ ALTER TABLE "event_access_grants" ADD CONSTRAINT "event_access_grants_user_id_fk
 -- AddForeignKey
 ALTER TABLE "event_access_grants" ADD CONSTRAINT "event_access_grants_link_id_fkey" FOREIGN KEY ("link_id") REFERENCES "event_access_links"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-
--- Heimabteilung bereits angemeldeter Cevi.DB-Personen aus der Ortsgruppe ableiten (profile.ortsgruppe_id)
-UPDATE "users" u
-SET "home_department_id" = d."id",
-    "home_department_source" = 'CEVIDB',
-    "department_setup_at" = CURRENT_TIMESTAMP
-FROM "departments" d
-WHERE u."ceviDbData"->>'ortsgruppe_id' ~ '^[0-9]{1,9}$'
-  AND d."ceviDbGroupId" = (u."ceviDbData"->>'ortsgruppe_id')::integer;

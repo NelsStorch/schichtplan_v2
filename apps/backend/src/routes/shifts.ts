@@ -8,6 +8,7 @@ import {
   managerFlags,
 } from '../services/eventAccess.js';
 import { missingProfileFields } from '../services/profile.js';
+import { validateAnswers } from './eventParticipation.js';
 
 function calculateAge(birthDate: Date, targetDate: Date): number {
   let age = targetDate.getFullYear() - birthDate.getFullYear();
@@ -375,7 +376,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             include: {
               ...accessEventInclude,
               department: { select: { name: true } },
-              questions: { select: { id: true, required: true } },
+              questions: { select: { id: true, required: true, scope: true, label: true, type: true, options: true } },
             },
           },
         },
@@ -406,6 +407,16 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { taskId, userId: requestedUserId, guestName: reqGuestName, guestEmail: reqGuestEmail, guestPhone: reqGuestPhone } =
         parse.data;
+
+      // Antworten auf Fragen, die bei jeder Eintragung neu gestellt werden (PER_SIGNUP)
+      const perSignupQuestions = event.questions.filter((q) => q.scope === 'PER_SIGNUP');
+      const signupAnswers = Object.fromEntries(
+        perSignupQuestions
+          .map((q) => [q.id, (parse.data.answers?.[q.id] ?? '').trim()] as const)
+          .filter(([, value]) => value)
+      );
+      const invalidAnswer = validateAnswers(perSignupQuestions, signupAnswers);
+      if (invalidAnswer) return reply.status(400).send({ error: invalidAnswer });
 
       let targetUserId: string | null = null;
       let targetUser = null;
@@ -457,14 +468,23 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           select: { questionId: true, value: true },
         });
         const missingQuestionIds = event.questions
-          .filter((q) => q.required && !answered.some((a) => a.questionId === q.id && a.value.trim()))
+          .filter(
+            (q) =>
+              q.scope !== 'PER_SIGNUP' &&
+              q.required &&
+              !answered.some((a) => a.questionId === q.id && a.value.trim())
+          )
           .map((q) => q.id);
-        if (missingFields.length > 0 || missingQuestionIds.length > 0) {
+        const missingSignupQuestionIds = perSignupQuestions
+          .filter((q) => q.required && !signupAnswers[q.id])
+          .map((q) => q.id);
+        if (missingFields.length > 0 || missingQuestionIds.length > 0 || missingSignupQuestionIds.length > 0) {
           return reply.status(400).send({
             error: 'Für diesen Anlass fehlen noch Angaben.',
             code: 'MISSING_INFO',
             missingFields,
             missingQuestionIds,
+            missingSignupQuestionIds,
           });
         }
       }
@@ -570,6 +590,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           guestName,
           guestEmail,
           guestPhone,
+          answers: {
+            create: Object.entries(signupAnswers).map(([questionId, value]) => ({ questionId, value })),
+          },
         },
         include: {
           user: {

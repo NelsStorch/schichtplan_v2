@@ -13,6 +13,7 @@ const EventQuestionInputSchema = z
     type: z.enum(['TEXT', 'YES_NO', 'CHOICE']).default('TEXT'),
     options: z.array(z.string().trim().min(1).max(100)).max(30).default([]),
     required: z.boolean().default(false),
+    scope: z.enum(['ONCE', 'PER_SIGNUP']).default('ONCE'),
   })
   .refine((q) => q.type !== 'CHOICE' || q.options.length >= 2, {
     message: 'Eine Auswahl-Frage braucht mindestens zwei Antworten',
@@ -39,18 +40,6 @@ const DepartmentSlugSchema = z
     message: 'Diese Subdomain ist reserviert und kann nicht verwendet werden',
   });
 
-export const RegisterDepartmentSchema = z.object({
-  departmentName: z.string().min(2, 'Name muss mindestens 2 Zeichen lang sein'),
-  slug: DepartmentSlugSchema,
-  adminFirstName: z.string().min(2, 'Vorname ist erforderlich'),
-  adminLastName: z.string().min(2, 'Nachname ist erforderlich'),
-  adminCeviName: z.string().optional(),
-  adminEmail: z.string().email('Ungültige E-Mail-Adresse'),
-  adminPassword: z.string().min(8, 'Passwort muss mindestens 8 Zeichen lang sein'),
-  adminPhone: z.string().optional(),
-});
-
-export type RegisterDepartmentInput = z.infer<typeof RegisterDepartmentSchema>;
 
 /** Abteilung anlegen als angemeldete Abteilungsleitung (Cevi.DB): ohne Passwort, Admin ist die angemeldete Person. */
 export const CreateDepartmentFromCeviDbSchema = z.object({
@@ -278,6 +267,8 @@ export const SignupShiftSchema = z.object({
   guestName: z.string().min(2, 'Bitte Cevi-Name oder Vorname angeben').optional().nullable(),
   guestEmail: z.string().email('Ungültige E-Mail').optional().or(z.literal('')).nullable(),
   guestPhone: z.string().optional().nullable(),
+  /** Antworten auf Fragen mit scope PER_SIGNUP (questionId -> Antwort) */
+  answers: z.record(z.string().uuid(), z.string().trim().max(1000)).optional(),
 });
 
 export type SignupShiftInput = z.infer<typeof SignupShiftSchema>;

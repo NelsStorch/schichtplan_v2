@@ -1,5 +1,6 @@
 import type {
   EventAccessType,
+  EventQuestionScope,
   EventQuestionType,
   RequiredProfileField,
   StufeRole,
@@ -270,6 +271,8 @@ export interface EventQuestionDto {
   type: EventQuestionType;
   options: string[];
   required: boolean;
+  /** ONCE = einmal pro Anlass, PER_SIGNUP = bei jeder Eintragung (Antwort pro Schicht) */
+  scope: EventQuestionScope;
 }
 
 /** Was der angemeldeten Person beim Anlass noch fehlt bzw. was sie angegeben hat */
@@ -306,7 +309,10 @@ export interface EventParticipantDto {
   homeDepartmentName: string | null;
   viaLink: boolean;
   shiftCount: number;
+  /** Antworten auf Fragen mit scope ONCE */
   answers: Record<string, string>;
+  /** Antworten auf Fragen mit scope PER_SIGNUP, pro Eintragung */
+  signupAnswers: { shiftTitle: string; startTime: string; answers: Record<string, string> }[];
 }
 
 export interface CeviDbRoleDto {
@@ -492,6 +498,8 @@ export interface DepartmentCreationEligibilityDto {
    */
   reason: 'NOT_CEVIDB' | 'NOT_LEADER' | 'NO_ORTSGRUPPE' | 'EXISTS' | null;
   ortsgruppeId: number | null;
+  /** Name der Ortsgruppe laut Cevi.DB (z. B. "Illnau-Effretikon"), Vorschlag für den Namen */
+  ortsgruppeName: string | null;
   /** Name der Cevi.DB-Gruppe, in der die Person Abteilungsleitung ist (z. B. "JS Illnau") */
   leaderGroupName: string | null;
   existingDepartment: { name: string; slug: string } | null;

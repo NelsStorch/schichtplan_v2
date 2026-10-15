@@ -1,6 +1,6 @@
 /**
  * Auswertung des Cevi.DB-Profils (`/oauth/profile` mit Scope `with_roles`).
- * Das Profil wird beim Cevi.DB-Login in `users.ceviDbData` gespeichert.
+ * Wird nur beim Cevi.DB-Login auf die frische Antwort angewendet (`deriveCeviDbFields`), nie auf `users.ceviDbData`.
  * Welche Rollen was bedeuten, steht in `config/cevidb.ts`.
  */
 import type { CeviDbStufeDto } from '@schichtplan/shared';
@@ -99,4 +99,34 @@ export function ceviDbStufen(profile: unknown): CeviDbStufeDto[] {
       kindRank[a.kind] - kindRank[b.kind] ||
       a.groupName.localeCompare(b.groupName, 'de')
   );
+}
+
+/** Name der Ortsgruppe: Gruppe einer Rolle mit der ID der Ortsgruppe (z. B. «Illnau-Effretikon») */
+function ortsgruppeNameFromProfile(profile: unknown, ortsgruppeId: number | null): string | null {
+  if (ortsgruppeId === null) return null;
+  const role = profileRoles(profile).find((r) => parseCeviDbGroupId(r.group_id) === ortsgruppeId);
+  return role && typeof role.group_name === 'string' ? role.group_name : null;
+}
+
+export interface CeviDbDerived {
+  ortsgruppeId: number | null;
+  ortsgruppeName: string | null;
+  isDepartmentLeader: boolean;
+  leaderGroupName: string | null;
+  stufen: CeviDbStufeDto[];
+}
+
+/**
+ * Alles, was der Schichtplan aus dem Cevi.DB-Profil braucht. Wird nur direkt beim Login auf die frische
+ * OAuth-Antwort angewendet und in eigene Spalten/Tabellen geschrieben (users.ceviDbData wird nie gelesen).
+ */
+export function deriveCeviDbFields(profile: unknown): CeviDbDerived {
+  const leadership = ceviDbLeadership(profile);
+  return {
+    ortsgruppeId: leadership.ortsgruppeId,
+    ortsgruppeName: ortsgruppeNameFromProfile(profile, leadership.ortsgruppeId),
+    isDepartmentLeader: leadership.isLeader,
+    leaderGroupName: leadership.leaderGroupName,
+    stufen: ceviDbStufen(profile),
+  };
 }

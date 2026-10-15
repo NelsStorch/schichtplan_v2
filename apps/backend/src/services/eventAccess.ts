@@ -11,7 +11,6 @@ import {
   type EventAccessDto,
   type EventAccessReason,
 } from '@schichtplan/shared';
-import { ceviDbLeadership, ceviDbStufen } from './cevidb.js';
 
 /** Was die Prüfung vom Anlass braucht */
 export interface AccessEvent {
@@ -36,7 +35,10 @@ export interface AccessUser {
   id: string;
   isGlobalAdmin: boolean;
   ceviDbId: number | null;
-  ceviDbData: unknown;
+  /** Abteilungsleitung laut Cevi.DB (beim Login gespeichert) */
+  ceviDbDepartmentLeader: boolean;
+  /** Stufen-Rollen laut Cevi.DB, auch in Stufen, die keine Abteilung erfasst hat */
+  ceviDbStufen: { kind: string }[];
   homeDepartmentId: string | null;
   homeDepartmentSource: string | null;
   stufen: { stufeId: string; role: string; source: string }[];
@@ -46,7 +48,8 @@ export const accessUserSelect = {
   id: true,
   isGlobalAdmin: true,
   ceviDbId: true,
-  ceviDbData: true,
+  ceviDbDepartmentLeader: true,
+  ceviDbStufen: { select: { kind: true } },
   homeDepartmentId: true,
   homeDepartmentSource: true,
   stufen: { select: { stufeId: true, role: true, source: true } },
@@ -156,8 +159,8 @@ function checkRules(event: AccessEvent, user: AccessUser, departmentName: string
     // Abteilungsleitung laut Cevi.DB zählt immer, bei «alle Abteilungen» auch jede Stufenleitung aus Cevi.DB
     const ceviDbLeader =
       user.ceviDbId !== null &&
-      (ceviDbLeadership(user.ceviDbData).isLeader ||
-        (cfg.scope === 'ANY' && ceviDbStufen(user.ceviDbData).some((s) => s.kind === 'LEITUNG')));
+      (user.ceviDbDepartmentLeader ||
+        (cfg.scope === 'ANY' && user.ceviDbStufen.some((s) => s.kind === 'LEITUNG')));
     if (!leadsStufe && !ceviDbLeader) {
       return deny('LEADERS_ONLY', 'Dieser Anlass ist nur für Leitende.');
     }

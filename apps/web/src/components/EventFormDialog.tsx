@@ -44,6 +44,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
         type: q.type,
         optionsText: q.options.join('\n'),
         required: q.required,
+        scope: q.scope,
       })),
     },
   };
@@ -337,6 +338,7 @@ function EventForm({
                           type: q.type,
                           optionsText: q.options.join('\n'),
                           required: q.required,
+                          scope: q.scope ?? 'ONCE',
                         })),
                       },
                     }));

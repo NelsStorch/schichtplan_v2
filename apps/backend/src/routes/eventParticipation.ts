@@ -10,6 +10,23 @@ import {
 import { managerFlags } from '../services/eventAccess.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
 
+/** Fehlermeldung bei ungültiger Antwort (Auswahl nicht in den Optionen, Ja/Nein falsch), sonst null */
+export function validateAnswers(
+  questions: { id: string; label: string; type: string; options: string[] }[],
+  answers: Record<string, string>
+): string | null {
+  for (const question of questions) {
+    const value = (answers[question.id] ?? '').trim();
+    if (question.type === 'CHOICE' && value && !question.options.includes(value)) {
+      return `Ungültige Antwort bei «${question.label}»`;
+    }
+    if (question.type === 'YES_NO' && value && value !== 'JA' && value !== 'NEIN') {
+      return `Bitte Ja oder Nein bei «${question.label}»`;
+    }
+  }
+  return null;
+}
+
 const displayNameOf = (u: { ceviName: string | null; firstName: string; lastName: string }) =>
   u.ceviName || `${u.firstName} ${u.lastName}`.trim();
 
@@ -191,18 +208,12 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const answers = parse.data.answers ?? {};
+      // Hier nur Fragen, die einmal pro Anlass gelten; PER_SIGNUP-Antworten kommen mit der Eintragung
       const questions = await fastify.prisma.eventQuestion.findMany({
-        where: { eventId: event.id, id: { in: Object.keys(answers) } },
+        where: { eventId: event.id, id: { in: Object.keys(answers) }, scope: 'ONCE' },
       });
-      for (const question of questions) {
-        const value = answers[question.id].trim();
-        if (question.type === 'CHOICE' && value && !question.options.includes(value)) {
-          return reply.status(400).send({ error: `Ungültige Antwort bei «${question.label}»` });
-        }
-        if (question.type === 'YES_NO' && value && value !== 'JA' && value !== 'NEIN') {
-          return reply.status(400).send({ error: `Bitte Ja oder Nein bei «${question.label}»` });
-        }
-      }
+      const invalid = validateAnswers(questions, answers);
+      if (invalid) return reply.status(400).send({ error: invalid });
 
       await fastify.prisma.$transaction(
         questions.map((question) => {
@@ -236,6 +247,8 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const signups = await fastify.prisma.shiftSignup.findMany({
         where: { shift: { eventId: event.id } },
         include: {
+          shift: { select: { title: true, startTime: true } },
+          answers: { select: { questionId: true, value: true } },
           user: {
             select: {
               id: true,
@@ -262,9 +275,19 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const byPerson = new Map<string, EventParticipantDto>();
       for (const su of signups) {
         const key = su.user ? `u:${su.user.id}` : `g:${(su.guestName || '').toLowerCase()}`;
+        const signupAnswers = su.answers.length
+          ? [
+              {
+                shiftTitle: su.shift.title,
+                startTime: su.shift.startTime.toISOString(),
+                answers: Object.fromEntries(su.answers.map((a) => [a.questionId, a.value])),
+              },
+            ]
+          : [];
         const existing = byPerson.get(key);
         if (existing) {
           existing.shiftCount++;
+          existing.signupAnswers.push(...signupAnswers);
           continue;
         }
         const u = su.user;
@@ -280,6 +303,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           homeDepartmentName: u?.homeDepartment?.name ?? null,
           viaLink: Boolean(u && grantUserIds.has(u.id)),
           shiftCount: 1,
+          signupAnswers,
           answers: u
             ? Object.fromEntries(answers.filter((a) => a.userId === u.id).map((a) => [a.questionId, a.value]))
             : {},

@@ -187,7 +187,11 @@ async function main() {
       accessType: 'DEPARTMENT',
       requiredFields: ['PHONE', 'BIRTH_DATE'],
       questions: {
-        create: [{ label: 'Allergien oder Unverträglichkeiten', type: 'TEXT', required: false, sortOrder: 0 }],
+        create: [
+          { label: 'Allergien oder Unverträglichkeiten', type: 'TEXT', required: false, sortOrder: 0 },
+          // Wird bei jeder Eintragung neu gefragt (Antwort pro Schicht)
+          { label: 'Kommst du mit dem Auto?', type: 'YES_NO', required: true, scope: 'PER_SIGNUP', sortOrder: 1 },
+        ],
       },
     },
   });

@@ -5,15 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Check, Database, Search, UsersRound } from 'lucide-react';
 import type { DepartmentDirectoryItemDto, StufeRole, UserDto } from '@schichtplan/shared';
 import { Button, Callout, CeviLogo, Input, ThemeToggle, cn } from '@schichtplan/ui';
-import { safeReturnTo } from '@schichtplan/shared/redirect';
-
-/** Weiterleitungsziel nur auf der eigenen Domain zulassen (wie auf der Login-Seite) */
-function cleanReturnTo(raw: string | null): string {
-  if (typeof window === 'undefined') return '/';
-  const host = window.location.hostname;
-  const isLocal = host === 'localhost' || host === '127.0.0.1';
-  return safeReturnTo(raw, host.replace(/^login\./, ''), { allowLocalhost: isLocal });
-}
+import { cleanReturnTo, finalDestination } from '@/lib/destination';
 
 const NONE = 'NONE';
 
@@ -39,7 +31,7 @@ function DepartmentSetup() {
     (async () => {
       const meRes = await fetch('/api/auth/me', { cache: 'no-store' });
       if (meRes.status === 401) {
-        window.location.href = `/?return_to=${encodeURIComponent(returnTo)}`;
+        window.location.href = `/?return_to=${encodeURIComponent(window.location.href)}`;
         return;
       }
       const me = (await meRes.json()) as UserDto;
@@ -92,7 +84,7 @@ function DepartmentSetup() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Speichern hat nicht geklappt.');
-      window.location.href = returnTo;
+      window.location.href = finalDestination(returnTo, data as UserDto);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speichern hat nicht geklappt.');
       setSaving(false);
