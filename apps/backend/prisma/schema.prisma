@@ -22,8 +22,8 @@ model Department {
   // Cevi.DB-Gruppen-ID der Ortsgruppe (Feld `ortsgruppe_id` im Cevi.DB-Profil).
   // Wer sich mit Cevi.DB anmeldet und zu dieser Ortsgruppe gehört, wird automatisch Mitglied.
   ceviDbGroupId Int?              @unique
-  // Startseite (Liste der Anlässe) nur für Mitglieder; öffentliche Anlässe bleiben per Link erreichbar
-  membersOnly   Boolean           @default(false) @map("members_only")
+  // Startseite (Liste der Anlässe) nur für Mitglieder (Vorgabe: an); öffentliche Anlässe bleiben per Link erreichbar
+  membersOnly   Boolean           @default(true) @map("members_only")
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   events       Event[]

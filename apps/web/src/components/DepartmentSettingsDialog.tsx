@@ -67,7 +67,7 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
     logoUrl: department?.logoUrl ?? '',
     contactEmail: department?.contactEmail ?? '',
     primaryColor: department?.primaryColor ?? SWATCHES[0],
-    membersOnly: department?.membersOnly ?? false,
+    membersOnly: department?.membersOnly ?? true,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
