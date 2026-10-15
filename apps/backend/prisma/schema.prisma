@@ -1,10 +1,15 @@
+// Prisma 7: Client wird nach src/generated/prisma erzeugt (nicht eingecheckt, `npx prisma generate`).
+// ESM mit .js-Endungen, passend zu "module": "NodeNext" im Backend.
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
 }
 
+// Die Verbindung (DATABASE_URL) steht in prisma.config.ts, die App verbindet über @prisma/adapter-pg.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Department {

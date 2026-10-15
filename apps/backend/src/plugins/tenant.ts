@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import { Department } from '@prisma/client';
+import { Department } from '../db.js';
 import { RESERVED_SUBDOMAINS } from '@schichtplan/shared';
 
 declare module 'fastify' {

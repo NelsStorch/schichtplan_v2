@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '../db.js';
 import {
   accessTypeConfig,
   toEventAccessType,

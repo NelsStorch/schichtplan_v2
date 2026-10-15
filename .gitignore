@@ -63,3 +63,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Prisma 7 generiert den Client in den Quellordner (npx prisma generate)
+apps/backend/src/generated/

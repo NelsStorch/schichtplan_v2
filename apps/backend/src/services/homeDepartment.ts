@@ -4,7 +4,7 @@
  * Alle anderen geben beides beim Login selbst an (Quelle SELF).
  * Grundlage sind die beim Login gespeicherten Spalten (users.ceviDb*) und user_cevidb_stufen, nie users.ceviDbData.
  */
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../db.js';
 import type { CeviDbStufeDto, StufeRole, UserStufeDto } from '@schichtplan/shared';
 import type { CeviDbDerived } from './cevidb.js';
 

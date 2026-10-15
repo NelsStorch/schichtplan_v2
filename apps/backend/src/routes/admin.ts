@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../db.js';
 import { z } from 'zod';
 import type {
   AdminOverviewDto,

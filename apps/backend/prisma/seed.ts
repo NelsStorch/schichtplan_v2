@@ -1,8 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
+import { createPrismaClient } from '../src/db.js';
 
-const prisma = new PrismaClient();
+dotenv.config({ quiet: true });
+
+const prisma = createPrismaClient();
 
 // Neutrale Demo-Daten für die lokale Entwicklung (keine echten Personen, Abteilungen oder Passwörter).
 // Nur fehlende Daten anlegen, nie bestehende überschreiben (update: {}) oder löschen.

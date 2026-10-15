@@ -5,7 +5,7 @@
  * danach zählt ein eingelöster Zugangs-Link, sonst die Regeln des Zugangs-Typs (EVENT_ACCESS_TYPES):
  * Cevi.DB-Pflicht, Abteilung (eigene plus Whitelist), Stufen-Filter und «nur Leitende».
  */
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../db.js';
 import {
   accessTypeConfig,
   type EventAccessDto,

@@ -20,6 +20,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 FROM base AS development
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
+# Backend-eigene Abhängigkeiten, die npm nicht hochzieht (z. B. dotenv 18, weil Prisma intern dotenv 17 nutzt)
+COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY packages/shared ./packages/shared
 COPY apps/backend ./apps/backend
 WORKDIR /app/apps/backend
@@ -31,6 +33,8 @@ CMD ["npm", "run", "dev"]
 FROM base AS builder
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
+# Backend-eigene Abhängigkeiten, die npm nicht hochzieht (z. B. dotenv 18, weil Prisma intern dotenv 17 nutzt)
+COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY packages/shared ./packages/shared
 COPY apps/backend ./apps/backend
 WORKDIR /app/packages/shared
@@ -44,11 +48,14 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/apps/backend/package.json ./apps/backend/package.json
 COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
+# Prisma 7: CLI-Konfiguration (DATABASE_URL, Migrationen) für `npx prisma migrate deploy` im Deploy
+COPY --from=builder /app/apps/backend/prisma.config.ts ./apps/backend/prisma.config.ts
 
 WORKDIR /app/apps/backend
 EXPOSE 4000

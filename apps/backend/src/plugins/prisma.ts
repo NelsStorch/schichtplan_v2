@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient, type PrismaClient } from '../db.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -9,7 +9,7 @@ declare module 'fastify' {
 }
 
 const prismaPlugin: FastifyPluginAsync = async (fastify) => {
-  const prisma = new PrismaClient({
+  const prisma = createPrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 

@@ -5,7 +5,7 @@
  * im OK eines ihrer Anlässe sitzt oder globaler Admin ist. Die Helfer-Mitgliedschaft (department_members
  * HELPER) zählt bewusst nicht: Sie entsteht schon durch ein Login von der Subdomain aus.
  */
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../db.js';
 
 export async function isDepartmentInsider(
   prisma: Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer'>,
