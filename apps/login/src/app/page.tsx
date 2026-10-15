@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight, ChevronRight, Database, KeyRound, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ChevronRight, Database, KeyRound, UserRound, Mail, CheckCircle2 } from 'lucide-react';
 import {
   Button,
   Callout,
@@ -17,7 +17,7 @@ import {
 import { getLandingUrl } from '@schichtplan/shared/redirect';
 import { afterLogin, cleanReturnTo } from '@/lib/destination';
 
-type View = 'start' | 'ceviname' | 'password';
+type View = 'start' | 'ceviname' | 'password' | 'verify_sent';
 
 // Fehlercodes, mit denen das Backend nach einem gescheiterten Cevi.DB-Login hierher zurückleitet
 const loginErrors: Record<string, string> = {
@@ -70,6 +70,11 @@ function LoginContent() {
   );
   const [success, setSuccess] = useState<string | null>(null);
 
+  // E-Mail-Verifikation
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendNotice, setResendNotice] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+
   // Fehlercode aus der Adresse entfernen, damit er nach einem Neuladen nicht erneut erscheint
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -90,6 +95,27 @@ function LoginContent() {
     setView(next);
     setError(null);
     setSuccess(null);
+    setResendNotice(null);
+  };
+
+  const handleResend = async (targetEmail: string) => {
+    if (!targetEmail.trim()) return;
+    setResending(true);
+    setResendNotice(null);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Fehler beim Senden.');
+      setResendNotice({ tone: 'success', text: data.message || 'Neuer Bestätigungslink gesendet!' });
+    } catch (err: any) {
+      setResendNotice({ tone: 'danger', text: err.message || 'Fehler beim Senden.' });
+    } finally {
+      setResending(false);
+    }
   };
 
   const handleQuickSubmit = async (e: React.FormEvent) => {
@@ -160,7 +186,15 @@ function LoginContent() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (data.requiresVerification) {
+          setUnverifiedEmail(email);
+        }
         throw new Error(data.error || (authMode === 'login' ? 'Anmeldung fehlgeschlagen. Bitte versuche es nochmals.' : 'Konto konnte nicht erstellt werden. Bitte versuche es nochmals.'));
+      }
+
+      if (data.requiresVerification) {
+        setView('verify_sent');
+        return;
       }
 
       setSuccess(
@@ -185,8 +219,30 @@ function LoginContent() {
   const feedback = (
     <>
       {error && (
-        <Callout tone="danger" className="animate-fade-in">
-          {error}
+        <div className="space-y-2 animate-fade-in">
+          <Callout tone="danger">
+            {error}
+          </Callout>
+          {unverifiedEmail && (
+            <div className="rounded-xl border border-line bg-surface p-3 text-xs flex flex-col gap-2">
+              <span className="text-fg-muted">Bestätigungslink nicht erhalten?</span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={resending}
+                disabled={resending}
+                onClick={() => handleResend(unverifiedEmail)}
+              >
+                Neuen Bestätigungslink anfordern
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      {resendNotice && (
+        <Callout tone={resendNotice.tone} className="animate-fade-in">
+          {resendNotice.text}
         </Callout>
       )}
       {success && (
@@ -507,6 +563,60 @@ function LoginContent() {
               </Button>
             </div>
           </form>
+        )}
+
+        {view === 'verify_sent' && (
+          <div key="verify_sent" className="animate-fade-up">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <Mail className="size-6" />
+            </div>
+            <h1 className="mt-4 font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
+              E-Mail bestätigen
+            </h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
+              Wir haben einen Bestätigungslink an{' '}
+              <strong className="font-semibold text-fg">{email}</strong> gesendet.
+            </p>
+            <div className="mt-4 rounded-xl border border-line bg-surface p-4 text-xs leading-relaxed text-fg-subtle">
+              Bitte klicke auf den Link in der E-Mail, um dein Konto zu aktivieren.
+              Prüfe bitte auch deinen Spam-Ordner, falls die E-Mail nicht innerhalb weniger Minuten ankommt.
+            </div>
+
+            {resendNotice && (
+              <div className="mt-4">
+                <Callout tone={resendNotice.tone}>{resendNotice.text}</Callout>
+              </div>
+            )}
+
+            <div className="mt-6 space-y-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                loading={resending}
+                disabled={resending}
+                onClick={() => handleResend(email)}
+                className="w-full"
+              >
+                Bestätigungs-E-Mail erneut senden
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                onClick={() => {
+                  setView('password');
+                  setAuthMode('login');
+                  setError(null);
+                  setResendNotice(null);
+                }}
+                className="w-full"
+              >
+                Zurück zum Login
+              </Button>
+            </div>
+          </div>
         )}
       </main>
 

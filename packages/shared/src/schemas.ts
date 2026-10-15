@@ -327,3 +327,15 @@ export const UpdateDepartmentPersonSchema = z.object({
 });
 
 export type UpdateDepartmentPersonInput = z.infer<typeof UpdateDepartmentPersonSchema>;
+
+export const VerifyEmailSchema = z.object({
+  token: z.string().min(1, 'Token ist erforderlich'),
+});
+
+export type VerifyEmailInput = z.infer<typeof VerifyEmailSchema>;
+
+export const ResendVerificationSchema = z.object({
+  email: z.string().email('Ungültige E-Mail-Adresse'),
+});
+
+export type ResendVerificationInput = z.infer<typeof ResendVerificationSchema>;

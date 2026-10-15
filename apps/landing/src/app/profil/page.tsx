@@ -116,6 +116,27 @@ export default function ProfilePage() {
   }, []);
 
   const hasRealEmail = Boolean(user?.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  const [resendingVerification, setResendingVerification] = useState(false);
+
+  const handleProfileResend = async () => {
+    if (!user?.email) return;
+    setResendingVerification(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Fehler beim Senden.');
+      setMessage({ tone: 'success', text: data.message || 'Neuer Bestätigungslink gesendet!' });
+    } catch (err) {
+      setMessage({ tone: 'danger', text: err instanceof Error ? err.message : 'Fehler beim Senden.' });
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -253,7 +274,33 @@ export default function ProfilePage() {
                 <Field label="Adresse" className="sm:col-span-2">
                   <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} autoComplete="street-address" placeholder="Dorfstrasse 1, 8307 Effretikon" />
                 </Field>
-                {!hasRealEmail && (
+                {hasRealEmail ? (
+                  <div className="sm:col-span-2">
+                    <div className="text-xs font-medium text-fg-subtle">E-Mail</div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-fg">{user?.email}</span>
+                      {user?.emailVerified ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          ✓ Bestätigt
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Nicht bestätigt
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleProfileResend}
+                            disabled={resendingVerification}
+                            className="text-xs font-medium text-accent-ink underline-offset-4 hover:underline"
+                          >
+                            {resendingVerification ? 'Wird gesendet …' : 'Bestätigungslink anfordern'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
                   <Field label="E-Mail" className="sm:col-span-2">
                     <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} autoComplete="email" />
                   </Field>

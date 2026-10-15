@@ -106,6 +106,11 @@ CEVIDB_CLIENT_ID=
 CEVIDB_CLIENT_SECRET=
 GLOBAL_ADMIN_CEVIDB_IDS=
 CEVIDB_REDIRECT_URI=https://login.$DefaultDomain/api/auth/cevidb/callback
+SMTP_HOST=mail.infomaniak.com
+SMTP_PORT=587
+SMTP_USER=admin@cevi-schichtplan.ch
+SMTP_PASSWORD=
+SMTP_FROM=Cevi Schichtplan <admin@cevi-schichtplan.ch>
 ENVEOF
   else
     cat > .env <<ENVEOF
@@ -121,6 +126,11 @@ CEVIDB_CLIENT_ID=
 CEVIDB_CLIENT_SECRET=
 GLOBAL_ADMIN_CEVIDB_IDS=
 CEVIDB_REDIRECT_URI=https://login.$DefaultDomain/api/auth/cevidb/callback
+SMTP_HOST=mail.infomaniak.com
+SMTP_PORT=587
+SMTP_USER=admin@cevi-schichtplan.ch
+SMTP_PASSWORD=
+SMTP_FROM=Cevi Schichtplan <admin@cevi-schichtplan.ch>
 ENVEOF
   fi
   chmod 600 .env

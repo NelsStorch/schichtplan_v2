@@ -114,6 +114,8 @@ model User {
   homeDepartmentSource String?     @map("home_department_source") // "CEVIDB", "SELF"
   // Gesetzt, sobald die Person ihre Abteilung angegeben hat (auch «keine Abteilung»). Null = nachfragen.
   departmentSetupAt    DateTime?   @map("department_setup_at")
+  emailVerified       Boolean            @default(false) @map("email_verified")
+  emailVerifiedAt     DateTime?          @map("email_verified_at")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
@@ -125,6 +127,7 @@ model User {
   eventAnswers  EventAnswer[]
   eventAccessGrants EventAccessGrant[]
   deregistrations EventDeregistration[]
+  emailVerificationTokens EmailVerificationToken[]
 
   @@map("users")
 }
@@ -401,5 +404,19 @@ model Upload {
   createdAt DateTime @default(now())
 
   @@map("uploads")
+}
+
+// Token zur Bestätigung der E-Mail-Adresse (z. B. nach Registrierung oder E-Mail-Änderung)
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  email     String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
 }
 

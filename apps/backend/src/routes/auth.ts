@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import {
   LoginSchema,
   RegisterHelperSchema,
+  VerifyEmailSchema,
+  ResendVerificationSchema,
   CeviNameQuickLoginSchema,
   SetHomeDepartmentSchema,
   UpdateProfileSchema,
@@ -20,6 +22,7 @@ import {
 } from '../services/homeDepartment.js';
 import { ceviDbProfileFields } from '../services/profile.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
+import { sendVerificationEmail } from '../services/email.js';
 
 function getCookieDomain(): string | undefined {
   if (process.env.COOKIE_DOMAIN) {
@@ -88,6 +91,20 @@ function bootstrapAdminCeviDbIds(): Set<number> {
   return new Set(ids);
 }
 
+/** Basis-URL für das zentrale Login-Portal (login.<domain>) */
+function getLoginPortalBaseUrl(requestHost?: string): string {
+  if (process.env.NODE_ENV !== 'production' || (requestHost && requestHost.includes('localhost'))) {
+    return 'http://localhost:3002';
+  }
+  const domain = (
+    process.env.COOKIE_DOMAIN ||
+    process.env.DOMAIN_DEV ||
+    process.env.DOMAIN ||
+    'cevi-schichtplan.ch'
+  ).replace(/^\./, '');
+  return `https://login.${domain}`;
+}
+
 /** Login-Seite (login.<domain>), z. B. für die Abfrage der Abteilung nach dem Cevi.DB-Login */
 function loginPageUrl(path: string, returnTo: string) {
   const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
@@ -125,6 +142,7 @@ async function loadUserDto(
     ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
     hasCeviDb: Boolean(user.ceviDbId),
     hasPassword: Boolean(user.passwordHash),
+    emailVerified: user.emailVerified,
     canSelfDelete: Boolean(user.ceviDbId !== null || user.passwordHash !== null),
     homeDepartment: user.homeDepartment,
     homeDepartmentFromCeviDb: user.homeDepartmentSource === 'CEVIDB',
@@ -358,6 +376,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             birthDate,
             address: extra.address,
             phone: extra.phone,
+            emailVerified: true,
+            emailVerifiedAt: now,
             ceviDbData: profile,
             ceviDbSyncedAt: now,
           },
@@ -373,6 +393,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             birthDate: birthDate || user.birthDate,
             address: user.address || extra.address,
             phone: user.phone || extra.phone,
+            emailVerified: true,
+            emailVerifiedAt: user.emailVerifiedAt || now,
             ceviDbData: profile,
             ceviDbSyncedAt: now,
           },
@@ -565,6 +587,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(401).send({ error: 'E-Mail oder Passwort falsch' });
     }
 
+    // E-Mail-Bestätigung erzwingen
+    if (!user.emailVerified) {
+      return reply.status(403).send({
+        error: 'Bitte bestätige zuerst deine E-Mail-Adresse. Wir haben dir einen Bestätigungslink gesendet.',
+        requiresVerification: true,
+        email: user.email,
+      });
+    }
+
     const token = fastify.jwt.sign({
       id: user.id,
       email: user.email || `${user.id}@cevi-schichtplan.ch`,
@@ -579,7 +610,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  // 5. Helfer registrieren mit Passwort
+  // 5. Helfer registrieren mit Passwort (erfordert E-Mail-Bestätigung)
   fastify.post('/api/auth/register-helper', async (request, reply) => {
     const parse = RegisterHelperSchema.safeParse(request.body);
     if (!parse.success) {
@@ -587,49 +618,217 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const { email, password, firstName, lastName, ceviName, phone } = parse.data;
+    const cleanEmail = email.toLowerCase().trim();
     const existing = await fastify.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: cleanEmail },
     });
 
-    if (existing) {
+    if (existing && (existing.passwordHash || existing.emailVerified)) {
       return reply.status(409).send({ error: 'Diese E-Mail ist bereits registriert' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await fastify.prisma.user.create({
-      data: {
-        email: email.toLowerCase(),
-        passwordHash,
-        firstName,
-        lastName,
-        ceviName: ceviName || null,
-        phone: phone || null,
-      },
-    });
-
-    if (request.tenant) {
-      await fastify.prisma.departmentMember.create({
+    let user;
+    if (existing) {
+      user = await fastify.prisma.user.update({
+        where: { id: existing.id },
         data: {
-          departmentId: request.tenant.id,
-          userId: user.id,
-          role: 'HELPER',
+          passwordHash,
+          firstName,
+          lastName,
+          ceviName: ceviName || existing.ceviName,
+          phone: phone || existing.phone,
+          emailVerified: false,
+          emailVerifiedAt: null,
+        },
+      });
+    } else {
+      user = await fastify.prisma.user.create({
+        data: {
+          email: cleanEmail,
+          passwordHash,
+          firstName,
+          lastName,
+          ceviName: ceviName || null,
+          phone: phone || null,
+          emailVerified: false,
+          emailVerifiedAt: null,
         },
       });
     }
 
-    const token = fastify.jwt.sign({
-      id: user.id,
-      email: user.email,
-      isGlobalAdmin: false,
+    if (request.tenant) {
+      await ensureHelperMembership(fastify.prisma, request.tenant.id, user.id);
+    }
+
+    // Token erzeugen & altes löschen
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    await fastify.prisma.emailVerificationToken.deleteMany({
+      where: { userId: user.id },
+    });
+    await fastify.prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token: verificationToken,
+        email: cleanEmail,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 Stunden
+      },
     });
 
-    setAuthCookie(reply, token);
+    // Bestätigungs-E-Mail versenden
+    const loginPortalUrl = getLoginPortalBaseUrl(request.headers.host);
+    const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
+    await sendVerificationEmail({
+      to: cleanEmail,
+      name: user.ceviName || user.firstName,
+      verificationUrl,
+    });
 
+    // Absichtlich KEIN Auth-Cookie setzen, damit die E-Mail zuerst verifiziert werden muss
     return {
-      token,
-      user: await loadUserDto(fastify.prisma, user.id, request.tenant?.id ?? null),
+      success: true,
+      requiresVerification: true,
+      email: cleanEmail,
+      message:
+        'Konto erfolgreich erstellt! Bitte überprüfe dein Postfach und bestätige deine E-Mail-Adresse, um dich anzumelden.',
     };
   });
+
+  // 5a. Bestätigungs-E-Mail erneut anfordern
+  fastify.post('/api/auth/resend-verification', async (request, reply) => {
+    const parse = ResendVerificationSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({ error: parse.error.issues[0].message });
+    }
+
+    const cleanEmail = parse.data.email.toLowerCase().trim();
+    const user = await fastify.prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user) {
+      return {
+        success: true,
+        message: 'Falls ein Konto mit dieser E-Mail existiert, wurde ein neuer Bestätigungslink versendet.',
+      };
+    }
+
+    if (user.emailVerified) {
+      return reply.status(400).send({
+        error: 'Deine E-Mail-Adresse ist bereits bestätigt. Du kannst dich direkt anmelden.',
+      });
+    }
+
+    const recentToken = await fastify.prisma.emailVerificationToken.findFirst({
+      where: {
+        userId: user.id,
+        createdAt: { gt: new Date(Date.now() - 60 * 1000) },
+      },
+    });
+    if (recentToken) {
+      return reply.status(429).send({
+        error: 'Bitte warte eine Minute, bevor du einen neuen Link anforderst.',
+      });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    await fastify.prisma.emailVerificationToken.deleteMany({
+      where: { userId: user.id },
+    });
+    await fastify.prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token: verificationToken,
+        email: cleanEmail,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const loginPortalUrl = getLoginPortalBaseUrl(request.headers.host);
+    const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
+    await sendVerificationEmail({
+      to: cleanEmail,
+      name: user.ceviName || user.firstName,
+      verificationUrl,
+    });
+
+    return {
+      success: true,
+      message: 'Ein neuer Bestätigungslink wurde an deine E-Mail-Adresse gesendet.',
+    };
+  });
+
+  // 5b. E-Mail-Adresse mit Token bestätigen (POST für UI & API)
+  fastify.post('/api/auth/verify-email', async (request, reply) => {
+    const parse = VerifyEmailSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({ error: parse.error.issues[0].message });
+    }
+
+    const { token } = parse.data;
+    const tokenRecord = await fastify.prisma.emailVerificationToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!tokenRecord) {
+      return reply.status(400).send({
+        error: 'Dieser Bestätigungslink ist ungültig oder wurde bereits verwendet.',
+      });
+    }
+
+    if (tokenRecord.expiresAt < new Date()) {
+      await fastify.prisma.emailVerificationToken.delete({ where: { id: tokenRecord.id } });
+      return reply.status(400).send({
+        error: 'Dieser Bestätigungslink ist abgelaufen. Bitte fordere einen neuen an.',
+        expired: true,
+        email: tokenRecord.email,
+      });
+    }
+
+    const updatedUser = await fastify.prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({
+        where: { id: tokenRecord.userId },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+          email: tokenRecord.email,
+        },
+      });
+      await tx.emailVerificationToken.deleteMany({
+        where: { userId: tokenRecord.userId },
+      });
+      return u;
+    });
+
+    const authToken = fastify.jwt.sign({
+      id: updatedUser.id,
+      email: updatedUser.email || `${updatedUser.id}@cevi-schichtplan.ch`,
+      isGlobalAdmin: updatedUser.isGlobalAdmin,
+    });
+
+    setAuthCookie(reply, authToken);
+
+    return {
+      success: true,
+      message: 'E-Mail-Adresse erfolgreich bestätigt!',
+      token: authToken,
+      user: await loadUserDto(fastify.prisma, updatedUser.id, request.tenant?.id ?? null),
+    };
+  });
+
+  // 5c. Direkter Link-Klick aus E-Mail (leitet auf Next.js Verify-Page weiter)
+  fastify.get<{ Querystring: { token?: string } }>(
+    '/api/auth/verify-email',
+    async (request, reply) => {
+      const token = request.query.token;
+      const loginBase = getLoginPortalBaseUrl(request.headers.host);
+      if (!token) {
+        return reply.redirect(`${loginBase}/verify-email?error=missing_token`);
+      }
+      return reply.redirect(`${loginBase}/verify-email?token=${encodeURIComponent(token)}`);
+    }
+  );
 
   // 6. Profil des aktuellen Users abfragen
   fastify.get(
