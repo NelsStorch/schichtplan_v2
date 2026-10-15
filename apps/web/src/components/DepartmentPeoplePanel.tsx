@@ -15,6 +15,12 @@ import { usePortal } from '@/lib/portal';
 const ROLE_LABELS = { HELPER: 'Helfer*in', PLANNER: 'Planung', ADMIN: 'Abteilungsleitung' } as const;
 type DeptRole = keyof typeof ROLE_LABELS;
 
+const ROLE_DESCRIPTIONS: Record<DeptRole, string> = {
+  ADMIN: 'Volle Administrationsrechte für die Abteilung (Einstellungen, Logo, Stufen, Personen und alle Anlässe).',
+  PLANNER: 'Darf neue Anlässe erstellen und hat in allen Events der Abteilung automatisch Planungs- und OK-Rechte.',
+  HELPER: 'Normales Abteilungsmitglied. Berechtigungen zum Planen von Schichten werden pro Anlass im jeweiligen OK-Team vergeben.',
+};
+
 /** Personen der Abteilung: Stufen und Rolle bearbeiten, Abteilungsleitung erkennen. */
 export function DepartmentPeoplePanel() {
   const toast = useToast();
@@ -201,8 +207,11 @@ function PersonEditor({
     <div className="mt-3 space-y-4 rounded-field border border-line bg-surface-2/60 p-3">
       {error && <Callout tone="danger">{error}</Callout>}
       <div>
-        <p className="mb-1.5 text-xs font-semibold text-fg-subtle">Rolle im Schichtplan</p>
-        <div role="radiogroup" aria-label="Rolle im Schichtplan" className="flex flex-wrap gap-1.5">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-fg-subtle">Rolle in der Abteilung</p>
+          <span className="text-2xs text-fg-subtle">Gilt abteilungsweit</span>
+        </div>
+        <div role="radiogroup" aria-label="Rolle in der Abteilung" className="flex flex-wrap gap-1.5">
           {(Object.keys(ROLE_LABELS) as DeptRole[]).map((r) => (
             <button
               key={r}
@@ -220,6 +229,12 @@ function PersonEditor({
               {ROLE_LABELS[r]}
             </button>
           ))}
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+          {ROLE_DESCRIPTIONS[deptRole]}
+        </p>
+        <div className="mt-2.5 rounded-card border border-line/60 bg-surface/60 p-2 text-2xs leading-normal text-fg-subtle">
+          💡 <strong>Hinweis:</strong> Wer Schichten für einen bestimmten Anlass (z. B. Chilbi) planen darf, wird unabhängig von dieser Rolle direkt im jeweiligen Event unter <em>Einstellungen → OK-Team</em> festgelegt.
         </div>
       </div>
 
