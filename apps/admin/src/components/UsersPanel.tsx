@@ -1,8 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, RotateCw, Search, SearchX, ShieldCheck, X } from 'lucide-react';
-import { Avatar, Badge, Button, Callout, Card, Chip, ChipRow, EmptyState, Select, Skeleton, cn } from '@schichtplan/ui';
+import { ChevronLeft, ChevronRight, RotateCw, Search, SearchX, ShieldCheck, Trash2, X } from 'lucide-react';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Callout,
+  Card,
+  Chip,
+  ChipRow,
+  EmptyState,
+  Select,
+  Skeleton,
+  cn,
+  useConfirm,
+  useToast,
+} from '@schichtplan/ui';
 import type { AdminOverviewDto, AdminUserListDto, AdminUserListItemDto } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
 import { formatDate, fullName } from '../lib/format';
@@ -93,7 +107,9 @@ function Departments({ user }: { user: AdminUserListItemDto }) {
   );
 }
 
-export function UsersPanel() {
+export function UsersPanel({ currentUserId }: { currentUserId?: string }) {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [overview, setOverview] = useState<AdminOverviewDto | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
 
@@ -108,6 +124,53 @@ export function UsersPanel() {
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<AdminUserListItemDto | null>(null);
+
+  const handleDeleteUser = async (target: AdminUserListItemDto) => {
+    if (target.id === currentUserId) {
+      toast({
+        title: 'Nicht möglich',
+        description: 'Du kannst dein eigenes Administratorkonto nicht löschen.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    const name = fullName(target);
+    const confirmed = await confirm({
+      title: `${name} wirklich löschen?`,
+      description: `Möchtest du das Konto von ${name} wirklich unwiderruflich löschen? Alle Schichteintragungen, Abteilungs- und OK-Mitgliedschaften werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmLabel: 'Benutzer endgültig löschen',
+      cancelLabel: 'Abbrechen',
+      tone: 'danger',
+      countdownSeconds: 7,
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await api(`/api/admin/users/${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+      });
+      toast({
+        title: 'Benutzer gelöscht',
+        description: `${name} wurde vollständig gelöscht.`,
+        tone: 'success',
+      });
+      if (selected?.id === target.id) {
+        setSelected(null);
+      }
+      setReload((n) => n + 1);
+      api<AdminOverviewDto>('/api/admin/overview')
+        .then(setOverview)
+        .catch(() => undefined);
+    } catch (err) {
+      toast({
+        title: 'Fehler beim Löschen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    }
+  };
 
   useEffect(() => {
     api<AdminOverviewDto>('/api/admin/overview')
@@ -280,6 +343,9 @@ export function UsersPanel() {
                   <th scope="col" className="px-3 py-3 font-semibold">Abteilung</th>
                   <th scope="col" className="px-3 py-3 text-right font-semibold">Einträge</th>
                   <th scope="col" className="px-5 py-3 text-right font-semibold">Registriert</th>
+                  <th scope="col" className="w-12 px-3 py-3 text-right font-semibold">
+                    <span className="sr-only">Aktionen</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -315,6 +381,20 @@ export function UsersPanel() {
                     <td className="tabular whitespace-nowrap px-5 py-3 text-right font-mono text-fg-muted">
                       {formatDate(user.createdAt)}
                     </td>
+                    <td className="w-12 px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      {user.id !== currentUserId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteUser(user)}
+                          aria-label={`${fullName(user)} löschen`}
+                          title="Benutzer löschen"
+                          className="text-fg-subtle transition hover:bg-danger/10 hover:text-danger-ink"
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -325,21 +405,45 @@ export function UsersPanel() {
           <Card className="overflow-hidden md:hidden">
             <ul className="divide-y divide-line">
               {items.map((user) => (
-                <li key={user.id}>
+                <li key={user.id} className="flex items-center transition-colors hover:bg-surface-2">
                   <button
                     type="button"
                     onClick={() => setSelected(user)}
-                    className="flex w-full flex-col gap-2 px-4 py-3.5 text-left transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                    className="flex min-w-0 flex-1 flex-col gap-2 px-4 py-3.5 text-left focus-visible:bg-surface-2 focus-visible:outline-none"
                   >
                     <span className="flex items-center justify-between gap-3">
                       <PersonCell user={user} />
-                      <ChevronRight className="size-4 shrink-0 text-fg-subtle" aria-hidden />
                     </span>
                     {user.email && <span className="truncate pl-10 text-[13px] text-fg-muted">{user.email}</span>}
                     <span className="pl-10">
                       <LoginMethodBadges methods={user.loginMethods} />
                     </span>
                   </button>
+                  <div className="flex shrink-0 items-center gap-1 pr-3">
+                    {user.id !== currentUserId && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteUser(user);
+                        }}
+                        aria-label={`${fullName(user)} löschen`}
+                        title="Benutzer löschen"
+                        className="text-fg-subtle hover:bg-danger/10 hover:text-danger-ink"
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </Button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSelected(user)}
+                      aria-label={`${fullName(user)} Details`}
+                      className="flex size-8 items-center justify-center rounded-full text-fg-subtle hover:text-fg"
+                    >
+                      <ChevronRight className="size-4" aria-hidden />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -378,7 +482,17 @@ export function UsersPanel() {
         </nav>
       )}
 
-      <UserDialog preview={selected} onClose={() => setSelected(null)} />
+      <UserDialog
+        preview={selected}
+        currentUserId={currentUserId}
+        onClose={() => setSelected(null)}
+        onDeleted={() => {
+          setReload((n) => n + 1);
+          api<AdminOverviewDto>('/api/admin/overview')
+            .then(setOverview)
+            .catch(() => undefined);
+        }}
+      />
     </div>
   );
 }

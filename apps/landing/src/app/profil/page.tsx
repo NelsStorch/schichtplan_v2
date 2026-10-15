@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpRight, Building2, CalendarDays, Database, LogOut } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Building2, CalendarDays, Database, LogOut, Trash2 } from 'lucide-react';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   PLACEHOLDER_LAST_NAME,
@@ -12,7 +12,18 @@ import {
   getLoginUrl,
   type UserDto,
 } from '@schichtplan/shared';
-import { Avatar, Badge, Button, Callout, Field, Input, ThemeToggle, buttonClasses } from '@schichtplan/ui';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Callout,
+  Field,
+  Input,
+  ThemeToggle,
+  buttonClasses,
+  useConfirm,
+  useToast,
+} from '@schichtplan/ui';
 import { CeviLogo } from '@/components/CeviLogo';
 
 /** Antwort von GET /api/shifts/my (Schichten über alle Abteilungen) */
@@ -39,11 +50,48 @@ const dateFmt = new Intl.DateTimeFormat('de-CH', {
 
 /** Kleine Profilseite auf der Landingpage: Angaben, Abteilung & Stufen, eigene Schichten. */
 export default function ProfilePage() {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [user, setUser] = useState<UserDto | null>(null);
   const [shifts, setShifts] = useState<MyShift[] | null>(null);
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', birthDate: '', address: '' });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+
+  const handleDeleteAccount = async () => {
+    const confirmed = await confirm({
+      title: 'Konto wirklich löschen?',
+      description:
+        'Möchtest du dein Benutzerkonto wirklich unwiderruflich löschen? Alle deine Schichteintragungen und Verknüpfungen werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmLabel: 'Mein Konto endgültig löschen',
+      cancelLabel: 'Abbrechen',
+      tone: 'danger',
+      countdownSeconds: 7,
+    });
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/auth/me', { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Löschen hat nicht geklappt.');
+      toast({
+        title: 'Konto gelöscht',
+        description: 'Dein Konto wurde erfolgreich gelöscht.',
+        tone: 'success',
+      });
+      window.location.href = '/';
+    } catch (err) {
+      toast({
+        title: 'Fehler beim Löschen',
+        description: err instanceof Error ? err.message : 'Löschen hat nicht geklappt.',
+        tone: 'error',
+      });
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -250,6 +298,29 @@ export default function ProfilePage() {
                 </ul>
               )}
             </section>
+
+            {user.canSelfDelete && (
+              <section className="rounded-card border border-danger/30 bg-surface p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-danger-ink">Konto löschen</h2>
+                    <p className="mt-1 text-xs text-fg-muted">
+                      Löscht dein Benutzerkonto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem Cevi Schichtplan.
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleDeleteAccount}
+                    disabled={deleting}
+                    className="shrink-0"
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                    {deleting ? 'Wird gelöscht …' : 'Konto löschen'}
+                  </Button>
+                </div>
+              </section>
+            )}
           </>
         )}
       </main>

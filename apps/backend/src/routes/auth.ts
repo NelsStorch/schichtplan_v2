@@ -124,6 +124,8 @@ async function loadUserDto(
     ceviDbId: user.ceviDbId,
     ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
     hasCeviDb: Boolean(user.ceviDbId),
+    hasPassword: Boolean(user.passwordHash),
+    canSelfDelete: Boolean(user.ceviDbId !== null || user.passwordHash !== null),
     homeDepartment: user.homeDepartment,
     homeDepartmentFromCeviDb: user.homeDepartmentSource === 'CEVIDB',
     stufen: user.stufen
@@ -655,6 +657,87 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const result = await applyProfileUpdate(fastify.prisma, request.user.id, parse.data);
       if ('error' in result) return reply.status(result.status).send({ error: result.error });
       return loadUserDto(fastify.prisma, request.user.id, request.tenant?.id ?? null);
+    }
+  );
+
+  // 6c. Eigenes Konto komplett löschen (nur für Accounts mit Cevi.DB oder Passwort)
+  fastify.delete(
+    '/api/auth/me',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const userId = request.user.id;
+
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          ceviName: true,
+          ceviDbId: true,
+          passwordHash: true,
+          isGlobalAdmin: true,
+        },
+      });
+
+      if (!user) {
+        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+      }
+
+      // Nur Accounts über Cevi.DB oder Passwort dürfen sich selbst löschen
+      if (user.ceviDbId === null && !user.passwordHash) {
+        return reply.status(403).send({
+          error: 'Nur Konten mit Cevi.DB oder Passwort können sich selbst löschen.',
+        });
+      }
+
+      // Schutz: Der letzte globale Administrator kann sich nicht selbst löschen
+      if (user.isGlobalAdmin) {
+        const adminCount = await fastify.prisma.user.count({ where: { isGlobalAdmin: true } });
+        if (adminCount <= 1) {
+          return reply.status(400).send({
+            error: 'Du bist die letzte Plattform-Administration und kannst dein Konto nicht löschen.',
+          });
+        }
+      }
+
+      await fastify.prisma.$transaction(async (tx) => {
+        // EventAccessLinks entkoppeln, falls dieser User gebunden war
+        await tx.eventAccessLink.updateMany({
+          where: { boundUserId: userId },
+          data: { boundUserId: null },
+        });
+
+        // EventDeregistrations und EventAccessLinks createdById auf null setzen
+        await tx.eventDeregistration.updateMany({
+          where: { createdById: userId },
+          data: { createdById: null },
+        });
+
+        await tx.eventAccessLink.updateMany({
+          where: { createdById: userId },
+          data: { createdById: null },
+        });
+
+        // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserCeviDbStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
+        await tx.user.delete({
+          where: { id: userId },
+        });
+      });
+
+      clearAuthCookie(reply);
+
+      const userDisplayName = user.ceviName
+        ? `${user.ceviName} (${user.firstName} ${user.lastName})`
+        : `${user.firstName} ${user.lastName}`;
+
+      request.log.info(
+        { userId, email: user.email, name: userDisplayName, ceviDbId: user.ceviDbId, hasPassword: Boolean(user.passwordHash) },
+        'Benutzer hat sein Konto selbst gelöscht'
+      );
+
+      return { success: true, message: 'Dein Konto wurde erfolgreich gelöscht.' };
     }
   );
 

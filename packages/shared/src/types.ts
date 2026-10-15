@@ -173,6 +173,10 @@ export interface UserDto {
   ceviDbId?: number | null;
   ceviDbSyncedAt?: string | null;
   hasCeviDb?: boolean;
+  /** Konto hat ein Passwort (E-Mail/Passwort-Login) */
+  hasPassword?: boolean;
+  /** Darf das Konto selbst löschen (Cevi.DB- oder Passwort-Account) */
+  canSelfDelete?: boolean;
   homeDepartment?: HomeDepartmentDto | null;
   /** Abteilung kommt aus Cevi.DB und ist dort festgelegt */
   homeDepartmentFromCeviDb?: boolean;

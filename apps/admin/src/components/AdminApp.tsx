@@ -145,7 +145,7 @@ export function AdminApp() {
           Alle Konten über sämtliche Abteilungen. Nur für globale Admins sichtbar.
         </p>
       </div>
-      <UsersPanel />
+      <UsersPanel currentUserId={session.user.id} />
     </Shell>
   );
 }

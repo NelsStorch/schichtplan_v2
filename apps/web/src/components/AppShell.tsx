@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, CalendarDays, Database, LogIn, LogOut, Ticket, UserRound } from 'lucide-react';
+import { Building2, CalendarDays, Database, LogIn, LogOut, Ticket, Trash2, UserRound } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -13,7 +13,10 @@ import {
   ThemeToggle,
   buttonClasses,
   cn,
+  useConfirm,
+  useToast,
 } from '@schichtplan/ui';
+import { getLandingUrl } from '@schichtplan/shared';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 
@@ -176,8 +179,47 @@ const ROLE_LABEL: Record<string, string> = {
 
 function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, logout } = usePortal();
+  const confirm = useConfirm();
+  const toast = useToast();
+  const [deleting, setDeleting] = useState(false);
+
   if (!user) return null;
   const role = user.isGlobalAdmin ? 'Plattform-Admin' : ROLE_LABEL[user.departmentRole ?? ''] ?? 'Helfer:in';
+
+  const handleDeleteAccount = async () => {
+    const confirmed = await confirm({
+      title: 'Konto wirklich löschen?',
+      description:
+        'Möchtest du dein Benutzerkonto wirklich unwiderruflich löschen? Alle deine Schichteintragungen und Verknüpfungen werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmLabel: 'Mein Konto endgültig löschen',
+      cancelLabel: 'Abbrechen',
+      tone: 'danger',
+      countdownSeconds: 7,
+    });
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/auth/me', { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Löschen hat nicht geklappt.');
+      toast({
+        title: 'Konto gelöscht',
+        description: 'Dein Konto wurde erfolgreich gelöscht.',
+        tone: 'success',
+      });
+      onClose();
+      window.location.href = '/';
+    } catch (err) {
+      toast({
+        title: 'Fehler beim Löschen',
+        description: err instanceof Error ? err.message : 'Löschen hat nicht geklappt.',
+        tone: 'error',
+      });
+      setDeleting(false);
+    }
+  };
 
   return (
     <Dialog open={open} onClose={onClose} size="sm" title="Dein Konto">
@@ -210,14 +252,28 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
         <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary' })}>
           <Building2 /> Abteilung &amp; Stufen
         </a>
+        <a href={getLandingUrl('/profil')} className={buttonClasses({ variant: 'secondary' })}>
+          <UserRound /> Profil &amp; Angaben
+        </a>
         {user.isGlobalAdmin && (
           <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
             <Database /> Cevi.DB Daten & Profil
           </Link>
         )}
-        <Button variant="ghost" onClick={logout}>
+        <Button variant="ghost" onClick={logout} disabled={deleting}>
           <LogOut /> Abmelden
         </Button>
+        {user.canSelfDelete && (
+          <Button
+            variant="ghost"
+            onClick={handleDeleteAccount}
+            disabled={deleting}
+            className="text-danger-ink hover:bg-danger/10 hover:text-danger-ink"
+          >
+            <Trash2 className="size-4" aria-hidden />
+            {deleting ? 'Wird gelöscht …' : 'Konto löschen'}
+          </Button>
+        )}
       </div>
     </Dialog>
   );

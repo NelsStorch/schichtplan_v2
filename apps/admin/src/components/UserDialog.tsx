@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Building2, CalendarClock, Mail, Phone, Users } from 'lucide-react';
-import { Avatar, Badge, Callout, Dialog, EmptyState, Skeleton } from '@schichtplan/ui';
+import { ArrowUpRight, Building2, CalendarClock, Mail, Phone, Trash2, Users } from 'lucide-react';
+import { Avatar, Badge, Button, Callout, Dialog, EmptyState, Skeleton, useConfirm, useToast } from '@schichtplan/ui';
 import { getRootDomain, type AdminUserDetailDto, type AdminUserListItemDto } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage } from '../lib/api';
 import {
@@ -43,13 +43,20 @@ const Missing = () => <span className="font-normal text-fg-subtle">–</span>;
 /** Details einer Person. Die Kopfzeile erscheint sofort aus der Liste, der Rest wird nachgeladen. */
 export function UserDialog({
   preview,
+  currentUserId,
   onClose,
+  onDeleted,
 }: {
   preview: AdminUserListItemDto | null;
+  currentUserId?: string;
   onClose: () => void;
+  onDeleted?: () => void;
 }) {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [detail, setDetail] = useState<AdminUserDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const id = preview?.id;
 
   useEffect(() => {
@@ -70,12 +77,77 @@ export function UserDialog({
   const loaded = detail && detail.id === id ? detail : null;
   const user = loaded ?? preview;
   const loadingDetail = Boolean(preview) && !loaded && !error;
+  const isSelf = Boolean(user && currentUserId && user.id === currentUserId);
+
+  const handleDelete = async () => {
+    if (!user) return;
+    if (isSelf) {
+      toast({
+        title: 'Nicht möglich',
+        description: 'Du kannst dein eigenes Administratorkonto nicht löschen.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    const name = fullName(user);
+    const confirmed = await confirm({
+      title: `${name} wirklich löschen?`,
+      description: `Möchtest du das Konto von ${name} wirklich unwiderruflich löschen? Alle Schichteintragungen, Abteilungs- und OK-Mitgliedschaften werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmLabel: 'Benutzer endgültig löschen',
+      cancelLabel: 'Abbrechen',
+      tone: 'danger',
+      countdownSeconds: 7,
+    });
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await api(`/api/admin/users/${encodeURIComponent(user.id)}`, {
+        method: 'DELETE',
+      });
+      toast({
+        title: 'Benutzer gelöscht',
+        description: `${name} wurde vollständig gelöscht.`,
+        tone: 'success',
+      });
+      onDeleted?.();
+      onClose();
+    } catch (err) {
+      toast({
+        title: 'Fehler beim Löschen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <Dialog
       open={Boolean(preview)}
       onClose={onClose}
       size="lg"
+      footer={
+        <>
+          {user && !isSelf && (
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="sm:mr-auto"
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {deleting ? 'Wird gelöscht …' : 'Benutzer löschen'}
+            </Button>
+          )}
+          <Button variant="secondary" onClick={onClose} disabled={deleting}>
+            Schliessen
+          </Button>
+        </>
+      }
       title={
         user ? (
           <span className="flex items-center gap-3">
@@ -290,6 +362,31 @@ export function UserDialog({
                   )}
                 </Section>
               </>
+            )}
+
+            {user && !isSelf && (
+              <Section title="Gefahrenzone">
+                <div className="rounded-card border border-danger/30 bg-danger/5 p-4 sm:p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold text-danger-ink">Benutzerkonto unwiderruflich löschen</h4>
+                      <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+                        Entfernt diese Person mitsamt allen Schichten, Abteilungsrollen und Verknüpfungen vollständig aus der Datenbank.
+                      </p>
+                    </div>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="shrink-0"
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                      {deleting ? 'Wird gelöscht …' : 'Benutzer löschen'}
+                    </Button>
+                  </div>
+                </div>
+              </Section>
             )}
           </div>
         </>

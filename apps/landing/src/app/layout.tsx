@@ -1,5 +1,6 @@
 import './globals.css';
 import { fontVariables } from '@schichtplan/ui/fonts';
+import { FeedbackProvider } from '@schichtplan/ui';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="min-h-[100dvh] bg-canvas text-fg antialiased flex flex-col selection:bg-accent selection:text-white grain">
-        {children}
+        <FeedbackProvider>{children}</FeedbackProvider>
       </body>
     </html>
   );

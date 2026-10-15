@@ -271,6 +271,76 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       return detail;
     }
   );
+
+  fastify.delete<{ Params: { id: string } }>(
+    '/api/admin/users/:id',
+    { preHandler: [fastify.requireGlobalAdmin] },
+    async (request, reply) => {
+      const targetUserId = request.params.id;
+
+      if (targetUserId === request.user.id) {
+        return reply.status(400).send({ error: 'Du kannst dein eigenes Administratorkonto nicht löschen.' });
+      }
+
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          ceviName: true,
+          isGlobalAdmin: true,
+        },
+      });
+
+      if (!user) {
+        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+      }
+
+      if (user.isGlobalAdmin) {
+        const adminCount = await fastify.prisma.user.count({ where: { isGlobalAdmin: true } });
+        if (adminCount <= 1) {
+          return reply.status(400).send({ error: 'Der letzte globale Administrator kann nicht gelöscht werden.' });
+        }
+      }
+
+      await fastify.prisma.$transaction(async (tx) => {
+        // EventAccessLinks entkoppeln, falls dieser User gebunden war
+        await tx.eventAccessLink.updateMany({
+          where: { boundUserId: targetUserId },
+          data: { boundUserId: null },
+        });
+
+        // EventDeregistrations und EventAccessLinks createdById auf null setzen
+        await tx.eventDeregistration.updateMany({
+          where: { createdById: targetUserId },
+          data: { createdById: null },
+        });
+
+        await tx.eventAccessLink.updateMany({
+          where: { createdById: targetUserId },
+          data: { createdById: null },
+        });
+
+        // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserCeviDbStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
+        await tx.user.delete({
+          where: { id: targetUserId },
+        });
+      });
+
+      const userDisplayName = user.ceviName
+        ? `${user.ceviName} (${user.firstName} ${user.lastName})`
+        : `${user.firstName} ${user.lastName}`;
+
+      request.log.info(
+        { adminId: request.user.id, targetUserId, email: user.email, name: userDisplayName },
+        'Admin: Benutzer komplett gelöscht'
+      );
+
+      return { success: true };
+    }
+  );
 };
 
 export default adminRoutes;

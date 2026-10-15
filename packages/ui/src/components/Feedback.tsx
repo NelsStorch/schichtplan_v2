@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from './Button';
@@ -86,11 +86,71 @@ export interface ConfirmOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: 'danger' | 'default';
+  /** Cooldown in Sekunden, während dem der Bestätigen-Button gesperrt ist (z. B. 7) */
+  countdownSeconds?: number;
 }
 
 const ConfirmContext = createContext<(options: ConfirmOptions) => Promise<boolean>>(async () => false);
 /** Ersatz für window.confirm(): `if (await confirm({...})) ...` */
 export const useConfirm = () => useContext(ConfirmContext);
+
+function ConfirmDialog({
+  options,
+  onSettle,
+}: {
+  options: ConfirmOptions;
+  onSettle: (value: boolean) => void;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(options.countdownSeconds ?? 0);
+
+  useEffect(() => {
+    const initial = options.countdownSeconds ?? 0;
+    setSecondsLeft(initial);
+    if (initial <= 0) return;
+
+    const interval = window.setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [options]);
+
+  const isLocked = secondsLeft > 0;
+  const baseLabel = options.confirmLabel ?? 'Bestätigen';
+  const label = isLocked ? `${baseLabel} (${secondsLeft}s)` : baseLabel;
+
+  return (
+    <Dialog
+      open
+      onClose={() => onSettle(false)}
+      size="sm"
+      title={options.title}
+      description={options.description}
+      icon={options.tone === 'danger' ? <AlertTriangle /> : <Info />}
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => onSettle(false)}>
+            {options.cancelLabel ?? 'Abbrechen'}
+          </Button>
+          <Button
+            variant={options.tone === 'danger' ? 'danger' : 'primary'}
+            onClick={() => onSettle(true)}
+            disabled={isLocked}
+            autoFocus={!isLocked}
+          >
+            {label}
+          </Button>
+        </>
+      }
+    />
+  );
+}
 
 function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
@@ -112,28 +172,9 @@ function ConfirmProvider({ children }: { children: ReactNode }) {
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      <Dialog
-        open={options !== null}
-        onClose={() => settle(false)}
-        size="sm"
-        title={options?.title}
-        description={options?.description}
-        icon={options?.tone === 'danger' ? <AlertTriangle /> : <Info />}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => settle(false)}>
-              {options?.cancelLabel ?? 'Abbrechen'}
-            </Button>
-            <Button
-              variant={options?.tone === 'danger' ? 'danger' : 'primary'}
-              onClick={() => settle(true)}
-              autoFocus
-            >
-              {options?.confirmLabel ?? 'Bestätigen'}
-            </Button>
-          </>
-        }
-      />
+      {options !== null && (
+        <ConfirmDialog options={options} onSettle={settle} />
+      )}
     </ConfirmContext.Provider>
   );
 }
