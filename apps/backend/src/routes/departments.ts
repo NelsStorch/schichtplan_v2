@@ -10,7 +10,7 @@ import {
   type DepartmentStufeDto,
   type StufeSuggestionDto,
 } from '@schichtplan/shared';
-import { backfillCeviDbStufen } from '../services/homeDepartment.js';
+import { autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
 
 const toStufeDto = (s: {
@@ -506,7 +506,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       const ortsgruppeId = eligibility.ortsgruppeId;
 
       try {
-        const department = await fastify.prisma.$transaction(async (tx) => {
+        const departmentResult = await fastify.prisma.$transaction(async (tx) => {
           const user = await tx.user.findUniqueOrThrow({
             where: { id: request.user.id },
             select: { email: true },
@@ -541,15 +541,23 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
             skipDuplicates: true,
           });
 
-          return created;
+          return { department: created, memberIds: people.map((p) => p.id) };
         });
 
+        for (const memberId of departmentResult.memberIds) {
+          await autoCreateCeviDbDepartmentStufen(fastify.prisma, departmentResult.department.id, memberId);
+        }
+
         request.log.info(
-          { userId: request.user.id, departmentId: department.id, slug, ortsgruppeId },
+          { userId: request.user.id, departmentId: departmentResult.department.id, slug, ortsgruppeId },
           'Abteilung von Abteilungsleitung (Cevi.DB) angelegt'
         );
         return reply.status(201).send({
-          department: { id: department.id, name: department.name, slug: department.slug },
+          department: {
+            id: departmentResult.department.id,
+            name: departmentResult.department.name,
+            slug: departmentResult.department.slug,
+          },
           message: 'Abteilung erfolgreich erstellt!',
         });
       } catch (err) {

@@ -11,7 +11,13 @@ import {
   type UserDto,
 } from '@schichtplan/shared';
 import { deriveCeviDbFields } from '../services/cevidb.js';
-import { storeCeviDbFields, syncCeviDbHomeDepartment, toUserStufeDto } from '../services/homeDepartment.js';
+import {
+  autoCreateCeviDbDepartmentStufen,
+  storeCeviDbFields,
+  syncCeviDbHomeDepartment,
+  syncCeviDbStufen,
+  toUserStufeDto,
+} from '../services/homeDepartment.js';
 import { ceviDbProfileFields } from '../services/profile.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
 
@@ -665,7 +671,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.id;
       const current = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { homeDepartmentId: true, homeDepartmentSource: true },
+        select: { homeDepartmentId: true, homeDepartmentSource: true, ceviDbId: true },
       });
       if (!current) return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
 
@@ -713,7 +719,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
-      if (departmentId) await ensureHelperMembership(fastify.prisma, departmentId, userId);
+      if (departmentId) {
+        if (current.ceviDbId !== null) {
+          await autoCreateCeviDbDepartmentStufen(fastify.prisma, departmentId, userId);
+          await syncCeviDbStufen(fastify.prisma, userId);
+        }
+        await ensureHelperMembership(fastify.prisma, departmentId, userId);
+      }
       return loadUserDto(fastify.prisma, userId, request.tenant?.id ?? null);
     }
   );
