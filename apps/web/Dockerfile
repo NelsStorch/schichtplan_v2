@@ -61,4 +61,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
   CMD node -e "fetch('http://localhost:3000/').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]
