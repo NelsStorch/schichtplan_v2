@@ -9,8 +9,9 @@ services:
       POSTGRES_DB: ${DB_NAME:-cevi_schichtplan_v2}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Nur im internen Datennetz: nur das Backend erreicht die DB, kein Zugang ins Internet
     networks:
-      - schichtplan_network
+      - data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cevi_schichtplan} -d ${DB_NAME:-cevi_schichtplan_v2}"]
       interval: 5s
@@ -47,12 +48,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # data = DB, app = Frontends, proxy = Traefik (auch Ausgang ins Internet: SMTP, Cevi.DB)
     networks:
-      - schichtplan_network
-      - web_proxy
+      - data
+      - app
+      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=web_proxy"
+      - "traefik.docker.network=schichtplan_prod_proxy"
       # API Endpunkte haben Vorrang auf allen Domains, Login und Subdomains
       - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`login.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`)) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-api.entrypoints=websecure"
@@ -77,11 +80,11 @@ services:
     depends_on:
       - backend
     networks:
-      - schichtplan_network
-      - web_proxy
+      - app
+      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=web_proxy"
+      - "traefik.docker.network=schichtplan_prod_proxy"
       # Dynamische Abteilungs-Subdomains (<abteilung>.cevi-schichtplan.ch)
       - "traefik.http.routers.schichtplan-web.rule=HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`)"
       - "traefik.http.routers.schichtplan-web.entrypoints=websecure"
@@ -108,11 +111,11 @@ services:
     depends_on:
       - backend
     networks:
-      - schichtplan_network
-      - web_proxy
+      - app
+      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=web_proxy"
+      - "traefik.docker.network=schichtplan_prod_proxy"
       # Hauptdomain und www (Marketing & Abteilungsauswahl)
       - "traefik.http.routers.schichtplan-landing.rule=Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`)"
       - "traefik.http.routers.schichtplan-landing.entrypoints=websecure"
@@ -135,11 +138,11 @@ services:
     depends_on:
       - backend
     networks:
-      - schichtplan_network
-      - web_proxy
+      - app
+      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=web_proxy"
+      - "traefik.docker.network=schichtplan_prod_proxy"
       # Zentrales Login-Portal (Single Sign-On für alle Abteilungen)
       - "traefik.http.routers.schichtplan-login.rule=Host(`login.${DOMAIN:-cevi-schichtplan.ch}`)"
       - "traefik.http.routers.schichtplan-login.entrypoints=websecure"
@@ -164,11 +167,11 @@ services:
     depends_on:
       - backend
     networks:
-      - schichtplan_network
-      - web_proxy
+      - app
+      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=web_proxy"
+      - "traefik.docker.network=schichtplan_prod_proxy"
       # Admin-Portal: Verwaltung für globale Admins (Zugriff wird im Backend geprüft)
       - "traefik.http.routers.schichtplan-admin.rule=Host(`admin.${DOMAIN:-cevi-schichtplan.ch}`)"
       - "traefik.http.routers.schichtplan-admin.entrypoints=websecure"
@@ -179,11 +182,27 @@ services:
       - "traefik.http.services.schichtplan-admin.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.schichtplan-admin.loadbalancer.healthcheck.interval=3s"
 
+# Netzwerk-Segmentierung (Prod). Dev läuft in docker-compose.staging.yml in komplett getrennten Netzen.
+#   proxy: nur Traefik + die Schichtplan-Prod-Container (Einstieg von aussen), kein geteiltes web_proxy
+#   app:   interne Verbindung Frontends <-> Backend, ohne Gateway
+#   data:  interne Verbindung Backend <-> DB, ohne Gateway
 networks:
-  schichtplan_network:
-    driver: bridge
-  web_proxy:
+  proxy:
     external: true
+    name: schichtplan_prod_proxy
+  # Feste Subnetze: der Docker-Standardpool des Servers ist ausgeschoepft ("all predefined address pools have been fully subnetted")
+  app:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.77.1.0/24
+  data:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.77.2.0/24
 
 volumes:
   postgres_data:

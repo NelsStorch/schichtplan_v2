@@ -30,11 +30,15 @@ if ($Environment -eq 'dev') {
     $ComposeFile = "docker-compose.staging.yml"
     $Prefix = "schichtplan-dev"
     $DefaultDomain = "dev.cevi-schichtplan.ch"
+    $LegacyNetwork = "schichtplan-dev_schichtplan_dev_network"
 } else {
     $ComposeFile = "docker-compose.yml"
     $Prefix = "schichtplan"
     $DefaultDomain = "cevi-schichtplan.ch"
+    $LegacyNetwork = "schichtplan-prod_schichtplan_network"
 }
+# Eigenes Proxy-Netz pro Umgebung (nur Traefik + diese Umgebung), siehe AGENTS.md Abschnitt 2a
+$ProxyNetwork = "schichtplan_${Environment}_proxy"
 
 function Step($text) { Write-Host "`n$text" -ForegroundColor Cyan }
 
@@ -68,6 +72,16 @@ set -euo pipefail
 cd "$RemoteDir"
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
+
+# Netz-Voraussetzung: eigenes Proxy-Netz, an dem der zentrale Traefik haengt (sonst bricht der Deploy hier ab, bevor etwas angefasst wird)
+if ! docker network inspect "$ProxyNetwork" > /dev/null 2>&1; then
+  echo "Docker-Netz $ProxyNetwork fehlt. Anlegen: docker network create $ProxyNetwork (und Traefik damit verbinden, siehe AGENTS.md 2a)"
+  exit 1
+fi
+if ! docker network inspect "$ProxyNetwork" --format '{{range .Containers}}{{.Name}}{{println}}{{end}}' | grep -qx traefik; then
+  echo "Traefik ist nicht mit $ProxyNetwork verbunden: docker network connect $ProxyNetwork traefik (und im Proxy-Compose eintragen)"
+  exit 1
+fi
 
 if [ "$backup" = "1" ]; then
   if docker ps --format '{{.Names}}' | grep -qx "$Prefix-db"; then
@@ -145,6 +159,9 @@ if ! docker compose -f "$ComposeFile" -p "$ProjectName" up -d --build > "`$log" 
   exit 1
 fi
 rm -f "`$log"
+
+# Altes Netz (vor der Segmentierung) aufraeumen, sobald es leer ist
+docker network rm "$LegacyNetwork" > /dev/null 2>&1 || true
 
 # Migrationen ausfuehren
 echo "Prisma Migrationen ausfuehren..."
