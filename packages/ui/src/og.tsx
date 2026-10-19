@@ -55,6 +55,38 @@ export async function loadRemoteLogo(url: string | null | undefined, base: strin
   }
 }
 
+const OG_CACHE_MAX_ENTRIES = 100;
+const ogCache = new Map<string, { expires: number; png: Promise<ArrayBuffer> }>();
+
+/**
+ * Fertig gerenderte Vorschaubilder im Speicher halten. Das Rendern dauert fast eine Sekunde, und WhatsApp
+ * schickt die Nachricht ohne Vorschau, wenn man vorher absendet. Gleichzeitige Abrufe teilen sich ein Rendering.
+ * Begrenzt auf wenige Einträge, weil der Schlüssel (Host) bei Wildcard-Subdomains von aussen kommt.
+ */
+export async function cachedOgImage(
+  key: string,
+  ttlMs: number,
+  render: () => Promise<Response>
+): Promise<Response> {
+  const now = Date.now();
+  let entry = ogCache.get(key);
+  if (!entry || entry.expires < now) {
+    const png = render().then((res) => {
+      if (!res.ok) throw new Error(`OG-Bild: HTTP ${res.status}`);
+      return res.arrayBuffer();
+    });
+    entry = { expires: now + ttlMs, png };
+    ogCache.delete(key);
+    ogCache.set(key, entry);
+    while (ogCache.size > OG_CACHE_MAX_ENTRIES) ogCache.delete(ogCache.keys().next().value!);
+    // Fehlgeschlagene Renderings nicht behalten
+    png.catch(() => ogCache.get(key) === entry && ogCache.delete(key));
+  }
+  return new Response(await entry.png, {
+    headers: { 'Content-Type': OG_CONTENT_TYPE, 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
+  });
+}
+
 /** Akzentfarbe nur akzeptieren, wenn sie ein Hex-Wert ist (kommt aus der DB, geht in CSS). */
 export function safeAccent(color: string | null | undefined): string {
   return color && /^#[0-9a-f]{6}$/i.test(color.trim()) ? color.trim() : DEFAULT_ACCENT;
