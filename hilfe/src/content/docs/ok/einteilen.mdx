@@ -1,0 +1,39 @@
+---
+title: Helfer*innen einteilen und austragen
+description: Als OK teilst du Leute selbst ein, auch Gäste ohne Konto, und trägst bei Bedarf wieder aus.
+audience: [ok]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+
+## Jemanden einteilen
+
+Im OK-Dashboard unter **Schichten & Einteilung** hat jede Arbeit den Knopf <Btn>Einteilen</Btn>. Im Anlass selbst öffnest du die Schicht und tippst auf <Btn>Helfer einteilen</Btn>.
+
+<Steps>
+1. Wähle **Abteilungsmitglied** und such die Person aus der Liste.
+2. Oder wähle **Gast / freier Name** und gib Name oder Cevi-Name ein, optional E-Mail und Telefon. Das ist für Leute ohne Konto, etwa die Nachbarin, die am Telefon zugesagt hat.
+3. Tippe auf <Btn variant="primary">Einteilen</Btn>.
+</Steps>
+
+Hat die Arbeit ein Mindestalter, zeigt das Fenster einen Hinweis. Für Mitglieder prüft der Schichtplan das Alter wie beim Selbsteintragen. Bei Gästen kennt er kein Alter, da bist du verantwortlich.
+
+:::tip[Einteilen geht immer]
+Als OK teilst du auch ein, wenn das Eintragen geschlossen ist oder die Person die Zugangsregeln nicht erfüllt. Pflichtangaben und Fragen werden dabei nicht abgefragt.
+:::
+
+## Austragen
+
+- **Aus einer Schicht**: das kleine Kreuz beim Namen, im Dashboard oder im Schicht-Fenster.
+- **Aus dem ganzen Anlass**: Tab **Eingetragene Helfer**, bei der Person <Btn variant="danger">Vom Event abmelden</Btn>. Das entfernt sie aus allen Schichten dieses Anlasses.
+
+Die Person bekommt keine Nachricht. Sag ihr Bescheid.
+
+## Eingetragene Helfer
+
+Der Tab **Eingetragene Helfer** zeigt jede Person einmal, mit allen ihren Schichten, dem Alter und bei Gästen E-Mail und Telefon. Das Suchfeld findet Namen, Cevi-Namen und E-Mails.
+
+## «Abmelden» im Helfer-Pool ist etwas anderes
+
+Im [Helfer-Pool](/ok/helfer-pool/) bedeutet **Abmelden**: Die Person muss an diesem Anlass keine Schichten übernehmen, zum Beispiel wegen Ferien. Dort wird niemand ausgetragen.

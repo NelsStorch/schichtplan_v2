@@ -1,0 +1,35 @@
+---
+title: Wieder austragen
+description: Etwas dazwischengekommen? Du trägst dich mit zwei Tipps wieder aus, der Platz ist sofort frei.
+audience: [helfer]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+## Über «Meine Schichten»
+
+<Path steps={['Meine Schichten', 'Anstehend', 'Austragen']} />
+
+<Steps>
+1. Tippe unten auf **Meine Schichten**.
+2. Such die Schicht unter **Anstehend**.
+3. Tippe auf <Btn variant="danger">Austragen</Btn> und bestätige.
+</Steps>
+
+## Direkt beim Anlass
+
+Öffne die Schicht im Anlass. Bei deiner Arbeit steht **Deine Arbeit**. Tippe auf <Btn variant="danger">Aus dieser Arbeit austragen</Btn> und bestätige.
+
+## Gut zu wissen
+
+- Du kannst dich jederzeit austragen, auch wenn das Eintragen beim Anlass inzwischen geschlossen ist.
+- Vergangene Schichten kannst du nicht mehr austragen. Sie stehen unter **Erledigt**.
+- Willst du in eine andere Arbeit derselben Schicht wechseln, trag dich zuerst aus und dann neu ein.
+
+:::caution[Kurzfristig? Sag es dem OK]
+Der Schichtplan meldet dem OK das Austragen nicht separat. Fällst du kurz vor der Schicht aus, ruf das OK an oder schreib ihm. Wer im OK ist, steht oben beim Anlass.
+:::
+
+Hat dich das OK eingeteilt und du kannst nicht, gilt dasselbe: austragen und das OK informieren.

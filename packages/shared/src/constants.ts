@@ -154,6 +154,12 @@ export const RESERVED_SUBDOMAINS = [
   'cdn',
   'auth',
   'status',
+  'login',
+  // Hilfe-Center (hilfe.<domain>) und naheliegende Varianten
+  'hilfe',
+  'help',
+  'docs',
+  'doku',
 ] as const;
 
 export const SUBDOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?$/;

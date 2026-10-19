@@ -1,0 +1,164 @@
+---
+// Titel mit Kapitel-Zeile (Gruppe aus der Seitenleiste), Lesezeit, Zielgruppe und Lead-Text.
+import Clock from '@lucide/astro/icons/clock-3';
+import Users from '@lucide/astro/icons/users-round';
+import { AUDIENCES, readingMinutes } from '../lib/audience';
+
+const PAGE_TITLE_ID = '_top';
+const { entry, sidebar } = Astro.locals.starlightRoute;
+const { title, description, audience = [] } = entry.data;
+
+type Entry = (typeof sidebar)[number];
+const hasCurrent = (e: Entry): boolean =>
+  e.type === 'link' ? e.isCurrent : e.entries.some((child) => hasCurrent(child as Entry));
+const group = sidebar.find((e) => e.type === 'group' && hasCurrent(e));
+const minutes = readingMinutes(entry.body);
+---
+
+<header class="pt">
+  <div class="pt-meta">
+    {group && <span class="pt-group">{group.label}</span>}
+    <span class="pt-dot" aria-hidden="true"></span>
+    <span class="pt-time">
+      <Clock size={13} strokeWidth={2} aria-hidden="true" />
+      {minutes} Min. Lesezeit
+    </span>
+  </div>
+
+  <h1 id={PAGE_TITLE_ID}>{title}</h1>
+
+  {description && <p class="pt-lead">{description}</p>}
+
+  {
+    audience.length > 0 && (
+      <ul class="pt-audience" aria-label="Für wen">
+        <li class="pt-audience-label">
+          <Users size={14} strokeWidth={2} aria-hidden="true" /> Für
+        </li>
+        {audience.map((key) => (
+          <li>
+            <a href={AUDIENCES[key].href} class={`pt-chip pt-chip--${key}`}>
+              {AUDIENCES[key].label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</header>
+
+<style>
+  .pt {
+    padding-top: 1.75rem;
+    animation: fade-up 0.6s var(--ease-out-expo) both;
+  }
+
+  .pt-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--fg-subtle));
+  }
+
+  .pt-group {
+    color: rgb(var(--accent-ink));
+  }
+
+  .pt-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgb(var(--line-strong));
+  }
+
+  .pt-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  h1 {
+    margin-top: 0.875rem;
+    font-family: var(--font-display);
+    font-size: var(--sl-text-h1);
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    color: rgb(var(--fg));
+    text-wrap: balance;
+  }
+
+  .pt-lead {
+    margin-top: 1.125rem;
+    max-width: 38rem;
+    font-size: 1.1875rem;
+    line-height: 1.6;
+    color: rgb(var(--fg-muted));
+    text-wrap: pretty;
+  }
+
+  .pt-audience {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.375rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pt-audience-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: rgb(var(--fg-subtle));
+  }
+
+  .pt-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 1.875rem;
+    padding-inline: 0.8125rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface));
+    font-size: 0.8125rem;
+    font-weight: 650;
+    text-decoration: none;
+    color: rgb(var(--fg));
+    transition:
+      border-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .pt-chip::before {
+    content: '';
+    width: 0.4375rem;
+    height: 0.4375rem;
+    margin-inline-end: 0.5rem;
+    border-radius: 999px;
+    background: var(--chip, rgb(var(--fg-subtle)));
+  }
+
+  .pt-chip:hover {
+    border-color: rgb(var(--line-strong));
+  }
+
+  .pt-chip--helfer {
+    --chip: rgb(var(--success));
+  }
+  .pt-chip--ok {
+    --chip: rgb(var(--ember));
+  }
+  .pt-chip--abteilung {
+    --chip: rgb(var(--accent));
+  }
+</style>

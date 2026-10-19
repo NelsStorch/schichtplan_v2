@@ -1,0 +1,42 @@
+---
+title: Stufen erfassen
+description: Stufen machen Anlässe nur für das Leiterteam oder die Jungschi möglich. Mit Cevi.DB ordnen sie sich selbst zu.
+audience: [abteilung]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+<Path steps={['Abteilung bearbeiten', 'Stufen']} />
+
+Stufen sind die Gruppen eurer Abteilung, zum Beispiel Fröschli, Jungschi, Hiskia oder Leiterteam. Helfer*innen geben beim Login an, in welcher Stufe sie **Teilnehmer*in** oder **Leitung** sind. Anlässe können dann [auf Stufen beschränkt](/ok/zugang/) werden.
+
+## Am schnellsten: Vorschläge aus der Cevi.DB
+
+Haben sich schon Leute mit Cevi.DB angemeldet, steht oben **Vorschläge aus Cevi.DB**: Stufen, in denen eure Mitglieder laut Cevi.DB eine Rolle haben, mit Anzahl Personen. Ein Tipp legt die Stufe an und verknüpft sie gleich mit der Cevi.DB-Gruppe.
+
+## Von Hand
+
+<Steps>
+1. Gib unten den Namen ein, zum Beispiel «Hiskia».
+2. Optional die **Cevi.DB-ID** der Stufen-Gruppe (siehe unten).
+3. Tippe auf <Btn variant="primary">Hinzufügen</Btn>.
+</Steps>
+
+**Umbenennen**: in den Namen klicken, ändern, wegklicken. **Löschen**: Papierkorb. Dabei verlieren Personen diese Stufe, und Anlässe mit diesem Stufen-Filter verlieren den Filter.
+
+## Die Cevi.DB-ID finden
+
+Öffne die Stufe in `db.cevi.ch`. Die Zahl in der Adresse nach `groups/` ist die ID, zum Beispiel `db.cevi.ch/groups/1234` → `1234`.
+
+Ist eine Stufe verknüpft, steht die ID als kleines Abzeichen daneben. Cevi.DB-Personen bekommen die Stufe dann bei jedem Login automatisch:
+
+- Rollen wie **Gruppenleiter*in** oder **Stufenleiter*in** werden zu **Leitung**
+- **Teilnehmer*in** bleibt **Teilnehmer*in**
+
+Diese Zuordnungen sind mit «aus Cevi.DB» markiert und lassen sich im Schichtplan nicht ändern. Ändert sich etwas in der Cevi.DB, gilt es ab dem nächsten Login der Person.
+
+:::tip[Leiterteam als eigene Stufe?]
+Für Anlässe nur für Leitende brauchst du keine eigene Stufe. Der Schalter **Nur Leitende** beim Anlass nimmt alle mit Leitungsrolle in irgendeiner Stufe.
+:::

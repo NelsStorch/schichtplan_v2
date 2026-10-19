@@ -1,0 +1,191 @@
+---
+// Startseite: In drei Schritten zur ersten Schicht, als Weg mit gestrichelter Linie.
+import LogIn from '@lucide/astro/icons/log-in';
+import CalendarDays from '@lucide/astro/icons/calendar-days';
+import Ticket from '@lucide/astro/icons/ticket';
+
+const steps = [
+  {
+    icon: LogIn,
+    title: 'Anmelden',
+    text: 'Mit Cevi.DB, mit deinem Cevi-Namen ohne Passwort oder mit E-Mail.',
+    href: '/start/anmelden/',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Anlass öffnen',
+    text: 'Den Link vom OK antippen oder auf der Seite deiner Abteilung auswählen.',
+    href: '/helfen/eintragen/',
+  },
+  {
+    icon: Ticket,
+    title: 'Eintragen',
+    text: 'Schicht mit freiem Platz wählen, «Eintragen» tippen, fertig.',
+    href: '/helfen/meine-schichten/',
+  },
+];
+---
+
+<section class="qs not-content" aria-labelledby="qs-title">
+  <div class="qs-head">
+    <p class="qs-eyebrow">Zum ersten Mal hier?</p>
+    <h2 id="qs-title">In drei Schritten zur ersten Schicht</h2>
+  </div>
+  <ol class="qs-steps">
+    {
+      steps.map((s, i) => {
+        const Icon = s.icon;
+        return (
+          <li style={`--i:${i}`}>
+            <a href={s.href}>
+              <span class="qs-num">{i + 1}</span>
+              <span class="qs-icon">
+                <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
+              </span>
+              <span class="qs-title">{s.title}</span>
+              <span class="qs-text">{s.text}</span>
+            </a>
+          </li>
+        );
+      })
+    }
+  </ol>
+</section>
+
+<style>
+  .qs {
+    margin-top: 4.5rem;
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    border-radius: 2rem;
+    border: 1px solid rgb(var(--line));
+    background:
+      radial-gradient(60% 100% at 0% 0%, rgb(var(--accent) / 0.08), transparent 70%),
+      radial-gradient(50% 80% at 100% 100%, rgb(var(--ember) / 0.08), transparent 70%),
+      rgb(var(--surface));
+  }
+
+  .qs-eyebrow {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(var(--accent-ink));
+  }
+
+  .qs-head h2 {
+    margin-top: 0.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.375rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    color: rgb(var(--fg));
+  }
+
+  .qs-steps {
+    position: relative;
+    display: grid;
+    gap: 1rem;
+    margin: 2rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .qs-steps li {
+    position: relative;
+    margin: 0;
+  }
+
+  .qs-steps a {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 1rem;
+    padding: 1.25rem;
+    border-radius: 1.25rem;
+    background: rgb(var(--canvas));
+    border: 1px solid rgb(var(--line));
+    z-index: 1;
+    text-decoration: none;
+    transition:
+      transform 0.4s var(--ease-out-expo),
+      border-color 0.2s ease;
+  }
+
+  .qs-steps a:hover {
+    transform: translateY(-3px);
+    border-color: rgb(var(--accent) / 0.4);
+  }
+
+  .qs-num {
+    position: absolute;
+    top: 1rem;
+    right: 1.125rem;
+    font-family: var(--font-display);
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.05em;
+    color: rgb(var(--line-strong));
+  }
+
+  .qs-icon {
+    grid-row: span 2;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.875rem;
+    color: rgb(var(--accent-fg));
+    background: linear-gradient(145deg, rgb(var(--accent)), rgb(var(--accent-ink)));
+    box-shadow: 0 10px 22px -10px rgb(var(--accent) / 0.8);
+  }
+
+  .qs-title {
+    font-family: var(--font-display);
+    font-size: 1.1875rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: rgb(var(--fg));
+  }
+
+  .qs-text {
+    margin-top: 0.25rem;
+    padding-right: 2rem;
+    font-size: 0.9063rem;
+    line-height: 1.5;
+    color: rgb(var(--fg-muted));
+  }
+
+  @media (min-width: 50rem) {
+    .qs-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .qs-steps::before {
+      content: '';
+      position: absolute;
+      top: 2.625rem;
+      left: 8%;
+      right: 8%;
+      border-top: 2px dashed rgb(var(--line-strong));
+      z-index: 0;
+    }
+
+    .qs-steps a {
+      grid-template-columns: 1fr;
+      row-gap: 0.25rem;
+      height: 100%;
+    }
+
+    .qs-icon {
+      grid-row: auto;
+      margin-bottom: 0.75rem;
+    }
+
+    .qs-text {
+      padding-right: 0;
+    }
+  }
+</style>

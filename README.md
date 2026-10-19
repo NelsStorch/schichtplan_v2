@@ -7,6 +7,7 @@ Basiert auf der bewährten Architektur von `laden_v2`:
 * **Frontend (Landing/Hauptseite):** Next.js 15 – läuft als separater Container auf `cevi-schichtplan.ch`
 * **Backend:** Fastify 5 + TypeScript (stateless, hochperformant, Zod-Validierung)
 * **Datenbank:** PostgreSQL 17 mit Prisma ORM
+* **Hilfe-Center:** Astro Starlight in `hilfe/` (statisch, nginx) auf `hilfe.cevi-schichtplan.ch`
 * **Shared Types:** `@schichtplan/shared` im Monorepo
 * **Reverse Proxy:** Traefik mit automatischem Wildcard-SSL & Zero-Downtime Healthchecks
 
@@ -69,6 +70,21 @@ docker compose -f docker-compose.dev.yml up --build
 # Hauptseite:     http://localhost:3001
 # PostgreSQL:     localhost:5432
 ```
+
+### Hilfe-Center (`hilfe/`)
+
+Eigenes Node-Projekt ausserhalb der Workspaces (eigene `package-lock.json`), damit Astro nicht in die
+Images der anderen Apps gelangt. Inhalte sind Markdown/MDX in `hilfe/src/content/docs/`, die Seitenleiste
+steht in `hilfe/astro.config.mjs`.
+
+```bash
+npm --prefix hilfe install
+npm run hilfe:dev       # http://localhost:3004 mit Hot-Reload (Suche nur im Build)
+npm run hilfe:build     # statischer Build nach hilfe/dist, inkl. Suchindex
+npm run hilfe:preview   # Build lokal ansehen, mit Suche
+```
+
+Aus den Apps verlinkt `helpUrl('/pfad/')` aus `@schichtplan/shared` auf eine Hilfeseite.
 
 ---
 

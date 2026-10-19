@@ -1,0 +1,50 @@
+---
+title: So funktioniert der Schichtplan
+description: Ein Konto für alle Abteilungen, jede Abteilung auf ihrer eigenen Adresse. Hier siehst du, was wo liegt.
+audience: [helfer, ok, abteilung]
+sidebar:
+  label: Überblick
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Der Cevi Schichtplan ersetzt die Excel-Liste und den Doodle für Chilbi, Lager und Feste. Helfer*innen sehen auf einen Blick, wo noch jemand fehlt, und tragen sich selbst ein. Das OK sieht in Echtzeit, welche Schichten voll sind.
+
+## Die vier Adressen
+
+| Adresse | Wofür |
+| --- | --- |
+| `cevi-schichtplan.ch` | Startseite, Abteilung suchen, dein [Profil](/helfen/konto/) |
+| `login.cevi-schichtplan.ch` | Anmelden. Gilt für alle Abteilungen auf einmal |
+| `deine-abteilung.cevi-schichtplan.ch` | Der Schichtplan deiner Abteilung mit allen Anlässen |
+| `hilfe.cevi-schichtplan.ch` | Diese Hilfe |
+
+Jede Abteilung hat ihre eigene Adresse, zum Beispiel `illnau.cevi-schichtplan.ch`. Diese Adresse bleibt fest und passt auf jeden Flyer.
+
+:::tip[Einmal anmelden reicht]
+Du meldest dich einmal an und bist danach auf allen Abteilungen angemeldet. Hilfst du bei einer anderen Abteilung aus, brauchst du kein zweites Konto.
+:::
+
+## Wie alles zusammenhängt
+
+- Eine **Abteilung** hat beliebig viele **Anlässe**, zum Beispiel «Chilbi 2026» oder «Sommerlager».
+- Ein Anlass hat **Schichten**, zum Beispiel «Samstag 17:00 bis 20:00».
+- Eine Schicht hat eine oder mehrere **Arbeiten** mit eigenen Plätzen, zum Beispiel Grill 2, Bar 2, Kasse 1.
+- Das **OK** (Organisationskomitee) plant die Schichten eines Anlasses. Die **Abteilungsleitung** verwaltet die ganze Abteilung.
+
+Mehr Begriffe stehen im [Glossar](/wissen/glossar/).
+
+## Auf dem Handy
+
+Der Schichtplan ist fürs Handy gebaut. Unten gibt es eine Leiste mit **Anlässe**, **Meine Schichten** und **Konto**. Auf dem Computer stehen dieselben Punkte oben.
+
+Du kannst die Seite deiner Abteilung auf den Home-Bildschirm legen (im Browser «Zum Home-Bildschirm»). Dann öffnet sie sich wie eine App, ohne App Store.
+
+## Wo anfangen?
+
+<CardGrid>
+  <LinkCard title="Anmelden" description="Cevi.DB, Cevi-Name oder E-Mail: was passt zu dir?" href="/start/anmelden/" />
+  <LinkCard title="In eine Schicht eintragen" description="Schicht finden, Arbeit wählen, fertig." href="/helfen/eintragen/" />
+  <LinkCard title="Einen Anlass planen" description="Für das OK: vom leeren Anlass zum vollen Plan." href="/ok/anlass-erstellen/" />
+  <LinkCard title="Abteilung einrichten" description="Für die Abteilungsleitung mit Cevi.DB." href="/abteilung/anlegen/" />
+</CardGrid>

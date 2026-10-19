@@ -7,6 +7,7 @@ import {
   EVENT_QUESTION_TYPES,
   REQUIRED_PROFILE_FIELDS,
   accessTypeConfig,
+  helpUrl,
   type DepartmentDirectoryItemDto,
   type EventAccessType,
   type EventQuestionScope,
@@ -135,7 +136,15 @@ export function EventAccessFields({
         <legend className="mb-1 text-[13px] font-semibold text-fg">Wer darf sich eintragen?</legend>
         <p className="mb-3 text-xs text-fg-muted">
           Eintragen braucht immer ein Konto, ein Cevi-Name ohne Passwort reicht. Das OK und persönliche Links gehen
-          immer.
+          immer.{' '}
+          <a
+            href={helpUrl('/ok/zugang/')}
+            target="_blank"
+            rel="noopener"
+            className="font-semibold text-accent-ink underline-offset-2 hover:underline"
+          >
+            Alle Arten erklärt
+          </a>
         </p>
         <div className="grid gap-2.5 sm:grid-cols-2">
           {ACCESS_TYPE_INFO.map((info) => {

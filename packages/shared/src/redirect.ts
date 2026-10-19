@@ -106,6 +106,16 @@ export function getLandingUrl(path = '/'): string {
   return `${protocol}//${getRootDomain(hostname)}${path}`;
 }
 
+/**
+ * Link ins Hilfe-Center, z. B. helpUrl('/ok/zugang/'). Bewusst immer die Produktiv-Hilfe:
+ * Die Inhalte sind für alle Umgebungen gleich, und eine feste URL vermeidet Hydration-Unterschiede.
+ */
+export const HELP_URL = 'https://hilfe.cevi-schichtplan.ch';
+
+export function helpUrl(path = '/'): string {
+  return `${HELP_URL}${path}`;
+}
+
 /** Ziel nach dem Login ohne return_to: eigene Abteilung, sonst Landingpage (nie zurück aufs Login). */
 export function getDefaultDestination(homeDepartmentSlug?: string | null): string {
   return homeDepartmentSlug ? getDepartmentUrl(homeDepartmentSlug) : getLandingUrl();

@@ -1,0 +1,35 @@
+---
+title: Meine Schichten und Kalender
+description: Alle deine Einsätze über alle Abteilungen auf einer Seite, mit Export in deinen Kalender.
+audience: [helfer]
+---
+
+import Btn from '../../../components/Btn.astro';
+
+Unten in der Leiste (auf dem Computer oben) findest du **Meine Schichten**. Dort steht alles, wofür du eingetragen bist, auch Schichten bei anderen Abteilungen.
+
+## Was du dort siehst
+
+- **Einsätze** und **Stunden**: wie oft und wie lange du insgesamt dabei bist.
+- **Als Nächstes**: deine nächste Schicht gross, mit «heute», «morgen» oder «in 5 Tagen».
+- **Anstehend**: alle kommenden Schichten als Zeitachse, nach Tag sortiert.
+- **Erledigt**: vergangene Schichten, etwas blasser.
+
+Ein Tipp auf den Namen des Anlasses führt direkt zum Plan.
+
+Auf der Startseite deiner Abteilung zeigt die Karte **Dein nächster Einsatz** dasselbe in kurz.
+
+## In den Kalender übernehmen
+
+- <Btn>In Kalender</Btn> bei «Als Nächstes» lädt eine Datei für diese eine Schicht.
+- <Btn variant="ghost">Alle exportieren</Btn> bei «Anstehend» lädt alle kommenden Schichten in einer Datei.
+
+Die Datei endet auf `.ics`. Öffne sie, dann fragt dein Handy oder Computer, in welchen Kalender die Termine sollen. Das klappt mit Apple Kalender, Google Kalender und Outlook.
+
+:::caution[Der Kalender aktualisiert sich nicht selbst]
+Die Datei ist eine Momentaufnahme. Verschiebt das OK eine Schicht oder trägst du dich aus, ändert sich der Termin in deinem Kalender nicht. Lösch ihn dann von Hand.
+:::
+
+## Auch auf dem Hauptportal
+
+Auf `cevi-schichtplan.ch/profil` stehen unter **Deine nächsten Schichten** dieselben Einsätze, mit Link zur jeweiligen Abteilung.

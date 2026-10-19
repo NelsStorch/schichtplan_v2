@@ -1,0 +1,44 @@
+---
+title: Vorlagen für nächstes Jahr
+description: Einen fertigen Anlass als Vorlage speichern und nächstes Jahr alle Schichten auf neue Daten übertragen.
+audience: [ok, abteilung]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+
+Die Chilbi ist jedes Jahr ähnlich. Statt fünfzig Schichten neu zu tippen, speicherst du den Anlass als Vorlage.
+
+## Als Vorlage speichern
+
+<Steps>
+1. Im OK-Dashboard oben auf <Btn>Als Vorlage speichern</Btn>.
+2. **Name der Vorlage**, vorgeschlagen ist «Chilbi 2026 (Vorlage)».
+3. **Beschreibung / Notizen für kommende Jahre**: Was hat gut geklappt, was nicht? Das liest das OK im nächsten Jahr.
+4. Tippe auf <Btn variant="primary">Vorlage anlegen</Btn>.
+</Steps>
+
+## Was in der Vorlage steckt
+
+| Kommt mit | Kommt nicht mit |
+| --- | --- |
+| alle Schichten mit Titel, Hinweisen, Auf-/Abbau | Eintragungen |
+| Tag relativ zum Start (Tag 1, Tag 2 …) und Uhrzeiten | das OK (die Person, die erstellt, wird OK-Leitung) |
+| alle Arbeiten mit Plätzen und Altersgrenzen | Banner und Logo |
+| Zugang, Nur Leitende, Pflichtangaben, Soll | Zugangs-Links |
+| eigene Fragen, freigeschaltete Abteilungen und Stufen | |
+
+## Aus einer Vorlage erstellen
+
+Zwei Wege:
+
+- Im OK-Dashboard Tab **Event-Vorlagen**, bei der Vorlage <Btn variant="primary">Neues Event aus dieser Vorlage erstellen</Btn>.
+- Oder beim [neuen Anlass](/ok/anlass-erstellen/) oben **Aus Vorlage erstellen** wählen.
+
+Dann setzt du Titel, Adresse und das neue **Startdatum**. Der Schichtplan legt alle Schichten mit demselben Abstand zum Start (Tag 1, Tag 2 …) und zu denselben Uhrzeiten an. Beginnt die Chilbi diesmal an einem anderen Wochentag, verschieben sich die Schichten mit. Das OK ergänzt du danach mit <Btn>OK ernennen</Btn>.
+
+Aus einer Vorlage erstellen dürfen, wie bei jedem neuen Anlass, die Abteilungsleitung und die Planung. Speichern darf jedes OK-Mitglied.
+
+## Vorlagen verwalten
+
+Der Tab **Event-Vorlagen** zeigt alle Vorlagen der Abteilung mit Anzahl Schichten, Zugang und den ersten Schichten als Vorschau. Löschen geht mit dem Papierkorb. Bestehende Anlässe ändern sich dadurch nicht.

@@ -1,0 +1,50 @@
+---
+/**
+ * Knopf aus der App im Fliesstext, damit man ihn wiedererkennt: <Btn>Eintragen</Btn>
+ * variant: primary (Akzent), secondary (neutral), danger (rot), ghost (nur Text)
+ */
+interface Props {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+}
+const { variant = 'secondary' } = Astro.props;
+---
+
+<span class:list={['btn', `btn--${variant}`]}><slot /></span>
+
+<style>
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.08em 0.7em 0.12em;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line-strong));
+    background: rgb(var(--surface));
+    font-size: 0.875em;
+    font-weight: 650;
+    line-height: 1.5;
+    white-space: nowrap;
+    color: rgb(var(--fg));
+    box-shadow: 0 1px 0 rgb(var(--shadow) / 0.06);
+    vertical-align: 0.06em;
+  }
+
+  .btn--primary {
+    border-color: transparent;
+    background: rgb(var(--accent));
+    color: rgb(var(--accent-fg));
+    box-shadow: 0 4px 12px -6px rgb(var(--accent) / 0.8);
+  }
+
+  .btn--danger {
+    border-color: rgb(var(--danger) / 0.35);
+    background: rgb(var(--danger) / 0.1);
+    color: rgb(var(--danger-ink));
+  }
+
+  .btn--ghost {
+    border-color: transparent;
+    background: rgb(var(--surface-2));
+    color: rgb(var(--fg-muted));
+  }
+</style>

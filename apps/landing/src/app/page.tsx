@@ -13,6 +13,7 @@ import {
 import {
   getLoginUrl,
   getLandingUrl,
+  helpUrl,
   type UserDto,
 } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
@@ -343,6 +344,9 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-5">
+            <a href={helpUrl()} className="hover:text-fg transition">
+              Hilfe
+            </a>
             <a
               href="https://github.com/NelsStorch/schichtplan_v2"
               target="_blank"

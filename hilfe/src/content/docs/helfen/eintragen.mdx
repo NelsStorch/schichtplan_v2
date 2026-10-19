@@ -1,0 +1,67 @@
+---
+title: In eine Schicht eintragen
+description: Anlass öffnen, eine Schicht mit freiem Platz wählen, eintragen. Hier steht, was du auf dem Weg siehst.
+audience: [helfer]
+numbered: true
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import ShiftRowMock from '../../../components/ShiftRowMock.astro';
+
+## Den Anlass finden
+
+Meistens bekommst du vom OK einen Link, zum Beispiel per WhatsApp. Er sieht so aus: `illnau.cevi-schichtplan.ch/events/chilbi-2026`. Tipp ihn an, fertig.
+
+Ohne Link öffnest du die Seite deiner Abteilung. Unter **Anlässe** stehen alle laufenden Anlässe, der nächste gross oben. Vergangene Anlässe sind weiter unten aufgelistet.
+
+## Den Plan lesen
+
+Oben siehst du das Banner mit Titel, Datum und für wen der Anlass ist. Rechts daneben (auf dem Handy darunter) steht, wie viele **Plätze frei** sind.
+
+Darunter kommt **Noch gesucht**: die nächsten Schichten mit freien Plätzen. Oft findest du hier schon, was du suchst. Steht **bald** daneben, beginnt die Schicht in weniger als zwei Tagen.
+
+Danach folgen alle Schichten, nach Tag sortiert. So sieht eine Schicht in der Liste aus:
+
+<ShiftRowMock />
+
+:::note[Nach Mitternacht]
+Schichten, die vor 03:00 Uhr beginnen, zählen zum Vortag. Die Bar bis 02:00 steht also beim Samstag, nicht beim Sonntag.
+:::
+
+### Liste oder Raster
+
+Oben in der Leiste wechselst du zwischen **Liste** und **Raster**. Das Raster sieht aus wie ein Excel-Schichtplan: Zeilen sind die Arbeiten, Spalten die Zeitfenster, die Farbe zeigt die Belegung. Gut für grosse Anlässe. Ein Tipp auf eine Zelle öffnet die Schicht. Der Schichtplan merkt sich deine Wahl.
+
+### Filtern
+
+In derselben Leiste gibt es Filter:
+
+- **Alle Tage** oder ein einzelner Tag
+- **Nur mit freien Plätzen**
+- **Auf- & Abbau**, wenn es solche Schichten gibt
+- Eine bestimmte **Arbeit**, zum Beispiel nur «Grill»
+
+Passt nichts mehr, hilft <Btn>Filter zurücksetzen</Btn>.
+
+## Eintragen
+
+<Steps>
+1. Tippe bei einer Schicht auf <Btn>Eintragen</Btn> oder auf das Plus.
+2. Hat die Schicht nur eine offene Arbeit, bist du sofort eingetragen. Hat sie mehrere, öffnet sich die Schicht und du wählst die Arbeit mit <Btn variant="primary">Für diese Arbeit eintragen</Btn>.
+3. Braucht das OK noch Angaben von dir, zum Beispiel deine Handynummer oder deine T-Shirt-Grösse, fragt der Schichtplan jetzt danach. Mehr dazu unter [Angaben und Fragen](/helfen/angaben-und-fragen/).
+4. Unten erscheint **Du bist eingetragen!** mit Schicht und Zeit. Im Kopf des Anlasses steht jetzt «Du bist 1× eingetragen».
+</Steps>
+
+Nicht angemeldet? Dann heisst der Knopf <Btn variant="primary">Anmelden & eintragen</Btn>. Nach dem Login kommst du zurück zum Anlass.
+
+:::tip[Eine Schicht im Detail ansehen]
+Tippe irgendwo auf die Schicht. Du siehst alle Arbeiten, wer schon eingetragen ist, Hinweise des OK und das Mindestalter.
+:::
+
+## Was nicht geht
+
+- **Zwei Arbeiten in derselben Schicht.** Pro Schicht bist du einmal dabei. Bei den anderen Arbeiten steht dann «Du bist bereits für eine andere Arbeit eingeteilt».
+- **Volle Schichten oder Arbeiten.** Steht «Voll besetzt», such dir eine andere Zeit oder frag das OK.
+- **Vergangene Schichten.** Sie sind ausgegraut und haben keinen Knopf mehr.
+- **Anlässe, die nicht für dich sind.** Dann steht oben ein Hinweis mit dem Grund. Was du tun kannst, steht unter [Ich kann mich nicht eintragen](/helfen/nicht-freigeschaltet/).

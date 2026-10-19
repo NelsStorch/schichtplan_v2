@@ -1,0 +1,8 @@
+---
+// Wie Starlight, plus Klasse für nummerierte Kapitel (frontmatter `numbered: true`)
+import '@astrojs/starlight/style/markdown.css';
+
+const { numbered } = Astro.locals.starlightRoute.entry.data;
+---
+
+<div class:list={['sl-markdown-content', { 'is-numbered': numbered }]}><slot /></div>

@@ -1,0 +1,33 @@
+---
+title: Angaben, Antworten und CSV
+description: Kontaktangaben und Antworten aller Eingetragenen in einer Tabelle, als CSV für Excel.
+audience: [ok]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+<Path steps={['Anlass', 'OK-Dashboard', 'Zugang & Angaben', 'Angaben der Helfer*innen']} />
+
+Unten im Tab **Zugang & Angaben** steht eine Tabelle mit allen, die sich eingetragen haben:
+
+- **Person**: Cevi-Name, Vor- und Nachname, Heimabteilung, «über Link» wenn jemand über einen Zugangs-Link kam
+- **Kontakt**: Handynummer (antippen zum Anrufen), E-Mail, Adresse, Geburtsdatum
+- **Schichten**: wie viele
+- eine Spalte pro **eigene Frage**. Bei Fragen «bei jeder Eintragung» steht die Antwort pro Schicht.
+
+Diese Tabelle sieht nur das OK und die Abteilungsleitung.
+
+## Als CSV herunterladen
+
+Tippe auf <Btn>CSV</Btn>. Die Datei heisst zum Beispiel `chilbi-2026-helfer.csv` und öffnet sich direkt in Excel, Numbers oder Google Tabellen. Umlaute stimmen, Spalten sind mit Semikolon getrennt.
+
+Spalten: Name, Vorname, Nachname, E-Mail, Handy, Adresse, Geburtsdatum, Abteilung, Schichten und alle eigenen Fragen.
+
+:::caution[Persönliche Daten]
+Die CSV enthält Kontaktangaben. Leg sie nicht in einen öffentlichen Ordner und lösch sie nach dem Anlass. Für die Planung reicht meistens das Dashboard.
+:::
+
+## Wer ist wo?
+
+Für die Frage «Wer ist am Samstag an der Bar?» ist der Tab **Schichten & Einteilung** besser. Dort stehen die Namen direkt bei jeder Arbeit. Für «Was macht Falk alles?» nimm den Tab **Eingetragene Helfer**.

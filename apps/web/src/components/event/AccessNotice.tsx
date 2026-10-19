@@ -1,6 +1,7 @@
 'use client';
 
 import { Building2, KeyRound, LogIn, ShieldCheck } from 'lucide-react';
+import { helpUrl } from '@schichtplan/shared';
 import { Callout, buttonClasses } from '@schichtplan/ui';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import type { EventDetails } from '@/lib/types';
@@ -59,6 +60,12 @@ export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedI
           <p className="mt-2 flex items-start gap-1.5 text-xs">
             <KeyRound className="mt-0.5 size-3.5 shrink-0" /> {linkHint}
           </p>
+          <a
+            href={helpUrl('/helfen/nicht-freigeschaltet/')}
+            className="mt-2 inline-block text-xs font-semibold underline-offset-2 hover:underline"
+          >
+            Warum? Alle Gründe erklärt
+          </a>
           {loggedIn && access.reason !== 'LEADERS_ONLY' && (
             <a
               href={departmentSetupUrl()}

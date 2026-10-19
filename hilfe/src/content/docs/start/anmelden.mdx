@@ -1,0 +1,74 @@
+---
+title: Anmelden
+description: Es gibt drei Wege. Mit Cevi.DB geht es am schnellsten, mit dem Cevi-Namen auch ganz ohne Passwort.
+audience: [helfer, ok, abteilung]
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+
+Zum Ansehen eines Plans brauchst du meistens kein Konto. Zum **Eintragen** schon, aber ein Cevi-Name ohne Passwort reicht. Angemeldet wird immer auf `login.cevi-schichtplan.ch`, egal von welcher Abteilung du kommst.
+
+## Welcher Weg passt zu mir?
+
+| Du bist … | Nimm |
+| --- | --- |
+| Leiter*in oder Teilnehmer*in mit Konto in der Cevi.DB | **Mit Cevi.DB anmelden** |
+| Elternteil, Ehemalige*r, Freund*in, kurz einmal Helfer*in | **Mit Cevi-Name** |
+| Ohne Cevi.DB, möchtest aber ein festes Konto mit Passwort | **Mit E-Mail und Passwort** |
+
+## So meldest du dich an
+
+<Tabs>
+  <TabItem label="Mit Cevi.DB">
+    <Steps>
+    1. Tippe auf <Btn variant="primary">Mit Cevi.DB anmelden</Btn>.
+    2. Du landest auf `db.cevi.ch`. Melde dich dort an wie immer.
+    3. Cevi.DB fragt, ob der Schichtplan deine Angaben lesen darf. Bestätige.
+    4. Du kommst automatisch zurück zu der Seite, von der du gekommen bist.
+    </Steps>
+
+    Der Schichtplan übernimmt aus der Cevi.DB deinen Cevi-Namen, Vor- und Nachnamen, das Geburtsdatum, deine Abteilung (Ortsgruppe) und deine Stufen. Adresse und Handynummer kommen dazu, wenn du sie im Schichtplan noch nicht selbst erfasst hast. Bei jedem neuen Login werden die Angaben aufgefrischt.
+  </TabItem>
+  <TabItem label="Mit Cevi-Name">
+    <Steps>
+    1. Tippe auf <Btn>Mit Cevi-Name</Btn>.
+    2. Gib deinen Cevi-Namen ein. Hast du keinen, nimm deinen Vornamen.
+    3. Optional: Geburtsdatum. Das braucht es nur für Schichten mit Altersgrenze, zum Beispiel an der Bar.
+    4. Optional: Unter «Vor-, Nachname und Handynummer ergänzen» kannst du mehr angeben. Das OK erreicht dich so im Notfall.
+    5. Tippe auf <Btn variant="primary">Weiter</Btn>.
+    </Steps>
+
+    Kein Passwort, keine E-Mail. Meldest du dich später wieder mit demselben Cevi-Namen an, bist du im selben Profil.
+
+    :::caution[Cevi-Name schon vergeben?]
+    Gehört der Cevi-Name zu einem Konto mit Passwort, verlangt der Schichtplan das Passwort und schickt dich zur Anmeldung mit E-Mail. Nimm dann deinen Cevi-Namen mit einem Zusatz, zum Beispiel «Falk Illnau».
+    :::
+  </TabItem>
+  <TabItem label="Mit E-Mail">
+    <Steps>
+    1. Tippe auf <Btn>Mit E-Mail und Passwort</Btn>.
+    2. Noch kein Konto? Tippe auf **Konto erstellen** und gib Vorname, Nachname, E-Mail und ein Passwort mit mindestens 8 Zeichen ein. Cevi-Name und Handynummer sind freiwillig.
+    3. Du bekommst eine E-Mail mit einem Bestätigungslink. Öffne ihn.
+    4. Danach meldest du dich mit E-Mail und Passwort an.
+    </Steps>
+
+    Keine E-Mail bekommen? Schau im Spam-Ordner nach oder tippe auf **Bestätigungs-E-Mail erneut senden**. Einen neuen Link gibt es höchstens einmal pro Minute.
+  </TabItem>
+</Tabs>
+
+## Wohin geht es nach dem Login?
+
+Kommst du von einer Abteilung oder einem Anlass, steht auf der Login-Seite «Danach geht es weiter zu …». Genau dorthin kommst du zurück. Öffnest du die Login-Seite direkt, landest du auf deiner Abteilung oder, wenn du keine hast, auf `cevi-schichtplan.ch`.
+
+Beim ersten Login fragt der Schichtplan, [zu welcher Abteilung du gehörst](/start/abteilung-und-stufen/). Mit Cevi.DB ist das schon ausgefüllt.
+
+## Abmelden
+
+Tippe unten rechts auf **Konto** (auf dem Computer oben rechts auf deinen Namen) und dann auf <Btn variant="ghost">Abmelden</Btn>. Du bist danach auf allen Abteilungen abgemeldet.
+
+## Probleme beim Anmelden
+
+- **«Die Anmeldung mit Cevi.DB ist im Moment nicht verfügbar»**: Versuch es etwas später nochmals. Meldest du dich stattdessen mit dem Cevi-Namen an, ist das ein eigenes Konto. Schichten von dort erscheinen nicht in deinem Cevi.DB-Konto.
+- **«E-Mail oder Passwort falsch»**: Prüfe die Schreibweise. Ein Passwort zurücksetzen geht im Moment nur über die [Kontaktadresse](/wissen/kontakt/).
+- **«Bitte bestätige zuerst deine E-Mail-Adresse»**: Öffne den Link in der Bestätigungs-E-Mail. Er ist nur eine gewisse Zeit gültig, danach forderst du einen neuen an.

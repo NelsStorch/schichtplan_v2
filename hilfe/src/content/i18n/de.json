@@ -1,0 +1,13 @@
+{
+  "search.label": "Suchen",
+  "pagefind.clear_search": "Löschen",
+  "pagefind.load_more": "Mehr Treffer laden",
+  "pagefind.search_label": "Hilfe durchsuchen",
+  "pagefind.filters_label": "Filter",
+  "pagefind.zero_results": "Nichts gefunden für [SEARCH_TERM]. Probier ein anderes Wort, zum Beispiel «Schicht» oder «Zugang».",
+  "pagefind.many_results": "[COUNT] Treffer für [SEARCH_TERM]",
+  "pagefind.one_result": "1 Treffer für [SEARCH_TERM]",
+  "pagefind.alt_search": "Nichts gefunden für [SEARCH_TERM]. Treffer für [DIFFERENT_TERM]:",
+  "pagefind.search_suggestion": "Nichts gefunden für [SEARCH_TERM]. Vielleicht hilft eine dieser Suchen:",
+  "pagefind.searching": "Suche nach [SEARCH_TERM] …"
+}

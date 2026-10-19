@@ -1,0 +1,36 @@
+---
+title: Der Arbeiten-Katalog
+description: Typische Arbeiten der Abteilung einmal erfassen und in jeder Schicht mit einem Tipp einfügen.
+audience: [ok]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+Bar, Grill, Kasse, Zeltbau: Viele Arbeiten kommen in jedem Anlass wieder. Im Katalog erfasst du sie einmal mit Beschreibung und Altersgrenze. Beim Planen fügst du sie dann mit einem Tipp in jede Schicht ein.
+
+Der Katalog gilt für die **ganze Abteilung**, nicht nur für einen Anlass.
+
+<Path steps={['Anlass', 'OK-Dashboard', 'Arbeiten-Katalog']} />
+
+## Eine Arbeit anlegen
+
+<Steps>
+1. Tippe auf <Btn variant="primary">Neue Arbeit anlegen</Btn>.
+2. **Titel der Arbeit**, zum Beispiel «Bar».
+3. **Beschreibung / Aufgaben**: Was tut man da? Die Beschreibung sehen Helfer*innen in der Schicht.
+4. **Mindestalter**: Keins, ab 14, ab 16 oder ab 18. Bei einem Alter wählst du **Alle Helfer** oder **Mind. 1 in Schicht**.
+5. Tippe auf <Btn variant="primary">Arbeit anlegen</Btn>.
+</Steps>
+
+## Im Katalog arbeiten
+
+Jede Karte zeigt die Altersregel und wie oft die Arbeit im aktuellen Anlass vorkommt («In 4 Schicht(en) aktiv»). Mit **+ Schicht erstellen** öffnest du direkt eine neue Schicht.
+
+- **Bearbeiten** ändert die Vorlage im Katalog. Schichten, die die Arbeit schon enthalten, bleiben wie sie sind.
+- **Löschen** entfernt die Arbeit aus dem Katalog. Bestehende Schichten bleiben ebenfalls unverändert.
+
+:::tip[Ein guter Start]
+Leg zuerst die fünf häufigsten Arbeiten an, mit Altersgrenzen. Dann planst du die Chilbi in einer Viertelstunde, und niemand vergisst die Bar-Regel ab 16.
+:::

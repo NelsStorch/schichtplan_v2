@@ -1,0 +1,52 @@
+---
+title: Zugangs-Links verschicken
+description: 'Für Personen, die die Bedingungen nicht erfüllen: ein persönlicher Link für eine Person oder ein Gruppen-Link für den Elternchat.'
+audience: [ok]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+Dein Anlass ist abteilungs-intern, aber die Gotte von Falk will an den Grill? Oder der Elternchat einer Stufe soll mithelfen dürfen? Dafür gibt es Zugangs-Links.
+
+<Path steps={['Anlass', 'OK-Dashboard', 'Zugang & Angaben', 'Zugangs-Links']} />
+
+Im Anlass führt auch der Knopf <Btn>Links</Btn> beim OK direkt dorthin.
+
+## Zwei Arten
+
+| Art | Gilt für | Gut für |
+| --- | --- | --- |
+| **Persönlich** | Nur das erste Konto, das den Link öffnet | eine bestimmte Person, z. B. «Mami von Falk» |
+| **Gruppe** | Alle, die den Link haben | einen Gruppenchat, z. B. «Elternchat Hiskia» |
+
+## Link erstellen
+
+<Steps>
+1. Tippe auf <Btn variant="primary">Link erstellen</Btn>.
+2. **Für wen?** Ein Name, den nur das OK sieht, zum Beispiel «Mami von Falk».
+3. Wähle **Persönlich** oder **Gruppe**.
+4. Optional **Gültig bis**: danach funktioniert der Link nicht mehr.
+5. Tippe auf <Btn variant="primary">Erstellen und kopieren</Btn>. Der Link liegt jetzt in der Zwischenablage. Füg ihn im Chat oder in einer E-Mail ein.
+</Steps>
+
+Später kopierst du ihn mit <Btn>Teilen</Btn> wieder. Auf dem Handy öffnet sich dabei das Teilen-Menü.
+
+## Was die Person erlebt
+
+Sie öffnet den Link, meldet sich an (ein Cevi-Name reicht) und sieht **Du bist über einen persönlichen Link freigeschaltet**. Ab dann kann sie sich eintragen, auch bei einer Abteilung mit Startseite «nur für Mitglieder».
+
+## Übersicht und Löschen
+
+In der Liste steht bei jedem Link, wer ihn eingelöst hat, bis wann er gilt und ob er **Abgelaufen** ist. In der [Auswertung](/ok/auswertung/) sind Personen, die über einen Link kamen, mit **über Link** markiert.
+
+Löschst du einen Link, verlieren alle, die ihn eingelöst haben, den Zugang. Ihre bestehenden Eintragungen bleiben.
+
+:::caution[Gruppen-Links sind wie ein Schlüssel unter der Matte]
+Wer den Gruppen-Link hat, kommt rein, auch wenn er weitergeleitet wird. Setz ein Ablaufdatum und lösch den Link nach dem Anlass.
+:::
+
+:::note[Geschlossen bleibt geschlossen]
+Ein Link hebt nur die Zugangsregeln auf. Ist das Eintragen beim Anlass geschlossen, kann sich auch mit Link niemand eintragen.
+:::

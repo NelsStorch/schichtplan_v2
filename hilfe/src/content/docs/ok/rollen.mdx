@@ -1,0 +1,51 @@
+---
+title: Rollen und Rechte
+description: 'Wer darf was? Zwei Ebenen: die Abteilung als Ganzes und das OK eines einzelnen Anlasses.'
+audience: [ok, abteilung]
+---
+
+import Btn from '../../../components/Btn.astro';
+
+Im Schichtplan gibt es zwei Ebenen. Die **Abteilungsrolle** gilt für alle Anlässe einer Abteilung. Das **OK** gilt nur für einen bestimmten Anlass. So kann jemand die Chilbi planen, ohne gleich die ganze Abteilung verwalten zu können.
+
+## Rollen in der Abteilung
+
+| Rolle | Darf |
+| --- | --- |
+| Abteilungsleitung | Alles in der Abteilung: Name, Logo, Farbe, Stufen, Personen und Rollen, alle Anlässe und deren OK |
+| Planung | Neue Anlässe erstellen, in allen Anlässen der Abteilung Schichten planen und einteilen |
+| Helfer*in | Sich eintragen. Planungsrechte gibt es pro Anlass über das OK |
+
+Die Abteilungsleitung vergibt diese Rollen unter [Personen](/abteilung/personen/).
+
+## Rollen im OK eines Anlasses
+
+| Rolle | Darf |
+| --- | --- |
+| OK-Leitung | Einstellungen und Design des Anlasses, Zugang, OK-Mitglieder ernennen und entfernen, dazu alles vom OK-Mitglied |
+| OK-Mitglied | Schichten anlegen, bearbeiten, duplizieren und löschen, Helfer*innen einteilen und austragen, Zugangs-Links und Angaben sehen |
+
+Zu jeder OK-Rolle passt ein **Ressort**, zum Beispiel «Bau & Technik», «Kassier» oder «Grillchef». Das Ressort steht beim Namen oben im Anlass, damit Helfer*innen wissen, wen sie fragen.
+
+Wer einen Anlass erstellt, ist automatisch **OK-Leitung** mit dem Ressort «Event-Leitung».
+
+## Jemanden ins OK aufnehmen
+
+1. Öffne den Anlass und tippe bei «OK» auf <Btn>OK ernennen</Btn> (im OK-Dashboard: <Btn>OK-Team</Btn>).
+2. Gib den **Cevi-Namen oder die E-Mail** der Person ein. Sie braucht schon ein Konto.
+3. Wähle **OK-Leitung** oder **OK-Mitglied** und optional ein Ressort.
+4. Tippe auf <Btn variant="primary">Ins OK aufnehmen</Btn>.
+
+Entfernen geht mit dem kleinen Kreuz beim Namen im Anlass. Die Person verliert nur die Planungsrechte, ihre eigenen Eintragungen bleiben.
+
+:::tip[Gleich beim Erstellen]
+Beim Anlegen eines neuen Anlasses kannst du das OK direkt mit eintragen, auch mit Personen aus der Abteilungsliste.
+:::
+
+## Plattform-Admins
+
+Plattform-Admins betreiben den Schichtplan. Sie gelten in jeder Abteilung wie die Abteilungsleitung und sehen im Admin-Portal alle Personen. Bei Fragen zum Betrieb ist das die [Kontaktadresse](/wissen/kontakt/).
+
+## Wer sieht das OK-Dashboard?
+
+Das OK-Dashboard (<Btn>OK-Dashboard</Btn> oben beim Anlass) sehen OK-Leitung, OK-Mitglieder, Planung und Abteilungsleitung. Alle anderen bekommen «Keine Berechtigung».

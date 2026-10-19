@@ -1,0 +1,393 @@
+---
+// Startseite: Frage statt Produktname, grosser Such-Knopf, Lagerfeuer-Szene mit App-Schnipseln.
+import Search from '@lucide/astro/icons/search';
+import Flame from '@lucide/astro/icons/flame';
+import Check from '@lucide/astro/icons/check';
+import Campfire from '../components/Campfire.astro';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const title = data.hero?.title ?? data.title;
+const tagline = data.hero?.tagline;
+
+const quick = [
+  { label: 'In eine Schicht eintragen', href: '/helfen/eintragen/' },
+  { label: 'Ich kann mich nicht eintragen', href: '/helfen/nicht-freigeschaltet/' },
+  { label: 'Zugangs-Link verschicken', href: '/ok/zugangs-links/' },
+  { label: 'Wer darf sich eintragen?', href: '/ok/zugang/' },
+];
+---
+
+<section class="hero not-content">
+  <div class="hero-copy">
+    <p class="hero-badge">
+      <Flame size={13} strokeWidth={2.2} aria-hidden="true" /> Hilfe-Center
+    </p>
+    <h1 id="_top" data-page-title set:html={title} />
+    {tagline && <p class="hero-tagline" set:html={tagline} />}
+
+    <button type="button" class="hero-search" data-hero-search>
+      <Search size={20} strokeWidth={2} aria-hidden="true" />
+      <span class="hero-search-text">
+        Suchen, z. B. <em>austragen</em>, <em>Zugangs-Link</em>, <em>Mindestalter</em>
+      </span>
+      <kbd class="hero-kbd" aria-hidden="true">Strg K</kbd>
+    </button>
+
+    <ul class="hero-quick" aria-label="Häufig gesucht">
+      {
+        quick.map((q) => (
+          <li>
+            <a href={q.href}>{q.label}</a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+
+  <div class="hero-scene" aria-hidden="true">
+    <Campfire />
+    <div class="snip snip-shift">
+      <span class="snip-time">Sa<br /><b>18:00</b></span>
+      <span class="snip-body">
+        <b>Bar &amp; Getränke</b>
+        <span class="snip-bar"><span style="width: 66%"></span></span>
+      </span>
+      <span class="snip-free">1 frei</span>
+    </div>
+    <div class="snip snip-toast">
+      <span class="snip-check"><Check size={14} strokeWidth={3} /></span>
+      <span>
+        <b>Du bist eingetragen!</b>
+        <small>Grill · Samstag ab 17:00</small>
+      </span>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Startseiten-Suche öffnet die normale Suche im Kopf. Ohne stopPropagation erreicht der Klick
+  // das Fenster, und Starlight schliesst den Dialog als «Klick ausserhalb» sofort wieder.
+  document.querySelector('[data-hero-search]')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    document.querySelector<HTMLButtonElement>('site-search button[data-open-modal]')?.click();
+  });
+  const kbd = document.querySelector('.hero-kbd');
+  if (kbd && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) kbd.textContent = '⌘ K';
+</script>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: center;
+    padding-block: 2.5rem 1rem;
+  }
+
+  .hero-copy {
+    min-width: 0;
+    animation: fade-up 0.7s var(--ease-out-expo) both;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+    padding: 0.3125rem 0.8125rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--accent) / 0.28);
+    background: rgb(var(--accent) / 0.1);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(var(--accent-ink));
+  }
+
+  .hero-badge :global(svg) {
+    color: rgb(var(--accent));
+    animation: flicker 2.4s ease-in-out infinite;
+  }
+
+  h1 {
+    margin-top: 1.25rem;
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 1.5rem + 5vw, 5.25rem);
+    line-height: 0.95;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+    color: rgb(var(--fg));
+    text-wrap: balance;
+  }
+
+  h1 :global(em) {
+    font-style: normal;
+    background: linear-gradient(100deg, rgb(var(--accent)), rgb(var(--ember)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hero-tagline {
+    margin-top: 1.25rem;
+    max-width: 34rem;
+    font-size: clamp(1.0625rem, 1rem + 0.4vw, 1.25rem);
+    line-height: 1.6;
+    color: rgb(var(--fg-muted));
+  }
+
+  .hero-search {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    width: 100%;
+    max-width: 34rem;
+    height: 3.75rem;
+    margin-top: 2rem;
+    padding-inline: 1.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line-strong));
+    background: rgb(var(--surface));
+    color: rgb(var(--fg-subtle));
+    text-align: start;
+    font: inherit;
+    font-size: 0.9375rem;
+    cursor: text;
+    box-shadow:
+      var(--shadow-soft),
+      0 0 0 0 rgb(var(--accent) / 0);
+    transition:
+      box-shadow 0.3s ease,
+      border-color 0.2s ease;
+  }
+
+  .hero-search:hover {
+    border-color: rgb(var(--accent) / 0.5);
+    box-shadow:
+      var(--shadow-soft),
+      0 0 0 5px rgb(var(--accent) / 0.1);
+  }
+
+  .hero-search :global(svg) {
+    flex-shrink: 0;
+    color: rgb(var(--accent-ink));
+  }
+
+  .hero-search-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .hero-search-text em {
+    font-style: normal;
+    color: rgb(var(--fg-muted));
+    font-weight: 550;
+  }
+
+  .hero-kbd {
+    display: none;
+    flex-shrink: 0;
+    padding: 0.375rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface-2));
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    color: rgb(var(--fg-subtle));
+  }
+
+  .hero-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.125rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .hero-quick a {
+    display: inline-flex;
+    align-items: center;
+    height: 2.125rem;
+    padding-inline: 0.9375rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface-2) / 0.6);
+    font-size: 0.8438rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: rgb(var(--fg-muted));
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  .hero-quick a:hover {
+    color: rgb(var(--fg));
+    border-color: rgb(var(--line-strong));
+    background: rgb(var(--surface));
+  }
+
+  /* Szene */
+  .hero-scene {
+    position: relative;
+    animation: fade-up 0.9s 0.1s var(--ease-out-expo) both;
+  }
+
+  .snip {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: 1rem;
+    border: 1px solid rgb(255 255 255 / 0.14);
+    background: rgb(28 25 23 / 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    color: rgb(245 244 242);
+    font-size: 0.8125rem;
+    box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.8);
+  }
+
+  .snip b {
+    font-weight: 650;
+  }
+
+  .snip-shift {
+    left: -1.25rem;
+    top: 14%;
+    width: 15.5rem;
+    animation: float 7s ease-in-out infinite;
+  }
+
+  .snip-time {
+    flex-shrink: 0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.625rem;
+    background: rgb(255 255 255 / 0.08);
+    font-size: 0.625rem;
+    line-height: 1.2;
+    text-align: center;
+    text-transform: uppercase;
+    color: rgb(172 166 161);
+  }
+
+  .snip-time b {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.8125rem;
+    color: rgb(245 244 242);
+  }
+
+  .snip-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .snip-bar {
+    display: block;
+    height: 0.3125rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.12);
+    overflow: hidden;
+  }
+
+  .snip-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: rgb(245 158 11);
+  }
+
+  .snip-free {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgb(251 191 36);
+  }
+
+  .snip-toast {
+    right: -0.75rem;
+    bottom: 12%;
+    animation: float 8s 1.2s ease-in-out infinite;
+  }
+
+  .snip-toast span:last-child {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+  }
+
+  .snip-toast small {
+    font-size: 0.75rem;
+    color: rgb(172 166 161);
+  }
+
+  .snip-check {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    background: rgb(34 197 94 / 0.22);
+    color: rgb(74 222 128);
+  }
+
+  @media (min-width: 50rem) {
+    .hero {
+      grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+      gap: 3.5rem;
+      padding-block: 4.5rem 2rem;
+    }
+
+    .hero-kbd {
+      display: inline-flex;
+    }
+  }
+
+  @media (max-width: 49.99rem) {
+    .hero-scene {
+      max-width: 26rem;
+      margin-inline: auto;
+      width: 100%;
+    }
+
+    .snip-shift {
+      left: 0.5rem;
+    }
+
+    .snip-toast {
+      right: 0.5rem;
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes flicker {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    45% {
+      opacity: 0.75;
+      transform: scale(0.92);
+    }
+  }
+</style>

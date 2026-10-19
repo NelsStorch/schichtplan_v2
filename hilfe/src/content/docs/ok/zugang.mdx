@@ -1,0 +1,77 @@
+---
+title: Zugang regeln
+description: Wer darf sich eintragen, was muss angegeben werden und welche Fragen stellst du? Alles in einem Formular.
+audience: [ok, abteilung]
+numbered: true
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+import AccessTypes from '../../../components/AccessTypes.astro';
+
+Den Zugang legst du beim [Erstellen](/ok/anlass-erstellen/) fest und änderst ihn jederzeit:
+
+<Path steps={['Anlass', 'Einstellungen']} />
+
+Eine Zusammenfassung siehst du im OK-Dashboard unter **Zugang & Angaben**: «Eintragen dürfen: …» mit allen Pflichtangaben und Fragen.
+
+:::note[Was immer gilt]
+- Eintragen braucht immer ein Konto. Ein Cevi-Name ohne Passwort reicht.
+- Das OK und die Abteilungsleitung können immer einteilen, auch Personen ohne Konto.
+- Wer einen gültigen [Zugangs-Link](/ok/zugangs-links/) eingelöst hat, darf sich eintragen, auch ohne die Bedingungen zu erfüllen.
+:::
+
+## Wer darf sich eintragen?
+
+Wähle eine der sechs Arten:
+
+<AccessTypes />
+
+**Cevi.DB**-Varianten zählen nur Abteilung und Stufen aus der Cevi.DB. Wer sich selbst einer Abteilung zugeordnet hat, reicht dort nicht. Ist deine Abteilung noch nicht mit einer Cevi.DB-Ortsgruppe verknüpft, warnt das Formular: dann erfüllt niemand die Bedingung, ausser über einen persönlichen Link.
+
+### Weitere Abteilungen freischalten
+
+Bei **Mehrere Abteilungen** erscheint eine Liste aller Abteilungen. Deine eigene ist immer dabei, die anderen kreuzt du an. Gut für Regionalanlässe oder wenn eine Nachbarabteilung an der Chilbi aushilft.
+
+## Nur bestimmte Stufen
+
+Bei allen Arten ausser **Öffentlich** und **Cevi.DB, alle Abteilungen** kannst du Stufen auswählen. Keine Auswahl heisst alle Stufen. Wählst du bei einer Abteilung Stufen aus, dürfen von dort nur diese. Bei freigeschalteten Abteilungen gilt das pro Abteilung.
+
+Fehlen hier Stufen, erfasst sie die Abteilungsleitung unter [Stufen](/abteilung/stufen/).
+
+## Nur Leitende
+
+Mit dem Schalter **Nur Leitende** dürfen nur Personen mit Leitungsrolle:
+
+- ohne Cevi.DB: Leitung in einer Stufe, beim Login angegeben
+- mit Cevi.DB: Stufenleitung oder Abteilungsleitung laut Cevi.DB
+
+Zusammen mit einem Stufen-Filter zählt die Leitung in einer der gewählten Stufen.
+
+## Pflichtangaben
+
+Wähle, was du von allen brauchst: **Handynummer**, **E-Mail**, **Geburtsdatum**, **Vor- und Nachname**, **Adresse**. Wer etwas davon noch nicht im Profil hat, wird beim ersten Eintragen gefragt. Bei Cevi.DB-Konten kommt das meiste aus der Cevi.DB.
+
+:::tip[Altersgrenzen? Geburtsdatum verlangen]
+Ohne Geburtsdatum kann der Schichtplan Altersgrenzen nicht prüfen. Hat dein Anlass Schichten ab 16 oder 18, setz die Pflichtangabe **Geburtsdatum**.
+:::
+
+## Eigene Fragen
+
+Mit <Btn>Frage hinzufügen</Btn> stellst du eigene Fragen:
+
+| Einstellung | Möglichkeiten |
+| --- | --- |
+| Art der Antwort | Freitext, Ja / Nein, Auswahl (eine Antwort pro Zeile) |
+| Wann wird gefragt? | **Einmal pro Anlass** (z. B. Allergien, T-Shirt-Grösse) oder **Bei jeder Eintragung** (z. B. «Bringe ich ein Auto mit?») |
+| Pflicht | Ohne Antwort kein Eintragen |
+
+Mit den Pfeilen änderst du die Reihenfolge. Die Antworten sieht nur das OK, unter [Auswertung](/ok/auswertung/).
+
+## Eintragen öffnen und schliessen
+
+In den Einstellungen gibt es den Schalter **Eintragen für Helfer:innen offen**. Ausgeschaltet können nur noch das OK und die Abteilungsleitung Personen einteilen. Helfer*innen sehen «Eintragen geschlossen». Austragen können sie sich weiterhin.
+
+## Wer sieht die Namen?
+
+Bei **Öffentlich** und **Cevi.DB, alle Abteilungen** sieht jede*r den Plan mit Namen. Bei internen Anlässen sehen nur Berechtigte die Namen, alle anderen sehen den Plan ohne Namen. Kontaktangaben und Alter sieht nur das OK. Siehe [Wer sieht was](/wissen/wer-sieht-was/).

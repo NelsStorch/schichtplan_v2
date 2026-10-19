@@ -1,0 +1,192 @@
+---
+// Startseite: die Fragen, die am häufigsten kommen, mit direkter Antwort und Link zur Anleitung.
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import MessagesSquare from '@lucide/astro/icons/messages-square';
+
+const questions = [
+  {
+    q: 'Brauche ich ein Konto, um mich einzutragen?',
+    a: 'Ja, aber ein Cevi-Name ohne Passwort reicht. Die Anmeldung dauert zehn Sekunden.',
+    href: '/start/anmelden/',
+  },
+  {
+    q: 'Da steht «Für dich nicht freigeschaltet». Was nun?',
+    a: 'Der Anlass ist nur für eine Abteilung, Stufe oder für Cevi.DB-Konten. Prüfe deine Abteilung oder frag das OK nach einem Zugangs-Link.',
+    href: '/helfen/nicht-freigeschaltet/',
+  },
+  {
+    q: 'Wie trage ich mich wieder aus?',
+    a: 'Unter «Meine Schichten» bei der Schicht «Austragen» tippen. Der Platz ist sofort wieder frei.',
+    href: '/helfen/austragen/',
+  },
+  {
+    q: 'Wie lade ich Leute ein, die nicht zur Abteilung gehören?',
+    a: 'Im OK-Dashboard unter «Zugang & Angaben» einen persönlichen oder einen Gruppen-Link erstellen und verschicken.',
+    href: '/ok/zugangs-links/',
+  },
+  {
+    q: 'Kann ich die Chilbi vom letzten Jahr wiederverwenden?',
+    a: 'Ja. Speichere den Anlass als Vorlage, dann erstellst du nächstes Jahr alle Schichten mit einem Klick neu.',
+    href: '/ok/vorlagen/',
+  },
+];
+---
+
+<section class="tq not-content" aria-labelledby="tq-title">
+  <div class="tq-side">
+    <span class="tq-icon" aria-hidden="true"><MessagesSquare size={22} strokeWidth={1.9} /></span>
+    <h2 id="tq-title">Häufig gefragt</h2>
+    <p>Die Antworten in einem Satz. Ein Klick führt zur ganzen Anleitung.</p>
+    <a href="/wissen/faq/" class="tq-all">
+      Alle Fragen <ArrowRight size={15} strokeWidth={2.2} aria-hidden="true" />
+    </a>
+  </div>
+  <ul class="tq-list">
+    {
+      questions.map((item) => (
+        <li>
+          <a href={item.href}>
+            <span class="tq-q">{item.q}</span>
+            <span class="tq-a">{item.a}</span>
+            <span class="tq-arrow" aria-hidden="true">
+              <ArrowRight size={16} strokeWidth={2.2} />
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .tq {
+    display: grid;
+    gap: 2rem;
+    margin-top: 4.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .tq-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 1rem;
+    background: rgb(var(--surface-2));
+    color: rgb(var(--fg));
+  }
+
+  .tq-side h2 {
+    margin-top: 1.25rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.375rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    color: rgb(var(--fg));
+  }
+
+  .tq-side p {
+    margin-top: 0.625rem;
+    color: rgb(var(--fg-muted));
+  }
+
+  .tq-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 1.25rem;
+    padding: 0.5625rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line-strong));
+    font-size: 0.875rem;
+    font-weight: 650;
+    text-decoration: none;
+    color: rgb(var(--fg));
+    transition: background-color 0.2s ease;
+  }
+
+  .tq-all:hover {
+    background: rgb(var(--surface-2));
+  }
+
+  .tq-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid rgb(var(--line));
+  }
+
+  .tq-list li {
+    margin: 0;
+    border-bottom: 1px solid rgb(var(--line));
+  }
+
+  .tq-list a {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1.125rem 3rem 1.125rem 0;
+    text-decoration: none;
+  }
+
+  .tq-q {
+    font-family: var(--font-display);
+    font-size: 1.1875rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+    color: rgb(var(--fg));
+    transition: color 0.2s ease;
+  }
+
+  .tq-a {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: rgb(var(--fg-muted));
+  }
+
+  .tq-arrow {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line));
+    color: rgb(var(--fg-subtle));
+    transform: translateY(-50%);
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.35s var(--ease-out-expo);
+  }
+
+  .tq-list a:hover .tq-q {
+    color: rgb(var(--accent-ink));
+  }
+
+  .tq-list a:hover .tq-arrow {
+    border-color: transparent;
+    background: rgb(var(--accent));
+    color: rgb(var(--accent-fg));
+    transform: translate(3px, -50%);
+  }
+
+  @media (min-width: 50rem) {
+    .tq {
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr);
+      gap: 4rem;
+    }
+
+    .tq-side {
+      position: sticky;
+      top: calc(var(--sl-nav-height) + 2rem);
+      align-self: start;
+    }
+  }
+</style>

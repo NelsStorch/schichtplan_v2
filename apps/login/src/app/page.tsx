@@ -14,7 +14,7 @@ import {
   buttonClasses,
   cn,
 } from '@schichtplan/ui';
-import { getLandingUrl } from '@schichtplan/shared/redirect';
+import { getLandingUrl, helpUrl } from '@schichtplan/shared/redirect';
 import { afterLogin, cleanReturnTo } from '@/lib/destination';
 
 type View = 'start' | 'ceviname' | 'password' | 'verify_sent';
@@ -622,13 +622,18 @@ function LoginContent() {
 
       <footer className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-fg-subtle sm:px-8">
         <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
-        <a
-          href={returnTo ?? landingHref}
-          className="inline-flex items-center gap-1.5 font-medium text-fg-muted transition hover:text-fg"
-        >
-          <ArrowLeft className="size-3.5" />
-          Ohne Anmeldung zurück
-        </a>
+        <div className="flex items-center gap-5">
+          <a href={helpUrl('/start/anmelden/')} className="font-medium text-fg-muted transition hover:text-fg">
+            Hilfe zum Anmelden
+          </a>
+          <a
+            href={returnTo ?? landingHref}
+            className="inline-flex items-center gap-1.5 font-medium text-fg-muted transition hover:text-fg"
+          >
+            <ArrowLeft className="size-3.5" />
+            Ohne Anmeldung zurück
+          </a>
+        </div>
       </footer>
     </div>
   );

@@ -1,0 +1,46 @@
+---
+title: Wie Cevi.DB mitspielt
+description: Was der Schichtplan aus der Cevi.DB übernimmt, wann es aktualisiert wird und was das für Zugangsregeln heisst.
+audience: [abteilung, ok]
+---
+
+Die Cevi.DB (`db.cevi.ch`, Hitobito) ist die Mitgliederdatenbank des Cevi. Der Schichtplan liest beim Login mit Cevi.DB einige Angaben aus, damit niemand sie doppelt pflegen muss.
+
+## Was übernommen wird
+
+| Aus der Cevi.DB | Im Schichtplan |
+| --- | --- |
+| Übername (Cevi-Name), Vor- und Nachname | Name auf dem Plan |
+| Geburtsdatum | Altersprüfung bei Schichten |
+| E-Mail | Konto, Kontakt fürs OK |
+| Adresse, Handynummer | nur wenn im Schichtplan noch nichts erfasst ist |
+| Ortsgruppe | Heimabteilung (fest) |
+| Rollen in Stufen-Gruppen | [Stufen](/abteilung/stufen/) mit Leitung oder Teilnehmer*in |
+| Rolle Abteilungsleiter*in | darf eine [Abteilung anlegen](/abteilung/anlegen/), zählt bei «Nur Leitende» |
+
+Der Schichtplan liest nur. Er schreibt nie etwas in die Cevi.DB zurück.
+
+## Wann aktualisiert wird
+
+Bei **jedem Login mit Cevi.DB**. Ändert sich etwas in der Cevi.DB, zum Beispiel ein Stufenwechsel oder eine abgegebene Leitung, gilt das im Schichtplan erst nach dem nächsten Login der Person.
+
+## Ortsgruppe und Abteilung
+
+Jede Abteilung im Schichtplan ist mit genau einer Cevi.DB-Ortsgruppe verknüpft. Das passiert beim Anlegen automatisch. Wer sich mit Cevi.DB anmeldet und zu dieser Ortsgruppe gehört,
+
+- bekommt die Abteilung als **Heimabteilung**, fest und nicht änderbar,
+- wird in der Abteilung als **Helfer*in** geführt. Höhere Rollen bleiben, befördert wird niemand automatisch.
+
+## Was das für Anlässe heisst
+
+Die Zugangsarten mit **Cevi.DB** zählen nur, was aus der Cevi.DB kommt:
+
+- Wer sich die Abteilung selbst gewählt hat, erfüllt «Abteilungs-intern, Cevi.DB» nicht.
+- Selbst angegebene Stufen zählen bei Cevi.DB-Anlässen nicht.
+- Ist die Abteilung nicht mit einer Ortsgruppe verknüpft, erfüllt niemand die Bedingung. Das Formular warnt dann.
+
+Für Ausnahmen gibt es [Zugangs-Links](/ok/zugangs-links/).
+
+## Datenschutz
+
+Mehr dazu, wer welche Angaben sieht, unter [Wer sieht was](/wissen/wer-sieht-was/).

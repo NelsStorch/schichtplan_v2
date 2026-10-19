@@ -1,0 +1,44 @@
+---
+title: Abteilung einstellen
+description: Name, Logo, Kontakt, Farbe und wer die Startseite sieht. Gilt für alle Anlässe der Abteilung.
+audience: [abteilung]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+<Path steps={['Startseite der Abteilung', 'Abteilung bearbeiten', 'Allgemein']} />
+
+Den Knopf <Btn>Abteilung bearbeiten</Btn> sieht nur die Abteilungsleitung. Das Fenster hat drei Bereiche: **Allgemein**, [Stufen](/abteilung/stufen/) und [Personen](/abteilung/personen/).
+
+## Allgemein
+
+| Feld | Wofür |
+| --- | --- |
+| Name der Abteilung | steht gross auf der Startseite und oben links |
+| Logo der Abteilung | Wappen oder Logo. Leer bleibt das Cevi-Logo |
+| Kontakt-E-Mail | allgemeine Adresse der Abteilung |
+| Startseite nur für Mitglieder | wer die Liste der Anlässe sieht, siehe unten |
+| Abteilungsfarbe | Akzent für Knöpfe und Hervorhebungen |
+
+Die Subdomain lässt sich nicht ändern.
+
+## Abteilungsfarbe
+
+Wähle eine von acht Farben oder mit dem **+** eine eigene. Die Vorschau ist live, du siehst die Farbe sofort im ganzen Fenster. Der Schichtplan passt die Kontraste selbst an, damit Text auf jeder Farbe lesbar bleibt, im hellen wie im dunklen Modus.
+
+Erst <Btn variant="primary">Speichern</Btn> übernimmt die Farbe. Mit <Btn variant="ghost">Abbrechen</Btn> springt sie zurück.
+
+## Startseite nur für Mitglieder
+
+Bei neuen Abteilungen ist dieser Schalter **an**. Dann gilt:
+
+- Aussenstehende sehen nur, dass es die Abteilung gibt, aber keine Liste der Anlässe.
+- **Öffentliche** Anlässe bleiben über ihren direkten Link für alle erreichbar.
+- **Interne** Anlässe öffnen Aussenstehende nur mit einem [Zugangs-Link](/ok/zugangs-links/).
+
+Als **Mitglied** zählt, wer die Abteilung als Heimabteilung hat, Abteilungsleitung oder Planung ist, im OK eines Anlasses ist oder Plattform-Admin ist.
+
+:::note[Warum an?]
+Viele Abteilungen wollen nicht, dass jede*r sieht, wann Lager und Hüttenwochenenden sind. Schalt den Schalter aus, wenn eure Anlässe sowieso öffentlich sind und die Startseite als Übersicht dienen soll.
+:::

@@ -1,6 +1,7 @@
 # Installed and built inside the images.
 **/node_modules
 **/.next
+**/.astro
 **/dist
 .git
 

@@ -1,0 +1,40 @@
+---
+title: Abteilung und Stufen angeben
+description: Manche Anlässe sind nur für eine Abteilung oder einzelne Stufen. Damit der Schichtplan das prüfen kann, sagst du einmal, wo du dabei bist.
+audience: [helfer]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+Nach dem ersten Login erscheint oben ein gelber Hinweis: **«Zu welcher Abteilung gehörst du?»**. Er bleibt, bis du eine Antwort gegeben hast. Auch «keine Abteilung» ist eine Antwort.
+
+## Abteilung wählen
+
+<Steps>
+1. Tippe auf <Btn>Abteilung angeben</Btn>. Du landest auf `login.cevi-schichtplan.ch/abteilung`.
+2. Wähle deine Abteilung aus der Liste. Bei vielen Abteilungen hilft das Suchfeld.
+3. Gehörst du zu keiner Abteilung, zum Beispiel als Elternteil, Ehemalige*r oder Gast, wähle **Ich gehöre zu keiner Abteilung**.
+4. Hat die Abteilung Stufen erfasst, wähle für jede Stufe **Nein**, **Teilnehmer*in** oder **Leitung**. Keine Stufe ist auch in Ordnung.
+5. Tippe auf <Btn variant="primary">Speichern und weiter</Btn>. Die Angabe gilt sofort.
+</Steps>
+
+:::note[Mit Cevi.DB ist alles schon da]
+Hast du dich mit Cevi.DB angemeldet, kommt die Abteilung aus deiner Ortsgruppe und lässt sich hier nicht ändern. Stufen aus der Cevi.DB sind mit «aus Cevi.DB» markiert und ebenfalls fest. Stimmt etwas nicht, korrigiert es die Cevi.DB-Verwaltung deiner Abteilung. Beim nächsten Login übernimmt der Schichtplan die neuen Angaben.
+:::
+
+## Später ändern
+
+<Path steps={['Konto', 'Abteilung & Stufen']} />
+
+Oder auf `cevi-schichtplan.ch/profil` bei «Abteilung & Stufen» auf <Btn>Ändern</Btn>.
+
+## Wofür das gut ist
+
+- Anlässe mit dem Zugang **Abteilungs-intern** lassen nur Personen der Abteilung zu.
+- Anlässe mit **Stufen-Filter** lassen nur bestimmte Stufen zu, zum Beispiel nur das Leiterteam.
+- Anlässe **nur für Leitende** brauchen bei dir in mindestens einer Stufe die Rolle **Leitung**.
+- Ist die Startseite einer Abteilung [nur für Mitglieder](/abteilung/einstellungen/), siehst du die Anlässe nur mit dieser Abteilung als Heimabteilung.
+
+Die Abteilungsleitung sieht, wer sich ihrer Abteilung zugeordnet hat, und kann Stufen anpassen oder falsche Zuordnungen entfernen.

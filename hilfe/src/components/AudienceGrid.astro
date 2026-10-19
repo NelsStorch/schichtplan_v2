@@ -1,0 +1,293 @@
+---
+// Startseite: «Wer bist du?» mit drei Einstiegen und den wichtigsten Seiten je Rolle.
+import HandHeart from '@lucide/astro/icons/hand-heart';
+import ClipboardList from '@lucide/astro/icons/clipboard-list';
+import Tent from '@lucide/astro/icons/tent';
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+
+const groups = [
+  {
+    key: 'helfer',
+    icon: HandHeart,
+    kicker: 'Ich helfe mit',
+    title: 'Helfer*innen',
+    text: 'Eltern, Leitende, Ehemalige: Schicht finden, eintragen, Kalender füllen.',
+    start: '/helfen/eintragen/',
+    links: [
+      { label: 'In eine Schicht eintragen', href: '/helfen/eintragen/' },
+      { label: 'Wieder austragen', href: '/helfen/austragen/' },
+      { label: 'Warum kann ich mich nicht eintragen?', href: '/helfen/nicht-freigeschaltet/' },
+      { label: 'Meine Schichten im Kalender', href: '/helfen/meine-schichten/' },
+    ],
+  },
+  {
+    key: 'ok',
+    icon: ClipboardList,
+    kicker: 'Ich plane einen Anlass',
+    title: 'OK',
+    text: 'Chilbi, Lager, Jubiläum: Schichten anlegen, Zugang regeln, Helfer*innen einteilen.',
+    start: '/ok/rollen/',
+    links: [
+      { label: 'Anlass erstellen', href: '/ok/anlass-erstellen/' },
+      { label: 'Schichten und Arbeiten planen', href: '/ok/schichten-planen/' },
+      { label: 'Wer darf sich eintragen?', href: '/ok/zugang/' },
+      { label: 'Helfer-Pool und Schicht-Soll', href: '/ok/helfer-pool/' },
+    ],
+  },
+  {
+    key: 'abteilung',
+    icon: Tent,
+    kicker: 'Ich leite eine Abteilung',
+    title: 'Abteilungsleitung',
+    text: 'Schichtplan für die Abteilung einrichten, Stufen pflegen, Rollen verteilen.',
+    start: '/abteilung/anlegen/',
+    links: [
+      { label: 'Abteilung anlegen', href: '/abteilung/anlegen/' },
+      { label: 'Stufen und Cevi.DB', href: '/abteilung/stufen/' },
+      { label: 'Personen und Rollen', href: '/abteilung/personen/' },
+      { label: 'Startseite nur für Mitglieder', href: '/abteilung/einstellungen/' },
+    ],
+  },
+];
+---
+
+<section class="ag not-content" aria-labelledby="ag-title">
+  <div class="ag-head">
+    <p class="ag-eyebrow">Einstieg</p>
+    <h2 id="ag-title">Wer bist du?</h2>
+    <p class="ag-sub">Wähle deine Rolle. Du kannst jederzeit über die Suche oder die Seitenleiste springen.</p>
+  </div>
+
+  <div class="ag-grid">
+    {
+      groups.map((g, i) => {
+        const Icon = g.icon;
+        return (
+          <article class={`ag-card ag-card--${g.key}`} style={`--i:${i}`}>
+            <a href={g.start} class="ag-cover" aria-label={`${g.title}: Anleitungen öffnen`} />
+            <div class="ag-top">
+              <span class="ag-icon">
+                <Icon size={22} strokeWidth={1.9} aria-hidden="true" />
+              </span>
+              <span class="ag-kicker">{g.kicker}</span>
+            </div>
+            <h3>{g.title}</h3>
+            <p class="ag-text">{g.text}</p>
+            <ol class="ag-links">
+              {g.links.map((l) => (
+                <li>
+                  <a href={l.href}>
+                    <span>{l.label}</span>
+                    <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </article>
+        );
+      })
+    }
+  </div>
+</section>
+
+<style>
+  .ag {
+    margin-top: 4rem;
+  }
+
+  .ag-eyebrow {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(var(--accent-ink));
+  }
+
+  .ag-head h2 {
+    margin-top: 0.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 1.4rem + 2vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: rgb(var(--fg));
+  }
+
+  .ag-sub {
+    margin-top: 0.75rem;
+    max-width: 36rem;
+    color: rgb(var(--fg-muted));
+  }
+
+  .ag-grid {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .ag-card {
+    --tone: var(--success);
+    --tone-ink: var(--success-ink);
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    border-radius: var(--radius-card);
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface));
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+    animation: fade-up 0.7s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i) * 80ms + 150ms);
+    transition:
+      transform 0.45s var(--ease-out-expo),
+      border-color 0.25s ease,
+      box-shadow 0.45s var(--ease-out-expo);
+  }
+
+  .ag-card::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -40% -30% auto auto;
+    width: 16rem;
+    height: 16rem;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgb(var(--tone) / 0.22), transparent 65%);
+    transition: transform 0.6s var(--ease-out-expo);
+  }
+
+  .ag-card:hover {
+    transform: translateY(-4px);
+    border-color: rgb(var(--tone) / 0.45);
+    box-shadow: var(--shadow-lift);
+  }
+
+  .ag-card:hover::before {
+    transform: scale(1.25);
+  }
+
+  .ag-card--ok {
+    --tone: var(--ember);
+    --tone-ink: var(--ember-ink);
+  }
+
+  .ag-card--abteilung {
+    --tone: var(--accent);
+    --tone-ink: var(--accent-ink);
+  }
+
+  .ag-cover {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .ag-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .ag-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 1rem;
+    background: rgb(var(--tone) / 0.14);
+    color: rgb(var(--tone-ink));
+  }
+
+  .ag-kicker {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgb(var(--fg-subtle));
+    text-align: end;
+  }
+
+  .ag-card h3 {
+    margin-top: 1.375rem;
+    font-family: var(--font-display);
+    font-size: 1.625rem;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    color: rgb(var(--fg));
+  }
+
+  .ag-text {
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: rgb(var(--fg-muted));
+  }
+
+  .ag-links {
+    position: relative;
+    z-index: 1;
+    margin-top: 1.25rem;
+    padding: 0;
+    list-style: none;
+    counter-reset: ag;
+    border-top: 1px solid rgb(var(--line));
+  }
+
+  .ag-links li {
+    counter-increment: ag;
+    border-bottom: 1px solid rgb(var(--line));
+  }
+
+  .ag-links li:last-child {
+    border-bottom: 0;
+  }
+
+  .ag-links a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-block: 0.6875rem;
+    font-size: 0.9063rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: rgb(var(--fg));
+  }
+
+  .ag-links a::before {
+    content: counter(ag, decimal-leading-zero);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    color: rgb(var(--fg-subtle));
+  }
+
+  .ag-links a span {
+    flex: 1;
+  }
+
+  .ag-links a :global(svg) {
+    color: rgb(var(--fg-subtle));
+    transition:
+      transform 0.3s var(--ease-out-expo),
+      color 0.2s ease;
+  }
+
+  .ag-links a:hover :global(svg) {
+    color: rgb(var(--tone-ink));
+    transform: translateX(3px);
+  }
+
+  .ag-links a:hover span {
+    color: rgb(var(--tone-ink));
+  }
+
+  @media (min-width: 50rem) {
+    .ag-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

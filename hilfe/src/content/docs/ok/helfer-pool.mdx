@@ -1,0 +1,45 @@
+---
+title: Helfer-Pool und Schicht-Soll
+description: Bei internen Anlässen siehst du alle, die helfen sollten, und wer sein Soll schon erfüllt hat.
+audience: [ok]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+Bei Anlässen, die auf eine Abteilung oder Stufen beschränkt sind, kennt der Schichtplan alle, die mithelfen könnten. Das ist der **Helfer-Pool**. Zusammen mit dem **Schicht-Soll** siehst du, wer schon genug macht und wen du noch fragen musst.
+
+<Path steps={['Anlass', 'OK-Dashboard', 'Helfer-Pool & Soll']} />
+
+:::note[Nur bei eingeschränkten Anlässen]
+Ist der Anlass **Öffentlich** oder **Cevi.DB, alle Abteilungen**, gibt es keinen festen Pool. Dann erscheint ein Hinweis mit <Btn>Zugang anpassen</Btn>.
+:::
+
+## Das Soll festlegen
+
+Das Soll ist die **Mindestanzahl Schichten pro Person**, zum Beispiel 2. Du legst es in den Event-Einstellungen unter «Schichten & Helfer-Soll» fest, oder direkt hier mit <Btn variant="ghost">Soll festlegen</Btn>. Leer heisst kein Soll.
+
+Das Soll ist ein Hinweis fürs OK. Helfer*innen sehen es nicht und werden nicht blockiert.
+
+## Die vier Zahlen
+
+| Kachel | Bedeutet |
+| --- | --- |
+| Helfer-Pool | alle berechtigten Personen |
+| Soll erfüllt | haben mindestens so viele Schichten wie das Soll (ohne Soll: mindestens eine) |
+| Noch offen | brauchen noch Schichten |
+| Abgemeldet | müssen an diesem Anlass nicht helfen |
+
+Darunter die Liste mit Stufe (👑 heisst Leitung), Alter, Anzahl Schichten und Status wie «Erfüllt» oder «Noch 1 nötig». Mit dem Pfeil bei den Schichten klappst du auf, welche es sind.
+
+Filter: Suche nach Namen, **Alle**, **Noch offen**, **Erfüllt**, **Abgemeldet**, dazu Stufe und bei mehreren Abteilungen die Abteilung.
+
+## Jemanden abmelden
+
+Ist jemand in den Ferien, im Militär oder verletzt, tippe auf <Btn variant="ghost">Abmelden</Btn> und gib optional einen Grund an. Die Person zählt dann nicht mehr zu «Noch offen». Ihre Eintragungen bleiben.
+
+Mit <Btn>Wieder anmelden</Btn> machst du das rückgängig.
+
+:::tip[Die «Noch offen»-Liste als Telefonliste]
+Filter auf **Noch offen**, dann hast du genau die Leute, die du noch fragen musst. Telefonnummern stehen unter [Auswertung](/ok/auswertung/).
+:::

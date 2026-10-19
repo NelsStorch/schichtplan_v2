@@ -1,0 +1,197 @@
+---
+// Nachtszene mit Lagerfeuer für die Startseite. Reines SVG + CSS, bleibt in beiden Modi dunkel.
+const stars = [
+  [38, 40, 1.2], [82, 22, 0.9], [130, 58, 1.4], [176, 30, 0.8], [228, 48, 1.1], [262, 18, 0.9],
+  [318, 62, 1.3], [352, 34, 0.8], [60, 92, 0.8], [292, 96, 1], [150, 104, 0.7], [372, 110, 0.9],
+];
+const embers = [
+  { x: 196, d: 0, s: 2.2 }, { x: 206, d: 0.8, s: 1.6 }, { x: 188, d: 1.6, s: 1.8 },
+  { x: 214, d: 2.3, s: 1.4 }, { x: 200, d: 3.1, s: 2 }, { x: 192, d: 3.8, s: 1.3 },
+  { x: 210, d: 4.6, s: 1.7 },
+];
+---
+
+<svg class="cf" viewBox="0 0 400 360" role="presentation" focusable="false">
+  <defs>
+    <linearGradient id="cf-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b0f1f" />
+      <stop offset="0.55" stop-color="#1a1220" />
+      <stop offset="1" stop-color="#2a1510" />
+    </linearGradient>
+    <radialGradient id="cf-glow" cx="0.5" cy="0.82" r="0.5">
+      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.55" />
+      <stop offset="0.45" stop-color="#e11d48" stop-opacity="0.18" />
+      <stop offset="1" stop-color="#e11d48" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="cf-flame-a" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#e11d48" />
+      <stop offset="0.6" stop-color="#f43f5e" />
+      <stop offset="1" stop-color="#fb7185" stop-opacity="0.85" />
+    </linearGradient>
+    <linearGradient id="cf-flame-b" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#f97316" />
+      <stop offset="1" stop-color="#fbbf24" />
+    </linearGradient>
+    <linearGradient id="cf-flame-c" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#fde68a" />
+      <stop offset="1" stop-color="#fffbeb" />
+    </linearGradient>
+    <clipPath id="cf-clip"><rect width="400" height="360" rx="28" /></clipPath>
+  </defs>
+
+  <g clip-path="url(#cf-clip)">
+    <rect width="400" height="360" fill="url(#cf-sky)" />
+
+    <g class="cf-stars">
+      {stars.map(([x, y, r], i) => <circle cx={x} cy={y} r={r} style={`--i:${i}`} />)}
+    </g>
+
+    <!-- Mond -->
+    <path d="M338 58a20 20 0 1 0 14 34a16 16 0 1 1 -14 -34z" fill="#fde68a" opacity="0.85" />
+
+    <!-- Hügel und Wald -->
+    <path d="M0 214 L40 186 L70 204 L112 168 L150 198 L196 160 L238 196 L282 170 L322 196 L360 176 L400 196 L400 360 L0 360 Z" fill="#141022" />
+    <path d="M0 246 Q100 222 200 238 T400 236 L400 360 L0 360 Z" fill="#1b1015" />
+    <g fill="#100c16">
+      <path d="M26 246 l12 -40 l12 40 z" />
+      <path d="M44 250 l9 -30 l9 30 z" />
+      <path d="M348 244 l12 -44 l12 44 z" />
+      <path d="M366 250 l9 -30 l9 30 z" />
+    </g>
+
+    <!-- Schein -->
+    <ellipse cx="200" cy="300" rx="190" ry="120" fill="url(#cf-glow)" class="cf-glow" />
+
+    <!-- Zelt -->
+    <g class="cf-tent">
+      <path d="M58 300 L104 226 L150 300 Z" fill="#2b1d24" />
+      <path d="M104 226 L150 300 L126 300 Z" fill="#e11d48" opacity="0.38" />
+      <path d="M96 300 L104 270 L112 300 Z" fill="#0d0a10" />
+      <path d="M104 226 L104 216" stroke="#3b2a32" stroke-width="2" />
+    </g>
+
+    <!-- Boden -->
+    <ellipse cx="200" cy="316" rx="120" ry="16" fill="#120b0c" opacity="0.8" />
+
+    <!-- Holz -->
+    <g class="cf-logs">
+      <rect x="150" y="296" width="104" height="14" rx="7" fill="#5b3a29" transform="rotate(-12 202 303)" />
+      <rect x="146" y="296" width="104" height="14" rx="7" fill="#7a4d33" transform="rotate(12 198 303)" />
+      <circle cx="152" cy="290" r="5" fill="#a16207" opacity="0.6" />
+      <circle cx="250" cy="291" r="5" fill="#a16207" opacity="0.5" />
+    </g>
+
+    <!-- Flammen -->
+    <g class="cf-fire">
+      <path class="cf-f1" d="M200 302 C168 302 158 272 170 246 C178 228 176 210 186 190 C190 214 204 216 202 196 C200 174 212 158 224 146 C222 176 238 190 238 216 C248 206 248 196 246 186 C262 210 258 248 248 268 C240 288 224 302 200 302 Z" fill="url(#cf-flame-a)" />
+      <path class="cf-f2" d="M200 302 C178 302 172 282 180 262 C186 248 186 236 192 222 C196 238 206 238 205 224 C204 210 212 200 220 192 C220 212 232 224 230 244 C236 238 238 232 238 226 C248 244 244 268 236 282 C230 294 216 302 200 302 Z" fill="url(#cf-flame-b)" />
+      <path class="cf-f3" d="M200 302 C188 302 184 290 188 278 C192 268 194 262 198 252 C200 262 206 262 206 254 C206 248 210 244 214 240 C214 252 222 260 220 274 C219 290 212 302 200 302 Z" fill="url(#cf-flame-c)" />
+    </g>
+
+    <!-- Funken -->
+    <g class="cf-embers">
+      {embers.map((e) => <circle cx={e.x} cy="240" r={e.s} style={`--d:${e.d}s`} />)}
+    </g>
+  </g>
+  <rect width="400" height="360" rx="28" fill="none" stroke="rgb(255 255 255 / 0.1)" />
+</svg>
+
+<style>
+  .cf {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 1.75rem;
+    box-shadow:
+      0 40px 80px -36px rgb(225 29 72 / 0.55),
+      0 24px 48px -24px rgb(0 0 0 / 0.6);
+  }
+
+  .cf-stars circle {
+    fill: #fff7ed;
+    animation: twinkle 3.6s ease-in-out infinite;
+    animation-delay: calc(var(--i) * -0.37s);
+  }
+
+  .cf-glow {
+    transform-origin: 200px 300px;
+    animation: glow 3.2s ease-in-out infinite;
+  }
+
+  .cf-fire path {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+  }
+
+  .cf-f1 {
+    animation: lick 1.9s ease-in-out infinite;
+  }
+  .cf-f2 {
+    animation: lick 1.4s ease-in-out -0.4s infinite;
+  }
+  .cf-f3 {
+    animation: lick 1.1s ease-in-out -0.2s infinite;
+  }
+
+  .cf-embers circle {
+    fill: #fbbf24;
+    opacity: 0;
+    animation: rise 5.4s ease-out infinite;
+    animation-delay: var(--d);
+  }
+
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 0.9;
+    }
+    50% {
+      opacity: 0.25;
+    }
+  }
+
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 0.95;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.75;
+      transform: scale(0.96);
+    }
+  }
+
+  @keyframes lick {
+    0%,
+    100% {
+      transform: scaleY(1) skewX(0deg);
+    }
+    30% {
+      transform: scaleY(1.06) skewX(-2.5deg);
+    }
+    65% {
+      transform: scaleY(0.95) skewX(2deg);
+    }
+  }
+
+  @keyframes rise {
+    0% {
+      opacity: 0;
+      transform: translate(0, 0);
+    }
+    12% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(14px, -190px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cf * {
+      animation: none !important;
+    }
+  }
+</style>

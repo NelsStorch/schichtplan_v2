@@ -1,0 +1,64 @@
+---
+title: Die Abteilung anlegen
+description: Den Schichtplan für eure Abteilung legt die Abteilungsleitung an, mit Cevi.DB. Das dauert eine Minute.
+audience: [abteilung]
+numbered: true
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import FaqItem from '../../../components/FaqItem.astro';
+
+## Wer darf das?
+
+Eine neue Abteilung legt nur die **Abteilungsleitung laut Cevi.DB** an, also wer in der Cevi.DB die Rolle «Abteilungsleiter/-in» hat. So gibt es pro Ortsgruppe genau einen Schichtplan, und niemand legt aus Versehen einen zweiten an.
+
+Bist du nicht Abteilungsleitung, frag eure AL, ob sie den Schichtplan anlegt. Sie kann dich danach zur Abteilungsleitung im Schichtplan machen.
+
+## So geht es
+
+<Steps>
+1. Öffne `cevi-schichtplan.ch` und tippe auf <Btn variant="primary">Abteilung anlegen</Btn>.
+2. Melde dich mit <Btn variant="primary">Mit Cevi.DB anmelden</Btn> an.
+3. Hat eure Ortsgruppe noch keinen Schichtplan, erscheint **«… hat noch keinen Schichtplan»**. Das passiert auch automatisch nach deinem ersten Cevi.DB-Login.
+4. **Name der Abteilung**: vorgeschlagen aus der Ortsgruppe, zum Beispiel «Cevi Illnau-Effretikon». Lässt sich später ändern.
+5. **Subdomain**: die Adresse, zum Beispiel `illnau` für `illnau.cevi-schichtplan.ch`. 3 bis 30 Zeichen, Kleinbuchstaben, Zahlen und Bindestriche. **Lässt sich später nicht ändern.**
+6. Tippe auf <Btn variant="primary">Abteilung anlegen</Btn>. Du landest direkt auf eurer neuen Adresse.
+</Steps>
+
+Mit <Btn variant="ghost">Später</Btn> überspringst du den Schritt und kommst beim nächsten Cevi.DB-Login wieder hierher.
+
+:::tip[Kurze Subdomain wählen]
+Die Adresse landet auf Flyern und im Gruppenchat. `illnau` ist besser als `cevi-illnau-effretikon`. Einige Namen sind reserviert, zum Beispiel `www`, `admin`, `login` oder `hilfe`.
+:::
+
+## Was dabei passiert
+
+- Du wirst **Abteilungsleitung** im Schichtplan (Hauptverantwortliche*r). Das kannst du später unter [Personen](/abteilung/personen/) weitergeben.
+- Die Abteilung wird mit eurer **Cevi.DB-Ortsgruppe** verknüpft.
+- Alle, die sich schon mit Cevi.DB angemeldet haben und zu eurer Ortsgruppe gehören, bekommen die Abteilung als Heimabteilung. Wer später dazukommt, wird beim Cevi.DB-Login automatisch zugeordnet.
+
+## Die nächsten Schritte
+
+1. [Name, Logo und Farbe](/abteilung/einstellungen/) setzen.
+2. [Stufen](/abteilung/stufen/) erfassen, am einfachsten über die Vorschläge aus der Cevi.DB.
+3. [Rollen](/abteilung/personen/) vergeben: Wer plant Anlässe mit?
+4. Den ersten [Anlass erstellen](/ok/anlass-erstellen/).
+
+## Wenn es nicht klappt
+
+<FaqItem q="«Für deine Ortsgruppe gibt es schon einen Schichtplan»">
+Jemand aus eurer Abteilung war schneller. Tippe auf den Knopf mit dem Namen der Abteilung. Brauchst du dort mehr Rechte, frag die Person, die angelegt hat, oder die [Kontaktadresse](/wissen/kontakt/).
+</FaqItem>
+
+<FaqItem q="«Melde dich dazu mit Cevi.DB an»">
+Du bist mit Cevi-Name oder E-Mail angemeldet. Nur über Cevi.DB sieht der Schichtplan deine Rolle und eure Ortsgruppe.
+</FaqItem>
+
+<FaqItem q="«In Cevi.DB ist für dich keine Ortsgruppe hinterlegt»">
+Dein Cevi.DB-Profil hat keine Ortsgruppe. Melde dich bei der Cevi.DB-Verwaltung eurer Abteilung.
+</FaqItem>
+
+<FaqItem q="«Eine neue Abteilung kann nur die Abteilungsleitung anlegen»">
+Du hast in der Cevi.DB keine Abteilungsleitungs-Rolle. Frag eure Abteilungsleitung.
+</FaqItem>

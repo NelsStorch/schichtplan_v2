@@ -178,6 +178,26 @@ services:
       - "traefik.http.services.schichtplan-dev-admin.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.schichtplan-dev-admin.loadbalancer.healthcheck.interval=3s"
 
+  hilfe:
+    build:
+      context: .
+      dockerfile: hilfe/Dockerfile
+    restart: unless-stopped
+    # Statisches HTML (nginx): braucht weder Backend noch DB, nur Traefik
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=schichtplan_dev_proxy"
+      - "traefik.http.routers.schichtplan-dev-hilfe.rule=Host(`hilfe.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-hilfe.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-dev-hilfe.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-dev-hilfe.priority=30"
+      - "traefik.http.routers.schichtplan-dev-hilfe.service=schichtplan-dev-hilfe"
+      - "traefik.http.services.schichtplan-dev-hilfe.loadbalancer.server.port=3004"
+      - "traefik.http.services.schichtplan-dev-hilfe.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-dev-hilfe.loadbalancer.healthcheck.interval=5s"
+
 # Netzwerk-Segmentierung (Dev/Staging). Prod läuft in docker-compose.yml in komplett getrennten Netzen:
 # kein gemeinsames Netz zwischen Dev und Prod, nur der zentrale Traefik hängt an beiden Proxy-Netzen.
 #   proxy: nur Traefik + die Schichtplan-Dev-Container (Einstieg von aussen), kein geteiltes web_proxy

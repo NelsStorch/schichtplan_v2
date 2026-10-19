@@ -1,0 +1,413 @@
+/* Lesetext: Typografie, Hinweise, Schritte, Tabellen, Karten. Alles unter .sl-markdown-content. */
+
+.sl-markdown-content {
+  font-size: 1.0625rem;
+  color: rgb(var(--fg-muted));
+}
+
+.sl-markdown-content :where(h2, h3, h4, h5, h6) {
+  font-family: var(--font-display);
+  color: rgb(var(--fg));
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.sl-markdown-content :where(h2) {
+  margin-top: 3rem;
+  font-size: var(--sl-text-h2);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.sl-markdown-content :where(h3) {
+  margin-top: 2.25rem;
+  font-size: var(--sl-text-h3);
+}
+
+.sl-markdown-content :where(h4) {
+  margin-top: 1.75rem;
+  font-size: var(--sl-text-h4);
+}
+
+.sl-markdown-content :where(p, li) {
+  text-wrap: pretty;
+}
+
+.sl-markdown-content :where(strong) {
+  color: rgb(var(--fg));
+  font-weight: 650;
+}
+
+.sl-markdown-content :where(a:not(.not-content a, .card-link, .sl-link-card a)) {
+  color: rgb(var(--accent-ink));
+  font-weight: 550;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgb(var(--accent) / 0.35);
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 0.2s ease;
+}
+
+.sl-markdown-content :where(a:not(.not-content a)):hover {
+  text-decoration-color: rgb(var(--accent));
+}
+
+.sl-markdown-content :where(ul:not(.sl-steps, .not-content ul)) {
+  padding-inline-start: 1.25rem;
+}
+
+.sl-markdown-content :where(ul:not(.sl-steps, .not-content ul)) > li::marker {
+  color: rgb(var(--accent));
+}
+
+.sl-markdown-content :where(ol:not(.sl-steps, .not-content ol)) > li::marker {
+  font-family: var(--__sl-font-mono);
+  font-weight: 600;
+  color: rgb(var(--accent-ink));
+}
+
+.sl-markdown-content :where(hr) {
+  border: 0;
+  height: 1px;
+  margin-block: 2.5rem;
+  background: linear-gradient(90deg, transparent, rgb(var(--line-strong)), transparent);
+}
+
+.sl-markdown-content :where(code:not(pre code)) {
+  padding: 0.125em 0.4em;
+  border-radius: 0.4rem;
+  border: 1px solid rgb(var(--line));
+  background-color: rgb(var(--surface-2));
+  color: rgb(var(--fg));
+  font-size: 0.875em;
+}
+
+.sl-markdown-content :where(kbd) {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0.05em 0.45em;
+  border-radius: 0.4rem;
+  border: 1px solid rgb(var(--line-strong));
+  border-bottom-width: 2px;
+  background-color: rgb(var(--surface));
+  font-family: var(--__sl-font-mono);
+  font-size: 0.8125em;
+  text-align: center;
+  color: rgb(var(--fg));
+}
+
+/* Nummerierte Kapitel (frontmatter `numbered: true`) */
+.sl-markdown-content.is-numbered {
+  counter-reset: chapter;
+}
+
+.sl-markdown-content.is-numbered :where(h2) {
+  counter-increment: chapter;
+}
+
+.sl-markdown-content.is-numbered :where(h2)::before {
+  content: counter(chapter, decimal-leading-zero);
+  display: block;
+  margin-bottom: 0.5rem;
+  font-family: var(--__sl-font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: rgb(var(--accent-ink));
+}
+
+/* ------------------------------------------------------------------ Hinweise (Asides) */
+
+.sl-markdown-content .starlight-aside {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  column-gap: 0.875rem;
+  padding: 1.125rem 1.25rem;
+  border: 1px solid rgb(var(--aside) / 0.24);
+  border-radius: 1.125rem;
+  background:
+    linear-gradient(135deg, rgb(var(--aside) / 0.1), rgb(var(--aside) / 0.03) 60%),
+    rgb(var(--surface));
+  color: rgb(var(--fg-muted));
+  box-shadow: var(--shadow-soft);
+}
+
+.sl-markdown-content .starlight-aside--note {
+  --aside: var(--info);
+  --aside-ink: var(--info-ink);
+}
+.sl-markdown-content .starlight-aside--tip {
+  --aside: var(--success);
+  --aside-ink: var(--success-ink);
+}
+.sl-markdown-content .starlight-aside--caution {
+  --aside: var(--ember);
+  --aside-ink: var(--ember-ink);
+}
+.sl-markdown-content .starlight-aside--danger {
+  --aside: var(--danger);
+  --aside-ink: var(--danger-ink);
+}
+
+.sl-markdown-content .starlight-aside__title {
+  display: contents;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: rgb(var(--fg));
+}
+
+.sl-markdown-content .starlight-aside__icon {
+  grid-row: span 2;
+  align-self: start;
+  box-sizing: content-box;
+  width: 1.125rem;
+  height: 1.125rem;
+  padding: 0.5625rem;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  color: rgb(var(--aside-ink));
+  background-color: rgb(var(--aside) / 0.14);
+}
+
+.sl-markdown-content .starlight-aside__title + .starlight-aside__content {
+  margin-top: 0.125rem;
+}
+
+.sl-markdown-content .starlight-aside__content {
+  grid-column: 2;
+  font-size: 0.9688rem;
+}
+
+.sl-markdown-content .starlight-aside__content a {
+  color: rgb(var(--aside-ink));
+}
+
+/* ------------------------------------------------------------------ Schritte als Wanderweg */
+
+.sl-markdown-content .sl-steps {
+  --bullet-size: 2.25rem;
+  --bullet-margin: 0.5rem;
+}
+
+.sl-markdown-content .sl-steps > li {
+  padding-inline-start: calc(var(--bullet-size) + 1.125rem);
+  padding-bottom: 1.5rem;
+}
+
+.sl-markdown-content .sl-steps > li::before {
+  width: var(--bullet-size);
+  height: var(--bullet-size);
+  line-height: var(--bullet-size);
+  border-radius: 999px;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgb(var(--accent-fg));
+  background: linear-gradient(145deg, rgb(var(--accent)), rgb(var(--accent-ink)));
+  box-shadow:
+    0 0 0 5px rgb(var(--canvas)),
+    0 8px 20px -6px rgb(var(--accent) / 0.65);
+}
+
+.sl-markdown-content .sl-steps > li::after {
+  top: calc(var(--bullet-size) + var(--bullet-margin));
+  bottom: var(--bullet-margin);
+  inset-inline-start: calc((var(--bullet-size) - 2px) / 2);
+  width: 0;
+  background: none;
+  border-inline-start: 2px dashed rgb(var(--line-strong));
+}
+
+.sl-markdown-content .sl-steps > li > :first-child {
+  --lh: calc(var(--bullet-size) / 1);
+  margin-top: 0.25rem;
+}
+
+.sl-markdown-content .sl-steps > li > :first-child:where(p) {
+  color: rgb(var(--fg));
+}
+
+/* ------------------------------------------------------------------ Tabellen */
+
+.sl-markdown-content :where(table:not(.not-content table)) {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgb(var(--line));
+  border-radius: 1.125rem;
+  background-color: rgb(var(--surface));
+  box-shadow: var(--shadow-soft);
+  font-size: 0.9375rem;
+}
+
+.sl-markdown-content :where(table:not(.not-content table)) :where(th, td) {
+  border: 0;
+  border-bottom: 1px solid rgb(var(--line));
+  padding: 0.75rem 1rem;
+  vertical-align: top;
+}
+
+.sl-markdown-content :where(table:not(.not-content table)) :where(tr:last-child td) {
+  border-bottom: 0;
+}
+
+.sl-markdown-content :where(table:not(.not-content table)) :where(th) {
+  background-color: rgb(var(--surface-2));
+  font-family: var(--__sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--fg-subtle));
+  white-space: nowrap;
+}
+
+.sl-markdown-content :where(table:not(.not-content table)) :where(td:first-child) {
+  color: rgb(var(--fg));
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ Karten, Tabs, Details */
+
+.sl-markdown-content .card {
+  border-radius: var(--radius-card);
+  border: 1px solid rgb(var(--line));
+  background-color: rgb(var(--surface));
+  box-shadow: var(--shadow-soft);
+}
+
+.sl-markdown-content .sl-link-card {
+  border-radius: 1.125rem;
+  border: 1px solid rgb(var(--line));
+  background-color: rgb(var(--surface));
+  box-shadow: var(--shadow-soft);
+  transition:
+    border-color 0.2s ease,
+    transform 0.3s var(--ease-out-expo);
+}
+
+.sl-markdown-content .sl-link-card:hover {
+  border-color: rgb(var(--accent) / 0.45);
+  transform: translateY(-2px);
+}
+
+.sl-markdown-content .sl-link-card .title {
+  font-family: var(--font-display);
+  font-weight: 750;
+  color: rgb(var(--fg));
+}
+
+.sl-markdown-content .sl-link-card .icon {
+  color: rgb(var(--accent-ink));
+}
+
+.sl-markdown-content starlight-tabs [role='tablist'] {
+  gap: 0.25rem;
+  border-bottom: 0;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background-color: rgb(var(--surface-2));
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.sl-markdown-content starlight-tabs [role='tab'] {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.4375rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(var(--fg-muted));
+}
+
+.sl-markdown-content starlight-tabs [role='tab'][aria-selected='true'] {
+  color: rgb(var(--fg));
+  background-color: rgb(var(--surface));
+  box-shadow: var(--shadow-soft);
+}
+
+.sl-markdown-content starlight-tabs .tab > [role='tab'] {
+  margin-bottom: 0;
+}
+
+.sl-markdown-content :where(details:not(.not-content details)) {
+  border-radius: 1rem;
+  border: 1px solid rgb(var(--line));
+  background-color: rgb(var(--surface));
+  padding: 0;
+  overflow: hidden;
+}
+
+.sl-markdown-content :where(details:not(.not-content details)) > summary {
+  padding: 0.875rem 1.125rem;
+  font-weight: 650;
+  color: rgb(var(--fg));
+  cursor: pointer;
+}
+
+.sl-markdown-content :where(details:not(.not-content details))[open] > summary {
+  border-bottom: 1px solid rgb(var(--line));
+}
+
+.sl-markdown-content :where(details:not(.not-content details)) > :not(summary) {
+  margin-inline: 1.125rem;
+}
+
+.sl-markdown-content :where(details:not(.not-content details)) > :last-child {
+  margin-bottom: 1rem;
+}
+
+/* Glossar */
+.sl-markdown-content dl.glossary {
+  display: grid;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgb(var(--line));
+}
+
+.sl-markdown-content dl.glossary dt {
+  margin-top: 0;
+  padding-top: 1.125rem;
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: rgb(var(--fg));
+}
+
+.sl-markdown-content dl.glossary dd {
+  margin: 0.25rem 0 0;
+  padding-bottom: 1.125rem;
+  border-bottom: 1px solid rgb(var(--line));
+  color: rgb(var(--fg-muted));
+}
+
+@media (min-width: 40rem) {
+  .sl-markdown-content dl.glossary {
+    grid-template-columns: 13rem 1fr;
+  }
+
+  .sl-markdown-content dl.glossary dt {
+    padding-block: 1.125rem;
+    border-bottom: 1px solid rgb(var(--line));
+  }
+
+  .sl-markdown-content dl.glossary dd {
+    margin-top: 0;
+    padding-top: 1.1875rem;
+  }
+}
+
+/* Starlight-Badges im Text */
+.sl-markdown-content .sl-badge {
+  border-radius: 999px;
+  font-family: var(--__sl-font);
+  font-weight: 650;
+}

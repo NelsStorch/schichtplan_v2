@@ -1,0 +1,109 @@
+---
+/** Aufklappbare Frage. Die Antwort ist normales Markdown: <FaqItem q="…">Antwort</FaqItem> */
+import Plus from '@lucide/astro/icons/plus';
+
+interface Props {
+  q: string;
+  open?: boolean;
+}
+const { q, open = false } = Astro.props;
+const id = q
+  .toLowerCase()
+  .replace(/ä/g, 'ae')
+  .replace(/ö/g, 'oe')
+  .replace(/ü/g, 'ue')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-|-$/g, '')
+  .slice(0, 60);
+---
+
+<details class="faq" id={id} open={open}>
+  <summary>
+    <span class="faq-q">{q}</span>
+    <span class="faq-toggle" aria-hidden="true"><Plus size={16} strokeWidth={2.2} /></span>
+  </summary>
+  <div class="faq-a">
+    <slot />
+  </div>
+</details>
+
+<style>
+  .faq {
+    margin-top: 0.625rem;
+    border-radius: 1.125rem;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface));
+    overflow: hidden;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.3s ease;
+  }
+
+  .faq[open] {
+    border-color: rgb(var(--line-strong));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .faq summary {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.125rem 1rem 1.25rem;
+    cursor: pointer;
+    list-style: none;
+    border-bottom: 0;
+  }
+
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq-q {
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+    color: rgb(var(--fg));
+  }
+
+  .faq-toggle {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgb(var(--surface-2));
+    color: rgb(var(--fg-muted));
+    transition:
+      transform 0.35s var(--ease-out-expo),
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .faq[open] .faq-toggle {
+    transform: rotate(45deg);
+    background: rgb(var(--accent) / 0.12);
+    color: rgb(var(--accent-ink));
+  }
+
+  .faq-a {
+    padding: 0 1.25rem 1.125rem;
+    font-size: 0.9875rem;
+  }
+
+  .faq-a > :global(:first-child) {
+    margin-top: 0;
+  }
+
+  /* Überschreibt die allgemeinen details-Stile aus content.css */
+  .faq[open] > summary {
+    border-bottom: 0;
+  }
+
+  .faq > :not(summary) {
+    margin-inline: 0;
+  }
+</style>

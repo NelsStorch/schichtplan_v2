@@ -1,0 +1,159 @@
+---
+/**
+ * Zugangsarten eines Anlasses. Namen und Beschreibungen kommen direkt aus
+ * packages/shared/src/constants.ts, damit die Hilfe nie andere Begriffe zeigt als die App.
+ */
+import { EVENT_ACCESS_TYPES } from '../../../packages/shared/src/constants';
+import Globe from '@lucide/astro/icons/globe';
+import ShieldCheck from '@lucide/astro/icons/shield-check';
+import Building from '@lucide/astro/icons/building';
+import Network from '@lucide/astro/icons/network';
+import Check from '@lucide/astro/icons/check';
+import Minus from '@lucide/astro/icons/minus';
+
+const ICONS = {
+  PUBLIC: Globe,
+  CEVIDB_ALL: ShieldCheck,
+  DEPARTMENT: Building,
+  DEPARTMENT_CEVIDB: Building,
+  WHITELIST: Network,
+  WHITELIST_CEVIDB: Network,
+} as const;
+
+const types = (Object.keys(EVENT_ACCESS_TYPES) as (keyof typeof EVENT_ACCESS_TYPES)[]).map((key) => ({
+  key,
+  ...EVENT_ACCESS_TYPES[key],
+  Icon: ICONS[key],
+}));
+---
+
+<div class="at not-content">
+  {
+    types.map(({ label, short, description, scope, ceviDb, whitelist, Icon }) => (
+      <article class="at-card">
+        <div class="at-head">
+          <span class="at-icon">
+            <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
+          </span>
+          <span class="at-short">{short}</span>
+        </div>
+        <h4>{label}</h4>
+        <p>{description}</p>
+        <ul class="at-props" aria-label={`Eigenschaften von ${label}`}>
+          <li class:list={{ on: scope === 'ANY' }}>
+            {scope === 'ANY' ? <Check size={13} strokeWidth={2.6} /> : <Minus size={13} strokeWidth={2.6} />}
+            Alle Abteilungen
+          </li>
+          <li class:list={{ on: ceviDb }}>
+            {ceviDb ? <Check size={13} strokeWidth={2.6} /> : <Minus size={13} strokeWidth={2.6} />}
+            Nur Cevi.DB
+          </li>
+          <li class:list={{ on: whitelist }}>
+            {whitelist ? <Check size={13} strokeWidth={2.6} /> : <Minus size={13} strokeWidth={2.6} />}
+            Weitere Abteilungen wählbar
+          </li>
+        </ul>
+      </article>
+    ))
+  }
+</div>
+
+<style>
+  .at {
+    display: grid;
+    gap: 0.75rem;
+    margin-block: 1.5rem;
+  }
+
+  .at-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 1.125rem 1.25rem 1rem;
+    border-radius: 1.25rem;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .at-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .at-icon {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.875rem;
+    background: rgb(var(--surface-2));
+    color: rgb(var(--fg));
+  }
+
+  .at-short {
+    padding: 0.1875rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line));
+    font-size: 0.75rem;
+    font-weight: 650;
+    color: rgb(var(--fg-muted));
+  }
+
+  h4 {
+    margin-top: 0.875rem;
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: rgb(var(--fg));
+  }
+
+  p {
+    margin-top: 0.25rem;
+    font-size: 0.9063rem;
+    line-height: 1.5;
+    color: rgb(var(--fg-muted));
+  }
+
+  .at-props {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0.875rem 0 0;
+    padding: 0.75rem 0 0;
+    list-style: none;
+    border-top: 1px solid rgb(var(--line));
+  }
+
+  .at-props li {
+    display: flex;
+    align-items: center;
+    gap: 0.4375rem;
+    margin: 0;
+    font-size: 0.8125rem;
+    color: rgb(var(--fg-subtle));
+  }
+
+  .at-props li :global(svg) {
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+
+  .at-props li.on {
+    color: rgb(var(--fg));
+    font-weight: 550;
+  }
+
+  .at-props li.on :global(svg) {
+    opacity: 1;
+    color: rgb(var(--success-ink));
+  }
+
+  @media (min-width: 40rem) {
+    .at {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

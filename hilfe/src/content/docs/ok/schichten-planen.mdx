@@ -1,0 +1,59 @@
+---
+title: Schichten und Arbeiten planen
+description: Eine Schicht ist ein Zeitfenster, darin stecken eine oder mehrere Arbeiten mit eigenen Plätzen.
+audience: [ok]
+numbered: true
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+
+## Schicht oder Arbeit?
+
+Eine **Schicht** ist ein Zeitfenster, zum Beispiel «Samstag 17:00 bis 20:00». Eine **Arbeit** ist, was in diesem Zeitfenster zu tun ist, zum Beispiel Grill, Bar, Kasse. Jede Arbeit hat eigene Plätze und ein eigenes Mindestalter. Die Plätze aller Arbeiten zusammen ergeben die Plätze der Schicht.
+
+Brauchst du keine Unterteilung, hat die Schicht einfach eine Arbeit, zum Beispiel «Helfer*in».
+
+## Eine neue Schicht
+
+Öffne den Anlass und tippe oben auf <Btn variant="primary">Schicht</Btn> oder im OK-Dashboard auf <Btn variant="primary">Neue Schicht</Btn>.
+
+<Steps>
+1. **Schichttitel**, zum Beispiel «Bar & Grill Samstagabend».
+
+2. **Aufbau- / Abbau-Schicht** ankreuzen, wenn es eine ist. Helfer*innen können dann gezielt danach filtern.
+
+3. **Beginn** und **Ende**. Beginnt die Schicht vor 03:00 Uhr, zählt sie im Plan zum Vortag.
+
+4. **Mindestalter für die gesamte Schicht**: Keins, ab 14, ab 16 oder ab 18. Gilt für alle in der Schicht.
+
+5. **Arbeiten in dieser Schicht**: Jede Arbeit hat einen Namen, Plätze (1 bis 20) und optional ein eigenes Mindestalter. Bei einem Mindestalter wählst du, ob **alle Helfer** das Alter brauchen oder **mind. 1 in Schicht**. Siehe [Mindestalter](/helfen/mindestalter/).
+
+6. **Hinweise / Beschreibung**: «Bequeme Schuhe, Schürze wird gestellt».
+
+7. Tippe auf <Btn variant="primary">Schicht anlegen</Btn>.
+</Steps>
+
+:::tip[Arbeiten aus dem Katalog]
+Oben im Bereich «Arbeiten» stehen unter **Katalog-Arbeiten schnell hinzufügen** die Arbeiten aus dem [Arbeiten-Katalog](/ok/arbeiten-katalog/). Ein Tipp fügt die Arbeit mit Altersgrenze und Beschreibung hinzu. Ist sie schon in der Schicht, gibt es einen Platz mehr.
+:::
+
+## Bearbeiten, duplizieren, löschen
+
+Im OK-Dashboard unter **Schichten & Einteilung** hat jede Schicht drei Knöpfe:
+
+- **Bearbeiten**: alle Angaben ändern. Bestehende Eintragungen bleiben.
+- **Duplizieren**: legt eine **Folgeschicht** an. Sie beginnt, wo die alte endet, und dauert gleich lang. Alle Arbeiten und Plätze werden kopiert, die Eintragungen nicht. So baust du einen Abend aus drei gleichen Schichten in Sekunden.
+- **Löschen**: entfernt die Schicht samt allen Eintragungen. Lässt sich nicht rückgängig machen.
+
+Bearbeiten geht auch direkt im Anlass: Schicht antippen, dann <Btn>Bearbeiten</Btn>.
+
+## Die Übersicht im OK-Dashboard
+
+Unter **Schichten & Einteilung** siehst du jede Schicht als Karte mit allen Arbeiten und wer eingeteilt ist. Oben filterst du nach Tag, nach **Nur offene Schichten**, nach **Nur Auf- & Abbau** oder nach einer Arbeit. Das Suchfeld findet Schichten und Arbeiten nach Namen.
+
+Oben im Dashboard steht die Belegung als Ring: wie viele Plätze besetzt und wie viele Helfer*innen insgesamt eingetragen sind.
+
+:::caution[Arbeiten entfernen oder Plätze senken]
+Senkst du die Plätze einer Arbeit unter die Zahl der Eingetragenen, bleiben alle eingetragen. Entfernst du eine Arbeit ganz, bleiben die Personen in der Schicht, gehören aber zu keiner Arbeit mehr. Prüf danach unter **Eingetragene Helfer**, wer betroffen ist, und teil neu ein.
+:::

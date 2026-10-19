@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, CalendarDays, Database, LogIn, LogOut, Ticket, Trash2, UserRound } from 'lucide-react';
+import { Building2, CalendarDays, Database, LifeBuoy, LogIn, LogOut, Ticket, Trash2, UserRound } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -16,7 +16,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { getLandingUrl } from '@schichtplan/shared';
+import { getLandingUrl, helpUrl } from '@schichtplan/shared';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 
@@ -107,9 +107,14 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
           <p>
             © {new Date().getFullYear()} {department?.name ?? 'Cevi'}
           </p>
-          <a href="https://cevi-schichtplan.ch" className="transition hover:text-fg">
-            cevi-schichtplan.ch
-          </a>
+          <div className="flex items-center gap-5">
+            <a href={helpUrl()} className="transition hover:text-fg">
+              Hilfe
+            </a>
+            <a href="https://cevi-schichtplan.ch" className="transition hover:text-fg">
+              cevi-schichtplan.ch
+            </a>
+          </div>
         </div>
       </footer>
 
@@ -254,6 +259,9 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
         </a>
         <a href={getLandingUrl('/profil')} className={buttonClasses({ variant: 'secondary' })}>
           <UserRound /> Profil &amp; Angaben
+        </a>
+        <a href={helpUrl()} className={buttonClasses({ variant: 'secondary' })}>
+          <LifeBuoy /> Hilfe &amp; Anleitungen
         </a>
         {user.isGlobalAdmin && (
           <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>

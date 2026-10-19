@@ -17,7 +17,10 @@
     "build": "npm run build --workspaces",
     "db:migrate": "npm run db:migrate --workspace=apps/backend",
     "db:seed": "npm run db:seed --workspace=apps/backend",
-    "db:studio": "npm run db:studio --workspace=apps/backend"
+    "db:studio": "npm run db:studio --workspace=apps/backend",
+    "hilfe:dev": "npm --prefix hilfe run dev",
+    "hilfe:build": "npm --prefix hilfe run build",
+    "hilfe:preview": "npm --prefix hilfe run preview"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

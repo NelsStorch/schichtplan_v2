@@ -98,7 +98,7 @@ else
   echo "Backup uebersprungen"
 fi
 
-rm -rf apps packages
+rm -rf apps packages hilfe
 tar -xzf "$ArchiveName"
 rm -f "$ArchiveName"
 
@@ -198,8 +198,9 @@ else
   check "https://login.`$domain/" || echo "WARNUNG: login.`$domain nicht erreichbar (DNS oder Zertifikat noch in Arbeit?)"
 fi
 
-# Admin-Portal: kein harter Fehler, damit ein fehlender DNS-Eintrag den restlichen Deploy nicht kippt
+# Admin-Portal und Hilfe: kein harter Fehler, damit ein fehlender DNS-Eintrag den restlichen Deploy nicht kippt
 check "https://admin.`$domain/" || echo "WARNUNG: admin.`$domain nicht erreichbar (DNS oder Zertifikat noch in Arbeit?)"
+check "https://hilfe.`$domain/" || echo "WARNUNG: hilfe.`$domain nicht erreichbar (DNS oder Zertifikat noch in Arbeit?)"
 
 echo "DEPLOY_SUCCESS=1"
 "@

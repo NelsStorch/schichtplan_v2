@@ -1,0 +1,58 @@
+---
+title: Einen Anlass erstellen
+description: Titel, Daten, OK und Zugang festlegen. Danach kommen die Schichten.
+audience: [ok, abteilung]
+numbered: true
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+
+Neue Anlässe erstellen die **Abteilungsleitung** und Personen mit der Rolle **Planung**. Bist du nur im OK eines bestehenden Anlasses, frag sie, ob sie den Anlass anlegen.
+
+## Formular öffnen
+
+Auf der Startseite deiner Abteilung oben rechts auf <Btn variant="primary">Neuer Anlass</Btn>. Gibt es noch gar keine Anlässe, steht in der Mitte <Btn variant="primary">Anlass erstellen</Btn>.
+
+## Die Angaben
+
+<Steps>
+1. **Aus Vorlage erstellen** (optional): Hast du letztes Jahr eine [Vorlage](/ok/vorlagen/) gespeichert, wähle sie hier. Alle Schichten, Arbeiten und Altersgrenzen werden übernommen.
+
+2. **Titel**, zum Beispiel «Chilbi 2026».
+
+3. **Adresse (Slug)**: der letzte Teil des Links, zum Beispiel `chilbi-2026`. Wird aus dem Titel vorgeschlagen. Nur Kleinbuchstaben, Zahlen und Bindestriche, pro Abteilung einmalig. Die Adresse lässt sich später nicht mehr ändern.
+
+4. **Beginn** und **Ende**. Schichten kannst du auch ausserhalb planen, etwa Aufbau am Vortag.
+
+5. **Beschreibung**: Was sollen Helfer*innen wissen? Treffpunkt, Kleidung, Verpflegung. Steht oben im Banner.
+
+6. **Organisationskomitee (OK)**: Du bist schon als OK-Leitung drin. Füge weitere Personen aus der Mitgliederliste oder per Cevi-Name oder E-Mail hinzu, mit Rolle und Ressort.
+
+7. **Schichten & Helfer-Soll** (optional): Mindestanzahl Schichten pro Person, zum Beispiel 2 für jede*n Leiter*in. Das OK sieht dann im [Helfer-Pool](/ok/helfer-pool/), wer sein Soll erfüllt hat.
+
+8. **Wer darf sich eintragen?** und weitere Zugangsregeln. Alles dazu unter [Zugang regeln](/ok/zugang/).
+
+9. **Banner und Logo**: siehe [Design](/ok/design/).
+
+10. Tippe auf <Btn variant="primary">Anlass erstellen</Btn>.
+</Steps>
+
+## Und dann?
+
+Der Anlass ist sofort sichtbar, aber noch leer. Tippe auf <Btn variant="primary">Schicht anlegen</Btn> und plane die erste Schicht. Wie, steht unter [Schichten planen](/ok/schichten-planen/).
+
+Sind die Schichten fertig, kopier den Link aus der Adresszeile und schick ihn in den Gruppenchat. Für Personen, die die Zugangsregeln nicht erfüllen, gibt es [Zugangs-Links](/ok/zugangs-links/).
+
+:::tip[Erst planen, dann teilen]
+Helfer*innen können sich eintragen, sobald die erste Schicht da ist. Willst du in Ruhe planen, schalte in den Einstellungen **Eintragen für Helfer:innen offen** aus und erst zum Start wieder ein.
+:::
+
+## Später ändern
+
+Titel, Beschreibung, Zugang, Soll, Banner und Logo änderst du jederzeit:
+
+- im Anlass bei «OK» über <Btn>Einstellungen</Btn>
+- im OK-Dashboard über <Btn>Event-Einstellungen</Btn>
+
+Adresse (Slug), Beginn und Ende lassen sich dort nicht mehr ändern. Prüf sie deshalb beim Erstellen gut.
