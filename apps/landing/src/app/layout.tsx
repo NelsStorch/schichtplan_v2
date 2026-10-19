@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const image = { url: `${origin}/og`, ...OG_SIZE, alt: 'Cevi Schichtplan: Ehrenamtliche Schichtplanung für Cevi-Abteilungen' };
   return {
     metadataBase: new URL(origin),
-    title: TITLE,
+    title: { default: TITLE, template: '%s · Cevi Schichtplan' },
     description: DESCRIPTION,
     icons: {
       icon: [

@@ -24,6 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     title: { default: title, template: '%s · Cevi Schichtplan' },
     description,
+    robots: { index: false, follow: false },
     manifest: '/manifest.json',
     icons: {
       icon: [

@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const image = { url: `${origin}/og`, ...OG_SIZE, alt: 'Anmelden beim Cevi Schichtplan' };
   return {
     metadataBase: new URL(origin),
-    title: TITLE,
+    title: { default: TITLE, template: '%s · Cevi Schichtplan' },
     description: DESCRIPTION,
     icons: {
       icon: [
