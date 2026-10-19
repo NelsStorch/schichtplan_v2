@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: 'Admin · Cevi Schichtplan',
   description: 'Verwaltung für globale Admins des Cevi Schichtplans',
   robots: { index: false, follow: false },
+  openGraph: { siteName: 'Cevi Schichtplan', locale: 'de_CH', title: 'Admin · Cevi Schichtplan' },
   icons: {
     icon: [
       { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },

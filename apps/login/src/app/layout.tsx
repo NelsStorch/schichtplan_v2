@@ -2,18 +2,29 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeScript } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
+import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 
-export const metadata: Metadata = {
-  title: 'Anmelden · Cevi Schichtplan',
-  description: 'Zentrales Login für Leiter*innen und Helfer*innen des Cevi Schichtplans',
-  icons: {
-    icon: [
-      { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
-      { url: '/images/cevi-logo.png', type: 'image/png' },
-    ],
-    apple: '/images/cevi-logo.png',
-  },
-};
+const TITLE = 'Anmelden · Cevi Schichtplan';
+const DESCRIPTION = 'Zentrales Login für Leiter*innen und Helfer*innen des Cevi Schichtplans';
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { origin } = await getRequestOrigin();
+  const image = { url: `${origin}/og`, ...OG_SIZE, alt: 'Anmelden beim Cevi Schichtplan' };
+  return {
+    metadataBase: new URL(origin),
+    title: TITLE,
+    description: DESCRIPTION,
+    icons: {
+      icon: [
+        { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
+        { url: '/images/cevi-logo.png', type: 'image/png' },
+      ],
+      apple: '/images/cevi-logo.png',
+    },
+    openGraph: { type: 'website', siteName: 'Cevi Schichtplan', locale: 'de_CH', title: TITLE, description: DESCRIPTION, url: '/', images: [image] },
+    twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION, images: [image] },
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',

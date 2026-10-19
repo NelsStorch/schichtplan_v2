@@ -11,6 +11,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./fonts": "./src/fonts.ts",
+    "./og": "./src/og.tsx",
     "./tailwind-preset": "./tailwind-preset.ts",
     "./theme.css": "./theme.css"
   },
