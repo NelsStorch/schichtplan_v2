@@ -22,6 +22,14 @@ declare module '@fastify/jwt' {
   }
 }
 
+/**
+ * Name des Login-Cookies. Dev braucht einen eigenen Namen: das Prod-Cookie gilt für
+ * `.cevi-schichtplan.ch` und wird auch an `*.dev.cevi-schichtplan.ch` gesendet. Mit gleichem Namen
+ * las das Dev-Backend das (ältere) Prod-Cookie, lehnte es ab (andere JWT_SECRET) und schickte
+ * zurück aufs Login: Endlosschleife.
+ */
+export const AUTH_COOKIE_NAME = process.env.COOKIE_NAME || 'token';
+
 const jwtPlugin: FastifyPluginAsync = async (fastify) => {
   const secret = process.env.JWT_SECRET || 'super-secret-development-key-min-32-chars';
 
@@ -30,7 +38,7 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(fastifyJwt, {
     secret,
     cookie: {
-      cookieName: 'token',
+      cookieName: AUTH_COOKIE_NAME,
       signed: false,
     },
   });

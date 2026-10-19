@@ -12,6 +12,7 @@ import {
   safeReturnTo,
   type UserDto,
 } from '@schichtplan/shared';
+import { AUTH_COOKIE_NAME } from '../plugins/jwt.js';
 import { deriveCeviDbFields } from '../services/cevidb.js';
 import {
   autoCreateCeviDbDepartmentStufen,
@@ -37,7 +38,7 @@ function getCookieDomain(): string | undefined {
 
 function setAuthCookie(reply: FastifyReply, token: string) {
   const domain = getCookieDomain();
-  reply.setCookie('token', token, {
+  reply.setCookie(AUTH_COOKIE_NAME, token, {
     path: '/',
     domain,
     httpOnly: true,
@@ -168,7 +169,7 @@ async function ensureHelperMembership(
 
 function clearAuthCookie(reply: FastifyReply) {
   const domain = getCookieDomain();
-  reply.clearCookie('token', {
+  reply.clearCookie(AUTH_COOKIE_NAME, {
     path: '/',
     domain,
   });
