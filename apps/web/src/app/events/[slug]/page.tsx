@@ -8,7 +8,6 @@ import {
   CalendarSearch,
   Check,
   Crown,
-  KeyRound,
   LayoutGrid,
   List,
   LogIn,
@@ -41,7 +40,6 @@ import {
   useToast,
 } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
-import { EventFormDialog, eventFormInitial } from '@/components/EventFormDialog';
 import { AccessTypeBadge } from '@/components/event-meta';
 import { AccessNotice } from '@/components/event/AccessNotice';
 import { SignupCountdown } from '@/components/SignupCountdown';
@@ -100,7 +98,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   } | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showOkForm, setShowOkForm] = useState(false);
   const [dayResponsiblesTarget, setDayResponsiblesTarget] = useState<{ dayDate: string; dayLabel: string } | null>(null);
 
@@ -414,7 +411,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         canManageShifts && (
           <div className="flex items-center gap-2">
             <Link href={`/events/${slug}/ok`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
-              <Shield className="size-4" /> <span className="hidden sm:inline">OK-Dashboard</span>
+              <Shield className="size-4" /> <span className="hidden sm:inline">OK-Bereich</span>
             </Link>
             <Button
               size="sm"
@@ -582,11 +579,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                 <Button variant="secondary" size="sm" onClick={() => setShowOkForm(true)}>
                   <UserPlus /> OK ernennen
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowSettings(true)}>
-                  <Palette /> Einstellungen
-                </Button>
-                <Link href={`/events/${event.slug}/ok`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
-                  <KeyRound className="size-4" /> Links
+                <Link href={`/events/${event.slug}/ok/einstellungen`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+                  <Palette className="size-4" /> Einstellungen
                 </Link>
               </div>
             )}
@@ -868,17 +862,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         onClose={() => setDayResponsiblesTarget(null)}
         onSaved={async () => {
           setDayResponsiblesTarget(null);
-          await load();
-        }}
-      />
-      <EventFormDialog
-        open={showSettings}
-        mode="edit"
-        eventSlug={event.slug}
-        initial={eventFormInitial(event)}
-        onClose={() => setShowSettings(false)}
-        onSaved={async () => {
-          setShowSettings(false);
           await load();
         }}
       />

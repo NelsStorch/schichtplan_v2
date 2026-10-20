@@ -656,3 +656,35 @@ export interface CheckinResultDto {
   /** Nächste eigene Schicht, falls gerade keine im Check-in-Fenster liegt */
   nextShift: { shiftTitle: string; startTime: string; endTime: string } | null;
 }
+
+export type EventMessageTarget = 'ALL' | 'SHIFTS' | 'PEOPLE' | 'OK';
+
+/** Verlauf: vom OK verschickte Nachricht */
+export interface EventMessageDto {
+  id: string;
+  sentByName: string;
+  subject: string;
+  body: string;
+  target: EventMessageTarget;
+  targetLabel: string;
+  recipientCount: number;
+  failedCount: number;
+  createdAt: string;
+}
+
+/** Antwort von POST /api/events/:slug/messages (bei dryRun ohne Versand) */
+export interface EventMessageResultDto {
+  recipientCount: number;
+  /** Personen ohne verwendbare E-Mail (bekommen nichts) */
+  withoutEmail: string[];
+  sent: number;
+  failed: number;
+  message?: EventMessageDto;
+}
+
+/** Antwort von POST /api/events/:slug/shifts/bulk */
+export interface BulkShiftsResultDto {
+  updated: number;
+  /** Schichten, die nicht geändert wurden, mit Grund */
+  skipped: { id: string; title: string; reason: string }[];
+}

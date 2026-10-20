@@ -119,6 +119,21 @@ export function zurichInputToIso(val: string | null | undefined): string | null 
 }
 
 /**
+ * Verschiebt einen Zeitpunkt um ganze Kalendertage in Schweizer Zeit: Die Uhrzeit bleibt gleich,
+ * auch über die Zeitumstellung hinweg (18:00 bleibt 18:00, nicht 17:00).
+ */
+export function addZurichDays(date: Date | string, days: number): Date {
+  const local = toZurichInput(date);
+  const match = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!match) return new Date(date);
+  const [, y, m, d, hr, min] = match.map(Number);
+  const shifted = new Date(Date.UTC(y, m - 1, d + days, hr, min));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const input = `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}T${pad(hr)}:${pad(min)}`;
+  return new Date(zurichInputToIso(input)!);
+}
+
+/**
  * Prüft, ob ein Freischaltzeitpunkt erreicht oder überschritten ist.
  * Berücksichtigt ein kleines Kulanzfenster (Standard 2 Sekunden) gegen Uhren-Abweichungen.
  */

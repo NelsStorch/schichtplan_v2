@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent, type ReactNode } from 'react';
 import { AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
 import {
   ATTENDANCE_MODES,
@@ -161,18 +161,55 @@ export function EventFormDialog({
   );
 }
 
-function EventForm({
+/** Abschnitt im Dialog: nur Überschrift */
+function DialogSection({ title, children }: { id: string; title: string; description?: string; children: ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <h4 className="text-[13px] font-semibold text-fg">{title}</h4>
+      {children}
+    </section>
+  );
+}
+
+/** Abschnitt auf der Einstellungs-Seite: eigene Karte mit Sprungmarke */
+function PageSection({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-24 rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
+      <h3 className="font-display text-lg font-bold text-fg">{title}</h3>
+      {description && <p className="mt-0.5 text-sm text-fg-muted">{description}</p>}
+      <div className="mt-5 space-y-5">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * Formular für «Neuer Anlass» (POST, im Dialog) und die Einstellungen eines Anlasses (PATCH,
+ * im OK-Bereich als Seite mit `layout="page"`).
+ */
+export function EventForm({
   mode,
   initial,
   eventSlug,
   onCancel,
   onSaved,
+  layout = 'dialog',
 }: {
   mode: 'create' | 'edit';
   initial?: Partial<EventFormValues>;
   eventSlug?: string;
   onCancel: () => void;
   onSaved: (slug: string) => void;
+  layout?: 'dialog' | 'page';
 }) {
   const toast = useToast();
   const { user } = usePortal();
@@ -221,7 +258,7 @@ function EventForm({
           userId: user.id,
           displayName: displayName(user),
           role: 'OK_LEAD',
-          roleTitle: 'Event-Leitung',
+          roleTitle: 'Leitung',
         },
       ]);
     }
@@ -390,169 +427,173 @@ function EventForm({
     (m) => !m.isCeviNameProfile && !organizers.some((o) => o.userId === m.userId)
   );
 
-  return (
-    <form onSubmit={submit} className="space-y-7">
-      {error && <Callout tone="danger">{error}</Callout>}
+  const S = layout === 'page' ? PageSection : DialogSection;
 
-      <section className="grid gap-5 sm:grid-cols-2">
-        {mode === 'create' && templates.length > 0 && (
+  return (
+    <form onSubmit={submit} className={layout === 'page' ? 'space-y-6' : 'space-y-7'}>
+      {error && layout === 'dialog' && <Callout tone="danger">{error}</Callout>}
+
+      <S id="grunddaten" title="Grunddaten" description="Name, Webadresse und Zeitraum des Anlasses.">
+        <div className="grid gap-5 sm:grid-cols-2">
+          {mode === 'create' && templates.length > 0 && (
+            <Field
+              label="Aus Vorlage erstellen (optional)"
+              hint="Übernimmt alle Schichten, Arbeiten und Mindestalter automatisch"
+              className="sm:col-span-2"
+            >
+              <Select
+                value={selectedTemplateId}
+                onChange={(e) => {
+                  const tId = e.target.value;
+                  setSelectedTemplateId(tId);
+                  setSlugTouched(false);
+                  if (tId) {
+                    const found = templates.find((t) => t.id === tId);
+                    if (found) {
+                      const cleanTitle = found.title.replace(/\s*\(Vorlage\)\s*/i, '');
+                      setForm((prev) => ({
+                        ...prev,
+                        title: cleanTitle,
+                        slug: slugify(cleanTitle),
+                        description: found.description || '',
+                        cancelDeadlineDays: found.cancelDeadlineDays ?? null,
+                        access: {
+                          accessType: found.accessType,
+                          leadersOnly: found.leadersOnly,
+                          requiredFields: found.requiredFields,
+                          allowedDepartmentIds: found.data.allowedDepartmentIds ?? [],
+                          allowedStufeIds: found.data.allowedStufeIds ?? [],
+                          questions: (found.data.questions ?? []).map((q) => ({
+                            label: q.label,
+                            type: q.type,
+                            optionsText: q.options.join('\n'),
+                            required: q.required,
+                            scope: q.scope ?? 'ONCE',
+                          })),
+                        },
+                      }));
+                    }
+                  }
+                }}
+              >
+                <option value="">Keine Vorlage (leerer Anlass)</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} ({t.shiftCount} Schichten)
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          <Field label="Titel" required className="sm:col-span-2">
+            <Input
+              value={form.title}
+              placeholder="Chilbi 2026"
+              autoFocus={mode === 'create'}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  title: val,
+                  slug: mode === 'create' && !slugTouched ? slugify(val) : f.slug,
+                }));
+              }}
+            />
+          </Field>
+
           <Field
-            label="Aus Vorlage erstellen (optional)"
-            hint="Übernimmt alle Schichten, Arbeiten und Mindestalter automatisch"
+            label={
+              <span className="flex items-center justify-between gap-2 flex-wrap">
+                <span>
+                  Adresse (Slug) <span className="text-accent-ink" aria-hidden>*</span>
+                </span>
+                {mode === 'edit' && form.slug !== initialSlug ? (
+                  <Badge tone="danger" size="sm" className="font-normal">
+                    Änderung bricht Links (10s Warnung)
+                  </Badge>
+                ) : mode === 'edit' ? (
+                  <Badge tone="outline" size="sm" className="font-normal text-fg-subtle">
+                    Änderung bricht geteilte Links
+                  </Badge>
+                ) : null}
+              </span>
+            }
+            hint={
+              mode === 'create' ? (
+                <span>
+                  <span className="font-mono text-fg-muted">…/events/{form.slug || 'chilbi-2026'}</span>
+                  <span className="mx-1.5 text-line-strong">·</span>
+                  <span>
+                    Empfehlung: Jahr ergänzen (z.&nbsp;B. <span className="font-mono">chilbi-2026</span>). Slugs sind abteilungsweit einmalig und bestimmen die Webadresse – so habt ihr nächstes Jahr wieder eine saubere Adresse.
+                  </span>
+                </span>
+              ) : (
+                <span>
+                  <span className="font-mono text-fg-muted">…/events/{form.slug}</span>
+                  <span className="mx-1.5 text-line-strong">·</span>
+                  <span className={form.slug !== initialSlug ? 'text-danger-ink font-semibold' : 'text-fg-subtle'}>
+                    Achtung: Eine Änderung macht alle bisher geteilten Links (WhatsApp, Einladungen) sowie Lesezeichen ungültig. Beim Speichern wird eine 10-sekündige Sicherheitsbestätigung verlangt.
+                  </span>
+                </span>
+              )
+            }
             className="sm:col-span-2"
           >
-            <Select
-              value={selectedTemplateId}
+            <Input
+              value={form.slug}
+              pattern="[-a-z0-9]+"
+              required
+              placeholder="chilbi-2026"
               onChange={(e) => {
-                const tId = e.target.value;
-                setSelectedTemplateId(tId);
-                setSlugTouched(false);
-                if (tId) {
-                  const found = templates.find((t) => t.id === tId);
-                  if (found) {
-                    const cleanTitle = found.title.replace(/\s*\(Vorlage\)\s*/i, '');
-                    setForm((prev) => ({
-                      ...prev,
-                      title: cleanTitle,
-                      slug: slugify(cleanTitle),
-                      description: found.description || '',
-                      cancelDeadlineDays: found.cancelDeadlineDays ?? null,
-                      access: {
-                        accessType: found.accessType,
-                        leadersOnly: found.leadersOnly,
-                        requiredFields: found.requiredFields,
-                        allowedDepartmentIds: found.data.allowedDepartmentIds ?? [],
-                        allowedStufeIds: found.data.allowedStufeIds ?? [],
-                        questions: (found.data.questions ?? []).map((q) => ({
-                          label: q.label,
-                          type: q.type,
-                          optionsText: q.options.join('\n'),
-                          required: q.required,
-                          scope: q.scope ?? 'ONCE',
-                        })),
-                      },
-                    }));
-                  }
-                }
+                setSlugTouched(true);
+                set('slug', slugify(e.target.value));
               }}
-            >
-              <option value="">Keine Vorlage (leeres Event anlegen)</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title} ({t.shiftCount} Schichten)
-                </option>
-              ))}
-            </Select>
+              className="font-mono"
+            />
           </Field>
-        )}
 
-        <Field label="Titel" required className="sm:col-span-2">
-          <Input
-            value={form.title}
-            placeholder="Chilbi 2026"
-            autoFocus={mode === 'create'}
-            onChange={(e) => {
-              const val = e.target.value;
-              setForm((f) => ({
-                ...f,
-                title: val,
-                slug: mode === 'create' && !slugTouched ? slugify(val) : f.slug,
-              }));
-            }}
-          />
-        </Field>
-
-        <Field
-          label={
-            <span className="flex items-center justify-between gap-2 flex-wrap">
+          <Field
+            label={
               <span>
-                Adresse (Slug) <span className="text-accent-ink" aria-hidden>*</span>
+                Beginn <span className="text-accent-ink" aria-hidden>*</span>
               </span>
-              {mode === 'edit' && form.slug !== initialSlug ? (
-                <Badge tone="danger" size="sm" className="font-normal">
-                  Änderung bricht Links (10s Warnung)
-                </Badge>
-              ) : mode === 'edit' ? (
-                <Badge tone="outline" size="sm" className="font-normal text-fg-subtle">
-                  Änderung bricht geteilte Links
-                </Badge>
-              ) : null}
-            </span>
-          }
-          hint={
-            mode === 'create' ? (
+            }
+            hint={mode === 'edit' ? 'Muss vor allen bestehenden Schichten liegen' : undefined}
+          >
+            <Input
+              type="datetime-local"
+              value={form.startDate}
+              required
+              onChange={(e) => set('startDate', e.target.value)}
+            />
+          </Field>
+          <Field
+            label={
               <span>
-                <span className="font-mono text-fg-muted">…/events/{form.slug || 'chilbi-2026'}</span>
-                <span className="mx-1.5 text-line-strong">·</span>
-                <span>
-                  Empfehlung: Jahr ergänzen (z.&nbsp;B. <span className="font-mono">chilbi-2026</span>). Slugs sind abteilungsweit einmalig und bestimmen die Webadresse – so habt ihr nächstes Jahr wieder eine saubere Adresse.
-                </span>
+                Ende <span className="text-accent-ink" aria-hidden>*</span>
               </span>
-            ) : (
-              <span>
-                <span className="font-mono text-fg-muted">…/events/{form.slug}</span>
-                <span className="mx-1.5 text-line-strong">·</span>
-                <span className={form.slug !== initialSlug ? 'text-danger-ink font-semibold' : 'text-fg-subtle'}>
-                  Achtung: Eine Änderung macht alle bisher geteilten Links (WhatsApp, Einladungen) sowie Lesezeichen ungültig. Beim Speichern wird eine 10-sekündige Sicherheitsbestätigung verlangt.
-                </span>
-              </span>
-            )
-          }
-          className="sm:col-span-2"
-        >
-          <Input
-            value={form.slug}
-            pattern="[-a-z0-9]+"
-            required
-            placeholder="chilbi-2026"
-            onChange={(e) => {
-              setSlugTouched(true);
-              set('slug', slugify(e.target.value));
-            }}
-            className="font-mono"
-          />
-        </Field>
-
-        <Field
-          label={
-            <span>
-              Beginn <span className="text-accent-ink" aria-hidden>*</span>
-            </span>
-          }
-          hint={mode === 'edit' ? 'Muss vor allen bestehenden Schichten liegen' : undefined}
-        >
-          <Input
-            type="datetime-local"
-            value={form.startDate}
-            required
-            onChange={(e) => set('startDate', e.target.value)}
-          />
-        </Field>
-        <Field
-          label={
-            <span>
-              Ende <span className="text-accent-ink" aria-hidden>*</span>
-            </span>
-          }
-          hint={mode === 'edit' ? 'Muss nach allen bestehenden Schichten liegen' : undefined}
-        >
-          <Input
-            type="datetime-local"
-            value={form.endDate}
-            min={form.startDate || undefined}
-            required
-            onChange={(e) => set('endDate', e.target.value)}
-          />
-        </Field>
-        <Field label="Beschreibung" className="sm:col-span-2">
-          <Textarea
-            rows={3}
-            value={form.description}
-            placeholder="Worum geht es? Was sollen Helfer:innen wissen?"
-            onChange={(e) => set('description', e.target.value)}
-          />
-        </Field>
-      </section>
+            }
+            hint={mode === 'edit' ? 'Muss nach allen bestehenden Schichten liegen' : undefined}
+          >
+            <Input
+              type="datetime-local"
+              value={form.endDate}
+              min={form.startDate || undefined}
+              required
+              onChange={(e) => set('endDate', e.target.value)}
+            />
+          </Field>
+          <Field label="Beschreibung" className="sm:col-span-2">
+            <Textarea
+              rows={3}
+              value={form.description}
+              placeholder="Worum geht es? Was sollen die Helfenden wissen?"
+              onChange={(e) => set('description', e.target.value)}
+            />
+          </Field>
+        </div>
+      </S>
 
       {/* Organisationskomitee (OK) bei neuem Event angeben */}
       {mode === 'create' && (
@@ -562,7 +603,7 @@ function EventForm({
             <legend className="text-[13px] font-semibold text-fg">Organisationskomitee (OK)</legend>
           </div>
           <p className="mb-4 text-xs text-fg-muted">
-            Wer leitet diesen Anlass und teilt Helfer:innen ein? Du kannst weitere Personen direkt hinzufügen.
+            Wer leitet diesen Anlass und teilt Helfende ein? Weitere Personen kannst du auch später unter «Einstellungen» hinzufügen.
           </p>
 
           {/* Bereits im OK eingetragene Personen */}
@@ -652,8 +693,8 @@ function EventForm({
                   onChange={(e) => setNewRole(e.target.value as 'OK_LEAD' | 'OK_MEMBER')}
                   className="w-full rounded-field border border-line bg-surface-1 px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
                 >
-                  <option value="OK_MEMBER">OK-Mitglied (Schichten planen & Helfer koordinieren)</option>
-                  <option value="OK_LEAD">OK-Leitung (Volle Event-Verwaltung & Design)</option>
+                  <option value="OK_MEMBER">OK-Mitglied (Schichten planen und Helfende einteilen)</option>
+                  <option value="OK_LEAD">OK-Leitung (zusätzlich Einstellungen und OK-Team)</option>
                 </select>
               </div>
 
@@ -684,85 +725,34 @@ function EventForm({
         </fieldset>
       )}
 
-      <div className="space-y-4 rounded-card border border-line bg-surface-2/60 p-4 sm:p-5">
-        <h4 className="text-[13px] font-semibold text-fg">Zuständigkeiten &amp; Schicht-Einstellungen</h4>
 
+      <S
+        id="eintragen"
+        title="Eintragen & Fristen"
+        description="Ab wann und wie lange sich Helfende selbst eintragen und austragen können."
+      >
+        {mode === 'edit' && (
+          <Switch
+            checked={form.allowPublicSignup}
+            onChange={(v) => set('allowPublicSignup', v)}
+            label="Helfende können sich selbst eintragen"
+            description="Ausgeschaltet teilen nur noch das OK und die Abteilungsleitung Personen ein."
+          />
+        )}
         <Field
-          label="Schichtplan-Verantwortliche(r) für Fragen (optional)"
-          hint="Wird Helfer:innen angezeigt, wenn eine Schicht voll besetzt ist, damit sie sich bei Fragen oder weiterem Interesse direkt per Telefon oder E-Mail melden können."
-        >
-          <Select
-            value={form.contactUserId || ''}
-            onChange={(e) => set('contactUserId', e.target.value || null)}
-          >
-            <option value="">-- Keine Person ausgewählt --</option>
-            {deptMembers.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {m.displayName}
-              </option>
-            ))}
-          </Select>
-        </Field>
-
-        <Field
-          label="Verantwortliche für Schichten / Tage"
-          hint="Bestimmt, ob Zuständigkeiten pro einzelner Schicht oder für ganze Veranstaltungstage vergeben werden."
-        >
-          <Select
-            value={form.responsibleMode}
-            onChange={(e) => set('responsibleMode', e.target.value as 'BY_SHIFT' | 'BY_DAY')}
-          >
-            <option value="BY_SHIFT">Pro Schicht einzeln festlegen</option>
-            <option value="BY_DAY">Pro Tag festlegen (gilt automatisch für alle Schichten des Tages)</option>
-          </Select>
-        </Field>
-
-        <Field
-          label="Tageswechsel-Uhrzeit"
-          hint="Ab welcher Uhrzeit Schichten zum neuen Tag zählen (z. B. 04:00 bei Chilbi oder Abendanlässen, damit Nachteinsätze bis 04:00 Uhr morgens noch zum Vortag gehören)."
+          label="Eintragen erst ab (optional)"
+          hint="Schweizer Zeit. Leer lassen = sofort offen. Das OK kann vorher schon Personen einteilen."
         >
           <Input
-            type="time"
-            value={form.dayCutoffTime}
-            onChange={(e) => set('dayCutoffTime', e.target.value)}
+            type="datetime-local"
+            value={form.signupOpensAt}
+            onChange={(e) => set('signupOpensAt', e.target.value)}
           />
         </Field>
 
         <Field
-          label="Kontaktdaten der Verantwortlichen"
-          hint="Bestimmt, welche Kontaktdaten (Handynummer / E-Mail) bei Schichtplan-, Tages- und Schicht-Verantwortlichen für Helfer:innen sichtbar sind."
-        >
-          <Select
-            value={form.contactVisibility}
-            onChange={(e) => set('contactVisibility', e.target.value as EventContactVisibility)}
-          >
-            <option value="BOTH">Handynummer und E-Mail anzeigen</option>
-            <option value="PHONE">Nur Handynummer anzeigen</option>
-            <option value="EMAIL">Nur E-Mail anzeigen</option>
-            <option value="NONE">Keine Kontaktdaten anzeigen (nur Name)</option>
-          </Select>
-        </Field>
-
-        <Field
-          label="Mindestanzahl Schichten pro Person (optional)"
-          hint="Zeigt dem OK im Helfer-Pool an, wer sein Schicht-Soll bereits erfüllt hat (z. B. 2 Schichten pro Leiter:in). Leer lassen für kein Soll."
-        >
-          <Input
-            type="number"
-            min={1}
-            max={50}
-            placeholder="z. B. 2 (leer lassen = kein Soll)"
-            value={form.minShiftsPerPerson ?? ''}
-            onChange={(e) => {
-              const val = e.target.value.trim();
-              set('minShiftsPerPerson', val === '' ? null : Math.max(1, parseInt(val, 10) || 1));
-            }}
-          />
-        </Field>
-
-        <Field
-          label="Austrage-Sperre (Tage vor Anlassbeginn)"
-          hint="Verhindert, dass sich Helfer:innen kurzfristig selbst austragen. Leer lassen = keine Sperre (Austragen immer möglich). 0 = bis zum Anlassbeginn. Z. B. 2 = ab 2 Tage vor Beginn können sich Helfer:innen nicht mehr selbst austragen (nur noch das OK)."
+          label="Austrage-Sperre in Tagen vor Beginn (optional)"
+          hint="Ab so vielen Tagen vor Beginn können sich Helfende nicht mehr selbst austragen, nur noch das OK. 0 = bis zum Beginn möglich, leer = immer möglich."
         >
           <Input
             type="number"
@@ -778,19 +768,95 @@ function EventForm({
         </Field>
 
         <Field
-          label="Freischaltung zum Eintragen (Schweizer Zeit, optional)"
-          hint="Datum und Uhrzeit (Schweizer Zeit), ab wann sich Helfer:innen selbst eintragen können. Leer lassen = sofort offen. Das OK kann Personen jederzeit auch vorab manuell einteilen."
+          label="Soll: Schichten pro Person (optional)"
+          hint="Unter «Helfende» siehst du dann, wer sein Soll erfüllt hat. Leer lassen = kein Soll."
         >
           <Input
-            type="datetime-local"
-            value={form.signupOpensAt}
-            onChange={(e) => set('signupOpensAt', e.target.value)}
+            type="number"
+            min={1}
+            max={50}
+            placeholder="z. B. 2 (leer lassen = kein Soll)"
+            value={form.minShiftsPerPerson ?? ''}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              set('minShiftsPerPerson', val === '' ? null : Math.max(1, parseInt(val, 10) || 1));
+            }}
+          />
+        </Field>
+
+      </S>
+
+      <S id="zugang" title="Zugang & Angaben" description="Wer sich eintragen darf und was ihr von den Helfenden wissen müsst.">
+        <EventAccessFields values={form.access} onChange={(access) => set('access', access)} />
+      </S>
+
+      <S
+        id="zustaendigkeiten"
+        title="Zuständigkeiten"
+        description="Wer bei Fragen hilft und wie die Tage eingeteilt sind."
+      >
+        <Field
+          label="Ansprechperson für Fragen (optional)"
+          hint="Sehen die Helfenden bei vollen Schichten, damit sie sich bei Fragen melden können."
+        >
+          <Select
+            value={form.contactUserId || ''}
+            onChange={(e) => set('contactUserId', e.target.value || null)}
+          >
+            <option value="">-- Keine Person ausgewählt --</option>
+            {deptMembers.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.displayName}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field
+          label="Verantwortliche"
+          hint="Pro Schicht festlegen oder eine Tagesleitung für ganze Tage."
+        >
+          <Select
+            value={form.responsibleMode}
+            onChange={(e) => set('responsibleMode', e.target.value as 'BY_SHIFT' | 'BY_DAY')}
+          >
+            <option value="BY_SHIFT">Pro Schicht einzeln festlegen</option>
+            <option value="BY_DAY">Pro Tag festlegen (gilt automatisch für alle Schichten des Tages)</option>
+          </Select>
+        </Field>
+
+        <Field
+          label="Tageswechsel-Uhrzeit"
+          hint="Schichten vor dieser Uhrzeit zählen zum Vortag, z. B. 04:00, damit Nachtschichten zum Abend davor gehören."
+        >
+          <Input
+            type="time"
+            value={form.dayCutoffTime}
+            onChange={(e) => set('dayCutoffTime', e.target.value)}
           />
         </Field>
 
         <Field
+          label="Sichtbare Kontaktdaten"
+          hint="Was die Helfenden von Ansprechperson, Tagesleitung und Schichtverantwortlichen sehen."
+        >
+          <Select
+            value={form.contactVisibility}
+            onChange={(e) => set('contactVisibility', e.target.value as EventContactVisibility)}
+          >
+            <option value="BOTH">Handynummer und E-Mail anzeigen</option>
+            <option value="PHONE">Nur Handynummer anzeigen</option>
+            <option value="EMAIL">Nur E-Mail anzeigen</option>
+            <option value="NONE">Keine Kontaktdaten anzeigen (nur Name)</option>
+          </Select>
+        </Field>
+
+      </S>
+
+      <S id="anwesenheit" title="Anwesenheit" description="Am Anlass abhaken, wer da war.">
+        <Field
           label="Anwesenheitsliste"
-          hint="Das OK hakt pro Schicht ab, wer da war (anwesend, entschuldigt, nicht erschienen). Mit QR-Code checken sich eingetragene Helfer:innen zusätzlich selbst ein, ab 30 Minuten vor Schichtbeginn bis Schichtende."
+          hint="Das OK hakt pro Schicht ab, wer da war. Mit QR-Code checken sich die Helfenden zusätzlich selbst ein (ab 30 Minuten vor Schichtbeginn bis Schichtende)."
         >
           <Select
             value={form.attendanceMode}
@@ -804,70 +870,75 @@ function EventForm({
           </Select>
         </Field>
 
-        {mode === 'edit' && (
-          <Switch
-            checked={form.allowPublicSignup}
-            onChange={(v) => set('allowPublicSignup', v)}
-            label="Eintragen für Helfer:innen offen"
-            description="Ausgeschaltet können nur noch das OK und die Abteilungsleitung Personen einteilen."
-          />
-        )}
-      </div>
+      </S>
 
-      <EventAccessFields values={form.access} onChange={(access) => set('access', access)} />
-
-      <fieldset className="space-y-5">
-        <div>
-          <legend className="mb-3 text-[13px] font-semibold text-fg">Banner des Anlasses</legend>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {BANNER_PRESETS.map((preset) => {
-              const selected = form.bannerUrl === preset.url;
-              return (
-                <button
-                  key={preset.url}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => set('bannerUrl', preset.url)}
-                  className={cn(
-                    'group relative aspect-[16/10] overflow-hidden rounded-tile ring-2 ring-offset-2 ring-offset-surface transition',
-                    selected ? 'ring-accent' : 'ring-transparent hover:ring-line-strong'
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={preset.url} alt={preset.name} className="size-full object-cover transition duration-500 group-hover:scale-105" />
-                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-6 text-left text-xs font-semibold text-white">
-                    {preset.name}
-                  </span>
-                </button>
-              );
-            })}
+      <S id="design" title="Design" description="Banner und Logo auf der Seite des Anlasses.">
+        <fieldset className="space-y-5">
+          <div>
+            <legend className="mb-3 text-[13px] font-semibold text-fg">Banner des Anlasses</legend>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {BANNER_PRESETS.map((preset) => {
+                const selected = form.bannerUrl === preset.url;
+                return (
+                  <button
+                    key={preset.url}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => set('bannerUrl', preset.url)}
+                    className={cn(
+                      'group relative aspect-[16/10] overflow-hidden rounded-tile ring-2 ring-offset-2 ring-offset-surface transition',
+                      selected ? 'ring-accent' : 'ring-transparent hover:ring-line-strong'
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preset.url} alt={preset.name} className="size-full object-cover transition duration-500 group-hover:scale-105" />
+                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-6 text-left text-xs font-semibold text-white">
+                      {preset.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Eigenes Bannerbild hochladen (kein Pfad/URL eingeben) */}
-        <ImageUpload
-          label="Oder eigenes Bannerbild hochladen"
-          hint="Breitbild empfohlen (max. 6 MB)"
-          aspectRatio="banner"
-          value={BANNER_PRESETS.some((p) => p.url === form.bannerUrl) ? null : form.bannerUrl}
-          onChange={(url) => set('bannerUrl', url ?? BANNER_PRESETS[0].url)}
-          showCeviFallback={false}
-        />
+          {/* Eigenes Bannerbild hochladen (kein Pfad/URL eingeben) */}
+          <ImageUpload
+            label="Oder eigenes Bannerbild hochladen"
+            hint="Breitbild empfohlen (max. 6 MB)"
+            aspectRatio="banner"
+            value={BANNER_PRESETS.some((p) => p.url === form.bannerUrl) ? null : form.bannerUrl}
+            onChange={(url) => set('bannerUrl', url ?? BANNER_PRESETS[0].url)}
+            showCeviFallback={false}
+          />
 
-        {/* Logo des Anlasses hochladen (kein Pfad/URL eingeben) */}
-        <ImageUpload
-          label="Logo des Anlasses"
-          hint="Leer lassen für das Cevi-Logo"
-          aspectRatio="square"
-          value={form.logoUrl}
-          onChange={(url) => set('logoUrl', url ?? '')}
-          showCeviFallback={true}
-        />
-      </fieldset>
+          {/* Logo des Anlasses hochladen (kein Pfad/URL eingeben) */}
+          <ImageUpload
+            label="Logo des Anlasses"
+            hint="Leer lassen für das Cevi-Logo"
+            aspectRatio="square"
+            value={form.logoUrl}
+            onChange={(url) => set('logoUrl', url ?? '')}
+            showCeviFallback={true}
+          />
+        </fieldset>
 
-      <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
+      </S>
+
+      <div
+        className={cn(
+          'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
+          layout === 'page'
+            ? 'sticky bottom-4 z-10 rounded-card border border-line-strong bg-surface/95 p-3 shadow-lift backdrop-blur'
+            : 'border-t border-line pt-5'
+        )}
+      >
+        {layout === 'page' && error && (
+          <p role="alert" className="mr-auto self-center text-sm font-semibold text-danger-ink">
+            {error}
+          </p>
+        )}
         <Button variant="ghost" onClick={onCancel}>
-          Abbrechen
+          {layout === 'page' ? 'Änderungen verwerfen' : 'Abbrechen'}
         </Button>
         <Button type="submit" loading={saving}>
           {mode === 'create' ? 'Anlass erstellen' : 'Speichern'}
@@ -891,7 +962,7 @@ function EventForm({
               <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">
                 Wenn du die Adresse von <strong className="text-fg font-mono">{initialSlug}</strong> zu{' '}
                 <strong className="text-fg font-mono">{form.slug}</strong> änderst, funktionieren alle bereits versendeten
-                Links (z.&nbsp;B. in WhatsApp-Gruppen, Einladungs-Mails, Flyern) sowie Lesezeichen sofort nicht mehr. Helfer:innen müssen den neuen Link erhalten.
+                Links (z.&nbsp;B. in WhatsApp-Gruppen, Einladungs-Mails, Flyern) sowie Lesezeichen sofort nicht mehr. Die Helfenden brauchen den neuen Link.
               </p>
             </Callout>
 

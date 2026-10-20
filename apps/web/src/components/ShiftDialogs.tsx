@@ -339,10 +339,10 @@ function ShiftForm({
           />
           <div className="space-y-0.5">
             <span className="text-sm font-bold text-fg flex items-center gap-1.5">
-              🛠️ Aufbau- / Abbau-Schicht
+              Auf- oder Abbau
             </span>
             <p className="text-xs text-fg-muted">
-              Kennzeichnet diese Schicht speziell als Auf- oder Abbauarbeit für gezielte Helfer-Filter.
+              Markiert die Schicht als Arbeit vor oder nach dem Anlass. Helfende können danach filtern.
             </p>
           </div>
         </label>
@@ -370,7 +370,7 @@ function ShiftForm({
       <div className="flex flex-col gap-1.5 rounded-field border border-line bg-surface-2 p-3">
         <span className="text-[13px] font-semibold text-fg">Mindestalter für die gesamte Schicht</span>
         <p className="text-xs text-fg-muted">
-          Gilt übergreifend für alle Helfer:innen dieser Schicht (z.B. Nachtschicht ab 18).
+          Gilt für alle in dieser Schicht (z. B. Nachtschicht ab 18).
         </p>
         <div className="mt-2 grid h-10 grid-cols-4 gap-1">
           {[0, 14, 16, 18].map((age) => (
@@ -395,7 +395,7 @@ function ShiftForm({
           <div>
             <h4 className="text-sm font-bold text-fg">Arbeiten in dieser Schicht</h4>
             <p className="text-xs text-fg-muted">
-              Wähle Arbeiten aus dem Katalog oder trage neue ein ({totalSlots} Helfer:innen total).
+              Wähle Arbeiten aus dem Katalog oder trage neue ein ({totalSlots} Plätze total).
             </p>
           </div>
           <Button type="button" size="sm" variant="secondary" onClick={addTask}>
@@ -523,9 +523,9 @@ function ShiftForm({
                             ? 'bg-accent/15 text-accent-ink font-bold'
                             : 'text-fg-muted hover:text-fg'
                         )}
-                        title="Jeder Helfer bei dieser Arbeit muss mindestens das Alter haben"
+                        title="Alle bei dieser Arbeit müssen mindestens so alt sein"
                       >
-                        Alle Helfer
+                        Alle
                       </button>
                       <button
                         type="button"
@@ -717,7 +717,7 @@ function DuplicateShiftForm({
       </div>
 
       <p className="text-xs text-fg-muted">
-        Alle Arbeiten ({shift.tasks?.length || 1} Aufgaben) und Plätze werden 1:1 kopiert. Die bisherigen Helfer-Eintragungen werden zurückgesetzt.
+        Alle Arbeiten ({shift.tasks?.length || 1} Aufgaben) und Plätze werden 1:1 kopiert. Eintragungen werden nicht kopiert.
       </p>
 
       <FormActions onCancel={onCancel} saving={saving} label="Duplizieren" />
@@ -774,7 +774,7 @@ export function SaveTemplateDialog({
       open={open}
       onClose={onClose}
       icon={<Copy />}
-      title="Als Event-Vorlage speichern"
+      title="Als Vorlage speichern"
       description="Speichert die gesamte Schicht- und Arbeitsstruktur relativ ab, um sie nächstes Jahr auf neue Daten anzuwenden."
     >
       <form onSubmit={submit} className="space-y-4">
@@ -818,7 +818,7 @@ export function OrganizerDialog({
       onClose={onClose}
       icon={<UserPlus />}
       title="Ins OK aufnehmen"
-      description="OK-Mitglieder planen Schichten und teilen Helfer:innen ein, ohne Abteilungs-Admin zu sein."
+      description="OK-Mitglieder planen Schichten und teilen Helfende ein, ohne Abteilungsleitung zu sein."
     >
       <OrganizerForm eventSlug={eventSlug} onCancel={onClose} onSaved={onSaved} />
     </Dialog>
@@ -863,7 +863,7 @@ function OrganizerForm({
 
   const roles = [
     { value: 'OK_LEAD' as const, label: 'OK-Leitung', text: 'Design, Einstellungen und OK verwalten', icon: Crown },
-    { value: 'OK_MEMBER' as const, label: 'OK-Mitglied', text: 'Schichten planen und Helfer:innen einteilen', icon: Shield },
+    { value: 'OK_MEMBER' as const, label: 'OK-Mitglied', text: 'Schichten planen und Helfende einteilen', icon: Shield },
   ];
 
   return (

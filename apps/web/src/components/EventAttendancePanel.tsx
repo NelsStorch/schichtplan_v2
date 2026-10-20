@@ -263,15 +263,15 @@ export function EventAttendancePanel({
 
   if (mode === 'OFF') {
     return (
-      <div className="py-6">
+      <div>
         <EmptyState
           icon={<ClipboardCheck />}
           title="Anwesenheitsliste ist ausgeschaltet"
-          description="Schalte sie in den Event-Einstellungen ein. Dort wählst du auch, ob nur das OK abhakt oder ob sich Helfer:innen zusätzlich per QR-Code selbst einchecken."
+          description="Schalte sie unter «Einstellungen» ein. Dort wählst du auch, ob nur das OK abhakt oder ob sich die Helfenden zusätzlich per QR-Code selbst einchecken."
           action={
             canEditSettings ? (
               <Button size="sm" onClick={onOpenSettings}>
-                <Settings className="size-4" /> Event-Einstellungen öffnen
+                <Settings className="size-4" /> Einstellungen öffnen
               </Button>
             ) : undefined
           }
@@ -281,7 +281,7 @@ export function EventAttendancePanel({
   }
 
   return (
-    <div className="py-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h3 className="text-base font-bold text-fg">Anwesenheitsliste</h3>
@@ -369,7 +369,7 @@ export function EventAttendancePanel({
         <EmptyState
           icon={<ClipboardCheck />}
           title="Noch niemand eingetragen"
-          description="Sobald Helfer:innen in Schichten eingetragen sind, kannst du sie hier abhaken."
+          description="Sobald Helfende in Schichten eingetragen sind, kannst du sie hier abhaken."
         />
       ) : (
         <>
@@ -448,7 +448,7 @@ export function EventAttendancePanel({
 
       {mode === 'OK_AND_QR' && !event.checkinToken && (
         <Callout tone="warning" title="Kein QR-Code vorhanden">
-          Speichere die Event-Einstellungen einmal neu, damit ein Check-in-Code erstellt wird.
+          Speichere die Einstellungen einmal neu, damit ein Check-in-Code erstellt wird.
         </Callout>
       )}
     </div>

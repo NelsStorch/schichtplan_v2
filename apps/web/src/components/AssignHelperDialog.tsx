@@ -56,7 +56,7 @@ export function AssignHelperDialog({
       open={open && shift !== null}
       onClose={onClose}
       icon={<UserCheck />}
-      title="Helfer:in einteilen"
+      title="Person einteilen"
       description={shift ? `${shift.title} · ${fmtWeekday(shift.startTime)}, ${fmtTime(shift.startTime)} – ${fmtTime(shift.endTime)} Uhr` : ''}
       size="lg"
     >
@@ -267,7 +267,7 @@ function AssignHelperForm({
       });
 
       toast({
-        title: `${mode === 'member' ? selected?.displayName || 'Helfer' : guestName} eingeteilt!`,
+        title: `${mode === 'member' ? selected?.displayName || 'Person' : guestName} eingeteilt!`,
         description: `${shift.title} ${chosenTask ? `(${chosenTask.title})` : ''}`,
       });
       onAssigned();
@@ -419,7 +419,7 @@ function AssignHelperForm({
           ) : visible.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-field border border-dashed border-line px-4 py-8 text-center text-sm text-fg-muted">
               <Filter className="size-5 text-fg-subtle" />
-              {candidates.length === 0 ? 'Für diesen Anlass gibt es noch keine Personen im Helfer-Pool.' : 'Niemand passt zu den Filtern.'}
+              {candidates.length === 0 ? 'Für diesen Anlass gibt es noch keine Personen unter «Helfende».' : 'Niemand passt zu den Filtern.'}
               {filtersActive && (
                 <Button
                   type="button"
@@ -481,7 +481,7 @@ function AssignHelperForm({
               <p className="text-fg-muted">
                 {mode === 'member'
                   ? `${selected?.displayName || 'Diese Person'} ist zur gleichen Zeit bereits eingetragen:`
-                  : `«${guestName}» ist in diesem Event zur gleichen Zeit bereits eingetragen:`}
+                  : `«${guestName}» ist in diesem Anlass zur gleichen Zeit bereits eingetragen:`}
               </p>
               <ul className="space-y-1 pt-1">
                 {collisionWarning.conflicts.map((c) => (

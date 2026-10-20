@@ -1,0 +1,43 @@
+---
+title: Nachrichten an Helfende
+description: Treffpunkt, Änderungen oder ein Aufruf für offene Schichten per E-Mail an die Helfenden schicken.
+audience: [ok]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+Mit einer Nachricht erreichst du alle Eingetragenen, die Leute einzelner Schichten oder das OK, ohne die Adressen zu kennen.
+
+<Path steps={['Anlass', 'OK-Bereich', 'Nachrichten']} />
+
+<Steps>
+1. Wähle **An wen?**
+   - **Alle Eingetragenen**: alle mit mindestens einer Schicht
+   - **Bestimmte Schichten**: kreuze die Schichten an
+   - **Ausgewählte Personen**: zuerst unter **Helfende** Personen ankreuzen und <Btn variant="primary">Nachricht an Auswahl</Btn> tippen
+   - **Das OK**: alle im OK dieses Anlasses
+
+2. Darunter steht, an wie viele Personen die Nachricht geht und wer keine bestätigte E-Mail-Adresse hat.
+
+3. **Betreff** und **Nachricht** schreiben. Ein Link zum Schichtplan kommt automatisch dazu.
+
+4. <Btn variant="primary">Senden</Btn> tippen und bestätigen.
+</Steps>
+
+Jede Person bekommt eine eigene E-Mail, die anderen Adressen sieht niemand. Antworten gehen direkt an deine E-Mail-Adresse.
+
+:::tip[Schichten verschoben?]
+Hast du unter **Schichten** mehrere Schichten auf einmal verschoben, tippe in derselben Leiste auf <Btn>Nachricht</Btn>. Dann sind genau diese Schichten schon ausgewählt.
+:::
+
+## Wer bekommt nichts?
+
+Nur Konten mit **bestätigter** E-Mail-Adresse bekommen Nachrichten: Cevi.DB-Konten und Konten mit E-Mail und Passwort. Wer sich nur mit Cevi-Namen angemeldet hat oder vom OK als Gast eingetragen wurde, bekommt nichts. Ruf diese Personen an oder schreib ihnen direkt.
+
+## Verlauf und Grenzen
+
+Rechts (auf dem Handy unten) unter **Verschickt** stehen alle Nachrichten dieses Anlasses mit Zeit, Absender*in und Anzahl Empfänger*innen. Ging eine Mail nicht raus, steht dort «nicht zugestellt».
+
+Pro Anlass gehen höchstens 10 Nachrichten pro Stunde raus, pro Nachricht höchstens 1000 Empfänger*innen.

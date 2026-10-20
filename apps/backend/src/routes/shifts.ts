@@ -1,5 +1,13 @@
 import { FastifyPluginAsync } from 'fastify';
-import { CreateShiftSchema, UpdateShiftSchema, SignupShiftSchema, type ResponsiblePersonDto } from '@schichtplan/shared';
+import {
+  addZurichDays,
+  BulkShiftsSchema,
+  CreateShiftSchema,
+  UpdateShiftSchema,
+  SignupShiftSchema,
+  type BulkShiftsResultDto,
+  type ResponsiblePersonDto,
+} from '@schichtplan/shared';
 import {
   accessEventInclude,
   accessUserSelect,
@@ -1132,6 +1140,90 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         departmentSlug: su.shift.event.department.slug,
         createdAt: su.createdAt.toISOString(),
       }));
+    }
+  );
+
+  // Mehrere Schichten eines Anlasses auf einmal ändern (Abteilungsleitung, Planung oder Event-OK)
+  fastify.post<{ Params: { slug: string } }>(
+    '/api/events/:slug/shifts/bulk',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      const event = await fastify.prisma.event.findUnique({
+        where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
+        include: { organizers: true },
+      });
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten der Schichten' });
+      }
+
+      const parse = BulkShiftsSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+      const shiftIds = [...new Set(parse.data.shiftIds)];
+      const { action } = parse.data;
+
+      const shifts = await fastify.prisma.shift.findMany({
+        where: { id: { in: shiftIds }, eventId: event.id },
+        include: { tasks: { include: { _count: { select: { signups: true } } } } },
+      });
+      if (shifts.length !== shiftIds.length) {
+        return reply.status(400).send({ error: 'Eine Schicht gehört nicht zu diesem Anlass' });
+      }
+
+      const skipped: BulkShiftsResultDto['skipped'] = [];
+      let updated = 0;
+
+      await fastify.prisma.$transaction(async (tx) => {
+        if (action.type === 'DELETE') {
+          updated = (await tx.shift.deleteMany({ where: { id: { in: shiftIds } } })).count;
+        } else if (action.type === 'MOVE') {
+          const move = (d: Date) => new Date(addZurichDays(d, action.days).getTime() + action.minutes * 60 * 1000);
+          for (const shift of shifts) {
+            await tx.shift.update({
+              where: { id: shift.id },
+              data: { startTime: move(shift.startTime), endTime: move(shift.endTime) },
+            });
+            updated++;
+          }
+        } else if (action.type === 'SET_SLOTS') {
+          for (const shift of shifts) {
+            if (shift.tasks.length !== 1) {
+              skipped.push({ id: shift.id, title: shift.title, reason: 'Hat mehrere Arbeiten, Plätze einzeln anpassen' });
+              continue;
+            }
+            const task = shift.tasks[0];
+            if (task._count.signups > action.requiredSlots) {
+              skipped.push({
+                id: shift.id,
+                title: shift.title,
+                reason: `Schon ${task._count.signups} Personen eingetragen`,
+              });
+              continue;
+            }
+            await tx.shiftTask.update({ where: { id: task.id }, data: { requiredSlots: action.requiredSlots } });
+            await tx.shift.update({ where: { id: shift.id }, data: { requiredSlots: action.requiredSlots } });
+            updated++;
+          }
+        } else if (action.type === 'SET_SETUP') {
+          updated = (
+            await tx.shift.updateMany({ where: { id: { in: shiftIds } }, data: { isSetupTeardown: action.isSetupTeardown } })
+          ).count;
+        } else {
+          updated = (
+            await tx.shift.updateMany({ where: { id: { in: shiftIds } }, data: { category: action.category || null } })
+          ).count;
+        }
+      });
+
+      return { updated, skipped } satisfies BulkShiftsResultDto;
     }
   );
 };

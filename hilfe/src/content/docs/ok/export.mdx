@@ -1,0 +1,28 @@
+---
+title: Export & Drucken
+description: Schichtplan und Einteilung als Excel-Liste herunterladen oder zum Aufhängen drucken.
+audience: [ok]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+<Path steps={['Anlass', 'OK-Bereich', 'Export & Drucken']} />
+
+| Was | Inhalt |
+| --- | --- |
+| **Schichtplan drucken** | Pro Tag eine Seite mit Zeit, Schicht, Arbeit und den Eingeteilten. <Btn>Mit leeren Zeilen</Btn> druckt für jeden freien Platz eine leere Zeile, zum Eintragen von Hand. |
+| **Schichtplan als Tabelle** | Eine Zeile pro Schicht und Arbeit mit Plätzen, Besetzung und Namen |
+| **Einteilung pro Person** | Wer wann wo hilft, nach Namen sortiert. Bei Gästen mit E-Mail und Telefon |
+| **Helfende mit Soll** | Alle Personen unter **Helfende** mit Stufe, Anzahl Schichten, Soll und Abmeldungen |
+| **Anwesenheitsliste** | Steht unter [Anwesenheit](/ok/anwesenheit/) |
+
+Die Tabellen sind CSV-Dateien und öffnen sich direkt in Excel oder Numbers, auch mit Umlauten.
+
+:::caution[Personendaten]
+Die Listen enthalten Namen und teils Kontaktdaten. Gib sie nur im OK weiter, leg sie nicht in einen öffentlichen Ordner und lösch sie nach dem Anlass.
+:::
+
+:::note[Druckansicht blockiert?]
+Die Druckansicht öffnet sich in einem neuen Fenster. Blockiert der Browser es, erlaube Pop-ups für diese Seite.
+:::

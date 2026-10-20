@@ -16,18 +16,18 @@ Brauchst du keine Unterteilung, hat die Schicht einfach eine Arbeit, zum Beispie
 
 ## Eine neue Schicht
 
-Öffne den Anlass und tippe oben auf <Btn variant="primary">Schicht</Btn> oder im OK-Dashboard auf <Btn variant="primary">Neue Schicht</Btn>.
+Öffne den Anlass und tippe oben auf <Btn variant="primary">Schicht</Btn> oder im OK-Bereich unter **Schichten** auf <Btn variant="primary">Neue Schicht</Btn>.
 
 <Steps>
 1. **Schichttitel**, zum Beispiel «Bar & Grill Samstagabend».
 
-2. **Aufbau- / Abbau-Schicht** ankreuzen, wenn es eine ist. Helfer*innen können dann gezielt danach filtern.
+2. **Auf- oder Abbau** ankreuzen, wenn es eine ist. Helfende können dann gezielt danach filtern.
 
 3. **Beginn** und **Ende**. Beginnt die Schicht vor 03:00 Uhr, zählt sie im Plan zum Vortag.
 
 4. **Mindestalter für die gesamte Schicht**: Keins, ab 14, ab 16 oder ab 18. Gilt für alle in der Schicht.
 
-5. **Arbeiten in dieser Schicht**: Jede Arbeit hat einen Namen, Plätze (1 bis 20) und optional ein eigenes Mindestalter. Bei einem Mindestalter wählst du, ob **alle Helfer** das Alter brauchen oder **mind. 1 in Schicht**. Siehe [Mindestalter](/helfen/mindestalter/).
+5. **Arbeiten in dieser Schicht**: Jede Arbeit hat einen Namen, Plätze (1 bis 20) und optional ein eigenes Mindestalter. Bei einem Mindestalter wählst du, ob **alle** das Alter brauchen oder **mind. 1 in Schicht**. Siehe [Mindestalter](/helfen/mindestalter/).
 
 6. **Hinweise / Beschreibung**: «Bequeme Schuhe, Schürze wird gestellt».
 
@@ -40,20 +40,44 @@ Oben im Bereich «Arbeiten» stehen unter **Katalog-Arbeiten schnell hinzufügen
 
 ## Bearbeiten, duplizieren, löschen
 
-Im OK-Dashboard unter **Schichten & Einteilung** hat jede Schicht drei Knöpfe:
+Im OK-Bereich unter **Schichten** hat jede Schicht drei Knöpfe:
 
 - **Bearbeiten**: alle Angaben ändern. Bestehende Eintragungen bleiben.
-- **Duplizieren**: legt eine **Folgeschicht** an. Sie beginnt, wo die alte endet, und dauert gleich lang. Alle Arbeiten und Plätze werden kopiert, die Eintragungen nicht. So baust du einen Abend aus drei gleichen Schichten in Sekunden.
+- **Kopieren**: legt eine **Folgeschicht** an. Sie beginnt, wo die alte endet, und dauert gleich lang. Alle Arbeiten und Plätze werden kopiert, die Eintragungen nicht. So baust du einen Abend aus drei gleichen Schichten in Sekunden.
 - **Löschen**: entfernt die Schicht samt allen Eintragungen. Lässt sich nicht rückgängig machen.
 
 Bearbeiten geht auch direkt im Anlass: Schicht antippen, dann <Btn>Bearbeiten</Btn>.
 
-## Die Übersicht im OK-Dashboard
+## Liste und Plan
 
-Unter **Schichten & Einteilung** siehst du jede Schicht als Karte mit allen Arbeiten und wer eingeteilt ist. Oben filterst du nach Tag, nach **Nur offene Schichten**, nach **Nur Auf- & Abbau** oder nach einer Arbeit. Das Suchfeld findet Schichten und Arbeiten nach Namen.
+Unter **Schichten** wählst du oben die Ansicht:
 
-Oben im Dashboard steht die Belegung als Ring: wie viele Plätze besetzt und wie viele Helfer*innen insgesamt eingetragen sind.
+- **Liste**: jede Schicht als Karte mit allen Arbeiten und wer eingeteilt ist. Hier teilst du mit <Btn>Einteilen</Btn> ein und trägst mit dem Kreuz aus.
+- **Plan**: pro Tag eine Zeitachse. Jede Schicht ist ein Balken: grün heisst voll, farbig teilweise besetzt, gestrichelt noch niemand. So siehst du Lücken und Überschneidungen sofort. Ein Tipp auf einen Balken öffnet die Schicht.
+
+Filtern kannst du nach Tag, **Nur nicht voll**, **Nur Auf-/Abbau** und nach Arbeit. Die Suche findet Schichten, Arbeiten und eingeteilte Personen.
+
+## Mehrere Schichten auf einmal ändern
+
+<Steps>
+1. Tippe auf <Btn>Auswählen</Btn>.
+
+2. Tippe die Schichten an, oder <Btn variant="ghost">Ganzen Tag wählen</Btn> beim Tag.
+
+3. Unten erscheint eine Leiste:
+   - <Btn>Verschieben</Btn>: früher oder später, in Tagen, Stunden und Minuten. Ganze Tage behalten die Uhrzeit, auch über die Zeitumstellung.
+   - <Btn>Plätze</Btn>: gleiche Anzahl Plätze für alle, nur bei Schichten mit einer Arbeit.
+   - <Btn>Kategorie</Btn> und <Btn>Auf-/Abbau</Btn> setzen.
+   - <Btn>Nachricht</Btn> an alle, die in diesen Schichten eingetragen sind.
+   - <Btn variant="danger">Löschen</Btn> samt Eintragungen.
+
+4. Mit <Btn variant="primary">Fertig</Btn> beendest du die Auswahl.
+</Steps>
+
+:::caution[Verschieben mit Eingetragenen]
+Wer schon eingetragen ist, bleibt eingetragen und erfährt die neue Zeit nicht automatisch. Schick danach eine [Nachricht](/ok/nachrichten/).
+:::
 
 :::caution[Arbeiten entfernen oder Plätze senken]
-Senkst du die Plätze einer Arbeit unter die Zahl der Eingetragenen, bleiben alle eingetragen. Entfernst du eine Arbeit ganz, bleiben die Personen in der Schicht, gehören aber zu keiner Arbeit mehr. Prüf danach unter **Eingetragene Helfer**, wer betroffen ist, und teil neu ein.
+Senkst du die Plätze einer Arbeit unter die Zahl der Eingetragenen, bleiben alle eingetragen. Entfernst du eine Arbeit ganz, bleiben die Personen in der Schicht, gehören aber zu keiner Arbeit mehr. Prüf danach unter **Helfende**, wer betroffen ist, und teil neu ein.
 :::

@@ -412,6 +412,54 @@ export const CheckinSchema = z.object({
 
 export type CheckinInput = z.infer<typeof CheckinSchema>;
 
+/** Nachricht des OK an Helfende eines Anlasses (E-Mail an jede Person einzeln) */
+export const SendEventMessageSchema = z
+  .object({
+    subject: z.string().trim().min(3, 'Betreff ist zu kurz').max(150, 'Betreff ist zu lang'),
+    body: z.string().trim().min(1, 'Nachricht fehlt').max(5000, 'Nachricht ist zu lang (max. 5000 Zeichen)'),
+    /** ALL = alle Eingetragenen, SHIFTS = Eingetragene bestimmter Schichten, PEOPLE = ausgewählte Personen, OK = das OK */
+    target: z.enum(['ALL', 'SHIFTS', 'PEOPLE', 'OK']),
+    shiftIds: z.array(z.string().uuid()).max(500).optional(),
+    userIds: z.array(z.string().uuid()).max(1000).optional(),
+    /** true = nur Empfänger zählen, nichts verschicken */
+    dryRun: z.boolean().optional(),
+  })
+  .refine((m) => m.target !== 'SHIFTS' || (m.shiftIds?.length ?? 0) > 0, {
+    message: 'Mindestens eine Schicht auswählen',
+    path: ['shiftIds'],
+  })
+  .refine((m) => m.target !== 'PEOPLE' || (m.userIds?.length ?? 0) > 0, {
+    message: 'Mindestens eine Person auswählen',
+    path: ['userIds'],
+  });
+
+export type SendEventMessageInput = z.infer<typeof SendEventMessageSchema>;
+
+/** Mehrere Schichten eines Anlasses auf einmal ändern */
+export const BulkShiftsSchema = z.object({
+  shiftIds: z.array(z.string().uuid()).min(1, 'Keine Schicht ausgewählt').max(500),
+  action: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('DELETE') }),
+    /**
+     * Beginn und Ende verschieben (negativ = früher). Ganze Tage behalten die Uhrzeit in Schweizer Zeit,
+     * die Minuten kommen danach dazu.
+     */
+    z
+      .object({
+        type: z.literal('MOVE'),
+        days: z.number().int().min(-365).max(365).default(0),
+        minutes: z.number().int().min(-1439).max(1439).default(0),
+      })
+      .refine((a) => a.days !== 0 || a.minutes !== 0, { message: 'Bitte eine Zeitspanne angeben' }),
+    /** Plätze setzen, nur bei Schichten mit genau einer Arbeit */
+    z.object({ type: z.literal('SET_SLOTS'), requiredSlots: z.number().int().min(1).max(500) }),
+    z.object({ type: z.literal('SET_SETUP'), isSetupTeardown: z.boolean() }),
+    z.object({ type: z.literal('SET_CATEGORY'), category: z.string().trim().max(80).nullable() }),
+  ]),
+});
+
+export type BulkShiftsInput = z.infer<typeof BulkShiftsSchema>;
+
 export type UnregisterHelperInput = z.infer<typeof UnregisterHelperSchema>;
 
 export const EventDeregistrationSchema = z.object({

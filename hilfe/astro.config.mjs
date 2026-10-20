@@ -54,6 +54,7 @@ export default defineConfig({
         {
           label: 'Im OK',
           items: [
+            'ok/ok-bereich',
             'ok/rollen',
             'ok/anlass-erstellen',
             'ok/schichten-planen',
@@ -62,7 +63,9 @@ export default defineConfig({
             'ok/zugangs-links',
             'ok/einteilen',
             'ok/helfer-pool',
+            'ok/nachrichten',
             'ok/anwesenheit',
+            'ok/export',
             'ok/auswertung',
             'ok/vorlagen',
             'ok/design',

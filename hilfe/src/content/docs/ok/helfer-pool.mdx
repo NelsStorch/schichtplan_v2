@@ -1,45 +1,46 @@
 ---
-title: Helfer-Pool und Schicht-Soll
-description: Bei internen Anlässen siehst du alle, die helfen sollten, und wer sein Soll schon erfüllt hat.
+title: Helfende und Soll
+description: Alle, die beim Anlass helfen oder helfen könnten, wer sein Soll erfüllt hat und wer abgemeldet ist.
 audience: [ok]
 ---
 
 import Btn from '../../../components/Btn.astro';
 import Path from '../../../components/Path.astro';
 
-Bei Anlässen, die auf eine Abteilung oder Stufen beschränkt sind, kennt der Schichtplan alle, die mithelfen könnten. Das ist der **Helfer-Pool**. Zusammen mit dem **Schicht-Soll** siehst du, wer schon genug macht und wen du noch fragen musst.
+Unter **Helfende** steht jede Person einmal: wer schon eingetragen ist, wer noch helfen könnte und wer abgemeldet ist. Zusammen mit dem **Soll** siehst du, wen du noch fragen musst.
 
-<Path steps={['Anlass', 'OK-Dashboard', 'Helfer-Pool & Soll']} />
+<Path steps={['Anlass', 'OK-Bereich', 'Helfende']} />
 
-:::note[Nur bei eingeschränkten Anlässen]
-Ist der Anlass **Öffentlich** oder **Cevi.DB, alle Abteilungen**, gibt es keinen festen Pool. Dann erscheint ein Hinweis mit <Btn>Zugang anpassen</Btn>.
-:::
+## Wer steht in der Liste?
 
-## Das Soll festlegen
+- alle mit mindestens einer Schicht, auch Gäste, die das OK eingetragen hat
+- bei Anlässen nur für die Abteilung oder einzelne Stufen: alle, die sich eintragen dürfen
+- bei offenen Anlässen zusätzlich die Personen deiner Abteilung
 
-Das Soll ist die **Mindestanzahl Schichten pro Person**, zum Beispiel 2. Du legst es in den Event-Einstellungen unter «Schichten & Helfer-Soll» fest, oder direkt hier mit <Btn variant="ghost">Soll festlegen</Btn>. Leer heisst kein Soll.
+Andere Abteilungen erscheinen nur bei einer Whitelist und nur mit Personen, die dort dazugehören.
 
-Das Soll ist ein Hinweis fürs OK. Helfer*innen sehen es nicht und werden nicht blockiert.
+## Das Soll
 
-## Die vier Zahlen
+Das Soll ist die **Mindestanzahl Schichten pro Person**, zum Beispiel 2. Du legst es unter **Einstellungen** → **Eintragen & Fristen** fest. Leer heisst kein Soll.
 
-| Kachel | Bedeutet |
-| --- | --- |
-| Helfer-Pool | alle berechtigten Personen |
-| Soll erfüllt | haben mindestens so viele Schichten wie das Soll (ohne Soll: mindestens eine) |
-| Noch offen | brauchen noch Schichten |
-| Abgemeldet | müssen an diesem Anlass nicht helfen |
+Das Soll ist ein Hinweis fürs OK. Helfende sehen es nicht und werden nicht blockiert.
 
-Darunter die Liste mit Stufe (👑 heisst Leitung), Alter, Anzahl Schichten und Status wie «Erfüllt» oder «Noch 1 nötig». Mit dem Pfeil bei den Schichten klappst du auf, welche es sind.
+## Zahlen und Filter
 
-Filter: Suche nach Namen, **Alle**, **Noch offen**, **Erfüllt**, **Abgemeldet**, dazu Stufe und bei mehreren Abteilungen die Abteilung.
+Oben stehen **Personen**, **Mit Schicht**, **Unter dem Soll** (ohne Soll: **Ohne Schicht**) und **Abgemeldet**. Mit den Filtern darunter zeigst du nur diese Gruppe, dazu Suche, Stufe und bei mehreren Abteilungen die Abteilung.
+
+Ein Tipp auf eine Person klappt ihre Schichten auf. Dort trägst du sie mit dem Kreuz aus einer Schicht aus oder mit <Btn variant="danger">Aus allen Schichten austragen</Btn> aus dem ganzen Anlass.
 
 ## Jemanden abmelden
 
-Ist jemand in den Ferien, im Militär oder verletzt, tippe auf <Btn variant="ghost">Abmelden</Btn> und gib optional einen Grund an. Die Person zählt dann nicht mehr zu «Noch offen». Ihre Eintragungen bleiben.
+Ist jemand in den Ferien, im Militär oder verletzt, tippe bei der Person auf <Btn variant="ghost">Kann nicht helfen (abmelden)</Btn> und gib optional einen Grund an. Die Person zählt dann nicht mehr beim Soll. Ihre Eintragungen bleiben.
 
-Mit <Btn>Wieder anmelden</Btn> machst du das rückgängig.
+Mit <Btn>Abmeldung aufheben</Btn> machst du das rückgängig.
 
-:::tip[Die «Noch offen»-Liste als Telefonliste]
-Filter auf **Noch offen**, dann hast du genau die Leute, die du noch fragen musst. Telefonnummern stehen unter [Auswertung](/ok/auswertung/).
+## Nachricht an mehrere Personen
+
+Kreuze Personen links an und tippe auf <Btn variant="primary">Nachricht an Auswahl</Btn>. Siehe [Nachrichten](/ok/nachrichten/).
+
+:::tip[Wer muss noch?]
+Filter auf **Unter dem Soll**, alle ankreuzen, Nachricht schreiben. So fragst du genau die Richtigen.
 :::

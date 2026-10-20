@@ -16,6 +16,7 @@ import eventRoutes from './routes/events.js';
 import eventParticipationRoutes from './routes/eventParticipation.js';
 import shiftRoutes from './routes/shifts.js';
 import attendanceRoutes from './routes/attendance.js';
+import eventMessageRoutes from './routes/eventMessages.js';
 import adminRoutes from './routes/admin.js';
 import uploadRoutes from './routes/uploads.js';
 import eventTemplateRoutes from './routes/eventTemplates.js';
@@ -95,6 +96,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(eventParticipationRoutes);
   await app.register(shiftRoutes);
   await app.register(attendanceRoutes);
+  await app.register(eventMessageRoutes);
   await app.register(eventTemplateRoutes);
   await app.register(taskDefinitionRoutes);
   await app.register(adminRoutes);

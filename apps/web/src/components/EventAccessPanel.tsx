@@ -34,7 +34,7 @@ function linkUrl(slug: string, token: string) {
 /** OK-Dashboard: Wer darf sich eintragen, Zugangs-Links, Angaben der eingetragenen Personen */
 export function EventAccessPanel({ event }: { event: EventDetails }) {
   return (
-    <div className="mt-6 space-y-8">
+    <div className="space-y-8">
       <Card className="p-5 shadow-soft">
         <div className="flex flex-wrap items-center gap-2">
           <AccessTypeBadge type={event.accessType} leadersOnly={event.leadersOnly} />
@@ -49,7 +49,7 @@ export function EventAccessPanel({ event }: { event: EventDetails }) {
             ? event.requiredFields.map((f) => REQUIRED_PROFILE_FIELDS[f].label).join(', ')
             : 'keine'}
           {event.questions.length > 0 && ` · ${event.questions.length} eigene Frage(n)`}. Ändern unter
-          «Event-Einstellungen».
+          «Einstellungen».
         </p>
       </Card>
 
@@ -386,7 +386,7 @@ function Participants({ event }: { event: EventDetails }) {
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 id="people-title" className="text-base font-bold text-fg">
-            Angaben der Helfer*innen
+            Angaben der Helfenden
           </h3>
           <p className="text-xs text-fg-muted">Kontaktangaben und Antworten aller Eingetragenen. Nur für das OK.</p>
         </div>

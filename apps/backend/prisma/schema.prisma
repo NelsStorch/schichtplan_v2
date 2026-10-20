@@ -204,6 +204,7 @@ model Event {
   deregistrations   EventDeregistration[]
   dayResponsibles   EventDayResponsible[]
   signupLogs        ShiftSignupLog[]
+  messages          EventMessage[]
 
   @@unique([departmentId, slug])
   @@map("events")
@@ -523,4 +524,25 @@ model ShiftSignupLog {
 
   @@index([eventId, createdAt])
   @@map("shift_signup_logs")
+}
+
+// Vom OK verschickte Nachrichten an Helfende (nur Verlauf, die Mails gehen einzeln raus)
+model EventMessage {
+  id             String   @id @default(uuid())
+  eventId        String   @map("event_id")
+  sentByUserId   String?  @map("sent_by_user_id")
+  sentByName     String   @map("sent_by_name")
+  subject        String
+  body           String
+  // "ALL", "SHIFTS", "PEOPLE" oder "OK"
+  target         String
+  targetLabel    String   @map("target_label")
+  recipientCount Int      @map("recipient_count")
+  failedCount    Int      @default(0) @map("failed_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
+  @@map("event_messages")
 }

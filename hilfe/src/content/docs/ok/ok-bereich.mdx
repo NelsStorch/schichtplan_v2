@@ -1,0 +1,55 @@
+---
+title: Der OK-Bereich
+description: Wo du was findest, wenn du einen Anlass planst, und was die Übersicht dir sagt.
+audience: [ok]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+Im OK-Bereich planst du einen Anlass. Du öffnest ihn im Anlass oben mit <Btn>OK-Bereich</Btn>. Sehen können ihn das OK des Anlasses, die Planung und die Abteilungsleitung.
+
+<Path steps={['Anlass', 'OK-Bereich']} />
+
+## Aufbau
+
+Links steht die Navigation (auf dem Handy oben unter **Bereich** → <Btn>Wechseln</Btn>). Die Bereiche folgen dem Ablauf eines Anlasses:
+
+| Gruppe | Bereich | Wofür |
+| --- | --- | --- |
+| | **Übersicht** | Was noch fehlt, Belegung pro Tag, letzte Aktivitäten |
+| Planen | **Schichten** | Schichten anlegen, Personen einteilen, mehrere Schichten auf einmal ändern. [Schichten planen](/ok/schichten-planen/) |
+| | **Arbeiten-Katalog** | Wiederkehrende Arbeiten der Abteilung. [Arbeiten-Katalog](/ok/arbeiten-katalog/) |
+| | **Vorlagen** | Den Anlass fürs nächste Mal speichern. [Vorlagen](/ok/vorlagen/) |
+| Helfende | **Helfende** | Alle Personen, Soll, Abmeldungen. [Helfende und Soll](/ok/helfer-pool/) |
+| | **Zugang & Antworten** | Zugangs-Links und Antworten auf eure Fragen. [Zugangs-Links](/ok/zugangs-links/) |
+| | **Nachrichten** | E-Mail an Helfende. [Nachrichten](/ok/nachrichten/) |
+| Am Anlass | **Anwesenheit** | Abhaken, wer da war, QR-Check-in. [Anwesenheit](/ok/anwesenheit/) |
+| | **Export & Drucken** | Listen für Excel und zum Aufhängen. [Export & Drucken](/ok/export/) |
+| Verwaltung | **Einstellungen** | Alles, was für den ganzen Anlass gilt, und das OK-Team |
+| | **Protokoll** | Wer sich wann ein- und ausgetragen hat. [Auswertung](/ok/auswertung/) |
+
+:::note[OK-Mitglieder]
+**Einstellungen** sehen nur die OK-Leitung und die Abteilungsleitung. OK-Mitglieder planen Schichten, teilen ein und schreiben Nachrichten. Siehe [Rollen](/ok/rollen/).
+:::
+
+## Die Übersicht
+
+Oben stehen der Zugang, ob das Eintragen offen ist (oder ab wann), die Anwesenheitsliste und das Soll. Darunter die Belegung als Ring und die wichtigsten Zahlen.
+
+Unter **Zu erledigen** sammelt der Schichtplan, was noch fehlt, zum Beispiel:
+
+- noch keine Schichten
+- Arbeiten mit «mindestens 1 Person ab 18», bei denen noch niemand alt genug in der Schicht ist
+- Tage ohne Tagesleitung (wenn ihr pro Tag plant)
+- freie Plätze, eine Woche vor dem Anlass als Warnung
+- Personen unter dem Soll
+- Eintragen geschlossen
+- kurz vor dem Anlass: Anwesenheitsliste und QR-Code vorbereiten
+- nach dem Anlass: als Vorlage speichern
+
+Jeder Hinweis führt mit einem Tipp an die richtige Stelle. Unter **Belegung pro Tag** öffnet ein Tipp auf einen Tag die Schichten dieses Tages.
+
+## Einstellungen
+
+Unter **Einstellungen** steht alles auf einer Seite, mit Sprungmarken oben: **OK-Team**, **Grunddaten**, **Eintragen & Fristen**, **Zugang & Angaben**, **Zuständigkeiten**, **Anwesenheit** und **Design**. Änderungen im Formular gelten erst nach <Btn variant="primary">Speichern</Btn> unten in der Leiste. Das OK-Team ändert sich sofort.

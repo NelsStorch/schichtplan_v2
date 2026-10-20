@@ -309,7 +309,7 @@ export function renderEmailTemplate({
 </html>`;
 }
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -326,11 +326,14 @@ export async function sendEmail({
   subject,
   html,
   text,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  /** Antworten gehen an diese Adresse statt an den Absender */
+  replyTo?: string;
 }): Promise<boolean> {
   const plainText = text || html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
 
@@ -349,6 +352,7 @@ export async function sendEmail({
       subject,
       text: plainText,
       html,
+      replyTo,
     });
     console.log(`[Mail] Gesendet an ${to} (ID: ${info.messageId})`);
     return true;
