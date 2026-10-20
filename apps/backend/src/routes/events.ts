@@ -14,6 +14,8 @@ import {
   type EventQuestionType,
   type ResponsiblePersonDto,
   type EventContactVisibility,
+  type AttendanceStatus,
+  type ShiftSignupLogAction,
 } from '@schichtplan/shared';
 import {
   accessEventInclude,
@@ -26,6 +28,7 @@ import {
 import { resolveOrganizerUser } from '../services/ceviNameLogin.js';
 import { isDepartmentInsider } from '../services/departmentVisibility.js';
 import { cleanRequiredFields, missingProfileFields } from '../services/profile.js';
+import { generateCheckinToken } from '../services/attendance.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -347,6 +350,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         dayResponsibles,
         contactVisibility,
         cancelDeadlineDays: event.cancelDeadlineDays ?? null,
+        attendanceMode: event.attendanceMode,
+        checkinToken: access.isManager ? event.checkinToken : null,
         audience: audienceLabel(event, request.tenant.name),
         allowedDepartments: event.allowedDepartments.map((a) => ({
           id: a.departmentId,
@@ -408,6 +413,14 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
               userAge,
               createdAt: su.createdAt.toISOString(),
               isConfirmed: su.isConfirmed,
+              ...(access.isManager
+                ? {
+                    attendance: su.attendance,
+                    attendanceAt: su.attendanceAt?.toISOString() ?? null,
+                    attendanceSource: su.attendanceSource,
+                    attendanceByName: su.attendanceByName,
+                  }
+                : {}),
             };
           });
 
@@ -497,6 +510,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         responsibleMode,
         contactVisibility,
         cancelDeadlineDays,
+        attendanceMode,
         allowedDepartmentIds,
         allowedStufeIds,
         questions,
@@ -615,6 +629,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             responsibleMode: responsibleMode || 'BY_SHIFT',
             contactVisibility: contactVisibility || 'BOTH',
             cancelDeadlineDays: cancelDeadlineDays ?? null,
+            attendanceMode: attendanceMode ?? 'OFF',
+            checkinToken: attendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
             organizers: {
               create: organizersToCreate,
             },
@@ -758,6 +774,10 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             responsibleMode: body.responsibleMode !== undefined ? body.responsibleMode : undefined,
             contactVisibility: body.contactVisibility !== undefined ? body.contactVisibility : undefined,
             cancelDeadlineDays: body.cancelDeadlineDays !== undefined ? body.cancelDeadlineDays : undefined,
+            attendanceMode: body.attendanceMode,
+            // Beim ersten Einschalten des Selbst-Check-ins einen Code erzeugen; der bestehende bleibt sonst gültig
+            checkinToken:
+              body.attendanceMode === 'OK_AND_QR' && !event.checkinToken ? generateCheckinToken() : undefined,
           },
         });
         await replaceAccessLists(tx, event.id, lists.departmentIds, lists.stufeIds);
@@ -776,6 +796,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         accessType: updated.accessType,
         contactVisibility: updated.contactVisibility,
         cancelDeadlineDays: updated.cancelDeadlineDays,
+        attendanceMode: updated.attendanceMode,
       };
     }
   );
@@ -1113,7 +1134,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         id: l.id,
         eventId: l.eventId,
         shiftId: l.shiftId,
-        action: l.action as 'SIGNUP' | 'SIGNOFF',
+        action: l.action as ShiftSignupLogAction,
         helperUserId: l.helperUserId,
         helperName: l.helperName,
         performedByUserId: l.performedByUserId,
@@ -1122,6 +1143,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         shiftStartTime: l.shiftStartTime ? l.shiftStartTime.toISOString() : null,
         shiftEndTime: l.shiftEndTime ? l.shiftEndTime.toISOString() : null,
         taskTitle: l.taskTitle,
+        attendance: l.attendance as AttendanceStatus | null,
         createdAt: l.createdAt.toISOString(),
       }));
     }
@@ -1225,6 +1247,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             dayCutoffTime: event.dayCutoffTime,
             responsibleMode: event.responsibleMode,
             contactVisibility: event.contactVisibility,
+            attendanceMode: event.attendanceMode,
             questions: event.questions.map((q) => {
               const { id: _id, ...rest } = toQuestionDto(q);
               return rest;

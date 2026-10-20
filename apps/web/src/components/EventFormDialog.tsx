@@ -2,7 +2,7 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
-import type { EventTemplateDto, EventContactVisibility } from '@schichtplan/shared';
+import { ATTENDANCE_MODES, type AttendanceMode, type EventTemplateDto, type EventContactVisibility } from '@schichtplan/shared';
 import { Badge, Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
@@ -27,6 +27,7 @@ export interface EventFormValues {
   dayCutoffTime: string;
   responsibleMode: 'BY_SHIFT' | 'BY_DAY';
   contactVisibility: EventContactVisibility;
+  attendanceMode: AttendanceMode;
   access: EventAccessValues;
 }
 
@@ -53,6 +54,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     dayCutoffTime: event.dayCutoffTime ?? '04:00',
     responsibleMode: event.responsibleMode ?? 'BY_SHIFT',
     contactVisibility: event.contactVisibility ?? 'BOTH',
+    attendanceMode: event.attendanceMode ?? 'OFF',
     access: {
       accessType: event.accessType,
       leadersOnly: event.leadersOnly,
@@ -108,6 +110,7 @@ const EMPTY: EventFormValues = {
   dayCutoffTime: '04:00',
   responsibleMode: 'BY_SHIFT',
   contactVisibility: 'BOTH',
+  attendanceMode: 'OFF',
   access: EMPTY_ACCESS,
 };
 
@@ -300,6 +303,7 @@ function EventForm({
         dayCutoffTime: form.dayCutoffTime || '04:00',
         responsibleMode: form.responsibleMode,
         contactVisibility: form.contactVisibility,
+        attendanceMode: form.attendanceMode,
         ...accessPayload(form.access),
       };
 
@@ -766,6 +770,22 @@ function EventForm({
               set('cancelDeadlineDays', val === '' ? null : Math.max(0, parseInt(val, 10) || 0));
             }}
           />
+        </Field>
+
+        <Field
+          label="Anwesenheitsliste"
+          hint="Das OK hakt pro Schicht ab, wer da war (anwesend, entschuldigt, nicht erschienen). Mit QR-Code checken sich eingetragene Helfer:innen zusätzlich selbst ein, ab 30 Minuten vor Schichtbeginn bis Schichtende."
+        >
+          <Select
+            value={form.attendanceMode}
+            onChange={(e) => set('attendanceMode', e.target.value as AttendanceMode)}
+          >
+            {(Object.keys(ATTENDANCE_MODES) as AttendanceMode[]).map((key) => (
+              <option key={key} value={key}>
+                {ATTENDANCE_MODES[key]}
+              </option>
+            ))}
+          </Select>
         </Field>
 
         {mode === 'edit' && (

@@ -10,6 +10,7 @@ import {
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
+  ClipboardCheck,
   Clock,
   Copy,
   Edit,
@@ -30,7 +31,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto, EventTemplateDto, TaskDefinitionDto, AgeRequirementType, ShiftSignupLogDto } from '@schichtplan/shared';
-import { EVENT_ACCESS_TYPES } from '@schichtplan/shared';
+import { ATTENDANCE_STATUSES, EVENT_ACCESS_TYPES } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -55,6 +56,7 @@ import { EventFormDialog, eventFormInitial } from '@/components/EventFormDialog'
 import { AccessTypeBadge } from '@/components/event-meta';
 import { EventAccessPanel } from '@/components/EventAccessPanel';
 import { EventRosterPanel } from '@/components/EventRosterPanel';
+import { EventAttendancePanel } from '@/components/EventAttendancePanel';
 import {
   AssignHelperDialog,
   DayResponsiblesDialog,
@@ -112,7 +114,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   const [error, setError] = useState<string | null>(null);
 
   // Tabs
-  const [tab, setTab] = useState<'shifts' | 'roster' | 'helpers' | 'access' | 'tasks' | 'templates' | 'logs'>('shifts');
+  const [tab, setTab] = useState<'shifts' | 'roster' | 'helpers' | 'attendance' | 'access' | 'tasks' | 'templates' | 'logs'>('shifts');
 
   // Filter Schichten
   const [day, setDay] = useState<string>('ALL');
@@ -150,7 +152,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   // Protokoll
   const [logs, setLogs] = useState<ShiftSignupLogDto[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  const [logActionFilter, setLogActionFilter] = useState<'ALL' | 'SIGNUP' | 'SIGNOFF'>('ALL');
+  const [logActionFilter, setLogActionFilter] = useState<'ALL' | 'SIGNUP' | 'SIGNOFF' | 'ATTENDANCE'>('ALL');
   const [logSearch, setLogSearch] = useState('');
 
   const load = useCallback(async () => {
@@ -234,6 +236,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
 
   const signupLogCount = useMemo(() => logs.filter((l) => l.action === 'SIGNUP').length, [logs]);
   const signoffLogCount = useMemo(() => logs.filter((l) => l.action === 'SIGNOFF').length, [logs]);
+  const attendanceLogCount = useMemo(() => logs.filter((l) => l.action === 'ATTENDANCE').length, [logs]);
 
   const days = useMemo(() => groupByBusinessDay(event?.shifts ?? [], event?.dayCutoffTime), [event]);
   const distinctTasks = useMemo(() => {
@@ -319,6 +322,12 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   // Berechtigung
   const isEventOk = Boolean(user && event?.organizers?.some((o) => o.userId === user.id));
   const canManage = Boolean(isDeptAdmin || isPlanner || user?.isGlobalAdmin || isEventOk);
+  // Wie PATCH /api/events/:slug: Abteilungsleitung (inkl. globale Admins) und OK-Leitung
+  const canEditSettings = Boolean(
+    isDeptAdmin ||
+      user?.isGlobalAdmin ||
+      (user && event?.organizers?.some((o) => o.userId === user.id && o.role === 'OK_LEAD'))
+  );
 
   if (loading || portalLoading) {
     return (
@@ -652,6 +661,18 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
             )}
           >
             <Users className="size-4" /> Eingetragene Helfer ({uniqueHelpersCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('attendance')}
+            className={cn(
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              tab === 'attendance'
+                ? 'border-accent text-accent-ink'
+                : 'border-transparent text-fg-muted hover:text-fg'
+            )}
+          >
+            <ClipboardCheck className="size-4" /> Anwesenheit
           </button>
           <button
             type="button"
@@ -1140,6 +1161,15 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
         )}
 
         {/* ----------------- TAB 3: ARBEITEN-KATALOG ----------------- */}
+        {tab === 'attendance' && (
+          <EventAttendancePanel
+            event={event}
+            canEditSettings={canEditSettings}
+            onOpenSettings={() => setShowEventSettings(true)}
+            onChanged={load}
+          />
+        )}
+
         {tab === 'access' && <EventAccessPanel event={event} />}
 
         {tab === 'tasks' && (
@@ -1369,7 +1399,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
               <div>
                 <h3 className="text-base font-bold text-fg">Aktivitäts-Protokoll</h3>
                 <p className="text-xs text-fg-muted">
-                  Vollständiger Verlauf aller Schichteintragungen und -austragungen für diesen Anlass.
+                  Vollständiger Verlauf aller Schichteintragungen, -austragungen und der Anwesenheit für diesen Anlass.
                 </p>
               </div>
               <Button
@@ -1436,6 +1466,14 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                 >
                   Nur Austragungen ({signoffLogCount})
                 </Chip>
+                {attendanceLogCount > 0 && (
+                  <Chip
+                    selected={logActionFilter === 'ATTENDANCE'}
+                    onClick={() => setLogActionFilter('ATTENDANCE')}
+                  >
+                    Nur Anwesenheit ({attendanceLogCount})
+                  </Chip>
+                )}
               </div>
 
               <div className="relative w-full sm:w-64">
@@ -1480,33 +1518,48 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
               <div className="space-y-2">
                 {filteredLogs.map((item) => {
                   const isSignup = item.action === 'SIGNUP';
+                  const isAttendance = item.action === 'ATTENDANCE';
                   return (
                     <Card
                       key={item.id}
                       className={cn(
                         'flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between transition',
-                        isSignup
-                          ? 'border-line/70 hover:border-success/40'
-                          : 'border-line/70 hover:border-danger/40'
+                        isAttendance
+                          ? 'border-line/70 hover:border-accent/40'
+                          : isSignup
+                            ? 'border-line/70 hover:border-success/40'
+                            : 'border-line/70 hover:border-danger/40'
                       )}
                     >
                       <div className="flex items-start gap-3 min-w-0">
                         <div
                           className={cn(
                             'flex size-9 shrink-0 items-center justify-center rounded-full mt-0.5',
-                            isSignup
-                              ? 'bg-success/15 text-success-ink'
-                              : 'bg-danger/15 text-danger-ink'
+                            isAttendance
+                              ? 'bg-accent/15 text-accent-ink'
+                              : isSignup
+                                ? 'bg-success/15 text-success-ink'
+                                : 'bg-danger/15 text-danger-ink'
                           )}
                         >
-                          {isSignup ? <UserPlus className="size-4" /> : <UserMinus className="size-4" />}
+                          {isAttendance ? (
+                            <ClipboardCheck className="size-4" />
+                          ) : isSignup ? (
+                            <UserPlus className="size-4" />
+                          ) : (
+                            <UserMinus className="size-4" />
+                          )}
                         </div>
 
                         <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-bold text-sm text-fg">{item.helperName}</span>
-                            <Badge tone={isSignup ? 'success' : 'danger'} size="sm">
-                              {isSignup ? 'Eintragung' : 'Austragung'}
+                            <Badge tone={isAttendance ? 'accent' : isSignup ? 'success' : 'danger'} size="sm">
+                              {isAttendance
+                                ? `Anwesenheit: ${item.attendance ? ATTENDANCE_STATUSES[item.attendance] : 'offen'}`
+                                : isSignup
+                                  ? 'Eintragung'
+                                  : 'Austragung'}
                             </Badge>
                             {item.performedByName && (
                               <Badge tone="neutral" size="sm">
@@ -1515,7 +1568,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                             )}
                             {!item.performedByName && (
                               <span className="text-[11px] text-fg-subtle">
-                                (selbstständig)
+                                {isAttendance ? '(per QR-Code)' : '(selbstständig)'}
                               </span>
                             )}
                           </div>

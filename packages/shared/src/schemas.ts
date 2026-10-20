@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  ATTENDANCE_MODE_KEYS,
+  ATTENDANCE_STATUS_KEYS,
   EVENT_ACCESS_TYPE_KEYS,
   REQUIRED_PROFILE_FIELD_KEYS,
   RESERVED_SUBDOMAINS,
@@ -160,6 +162,7 @@ export const CreateEventSchema = z.object({
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
   contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional().default('BOTH'),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
+  attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
 });
 
@@ -186,6 +189,7 @@ export const UpdateEventSchema = z.object({
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional(),
   contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
+  attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
   requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).optional(),
@@ -382,6 +386,7 @@ export const InstantiateTemplateSchema = z.object({
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
   contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional().default('BOTH'),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
+  attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
 });
 
 export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;
@@ -390,6 +395,19 @@ export const UnregisterHelperSchema = z.object({
   userId: z.string().uuid().optional(),
   guestName: z.string().trim().max(80).optional(),
 });
+
+export const SetAttendanceSchema = z.object({
+  /** null = zurück auf offen */
+  status: z.enum(ATTENDANCE_STATUS_KEYS).nullable(),
+});
+
+export type SetAttendanceInput = z.infer<typeof SetAttendanceSchema>;
+
+export const CheckinSchema = z.object({
+  code: z.string().trim().min(10).max(100),
+});
+
+export type CheckinInput = z.infer<typeof CheckinSchema>;
 
 export type UnregisterHelperInput = z.infer<typeof UnregisterHelperSchema>;
 

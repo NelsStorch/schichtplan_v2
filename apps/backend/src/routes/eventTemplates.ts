@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { InstantiateTemplateSchema, toEventAccessType, type EventTemplateData } from '@schichtplan/shared';
 import { cleanRequiredFields } from '../services/profile.js';
 import { isDepartmentManager } from '../services/departmentVisibility.js';
+import { generateCheckinToken } from '../services/attendance.js';
 import { replaceAccessLists, resolveAccessLists, syncQuestions } from './events.js';
 
 const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
@@ -163,6 +164,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
 
       const templateData = template.data as unknown as EventTemplateData;
       const templateShifts = templateData?.shifts || [];
+      const instantiateAttendanceMode = parse.data.attendanceMode ?? templateData?.attendanceMode ?? 'OFF';
 
       // Basisdatum ermitteln
       const startBase = new Date(startDate);
@@ -194,6 +196,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             dayCutoffTime: parse.data.dayCutoffTime || '04:00',
             responsibleMode: parse.data.responsibleMode || 'BY_SHIFT',
             contactVisibility: parse.data.contactVisibility || (template.data as any)?.contactVisibility || 'BOTH',
+            attendanceMode: instantiateAttendanceMode,
+            checkinToken: instantiateAttendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
             organizers: {
               create: [
                 {

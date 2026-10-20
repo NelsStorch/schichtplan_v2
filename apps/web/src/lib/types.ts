@@ -7,6 +7,7 @@ import type {
   ResponsiblePersonDto,
   EventResponsibleMode,
   EventContactVisibility,
+  AttendanceMode,
 } from '@schichtplan/shared';
 
 /** Antwort von GET /api/shifts/my */
@@ -71,4 +72,7 @@ export interface EventDetails {
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   contactVisibility?: EventContactVisibility;
   cancelDeadlineDays?: number | null;
+  attendanceMode?: AttendanceMode;
+  /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
+  checkinToken?: string | null;
 }

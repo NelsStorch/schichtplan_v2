@@ -184,6 +184,10 @@ model Event {
   contactVisibility String            @default("BOTH") @map("contact_visibility")
   // Austrage-Sperre in Tagen vor Anlassbeginn (null = keine Sperre, 0 = bis Anlassbeginn, z. B. 3 = bis 3 Tage vorher)
   cancelDeadlineDays Int?             @map("cancel_deadline_days")
+  // Anwesenheit: "OFF", "OK_ONLY" (nur das OK hakt ab) oder "OK_AND_QR" (zusätzlich Selbst-Check-in per QR-Code)
+  attendanceMode    String            @default("OFF") @map("attendance_mode")
+  // Geheimer Code im QR-Link für den Selbst-Check-in (erneuerbar, alte Plakate werden damit ungültig)
+  checkinToken      String?           @unique @map("checkin_token")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   department        Department        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -381,6 +385,12 @@ model ShiftSignup {
   notes       String?
   /// Erinnerungs-Mail verschickt (oder vergeben, siehe services/shiftReminders.ts)
   reminderSentAt DateTime? @map("reminder_sent_at")
+  /// Anwesenheit: null = offen, "PRESENT", "EXCUSED", "NO_SHOW"
+  attendance       String?   @map("attendance")
+  attendanceAt     DateTime? @map("attendance_at")
+  /// "OK" (abgehakt) oder "QR" (Selbst-Check-in)
+  attendanceSource String?   @map("attendance_source")
+  attendanceByName String?   @map("attendance_by_name")
   createdAt   DateTime   @default(now())
   shift       Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
   task        ShiftTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
@@ -491,7 +501,7 @@ model ShiftSignupLog {
   id                String    @id @default(uuid())
   eventId           String    @map("event_id")
   shiftId           String?   @map("shift_id")
-  action            String    // "SIGNUP" oder "SIGNOFF"
+  action            String    // "SIGNUP", "SIGNOFF" oder "ATTENDANCE"
   helperUserId      String?   @map("helper_user_id")
   helperName        String    @map("helper_name")
   performedByUserId String?   @map("performed_by_user_id")
@@ -500,6 +510,8 @@ model ShiftSignupLog {
   shiftStartTime    DateTime? @map("shift_start_time")
   shiftEndTime      DateTime? @map("shift_end_time")
   taskTitle         String?   @map("task_title")
+  // Bei ATTENDANCE: neuer Status ("PRESENT", "EXCUSED", "NO_SHOW"), null = zurück auf offen
+  attendance        String?   @map("attendance")
   createdAt         DateTime  @default(now()) @map("created_at")
 
   event             Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)

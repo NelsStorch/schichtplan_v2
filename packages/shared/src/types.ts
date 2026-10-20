@@ -1,4 +1,6 @@
 import type {
+  AttendanceMode,
+  AttendanceStatus,
   EventAccessType,
   EventQuestionScope,
   EventQuestionType,
@@ -70,6 +72,9 @@ export interface EventDto {
   dayCutoffTime?: string;
   responsibleMode?: EventResponsibleMode;
   contactVisibility?: EventContactVisibility;
+  attendanceMode?: AttendanceMode;
+  /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
+  checkinToken?: string | null;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   cancelDeadlineDays?: number | null;
   createdAt: string;
@@ -156,6 +161,11 @@ export interface ShiftSignupDto {
   userAge?: number | null;
   createdAt: string;
   isConfirmed: boolean;
+  /** Nur für das OK: Anwesenheit (null = offen) */
+  attendance?: AttendanceStatus | null;
+  attendanceAt?: string | null;
+  attendanceSource?: 'OK' | 'QR' | null;
+  attendanceByName?: string | null;
 }
 
 export interface ShiftTaskTemplateItem {
@@ -183,6 +193,7 @@ export interface EventTemplateData {
   questions?: Omit<EventQuestionDto, 'id'>[];
   allowedDepartmentIds?: string[];
   allowedStufeIds?: string[];
+  attendanceMode?: AttendanceMode;
 }
 
 export interface EventTemplateDto {
@@ -619,7 +630,7 @@ export interface ShiftSignupLogDto {
   id: string;
   eventId: string;
   shiftId: string | null;
-  action: 'SIGNUP' | 'SIGNOFF';
+  action: ShiftSignupLogAction;
   helperUserId: string | null;
   helperName: string;
   performedByUserId: string | null;
@@ -628,5 +639,18 @@ export interface ShiftSignupLogDto {
   shiftStartTime: string | null;
   shiftEndTime: string | null;
   taskTitle: string | null;
+  /** Bei ATTENDANCE: neuer Status (null = zurück auf offen) */
+  attendance?: AttendanceStatus | null;
   createdAt: string;
+}
+
+export type ShiftSignupLogAction = 'SIGNUP' | 'SIGNOFF' | 'ATTENDANCE';
+
+/** Ergebnis des Selbst-Check-ins per QR-Code */
+export interface CheckinResultDto {
+  eventTitle: string;
+  /** Eben (oder schon vorher) als anwesend markierte Schichten */
+  checkedIn: Array<{ signupId: string; shiftTitle: string; taskTitle: string | null; startTime: string; endTime: string; alreadyPresent: boolean }>;
+  /** Nächste eigene Schicht, falls gerade keine im Check-in-Fenster liegt */
+  nextShift: { shiftTitle: string; startTime: string; endTime: string } | null;
 }

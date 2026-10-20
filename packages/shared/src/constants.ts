@@ -120,6 +120,29 @@ export const EVENT_QUESTION_SCOPES = {
 
 export type EventQuestionScope = keyof typeof EVENT_QUESTION_SCOPES;
 
+/** Anwesenheit pro Anlass: aus, nur das OK hakt ab, oder zusätzlich Selbst-Check-in per QR-Code */
+export const ATTENDANCE_MODES = {
+  OFF: 'Keine Anwesenheitsliste',
+  OK_ONLY: 'Nur das OK hakt ab',
+  OK_AND_QR: 'OK hakt ab und Selbst-Check-in per QR-Code',
+} as const;
+
+export type AttendanceMode = keyof typeof ATTENDANCE_MODES;
+export const ATTENDANCE_MODE_KEYS = Object.keys(ATTENDANCE_MODES) as [AttendanceMode, ...AttendanceMode[]];
+
+/** Status einer Schicht-Eintragung (null = offen) */
+export const ATTENDANCE_STATUSES = {
+  PRESENT: 'Anwesend',
+  EXCUSED: 'Entschuldigt',
+  NO_SHOW: 'Nicht erschienen',
+} as const;
+
+export type AttendanceStatus = keyof typeof ATTENDANCE_STATUSES;
+export const ATTENDANCE_STATUS_KEYS = Object.keys(ATTENDANCE_STATUSES) as [AttendanceStatus, ...AttendanceStatus[]];
+
+/** Selbst-Check-in ist ab so vielen Minuten vor Schichtbeginn bis zum Schichtende möglich */
+export const CHECKIN_EARLY_MINUTES = 30;
+
 export const STUFE_ROLES = {
   LEITUNG: 'Leitung',
   TEILNEHMER: 'Teilnehmer*in',

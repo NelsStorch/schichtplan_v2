@@ -1,0 +1,59 @@
+---
+title: Anwesenheitsliste und QR-Check-in
+description: Abhaken, wer bei der Schicht war, von Hand oder per QR-Code am Eingang. Mit CSV und Druckliste.
+audience: [ok]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+<Path steps={['Anlass', 'OK-Dashboard', 'Anwesenheit']} />
+
+Mit der Anwesenheitsliste hältst du pro Schicht fest, wer wirklich da war. Das hilft beim Danke-Essen, bei Abrechnungen und um zu sehen, wer kurzfristig gefehlt hat.
+
+## Einschalten
+
+Die Liste ist pro Anlass ausgeschaltet. In den <Btn>Event-Einstellungen</Btn> wählst du bei **Anwesenheitsliste**:
+
+- **Keine Anwesenheitsliste**: der Tab bleibt leer.
+- **Nur das OK hakt ab**: das OK markiert alle von Hand.
+- **OK hakt ab und Selbst-Check-in per QR-Code**: zusätzlich checken sich Helfer\*innen selbst ein.
+
+Einstellen dürfen das die Abteilungsleitung und die OK-Leitung. Abhaken dürfen alle im OK und die Planung.
+
+## Abhaken
+
+Im Tab **Anwesenheit** steht jede Schicht mit allen Eingetragenen. Pro Person gibt es drei Knöpfe:
+
+- <Btn>Da</Btn>: anwesend
+- <Btn>Entsch.</Btn>: entschuldigt, hat sich abgemeldet
+- <Btn>Fehlt</Btn>: nicht erschienen
+
+Tippst du nochmals auf den aktiven Knopf, steht die Person wieder auf **offen**. Unter dem Namen steht, wer es wann erfasst hat. Schichten, die gerade laufen, sind mit «läuft» markiert.
+
+Oben zählt die Liste, wie viele anwesend, entschuldigt, nicht erschienen und noch offen sind. Filtere nach Tag, Status oder suche nach Namen.
+
+## Selbst-Check-in per QR-Code
+
+Ist der QR-Check-in eingeschaltet, zeigt der Tab einen QR-Code im Cevi-Stil (erstellt mit [qr.cevi.tools](https://qr.cevi.tools/)).
+
+1. Tippe auf <Btn>A4-Plakat (PDF)</Btn>, druck es aus und häng es am Eingang oder beim Posten auf.
+2. Helfer\*innen scannen den Code mit dem Handy und melden sich an, falls sie es nicht schon sind.
+3. Der Schichtplan hakt automatisch alle Schichten der Person ab, die gerade laufen: **ab 30 Minuten vor Beginn bis zum Schichtende**.
+
+Wer noch zu früh ist, sieht, wann die nächste eigene Schicht beginnt. Wer nicht eingetragen ist, wird nicht abgehakt und soll sich beim OK melden. Spontane Helfer\*innen trägst du zuerst ein und hakst sie dann ab.
+
+In der Liste steht bei solchen Einträgen «per QR-Code» mit Uhrzeit. Du kannst sie jederzeit von Hand ändern.
+
+:::caution[Der Link ist ein Schlüssel]
+Der QR-Code enthält einen geheimen Code. Wer den Link hat, kann sich auch von zu Hause einchecken. Verschick ihn deshalb nicht in Chats. Ist er doch herumgegangen, tippe auf <Btn>Code erneuern</Btn>: der alte Code und alle ausgedruckten Plakate gelten dann nicht mehr, du druckst das neue Plakat aus.
+:::
+
+## CSV und Druckliste
+
+- <Btn>CSV</Btn> lädt die ganze Liste herunter (Tag, Zeit, Schicht, Arbeit, Name, Anwesenheit, wer es erfasst hat), zum Öffnen in Excel.
+- <Btn>Drucken</Btn> öffnet eine Tabelle pro Schicht mit Kästchen zum Abhaken auf Papier, falls vor Ort kein Handy zur Hand ist.
+
+## Im Protokoll
+
+Jede Änderung landet im Tab **Protokoll** als «Anwesenheit: …», mit Zeit und wer es gesetzt hat. Check-ins per QR-Code stehen dort als «(per QR-Code)».
