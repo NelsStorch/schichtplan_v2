@@ -2,7 +2,7 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
-import type { EventTemplateDto } from '@schichtplan/shared';
+import type { EventTemplateDto, EventContactVisibility } from '@schichtplan/shared';
 import { Badge, Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
@@ -22,9 +22,11 @@ export interface EventFormValues {
   /** false = Eintragen geschlossen (nur noch das OK teilt ein) */
   allowPublicSignup: boolean;
   minShiftsPerPerson: number | null;
+  cancelDeadlineDays: number | null;
   contactUserId: string | null;
   dayCutoffTime: string;
   responsibleMode: 'BY_SHIFT' | 'BY_DAY';
+  contactVisibility: EventContactVisibility;
   access: EventAccessValues;
 }
 
@@ -46,9 +48,11 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     bannerUrl: event.bannerUrl ?? '',
     allowPublicSignup: event.allowPublicSignup,
     minShiftsPerPerson: event.minShiftsPerPerson ?? null,
+    cancelDeadlineDays: event.cancelDeadlineDays ?? null,
     contactUserId: event.contactUserId ?? null,
     dayCutoffTime: event.dayCutoffTime ?? '04:00',
     responsibleMode: event.responsibleMode ?? 'BY_SHIFT',
+    contactVisibility: event.contactVisibility ?? 'BOTH',
     access: {
       accessType: event.accessType,
       leadersOnly: event.leadersOnly,
@@ -99,9 +103,11 @@ const EMPTY: EventFormValues = {
   endDate: '',
   allowPublicSignup: true,
   minShiftsPerPerson: null,
+  cancelDeadlineDays: null,
   contactUserId: null,
   dayCutoffTime: '04:00',
   responsibleMode: 'BY_SHIFT',
+  contactVisibility: 'BOTH',
   access: EMPTY_ACCESS,
 };
 
@@ -284,9 +290,16 @@ function EventForm({
         logoUrl: form.logoUrl.trim() || null,
         bannerUrl: form.bannerUrl.trim() || null,
         minShiftsPerPerson: form.minShiftsPerPerson ?? null,
+        cancelDeadlineDays:
+          form.cancelDeadlineDays !== null &&
+          form.cancelDeadlineDays !== undefined &&
+          (form.cancelDeadlineDays as unknown as string) !== ''
+            ? Number(form.cancelDeadlineDays)
+            : null,
         contactUserId: form.contactUserId || null,
         dayCutoffTime: form.dayCutoffTime || '04:00',
         responsibleMode: form.responsibleMode,
+        contactVisibility: form.contactVisibility,
         ...accessPayload(form.access),
       };
 
@@ -394,6 +407,7 @@ function EventForm({
                       title: cleanTitle,
                       slug: slugify(cleanTitle),
                       description: found.description || '',
+                      cancelDeadlineDays: found.cancelDeadlineDays ?? null,
                       access: {
                         accessType: found.accessType,
                         leadersOnly: found.leadersOnly,
@@ -706,6 +720,21 @@ function EventForm({
         </Field>
 
         <Field
+          label="Kontaktdaten der Verantwortlichen"
+          hint="Bestimmt, welche Kontaktdaten (Handynummer / E-Mail) bei Schichtplan-, Tages- und Schicht-Verantwortlichen für Helfer:innen sichtbar sind."
+        >
+          <Select
+            value={form.contactVisibility}
+            onChange={(e) => set('contactVisibility', e.target.value as EventContactVisibility)}
+          >
+            <option value="BOTH">Handynummer und E-Mail anzeigen</option>
+            <option value="PHONE">Nur Handynummer anzeigen</option>
+            <option value="EMAIL">Nur E-Mail anzeigen</option>
+            <option value="NONE">Keine Kontaktdaten anzeigen (nur Name)</option>
+          </Select>
+        </Field>
+
+        <Field
           label="Mindestanzahl Schichten pro Person (optional)"
           hint="Zeigt dem OK im Helfer-Pool an, wer sein Schicht-Soll bereits erfüllt hat (z. B. 2 Schichten pro Leiter:in). Leer lassen für kein Soll."
         >
@@ -718,6 +747,23 @@ function EventForm({
             onChange={(e) => {
               const val = e.target.value.trim();
               set('minShiftsPerPerson', val === '' ? null : Math.max(1, parseInt(val, 10) || 1));
+            }}
+          />
+        </Field>
+
+        <Field
+          label="Austrage-Sperre (Tage vor Anlassbeginn)"
+          hint="Verhindert, dass sich Helfer:innen kurzfristig selbst austragen. Leer lassen = keine Sperre (Austragen immer möglich). 0 = bis zum Anlassbeginn. Z. B. 2 = ab 2 Tage vor Beginn können sich Helfer:innen nicht mehr selbst austragen (nur noch das OK)."
+        >
+          <Input
+            type="number"
+            min={0}
+            max={365}
+            placeholder="z. B. 2 (leer lassen = keine Sperre)"
+            value={form.cancelDeadlineDays ?? ''}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              set('cancelDeadlineDays', val === '' ? null : Math.max(0, parseInt(val, 10) || 0));
             }}
           />
         </Field>

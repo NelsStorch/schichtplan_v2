@@ -158,6 +158,8 @@ export const CreateEventSchema = z.object({
   contactUserId: z.string().uuid().optional().nullable(),
   dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional().default('04:00'),
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
+  contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional().default('BOTH'),
+  cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
 });
 
@@ -182,6 +184,8 @@ export const UpdateEventSchema = z.object({
   contactUserId: z.string().uuid().optional().nullable(),
   dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional(),
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional(),
+  contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional(),
+  cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
   requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).optional(),
@@ -376,6 +380,8 @@ export const InstantiateTemplateSchema = z.object({
   contactUserId: z.string().uuid().optional().nullable(),
   dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional().default('04:00'),
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
+  contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional().default('BOTH'),
+  cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
 });
 
 export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;

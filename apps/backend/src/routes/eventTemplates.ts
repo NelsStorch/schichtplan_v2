@@ -31,6 +31,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         accessType: toEventAccessType(t.accessType),
         leadersOnly: t.leadersOnly,
         requiredFields: cleanRequiredFields(t.requiredFields),
+        minShiftsPerPerson: t.minShiftsPerPerson ?? null,
+        cancelDeadlineDays: t.cancelDeadlineDays ?? null,
         shiftCount: shifts.length,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
@@ -69,6 +71,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         leadersOnly: template.leadersOnly,
         requiredFields: cleanRequiredFields(template.requiredFields),
         minShiftsPerPerson: template.minShiftsPerPerson ?? null,
+        cancelDeadlineDays: template.cancelDeadlineDays ?? null,
         shiftCount: data?.shifts?.length || 0,
         createdAt: template.createdAt.toISOString(),
         updatedAt: template.updatedAt.toISOString(),
@@ -186,9 +189,11 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             requiredFields,
             allowPublicSignup,
             minShiftsPerPerson: parse.data.minShiftsPerPerson ?? template.minShiftsPerPerson ?? null,
+            cancelDeadlineDays: parse.data.cancelDeadlineDays !== undefined ? parse.data.cancelDeadlineDays : (template.cancelDeadlineDays ?? null),
             contactUserId: parse.data.contactUserId || null,
             dayCutoffTime: parse.data.dayCutoffTime || '04:00',
             responsibleMode: parse.data.responsibleMode || 'BY_SHIFT',
+            contactVisibility: parse.data.contactVisibility || (template.data as any)?.contactVisibility || 'BOTH',
             organizers: {
               create: [
                 {

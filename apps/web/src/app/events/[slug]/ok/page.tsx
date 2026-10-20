@@ -26,8 +26,10 @@ import {
   Users,
   Wrench,
   X,
+  History,
+  RefreshCw,
 } from 'lucide-react';
-import type { ShiftDto, ShiftTaskDto, EventTemplateDto, TaskDefinitionDto, AgeRequirementType } from '@schichtplan/shared';
+import type { ShiftDto, ShiftTaskDto, EventTemplateDto, TaskDefinitionDto, AgeRequirementType, ShiftSignupLogDto } from '@schichtplan/shared';
 import { EVENT_ACCESS_TYPES } from '@schichtplan/shared';
 import {
   Avatar,
@@ -87,6 +89,17 @@ interface HelperSummary {
   shifts: Array<{ shift: ShiftDto; taskTitle?: string | null; signupId: string }>;
 }
 
+function fmtLogTimestamp(iso: string) {
+  const d = new Date(iso);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${day}.${month}.${year}, ${hours}:${minutes}:${seconds} Uhr`;
+}
+
 export default function EventOkManagePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
@@ -99,7 +112,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   const [error, setError] = useState<string | null>(null);
 
   // Tabs
-  const [tab, setTab] = useState<'shifts' | 'roster' | 'helpers' | 'access' | 'tasks' | 'templates'>('shifts');
+  const [tab, setTab] = useState<'shifts' | 'roster' | 'helpers' | 'access' | 'tasks' | 'templates' | 'logs'>('shifts');
 
   // Filter Schichten
   const [day, setDay] = useState<string>('ALL');
@@ -133,6 +146,12 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   // Vorlagen
   const [templates, setTemplates] = useState<EventTemplateDto[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // Protokoll
+  const [logs, setLogs] = useState<ShiftSignupLogDto[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logActionFilter, setLogActionFilter] = useState<'ALL' | 'SIGNUP' | 'SIGNOFF'>('ALL');
+  const [logSearch, setLogSearch] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -169,6 +188,18 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
     }
   }, []);
 
+  const loadLogs = useCallback(async () => {
+    setLoadingLogs(true);
+    try {
+      const data = await api<ShiftSignupLogDto[]>(`/api/events/${slug}/logs`);
+      setLogs(data);
+    } catch (err) {
+      toast({ title: 'Protokoll konnte nicht geladen werden', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, [slug, toast]);
+
   useEffect(() => {
     load();
     loadTasks();
@@ -181,7 +212,28 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
     if (tab === 'tasks') {
       loadTasks();
     }
-  }, [tab, loadTemplates, loadTasks]);
+    if (tab === 'logs') {
+      loadLogs();
+    }
+  }, [tab, loadTemplates, loadTasks, loadLogs]);
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter((l) => {
+      if (logActionFilter !== 'ALL' && l.action !== logActionFilter) return false;
+      if (logSearch.trim()) {
+        const query = logSearch.toLowerCase();
+        const matchesHelper = l.helperName.toLowerCase().includes(query);
+        const matchesShift = l.shiftTitle.toLowerCase().includes(query);
+        const matchesTask = l.taskTitle?.toLowerCase().includes(query) ?? false;
+        const matchesPerformer = l.performedByName?.toLowerCase().includes(query) ?? false;
+        if (!matchesHelper && !matchesShift && !matchesTask && !matchesPerformer) return false;
+      }
+      return true;
+    });
+  }, [logs, logActionFilter, logSearch]);
+
+  const signupLogCount = useMemo(() => logs.filter((l) => l.action === 'SIGNUP').length, [logs]);
+  const signoffLogCount = useMemo(() => logs.filter((l) => l.action === 'SIGNOFF').length, [logs]);
 
   const days = useMemo(() => groupByBusinessDay(event?.shifts ?? [], event?.dayCutoffTime), [event]);
   const distinctTasks = useMemo(() => {
@@ -636,6 +688,18 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
             )}
           >
             <Copy className="size-4" /> Event-Vorlagen
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('logs')}
+            className={cn(
+              'flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition',
+              tab === 'logs'
+                ? 'border-accent text-accent-ink'
+                : 'border-transparent text-fg-muted hover:text-fg'
+            )}
+          >
+            <History className="size-4" /> Protokoll {logs.length > 0 ? `(${logs.length})` : ''}
           </button>
         </div>
 
@@ -1293,6 +1357,197 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                     </div>
                   </Card>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ----------------- TAB: PROTOKOLL (SIGNUP / SIGNOFF LOGS) ----------------- */}
+        {tab === 'logs' && (
+          <div className="py-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-fg">Aktivitäts-Protokoll</h3>
+                <p className="text-xs text-fg-muted">
+                  Vollständiger Verlauf aller Schichteintragungen und -austragungen für diesen Anlass.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={loadingLogs}
+                onClick={loadLogs}
+              >
+                <RefreshCw className="size-3.5" /> Aktualisieren
+              </Button>
+            </div>
+
+            {/* Statistik-Karten */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Card className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Gesamt-Aktivitäten</p>
+                  <p className="font-display text-2xl font-extrabold text-fg mt-1 tabular">{logs.length}</p>
+                </div>
+                <div className="flex size-10 items-center justify-center rounded-tile bg-surface-2 text-fg-subtle">
+                  <History className="size-5" />
+                </div>
+              </Card>
+
+              <Card className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-success-ink uppercase tracking-wider">Eintragungen</p>
+                  <p className="font-display text-2xl font-extrabold text-success-ink mt-1 tabular">{signupLogCount}</p>
+                </div>
+                <div className="flex size-10 items-center justify-center rounded-tile bg-success/15 text-success-ink">
+                  <UserPlus className="size-5" />
+                </div>
+              </Card>
+
+              <Card className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-danger-ink uppercase tracking-wider">Austragungen</p>
+                  <p className="font-display text-2xl font-extrabold text-danger-ink mt-1 tabular">{signoffLogCount}</p>
+                </div>
+                <div className="flex size-10 items-center justify-center rounded-tile bg-danger/15 text-danger-ink">
+                  <UserMinus className="size-5" />
+                </div>
+              </Card>
+            </div>
+
+            {/* Filter-Leiste */}
+            <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Chip
+                  selected={logActionFilter === 'ALL'}
+                  onClick={() => setLogActionFilter('ALL')}
+                >
+                  Alle ({logs.length})
+                </Chip>
+                <Chip
+                  selected={logActionFilter === 'SIGNUP'}
+                  onClick={() => setLogActionFilter('SIGNUP')}
+                >
+                  Nur Eintragungen ({signupLogCount})
+                </Chip>
+                <Chip
+                  selected={logActionFilter === 'SIGNOFF'}
+                  onClick={() => setLogActionFilter('SIGNOFF')}
+                >
+                  Nur Austragungen ({signoffLogCount})
+                </Chip>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
+                <input
+                  type="text"
+                  placeholder="Helfer, Schicht oder OK..."
+                  value={logSearch}
+                  onChange={(e) => setLogSearch(e.target.value)}
+                  className="w-full rounded-field border border-line bg-surface-1 py-1.5 pl-9 pr-8 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
+                />
+                {logSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setLogSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Log-Liste */}
+            {loadingLogs && logs.length === 0 ? (
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full rounded-card" />
+                <Skeleton className="h-16 w-full rounded-card" />
+                <Skeleton className="h-16 w-full rounded-card" />
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <EmptyState
+                icon={<History />}
+                title={logs.length === 0 ? 'Noch keine Aktivitäten' : 'Keine passenden Einträge'}
+                description={
+                  logs.length === 0
+                    ? 'Sobald sich Helfer:innen für Schichten ein- oder austragen, wird der Verlauf hier mit Zeitstempel und Verantwortlichen angezeigt.'
+                    : 'Passe den Filter oder den Suchbegriff an.'
+                }
+              />
+            ) : (
+              <div className="space-y-2">
+                {filteredLogs.map((item) => {
+                  const isSignup = item.action === 'SIGNUP';
+                  return (
+                    <Card
+                      key={item.id}
+                      className={cn(
+                        'flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between transition',
+                        isSignup
+                          ? 'border-line/70 hover:border-success/40'
+                          : 'border-line/70 hover:border-danger/40'
+                      )}
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div
+                          className={cn(
+                            'flex size-9 shrink-0 items-center justify-center rounded-full mt-0.5',
+                            isSignup
+                              ? 'bg-success/15 text-success-ink'
+                              : 'bg-danger/15 text-danger-ink'
+                          )}
+                        >
+                          {isSignup ? <UserPlus className="size-4" /> : <UserMinus className="size-4" />}
+                        </div>
+
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-sm text-fg">{item.helperName}</span>
+                            <Badge tone={isSignup ? 'success' : 'danger'} size="sm">
+                              {isSignup ? 'Eintragung' : 'Austragung'}
+                            </Badge>
+                            {item.performedByName && (
+                              <Badge tone="neutral" size="sm">
+                                durch {item.performedByName}
+                              </Badge>
+                            )}
+                            {!item.performedByName && (
+                              <span className="text-[11px] text-fg-subtle">
+                                (selbstständig)
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-fg-muted flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-medium text-fg">«{item.shiftTitle}»</span>
+                            {item.taskTitle && (
+                              <>
+                                <span className="text-fg-subtle">•</span>
+                                <span>Arbeit: <strong className="text-fg-muted">{item.taskTitle}</strong></span>
+                              </>
+                            )}
+                            {item.shiftStartTime && item.shiftEndTime && (
+                              <>
+                                <span className="text-fg-subtle">•</span>
+                                <span className="font-mono text-[11px]">
+                                  {fmtWeekday(item.shiftStartTime)}, {fmtTime(item.shiftStartTime)} – {fmtTime(item.shiftEndTime)}
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-left sm:text-right border-t border-line/50 pt-2 sm:border-0 sm:pt-0">
+                        <span className="text-[11px] font-mono text-fg-subtle tabular">
+                          {fmtLogTimestamp(item.createdAt)}
+                        </span>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>

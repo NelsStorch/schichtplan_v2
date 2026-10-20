@@ -286,18 +286,20 @@ export function ShiftDetailsDialog({
                 <div key={r.id} className="flex items-center justify-between rounded-field border border-line/70 bg-surface-2 p-2.5">
                   <div className="min-w-0">
                     <span className="font-semibold text-xs text-fg block truncate">{r.displayName}</span>
-                    <div className="flex items-center gap-2 mt-0.5 text-2xs text-fg-muted">
-                      {r.phone && (
-                        <a href={`tel:${r.phone}`} className="inline-flex items-center gap-0.5 hover:text-accent-ink font-mono">
-                          <Phone className="size-3" /> {r.phone}
-                        </a>
-                      )}
-                      {r.email && (
-                        <a href={`mailto:${r.email}`} className="inline-flex items-center gap-0.5 hover:text-accent-ink">
-                          <Mail className="size-3" /> Mail
-                        </a>
-                      )}
-                    </div>
+                    {(r.phone || r.email) && (
+                      <div className="flex items-center gap-2 mt-0.5 text-2xs text-fg-muted">
+                        {r.phone && (
+                          <a href={`tel:${r.phone}`} className="inline-flex items-center gap-0.5 hover:text-accent-ink font-mono">
+                            <Phone className="size-3" /> {r.phone}
+                          </a>
+                        )}
+                        {r.email && (
+                          <a href={`mailto:${r.email}`} className="inline-flex items-center gap-0.5 hover:text-accent-ink">
+                            <Mail className="size-3" /> Mail
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

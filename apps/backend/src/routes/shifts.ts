@@ -20,16 +20,21 @@ function calculateAge(birthDate: Date, targetDate: Date): number {
   return age;
 }
 
-function toResponsiblePersonDto(r: {
-  user: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    ceviName?: string | null;
-    phone?: string | null;
-    email?: string | null;
-  };
-}): ResponsiblePersonDto {
+function toResponsiblePersonDto(
+  r: {
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      ceviName?: string | null;
+      phone?: string | null;
+      email?: string | null;
+    };
+  },
+  contactVisibility: string = 'BOTH'
+): ResponsiblePersonDto {
+  const allowPhone = contactVisibility === 'BOTH' || contactVisibility === 'PHONE';
+  const allowEmail = contactVisibility === 'BOTH' || contactVisibility === 'EMAIL';
   return {
     id: r.user.id,
     displayName: r.user.ceviName
@@ -38,8 +43,8 @@ function toResponsiblePersonDto(r: {
     firstName: r.user.firstName,
     lastName: r.user.lastName,
     ceviName: r.user.ceviName,
-    phone: r.user.phone,
-    email: r.user.email,
+    phone: allowPhone ? r.user.phone : null,
+    email: allowEmail ? r.user.email : null,
   };
 }
 
@@ -161,7 +166,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       return {
         ...shift,
-        responsibles: shift.responsibles.map(toResponsiblePersonDto),
+        responsibles: shift.responsibles.map((r) =>
+          toResponsiblePersonDto(r, event.contactVisibility || 'BOTH')
+        ),
       };
     }
   );
@@ -323,7 +330,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       return {
         ...updated,
-        responsibles: updated.responsibles.map(toResponsiblePersonDto),
+        responsibles: updated.responsibles.map((r) =>
+          toResponsiblePersonDto(r, shift.event.contactVisibility || 'BOTH')
+        ),
       };
     }
   );
@@ -451,7 +460,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       return {
         ...duplicated,
-        responsibles: duplicated.responsibles.map(toResponsiblePersonDto),
+        responsibles: duplicated.responsibles.map((r) =>
+          toResponsiblePersonDto(r, shift.event.contactVisibility || 'BOTH')
+        ),
       };
     }
   );
@@ -906,6 +917,43 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         signup.guestName ||
         'Helfer*in';
 
+      // Im Aktivitäts-Protokoll festhalten
+      try {
+        const isSelf = Boolean(request.user && targetUserId === request.user.id);
+        let performerUser = null;
+        if (request.user) {
+          if (isSelf && signup.user) {
+            performerUser = signup.user;
+          } else {
+            performerUser = await fastify.prisma.user.findUnique({
+              where: { id: request.user.id },
+              select: { firstName: true, lastName: true, ceviName: true },
+            });
+          }
+        }
+        const performerName = performerUser
+          ? (performerUser.ceviName ? `${performerUser.firstName} / ${performerUser.ceviName}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
+          : null;
+
+        await fastify.prisma.shiftSignupLog.create({
+          data: {
+            eventId: event.id,
+            shiftId: shift.id,
+            action: 'SIGNUP',
+            helperUserId: targetUserId,
+            helperName: displayName,
+            performedByUserId: request.user?.id || null,
+            performedByName: isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
+            shiftTitle: shift.title,
+            shiftStartTime: shift.startTime,
+            shiftEndTime: shift.endTime,
+            taskTitle: signup.task?.title || null,
+          },
+        });
+      } catch (logErr) {
+        request.log.error(logErr, 'Fehler beim Erstellen des Signup-Logs');
+      }
+
       return {
         id: signup.id,
         shiftId: signup.shiftId,
@@ -934,7 +982,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       if (signupId) {
         existingSignup = await fastify.prisma.shiftSignup.findUnique({
           where: { id: signupId },
-          include: { shift: { include: { event: { include: { organizers: true } } } } },
+          include: {
+            shift: { include: { event: { include: { organizers: true } } } },
+            task: true,
+            user: true,
+          },
         });
       } else if (request.user) {
         existingSignup = await fastify.prisma.shiftSignup.findFirst({
@@ -942,7 +994,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             shiftId,
             userId: request.user.id,
           },
-          include: { shift: { include: { event: { include: { organizers: true } } } } },
+          include: {
+            shift: { include: { event: { include: { organizers: true } } } },
+            task: true,
+            user: true,
+          },
         });
       }
 
@@ -951,29 +1007,75 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Prüfe Berechtigung: Eigener Eintrag ODER Abteilungsleitung ODER Event-OK
-      let isAllowed = false;
-      if (request.user && existingSignup.userId === request.user.id) {
-        isAllowed = true;
-      } else if (request.user) {
-        const member = await fastify.prisma.departmentMember.findUnique({
-          where: {
-            departmentId_userId: {
-              departmentId: existingSignup.shift.event.departmentId,
-              userId: request.user.id,
-            },
-          },
-        });
-        const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-        const isEventOk = existingSignup.shift.event.organizers?.some(
-          (o) => o.userId === request.user.id
-        );
-        if (isDeptAdmin || isEventOk || request.user.isGlobalAdmin) {
-          isAllowed = true;
+      const event = existingSignup.shift.event;
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      const isManager = flags.isManager;
+      const isSelf = Boolean(request.user && existingSignup.userId === request.user.id);
+
+      if (!isSelf && !isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Eintragung' });
+      }
+
+      // Austrag-Sperre prüfen: Helfer können sich ab X Tagen vor Event-Beginn nicht mehr selbst austragen
+      if (!isManager && event.cancelDeadlineDays !== null && event.cancelDeadlineDays !== undefined) {
+        const deadline = new Date(event.startDate.getTime() - event.cancelDeadlineDays * 24 * 60 * 60 * 1000);
+        if (new Date() >= deadline) {
+          const deadlineStr = deadline.toLocaleDateString('de-CH', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          const daysText =
+            event.cancelDeadlineDays === 0
+              ? 'seit Anlassbeginn'
+              : `seit ${event.cancelDeadlineDays} Tag(en) vor dem Anlass (${deadlineStr} Uhr)`;
+          return reply.status(403).send({
+            error: `Austragen ist ${daysText} nicht mehr selbst möglich. Bitte wende dich direkt an das Event-OK.`,
+          });
         }
       }
 
-      if (!isAllowed) {
-        return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Eintragung' });
+      // Im Aktivitäts-Protokoll festhalten
+      try {
+        let performerUser = null;
+        if (request.user) {
+          if (isSelf && existingSignup.user) {
+            performerUser = existingSignup.user;
+          } else {
+            performerUser = await fastify.prisma.user.findUnique({
+              where: { id: request.user.id },
+              select: { firstName: true, lastName: true, ceviName: true },
+            });
+          }
+        }
+        const performerName = performerUser
+          ? (performerUser.ceviName ? `${performerUser.firstName} / ${performerUser.ceviName}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
+          : null;
+        const helperName =
+          existingSignup.user?.ceviName ||
+          (existingSignup.user ? `${existingSignup.user.firstName} ${existingSignup.user.lastName}`.trim() : null) ||
+          existingSignup.guestName ||
+          'Helfer*in';
+
+        await fastify.prisma.shiftSignupLog.create({
+          data: {
+            eventId: event.id,
+            shiftId: existingSignup.shift.id,
+            action: 'SIGNOFF',
+            helperUserId: existingSignup.userId,
+            helperName,
+            performedByUserId: request.user?.id || null,
+            performedByName: isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
+            shiftTitle: existingSignup.shift.title,
+            shiftStartTime: existingSignup.shift.startTime,
+            shiftEndTime: existingSignup.shift.endTime,
+            taskTitle: existingSignup.task?.title || null,
+          },
+        });
+      } catch (logErr) {
+        request.log.error(logErr, 'Fehler beim Erstellen des Signoff-Logs');
       }
 
       await fastify.prisma.shiftSignup.delete({
@@ -1000,6 +1102,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                   id: true,
                   title: true,
                   slug: true,
+                  startDate: true,
+                  cancelDeadlineDays: true,
                   department: { select: { name: true, slug: true } },
                 },
               },
@@ -1022,6 +1126,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         eventId: su.shift.event.id,
         eventTitle: su.shift.event.title,
         eventSlug: su.shift.event.slug,
+        eventStartDate: su.shift.event.startDate.toISOString(),
+        cancelDeadlineDays: su.shift.event.cancelDeadlineDays,
         departmentName: su.shift.event.department.name,
         departmentSlug: su.shift.event.department.slug,
         createdAt: su.createdAt.toISOString(),

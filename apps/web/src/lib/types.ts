@@ -6,6 +6,7 @@ import type {
   ShiftDto,
   ResponsiblePersonDto,
   EventResponsibleMode,
+  EventContactVisibility,
 } from '@schichtplan/shared';
 
 /** Antwort von GET /api/shifts/my */
@@ -20,6 +21,8 @@ export interface MyShift {
   eventId: string;
   eventTitle: string;
   eventSlug: string;
+  eventStartDate?: string;
+  cancelDeadlineDays?: number | null;
   departmentName: string;
   departmentSlug: string;
   createdAt: string;
@@ -66,4 +69,6 @@ export interface EventDetails {
   dayCutoffTime: string;
   responsibleMode: EventResponsibleMode;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
+  contactVisibility?: EventContactVisibility;
+  cancelDeadlineDays?: number | null;
 }

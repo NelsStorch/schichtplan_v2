@@ -313,6 +313,42 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   };
 
   const cancel = async (shift: ShiftDto, signupId?: string, name?: string) => {
+    // Falls Helfer:in sich selbst austragen möchte, Austrag-Sperre prüfen
+    const isSelfCancel = !name;
+    if (
+      isSelfCancel &&
+      !canManageShifts &&
+      !user?.isGlobalAdmin &&
+      event.cancelDeadlineDays !== null &&
+      event.cancelDeadlineDays !== undefined
+    ) {
+      const deadline = new Date(new Date(event.startDate).getTime() - event.cancelDeadlineDays * 24 * 60 * 60 * 1000);
+      if (new Date() >= deadline) {
+        const deadlineStr = deadline.toLocaleDateString('de-CH', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const daysText =
+          event.cancelDeadlineDays === 0
+            ? 'seit Anlassbeginn'
+            : `seit dem ${deadlineStr} Uhr (${event.cancelDeadlineDays} Tag(e) vor Anlassbeginn)`;
+        const contactInfo = event.contactUser
+          ? `Bitte melde dich bei ${event.contactUser.displayName}${event.contactUser.phone ? ` (${event.contactUser.phone})` : ''}${event.contactUser.email ? ` oder per Mail an ${event.contactUser.email}` : ''}.`
+          : 'Bitte wende dich direkt an das Event-OK.';
+
+        await confirm({
+          title: 'Austragen nicht mehr selbst möglich',
+          description: `Das selbständige Austragen ist ${daysText} gesperrt. ${contactInfo}`,
+          confirmLabel: 'Verstanden',
+          tone: 'default',
+        });
+        return;
+      }
+    }
+
     const ok = await confirm({
       title: name ? `${name} austragen?` : 'Aus Schicht austragen?',
       description: name

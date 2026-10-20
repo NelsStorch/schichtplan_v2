@@ -13,6 +13,7 @@ import {
   type EventQuestionDto,
   type EventQuestionType,
   type ResponsiblePersonDto,
+  type EventContactVisibility,
 } from '@schichtplan/shared';
 import {
   accessEventInclude,
@@ -50,6 +51,32 @@ export function toQuestionDto(q: {
     options: q.options,
     required: q.required,
     scope: q.scope === 'PER_SIGNUP' ? 'PER_SIGNUP' : 'ONCE',
+  };
+}
+
+function toResponsiblePersonDto(
+  u: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    ceviName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  },
+  contactVisibility: string = 'BOTH'
+): ResponsiblePersonDto {
+  const allowPhone = contactVisibility === 'BOTH' || contactVisibility === 'PHONE';
+  const allowEmail = contactVisibility === 'BOTH' || contactVisibility === 'EMAIL';
+  return {
+    id: u.id,
+    displayName: u.ceviName
+      ? `${u.firstName} / ${u.ceviName}`
+      : `${u.firstName} ${u.lastName}`,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    ceviName: u.ceviName,
+    phone: allowPhone ? u.phone : null,
+    email: allowEmail ? u.email : null,
   };
 }
 
@@ -286,34 +313,16 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         .filter((q) => q.scope !== 'PER_SIGNUP' && q.required && !answers[q.id]?.trim())
         .map((q) => q.id);
 
+      const contactVisibility = (event.contactVisibility as EventContactVisibility) || 'BOTH';
+
       const contactUser: ResponsiblePersonDto | null = event.contactUser
-        ? {
-            id: event.contactUser.id,
-            displayName: event.contactUser.ceviName
-              ? `${event.contactUser.firstName} / ${event.contactUser.ceviName}`
-              : `${event.contactUser.firstName} ${event.contactUser.lastName}`,
-            firstName: event.contactUser.firstName,
-            lastName: event.contactUser.lastName,
-            ceviName: event.contactUser.ceviName,
-            phone: event.contactUser.phone,
-            email: event.contactUser.email,
-          }
+        ? toResponsiblePersonDto(event.contactUser, contactVisibility)
         : null;
 
       const dayResponsibles: Record<string, ResponsiblePersonDto[]> = {};
       for (const dr of event.dayResponsibles ?? []) {
         if (!dayResponsibles[dr.dayDate]) dayResponsibles[dr.dayDate] = [];
-        dayResponsibles[dr.dayDate].push({
-          id: dr.user.id,
-          displayName: dr.user.ceviName
-            ? `${dr.user.firstName} / ${dr.user.ceviName}`
-            : `${dr.user.firstName} ${dr.user.lastName}`,
-          firstName: dr.user.firstName,
-          lastName: dr.user.lastName,
-          ceviName: dr.user.ceviName,
-          phone: dr.user.phone,
-          email: dr.user.email,
-        });
+        dayResponsibles[dr.dayDate].push(toResponsiblePersonDto(dr.user, contactVisibility));
       }
 
       return {
@@ -336,6 +345,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         dayCutoffTime: event.dayCutoffTime || '04:00',
         responsibleMode: (event.responsibleMode as 'BY_SHIFT' | 'BY_DAY') || 'BY_SHIFT',
         dayResponsibles,
+        contactVisibility,
+        cancelDeadlineDays: event.cancelDeadlineDays ?? null,
         audience: audienceLabel(event, request.tenant.name),
         allowedDepartments: event.allowedDepartments.map((a) => ({
           id: a.departmentId,
@@ -416,17 +427,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             };
           });
 
-          const responsibles: ResponsiblePersonDto[] = s.responsibles.map((r) => ({
-            id: r.user.id,
-            displayName: r.user.ceviName
-              ? `${r.user.firstName} / ${r.user.ceviName}`
-              : `${r.user.firstName} ${r.user.lastName}`,
-            firstName: r.user.firstName,
-            lastName: r.user.lastName,
-            ceviName: r.user.ceviName,
-            phone: r.user.phone,
-            email: r.user.email,
-          }));
+          const responsibles: ResponsiblePersonDto[] = s.responsibles.map((r) =>
+            toResponsiblePersonDto(r.user, contactVisibility)
+          );
 
           return {
             id: s.id,
@@ -492,6 +495,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         contactUserId,
         dayCutoffTime,
         responsibleMode,
+        contactVisibility,
+        cancelDeadlineDays,
         allowedDepartmentIds,
         allowedStufeIds,
         questions,
@@ -608,6 +613,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             contactUserId: contactUserId || null,
             dayCutoffTime: dayCutoffTime || '04:00',
             responsibleMode: responsibleMode || 'BY_SHIFT',
+            contactVisibility: contactVisibility || 'BOTH',
+            cancelDeadlineDays: cancelDeadlineDays ?? null,
             organizers: {
               create: organizersToCreate,
             },
@@ -749,6 +756,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             contactUserId: body.contactUserId !== undefined ? (body.contactUserId || null) : undefined,
             dayCutoffTime: body.dayCutoffTime !== undefined ? body.dayCutoffTime : undefined,
             responsibleMode: body.responsibleMode !== undefined ? body.responsibleMode : undefined,
+            contactVisibility: body.contactVisibility !== undefined ? body.contactVisibility : undefined,
+            cancelDeadlineDays: body.cancelDeadlineDays !== undefined ? body.cancelDeadlineDays : undefined,
           },
         });
         await replaceAccessLists(tx, event.id, lists.departmentIds, lists.stufeIds);
@@ -765,6 +774,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         startDate: updated.startDate.toISOString(),
         endDate: updated.endDate.toISOString(),
         accessType: updated.accessType,
+        contactVisibility: updated.contactVisibility,
+        cancelDeadlineDays: updated.cancelDeadlineDays,
       };
     }
   );
@@ -840,17 +851,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       return {
         dayDate,
-        responsibles: updated.map((r) => ({
-          id: r.user.id,
-          displayName: r.user.ceviName
-            ? `${r.user.firstName} / ${r.user.ceviName}`
-            : `${r.user.firstName} ${r.user.lastName}`,
-          firstName: r.user.firstName,
-          lastName: r.user.lastName,
-          ceviName: r.user.ceviName,
-          phone: r.user.phone,
-          email: r.user.email,
-        })),
+        responsibles: updated.map((r) =>
+          toResponsiblePersonDto(r.user, event.contactVisibility || 'BOTH')
+        ),
       };
     }
   );
@@ -1011,14 +1014,116 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         whereClause.guestName = { equals: guestName, mode: 'insensitive' };
       }
 
+      const signupsToCancel = await fastify.prisma.shiftSignup.findMany({
+        where: whereClause,
+        include: {
+          shift: true,
+          task: true,
+          user: {
+            select: { id: true, firstName: true, lastName: true, ceviName: true },
+          },
+        },
+      });
+
       const deleted = await fastify.prisma.shiftSignup.deleteMany({
         where: whereClause,
       });
+
+      // Im Aktivitäts-Protokoll festhalten
+      if (signupsToCancel.length > 0) {
+        try {
+          const performerUser = request.user
+            ? await fastify.prisma.user.findUnique({
+                where: { id: request.user.id },
+                select: { firstName: true, lastName: true, ceviName: true },
+              })
+            : null;
+          const performerName = performerUser
+            ? (performerUser.ceviName ? `${performerUser.firstName} / ${performerUser.ceviName}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
+            : null;
+          const pLabel = performerName ? `${performerName} (OK)` : 'OK';
+
+          await fastify.prisma.shiftSignupLog.createMany({
+            data: signupsToCancel.map((su) => {
+              const hName = su.user
+                ? (su.user.ceviName ? `${su.user.firstName} / ${su.user.ceviName}` : `${su.user.firstName} ${su.user.lastName}`.trim())
+                : (su.guestName || 'Gast');
+              return {
+                eventId: event.id,
+                shiftId: su.shiftId,
+                action: 'SIGNOFF',
+                helperUserId: su.userId,
+                helperName: hName,
+                performedByUserId: request.user?.id || null,
+                performedByName: pLabel,
+                shiftTitle: su.shift.title,
+                shiftStartTime: su.shift.startTime,
+                shiftEndTime: su.shift.endTime,
+                taskTitle: su.task?.title || null,
+              };
+            }),
+          });
+        } catch (logErr) {
+          request.log.error(logErr, 'Fehler beim Erstellen der Abmelde-Logs');
+        }
+      }
 
       return {
         message: `${deleted.count} Schichteintragung(en) erfolgreich entfernt`,
         deletedCount: deleted.count,
       };
+    }
+  );
+
+  // Protokoll aller Schicht-Eintragungen und -Austragungen (Abteilungsleitung ODER Event-OK)
+  fastify.get<{ Params: { slug: string } }>(
+    '/api/events/:slug/logs',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+
+      const event = await fastify.prisma.event.findUnique({
+        where: {
+          departmentId_slug: {
+            departmentId: request.tenant.id,
+            slug: request.params.slug,
+          },
+        },
+        include: { organizers: true },
+      });
+
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Einsehen des Protokolls' });
+      }
+
+      const logs = await fastify.prisma.shiftSignupLog.findMany({
+        where: { eventId: event.id },
+        orderBy: { createdAt: 'desc' },
+        take: 300,
+      });
+
+      return logs.map((l) => ({
+        id: l.id,
+        eventId: l.eventId,
+        shiftId: l.shiftId,
+        action: l.action as 'SIGNUP' | 'SIGNOFF',
+        helperUserId: l.helperUserId,
+        helperName: l.helperName,
+        performedByUserId: l.performedByUserId,
+        performedByName: l.performedByName,
+        shiftTitle: l.shiftTitle,
+        shiftStartTime: l.shiftStartTime ? l.shiftStartTime.toISOString() : null,
+        shiftEndTime: l.shiftEndTime ? l.shiftEndTime.toISOString() : null,
+        taskTitle: l.taskTitle,
+        createdAt: l.createdAt.toISOString(),
+      }));
     }
   );
 
@@ -1114,10 +1219,12 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           leadersOnly: event.leadersOnly,
           requiredFields: event.requiredFields,
           minShiftsPerPerson: event.minShiftsPerPerson ?? null,
+          cancelDeadlineDays: event.cancelDeadlineDays ?? null,
           data: {
             shifts: shiftTemplates,
             dayCutoffTime: event.dayCutoffTime,
             responsibleMode: event.responsibleMode,
+            contactVisibility: event.contactVisibility,
             questions: event.questions.map((q) => {
               const { id: _id, ...rest } = toQuestionDto(q);
               return rest;

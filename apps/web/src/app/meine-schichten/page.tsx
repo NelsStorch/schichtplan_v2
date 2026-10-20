@@ -57,6 +57,37 @@ export default function MyShiftsPage() {
   }, [sessionLoading, user, load]);
 
   const cancel = async (shift: MyShift) => {
+    // Austrag-Sperre prüfen falls vorhanden
+    if (
+      !user?.isGlobalAdmin &&
+      shift.eventStartDate &&
+      shift.cancelDeadlineDays !== null &&
+      shift.cancelDeadlineDays !== undefined
+    ) {
+      const deadline = new Date(
+        new Date(shift.eventStartDate).getTime() - shift.cancelDeadlineDays * 24 * 60 * 60 * 1000
+      );
+      if (new Date() >= deadline) {
+        const deadlineStr = deadline.toLocaleDateString('de-CH', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const daysText =
+          shift.cancelDeadlineDays === 0
+            ? 'seit Anlassbeginn'
+            : `seit dem ${deadlineStr} Uhr (${shift.cancelDeadlineDays} Tag(e) vor Anlassbeginn)`;
+        await confirm({
+          title: 'Austragen nicht mehr selbst möglich',
+          description: `Das selbständige Austragen für «${shift.eventTitle}» ist ${daysText} gesperrt. Bitte wende dich direkt an das Event-OK.`,
+          confirmLabel: 'Verstanden',
+          tone: 'default',
+        });
+        return;
+      }
+    }
     const ok = await confirm({
       title: 'Aus Schicht austragen?',
       description: `Du wirst aus "${shift.title}" ausgetragen. Der Platz wird für andere frei.`,

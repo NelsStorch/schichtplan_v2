@@ -37,6 +37,7 @@ export interface EventOrganizerDto {
 }
 
 export type EventResponsibleMode = 'BY_SHIFT' | 'BY_DAY';
+export type EventContactVisibility = 'BOTH' | 'PHONE' | 'EMAIL' | 'NONE';
 
 export interface ResponsiblePersonDto {
   id: string;
@@ -68,7 +69,9 @@ export interface EventDto {
   contactUser?: ResponsiblePersonDto | null;
   dayCutoffTime?: string;
   responsibleMode?: EventResponsibleMode;
+  contactVisibility?: EventContactVisibility;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
+  cancelDeadlineDays?: number | null;
   createdAt: string;
   shiftCount?: number;
   /** Summe der benötigten bzw. besetzten Plätze über alle Schichten */
@@ -191,6 +194,7 @@ export interface EventTemplateDto {
   leadersOnly: boolean;
   requiredFields: RequiredProfileField[];
   minShiftsPerPerson?: number | null;
+  cancelDeadlineDays?: number | null;
   shiftCount: number;
   data: EventTemplateData;
   createdAt: string;
@@ -608,4 +612,21 @@ export interface DepartmentCreationEligibilityDto {
   /** Name der Cevi.DB-Gruppe, in der die Person Abteilungsleitung ist (z. B. "JS Illnau") */
   leaderGroupName: string | null;
   existingDepartment: { name: string; slug: string } | null;
+}
+
+/** Eintrag im Protokoll von Schicht-Eintragungen und -Austragungen */
+export interface ShiftSignupLogDto {
+  id: string;
+  eventId: string;
+  shiftId: string | null;
+  action: 'SIGNUP' | 'SIGNOFF';
+  helperUserId: string | null;
+  helperName: string;
+  performedByUserId: string | null;
+  performedByName: string | null;
+  shiftTitle: string;
+  shiftStartTime: string | null;
+  shiftEndTime: string | null;
+  taskTitle: string | null;
+  createdAt: string;
 }
