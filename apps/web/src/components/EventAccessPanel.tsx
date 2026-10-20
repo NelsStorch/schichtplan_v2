@@ -314,8 +314,8 @@ function CreateLinkDialog({
 function csvCell(value: string | number | null | undefined) {
   const text = value === null || value === undefined ? '' : String(value);
   // Formeln in Excel verhindern
-  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
-  return /[";\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return /[";\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 function Participants({ event }: { event: EventDetails }) {
