@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { canUploadImages } from '../services/departmentVisibility.js';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/png',
@@ -31,10 +32,14 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: 'Bild nicht gefunden' });
     }
 
+    // Bilder liegen auf der eigenen Domain: Ein SVG darf beim direkten Öffnen kein Skript ausführen
+    // (sonst liefe es mit den Rechten der angemeldeten Person). Als <img> eingebunden wirkt das nicht.
     reply
       .header('Content-Type', upload.mimeType)
       .header('Cache-Control', 'public, max-age=31536000, immutable')
-      .header('Content-Disposition', `inline; filename="${encodeURIComponent(upload.filename)}"`);
+      .header('Content-Disposition', `inline; filename="${encodeURIComponent(upload.filename)}"`)
+      .header('Content-Security-Policy', "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox")
+      .header('X-Content-Type-Options', 'nosniff');
 
     return reply.send(Buffer.from(upload.data));
   });
@@ -44,6 +49,11 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/uploads',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
+      // Hochladen nur für wer Logos und Banner setzen kann (sonst füllt jedes Gratis-Profil die DB)
+      if (!(await canUploadImages(fastify.prisma, request.user.id))) {
+        return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder ein Event-OK kann Bilder hochladen' });
+      }
+
       const body = request.body || {};
       let rawBase64 = body.base64 || body.dataUrl || '';
       let mimeType = (body.mimeType || '').toLowerCase().trim();

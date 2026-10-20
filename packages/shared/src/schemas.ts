@@ -31,6 +31,21 @@ const EventAccessFields = {
   questions: z.array(EventQuestionInputSchema).max(30).default([]),
 };
 
+/**
+ * Bild-Adresse (Logo, Banner): Pfad auf der eigenen Seite (z. B. /api/uploads/…) oder http(s)-URL.
+ * Leer = kein Bild. Andere Schemata (javascript:, data: …) und protokoll-relative Pfade sind nicht erlaubt.
+ */
+export const ImageUrlSchema = z
+  .string()
+  .trim()
+  .max(500, 'Die Bild-Adresse ist zu lang')
+  .refine((value) => value === '' || /^\/(?![/\\])[^\\\s]*$/.test(value) || /^https?:\/\/[^\s\\]+$/i.test(value), {
+    message: 'Ungültige Bild-Adresse',
+  });
+
+/** Akzentfarbe als #rrggbb */
+export const HexColorSchema = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Farbe im Format #rrggbb');
+
 const DepartmentSlugSchema = z
   .string()
   .min(3, 'Subdomain muss mindestens 3 Zeichen lang sein')
@@ -51,18 +66,21 @@ export type CreateDepartmentFromCeviDbInput = z.infer<typeof CreateDepartmentFro
 
 export const LoginSchema = z.object({
   email: z.string().email('Ungültige E-Mail-Adresse'),
-  password: z.string().min(1, 'Passwort ist erforderlich'),
+  password: z.string().min(1, 'Passwort ist erforderlich').max(200),
 });
 
 export type LoginInput = z.infer<typeof LoginSchema>;
 
 export const RegisterHelperSchema = z.object({
-  email: z.string().email('Ungültige E-Mail-Adresse'),
-  password: z.string().min(8, 'Passwort muss mindestens 8 Zeichen lang sein'),
-  firstName: z.string().min(2, 'Vorname erforderlich'),
-  lastName: z.string().min(2, 'Nachname erforderlich'),
-  ceviName: z.string().optional(),
-  phone: z.string().optional(),
+  email: z.string().email('Ungültige E-Mail-Adresse').max(254),
+  password: z
+    .string()
+    .min(8, 'Passwort muss mindestens 8 Zeichen lang sein')
+    .max(200, 'Passwort darf höchstens 200 Zeichen lang sein'),
+  firstName: z.string().trim().min(2, 'Vorname erforderlich').max(80),
+  lastName: z.string().trim().min(2, 'Nachname erforderlich').max(80),
+  ceviName: z.string().trim().max(60).optional(),
+  phone: z.string().trim().max(30).optional(),
 });
 
 export type RegisterHelperInput = z.infer<typeof RegisterHelperSchema>;
@@ -86,10 +104,10 @@ const BirthDateSchema = z
  * das Profil (gleiche Namen in einer Abteilung sind erlaubt, solange das Geburtsdatum anders ist).
  */
 export const CeviNameQuickLoginSchema = z.object({
-  departmentSlug: z.string().trim().min(1, 'Abteilung fehlt'),
+  departmentSlug: z.string().trim().min(1, 'Abteilung fehlt').max(30),
   ceviName: z.string().trim().min(2, 'Cevi-Name muss mindestens 2 Zeichen lang sein').max(60),
   birthDate: BirthDateSchema,
-  returnTo: z.string().optional(),
+  returnTo: z.string().max(2000).optional(),
 });
 
 export type CeviNameQuickLoginInput = z.infer<typeof CeviNameQuickLoginSchema>;
@@ -114,40 +132,40 @@ export type CeviNameRegisterInput = z.infer<typeof CeviNameRegisterSchema>;
 
 export const CreateEventOrganizerItemSchema = z.object({
   userId: z.string().uuid().optional(),
-  ceviName: z.string().optional(),
-  email: z.string().email().optional(),
+  ceviName: z.string().trim().max(60).optional(),
+  email: z.string().email().max(254).optional(),
   role: z.enum(['OK_LEAD', 'OK_MEMBER']).default('OK_MEMBER'),
-  roleTitle: z.string().optional().nullable(),
+  roleTitle: z.string().trim().max(80).optional().nullable(),
 });
 
 export type CreateEventOrganizerItemInput = z.infer<typeof CreateEventOrganizerItemSchema>;
 
 export const CreateEventSchema = z.object({
-  title: z.string().min(2, 'Titel ist erforderlich'),
+  title: z.string().trim().min(2, 'Titel ist erforderlich').max(120),
   slug: z
     .string()
     .min(2, 'Slug erforderlich')
     .max(50)
     .regex(/^[a-z0-9-]+$/, 'Slug darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten'),
-  description: z.string().optional(),
-  logoUrl: z.string().optional().nullable(),
-  bannerUrl: z.string().optional().nullable(),
+  description: z.string().max(5000).optional(),
+  logoUrl: ImageUrlSchema.optional().nullable(),
+  bannerUrl: ImageUrlSchema.optional().nullable(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
   minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
-  organizers: z.array(CreateEventOrganizerItemSchema).optional(),
+  organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
 });
 
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
 
 /** Anlass bearbeiten: alle Felder optional. Listen (Whitelist, Stufen, Fragen) ersetzen die bisherigen. */
 export const UpdateEventSchema = z.object({
-  title: z.string().min(2, 'Titel ist erforderlich').optional(),
-  description: z.string().optional().nullable(),
-  logoUrl: z.string().optional().nullable(),
-  bannerUrl: z.string().optional().nullable(),
+  title: z.string().trim().min(2, 'Titel ist erforderlich').max(120).optional(),
+  description: z.string().max(5000).optional().nullable(),
+  logoUrl: ImageUrlSchema.optional().nullable(),
+  bannerUrl: ImageUrlSchema.optional().nullable(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   allowPublicSignup: z.boolean().optional(),
@@ -171,8 +189,8 @@ export const UpdateProfileSchema = z.object({
     .trim()
     .regex(/^\+?[0-9 ()\/-]{7,25}$/, 'Bitte eine gültige Handynummer angeben')
     .optional(),
-  email: z.string().trim().email('Ungültige E-Mail-Adresse').optional(),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Geburtsdatum im Format JJJJ-MM-TT').optional(),
+  email: z.string().trim().email('Ungültige E-Mail-Adresse').max(254).optional(),
+  birthDate: BirthDateSchema.optional(),
   address: z.string().trim().min(5, 'Bitte Strasse, PLZ und Ort angeben').max(200).optional(),
 });
 
@@ -217,10 +235,10 @@ export const StufeInputSchema = z.object({
 export type StufeInput = z.infer<typeof StufeInputSchema>;
 
 export const UpdateDepartmentSchema = z.object({
-  name: z.string().min(2).optional(),
-  logoUrl: z.string().optional().nullable(),
-  primaryColor: z.string().optional().nullable(),
-  contactEmail: z.string().email().optional().nullable(),
+  name: z.string().trim().min(2).max(80).optional(),
+  logoUrl: ImageUrlSchema.optional().nullable(),
+  primaryColor: HexColorSchema.optional().nullable(),
+  contactEmail: z.string().email().max(254).optional().nullable(),
   membersOnly: z.boolean().optional(),
 });
 
@@ -228,27 +246,27 @@ export type UpdateDepartmentInput = z.infer<typeof UpdateDepartmentSchema>;
 
 export const AddEventOrganizerSchema = z.object({
   userId: z.string().uuid().optional(),
-  ceviName: z.string().optional(),
-  email: z.string().email().optional(),
+  ceviName: z.string().trim().max(60).optional(),
+  email: z.string().email().max(254).optional(),
   role: z.enum(['OK_LEAD', 'OK_MEMBER']).default('OK_MEMBER'),
-  roleTitle: z.string().optional(),
+  roleTitle: z.string().trim().max(80).optional(),
 });
 
 export type AddEventOrganizerInput = z.infer<typeof AddEventOrganizerSchema>;
 
 export const CreateTaskDefinitionSchema = z.object({
-  title: z.string().min(2, 'Titel der Arbeit erforderlich'),
-  description: z.string().optional().nullable(),
-  minAge: z.number().int().min(0).optional().nullable(),
+  title: z.string().trim().min(2, 'Titel der Arbeit erforderlich').max(120),
+  description: z.string().max(2000).optional().nullable(),
+  minAge: z.number().int().min(0).max(120).optional().nullable(),
   ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']).default('ALL'),
 });
 
 export type CreateTaskDefinitionInput = z.infer<typeof CreateTaskDefinitionSchema>;
 
 export const UpdateTaskDefinitionSchema = z.object({
-  title: z.string().min(2).optional(),
-  description: z.string().optional().nullable(),
-  minAge: z.number().int().min(0).optional().nullable(),
+  title: z.string().trim().min(2).max(120).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  minAge: z.number().int().min(0).max(120).optional().nullable(),
   ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']).optional(),
 });
 
@@ -257,10 +275,10 @@ export type UpdateTaskDefinitionInput = z.infer<typeof UpdateTaskDefinitionSchem
 export const CreateShiftTaskSchema = z.object({
   id: z.string().uuid().optional(),
   taskDefinitionId: z.string().uuid().optional().nullable(),
-  title: z.string().min(2, 'Titel der Arbeit erforderlich'),
-  description: z.string().optional().nullable(),
-  requiredSlots: z.number().int().min(1, 'Mindestens 1 Helfer benötigt').default(1),
-  minAge: z.number().int().min(0).optional().nullable(),
+  title: z.string().trim().min(2, 'Titel der Arbeit erforderlich').max(120),
+  description: z.string().max(2000).optional().nullable(),
+  requiredSlots: z.number().int().min(1, 'Mindestens 1 Helfer benötigt').max(500).default(1),
+  minAge: z.number().int().min(0).max(120).optional().nullable(),
   ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']).default('ALL'),
 });
 
@@ -268,29 +286,29 @@ export type CreateShiftTaskInput = z.infer<typeof CreateShiftTaskSchema>;
 
 export const CreateShiftSchema = z.object({
   eventId: z.string().uuid(),
-  title: z.string().min(2, 'Titel erforderlich'),
-  category: z.string().optional().nullable(),
+  title: z.string().trim().min(2, 'Titel erforderlich').max(120),
+  category: z.string().max(80).optional().nullable(),
   isSetupTeardown: z.boolean().optional().default(false),
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
-  requiredSlots: z.number().int().min(1).optional(),
-  description: z.string().optional().nullable(),
-  minAge: z.number().int().min(0).optional().nullable(),
-  tasks: z.array(CreateShiftTaskSchema).optional(),
+  requiredSlots: z.number().int().min(1).max(500).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  minAge: z.number().int().min(0).max(120).optional().nullable(),
+  tasks: z.array(CreateShiftTaskSchema).max(50).optional(),
 });
 
 export type CreateShiftInput = z.infer<typeof CreateShiftSchema>;
 
 export const UpdateShiftSchema = z.object({
-  title: z.string().min(2).optional(),
-  category: z.string().optional().nullable(),
+  title: z.string().trim().min(2).max(120).optional(),
+  category: z.string().max(80).optional().nullable(),
   isSetupTeardown: z.boolean().optional(),
   startTime: z.string().datetime().optional(),
   endTime: z.string().datetime().optional(),
-  requiredSlots: z.number().int().min(1).optional(),
-  description: z.string().optional().nullable(),
-  minAge: z.number().int().min(0).optional().nullable(),
-  tasks: z.array(CreateShiftTaskSchema).optional(),
+  requiredSlots: z.number().int().min(1).max(500).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  minAge: z.number().int().min(0).max(120).optional().nullable(),
+  tasks: z.array(CreateShiftTaskSchema).max(50).optional(),
 });
 
 export type UpdateShiftInput = z.infer<typeof UpdateShiftSchema>;
@@ -300,9 +318,9 @@ export const SignupShiftSchema = z.object({
   taskId: z.string().uuid().optional().nullable(),
   userId: z.string().uuid().optional().nullable(), // Ermöglicht dem OK, ein Abteilungsmitglied einzuteilen
   // Nur für das OK: Person ohne Konto von Hand eintragen (Selbsteintragung braucht immer ein Konto)
-  guestName: z.string().min(2, 'Bitte Cevi-Name oder Vorname angeben').optional().nullable(),
-  guestEmail: z.string().email('Ungültige E-Mail').optional().or(z.literal('')).nullable(),
-  guestPhone: z.string().optional().nullable(),
+  guestName: z.string().trim().min(2, 'Bitte Cevi-Name oder Vorname angeben').max(80).optional().nullable(),
+  guestEmail: z.string().email('Ungültige E-Mail').max(254).optional().or(z.literal('')).nullable(),
+  guestPhone: z.string().trim().max(30).optional().nullable(),
   /** Antworten auf Fragen mit scope PER_SIGNUP (questionId -> Antwort) */
   answers: z.record(z.string().uuid(), z.string().trim().max(1000)).optional(),
 });
@@ -310,22 +328,22 @@ export const SignupShiftSchema = z.object({
 export type SignupShiftInput = z.infer<typeof SignupShiftSchema>;
 
 export const SaveAsTemplateSchema = z.object({
-  title: z.string().min(2, 'Name der Vorlage erforderlich'),
-  description: z.string().optional().nullable(),
+  title: z.string().trim().min(2, 'Name der Vorlage erforderlich').max(120),
+  description: z.string().max(5000).optional().nullable(),
 });
 
 export type SaveAsTemplateInput = z.infer<typeof SaveAsTemplateSchema>;
 
 export const InstantiateTemplateSchema = z.object({
-  title: z.string().min(2, 'Titel ist erforderlich'),
+  title: z.string().trim().min(2, 'Titel ist erforderlich').max(120),
   slug: z
     .string()
     .min(2, 'Slug erforderlich')
     .max(50)
     .regex(/^[a-z0-9-]+$/, 'Slug darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten'),
-  description: z.string().optional().nullable(),
-  logoUrl: z.string().optional().nullable(),
-  bannerUrl: z.string().optional().nullable(),
+  description: z.string().max(5000).optional().nullable(),
+  logoUrl: ImageUrlSchema.optional().nullable(),
+  bannerUrl: ImageUrlSchema.optional().nullable(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   ...EventAccessFields,
@@ -337,7 +355,7 @@ export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>
 
 export const UnregisterHelperSchema = z.object({
   userId: z.string().uuid().optional(),
-  guestName: z.string().optional(),
+  guestName: z.string().trim().max(80).optional(),
 });
 
 export type UnregisterHelperInput = z.infer<typeof UnregisterHelperSchema>;
@@ -362,7 +380,7 @@ export const UpdateDepartmentPersonSchema = z.object({
 export type UpdateDepartmentPersonInput = z.infer<typeof UpdateDepartmentPersonSchema>;
 
 export const VerifyEmailSchema = z.object({
-  token: z.string().min(1, 'Token ist erforderlich'),
+  token: z.string().min(1, 'Token ist erforderlich').max(200),
 });
 
 export type VerifyEmailInput = z.infer<typeof VerifyEmailSchema>;

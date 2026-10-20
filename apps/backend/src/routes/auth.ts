@@ -35,6 +35,15 @@ import {
   tooManyRequests,
 } from '../services/ceviNameLogin.js';
 import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
+import { createRateLimiter } from '../services/rateLimit.js';
+
+/** Passwort-Login: höchstens 30 Fehlversuche pro IP in 10 Minuten, 10 pro E-Mail in 15 Minuten */
+const loginFailuresByIp = createRateLimiter(10 * 60 * 1000, 30);
+const loginFailuresByEmail = createRateLimiter(15 * 60 * 1000, 10);
+/** Registrieren / Bestätigungsmail anfordern: höchstens 10 pro IP und Stunde (gegen Mail-Bomben) */
+const mailRequestsByIp = createRateLimiter(60 * 60 * 1000, 10);
+/** Falsche Passwörter beim Verknüpfen: nach 5 ist die Verknüpfung weg */
+const MAX_LINK_ATTEMPTS = 5;
 
 function getCookieDomain(): string | undefined {
   if (process.env.COOKIE_DOMAIN) {
@@ -138,14 +147,15 @@ interface PendingLink {
   tenantSlug: string | null;
   userId: string;
   expires: number;
+  failedAttempts: number;
 }
 const pendingLinks = new Map<string, PendingLink>();
 
-function createPendingLink(link: Omit<PendingLink, 'expires'>): string {
+function createPendingLink(link: Omit<PendingLink, 'expires' | 'failedAttempts'>): string {
   const now = Date.now();
   for (const [key, value] of pendingLinks) if (value.expires < now) pendingLinks.delete(key);
   const token = crypto.randomBytes(24).toString('base64url');
-  pendingLinks.set(token, { ...link, expires: now + PENDING_LINK_TTL_SECONDS * 1000 });
+  pendingLinks.set(token, { ...link, expires: now + PENDING_LINK_TTL_SECONDS * 1000, failedAttempts: 0 });
   return token;
 }
 
@@ -424,7 +434,18 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     // Benutzer finden: zuerst über die Cevi.DB-ID, sonst über die E-Mail (E-Mails sind eindeutig)
     let user = await fastify.prisma.user.findUnique({ where: { ceviDbId } });
     if (!user) {
-      const byEmail = await fastify.prisma.user.findUnique({ where: { email } });
+      let byEmail = await fastify.prisma.user.findUnique({ where: { email } });
+      if (byEmail && !byEmail.emailVerified && byEmail.id !== linkConfirmedUserId) {
+        // Unbestätigte Adresse (Registrierung ohne Bestätigung oder selbst ins Profil geschrieben):
+        // Sie gehört nicht nachweislich diesem Konto. Cevi.DB bestätigt sie, das andere Konto verliert sie.
+        // Sonst könnte jemand mit fremder E-Mail ein Konto vorbereiten und es so übernehmen oder sperren.
+        await fastify.prisma.$transaction([
+          fastify.prisma.emailVerificationToken.deleteMany({ where: { userId: byEmail.id } }),
+          fastify.prisma.user.update({ where: { id: byEmail.id }, data: { email: null } }),
+        ]);
+        fastify.log.warn({ userId: byEmail.id, ceviDbId }, 'Cevi.DB-Login: unbestätigte E-Mail von anderem Konto gelöst');
+        byEmail = null;
+      }
       if (byEmail && byEmail.ceviDbId !== null) {
         // E-Mail gehört schon zu einer anderen Cevi.DB-Person: nicht überschreiben
         fastify.log.warn({ userId: byEmail.id, ceviDbId }, 'Cevi.DB-Login: E-Mail gehört zu anderem Cevi.DB-Konto');
@@ -577,6 +598,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const password = typeof (request.body as any)?.password === 'string' ? (request.body as any).password : '';
     const user = await fastify.prisma.user.findUnique({ where: { id: link.userId } });
     if (!user || !user.passwordHash || !password || !(await bcrypt.compare(password, user.passwordHash))) {
+      link.failedAttempts++;
+      if (link.failedAttempts >= MAX_LINK_ATTEMPTS) {
+        pendingLinks.delete(token!);
+        reply.clearCookie(PENDING_LINK_COOKIE, { path: '/' });
+        return reply
+          .status(429)
+          .send({ error: 'Zu viele falsche Passwörter. Melde dich nochmals mit Cevi.DB an.', code: 'RATE_LIMITED' });
+      }
       return reply.status(401).send({ error: 'Das Passwort stimmt nicht.' });
     }
 
@@ -746,18 +775,22 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const { email, password } = parse.data;
+    // Gegen das Durchprobieren von Passwörtern: Fehlversuche pro IP und pro Konto bremsen
+    const emailKey = email.trim().toLowerCase();
+    if (loginFailuresByIp.isBlocked(request.ip) || loginFailuresByEmail.isBlocked(emailKey)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
     const user = await fastify.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: {
-        memberships: {
-          include: { department: true },
-        },
-      },
+      where: { email: emailKey },
+      select: { id: true, email: true, passwordHash: true, emailVerified: true, isGlobalAdmin: true },
     });
 
     if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
+      loginFailuresByIp.hit(request.ip);
+      loginFailuresByEmail.hit(emailKey);
       return reply.status(401).send({ error: 'E-Mail oder Passwort falsch' });
     }
+    loginFailuresByEmail.reset(emailKey);
 
     // E-Mail-Bestätigung erzwingen
     if (!user.emailVerified) {
@@ -776,14 +809,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     setAuthCookie(reply, token);
 
+    // Das Token steht nur im httpOnly-Cookie, nicht in der Antwort (für Skripte unerreichbar)
     return {
-      token,
       user: await loadUserDto(fastify.prisma, user.id, request.tenant?.id ?? null),
     };
   });
 
   // 5. Helfer registrieren mit Passwort (erfordert E-Mail-Bestätigung)
   fastify.post('/api/auth/register-helper', async (request, reply) => {
+    if (mailRequestsByIp.hit(request.ip)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
     const parse = RegisterHelperSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -795,39 +831,25 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       where: { email: cleanEmail },
     });
 
-    if (existing && (existing.passwordHash || existing.emailVerified)) {
+    // Auch ohne Passwort nicht übernehmen: Ein bestehendes Konto (z. B. Cevi-Name-Profil mit selbst
+    // eingetragener E-Mail) bekäme sonst von irgendwem ein Passwort und fremde Namen.
+    if (existing) {
       return reply.status(409).send({ error: 'Diese E-Mail ist bereits registriert' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    let user;
-    if (existing) {
-      user = await fastify.prisma.user.update({
-        where: { id: existing.id },
-        data: {
-          passwordHash,
-          firstName,
-          lastName,
-          ceviName: ceviName || existing.ceviName,
-          phone: phone || existing.phone,
-          emailVerified: false,
-          emailVerifiedAt: null,
-        },
-      });
-    } else {
-      user = await fastify.prisma.user.create({
-        data: {
-          email: cleanEmail,
-          passwordHash,
-          firstName,
-          lastName,
-          ceviName: ceviName || null,
-          phone: phone || null,
-          emailVerified: false,
-          emailVerifiedAt: null,
-        },
-      });
-    }
+    const user = await fastify.prisma.user.create({
+      data: {
+        email: cleanEmail,
+        passwordHash,
+        firstName,
+        lastName,
+        ceviName: ceviName || null,
+        phone: phone || null,
+        emailVerified: false,
+        emailVerifiedAt: null,
+      },
+    });
 
     if (request.tenant) {
       await ensureHelperMembership(fastify.prisma, request.tenant.id, user.id);
@@ -868,6 +890,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   // 5a. Bestätigungs-E-Mail erneut anfordern
   fastify.post('/api/auth/resend-verification', async (request, reply) => {
+    if (mailRequestsByIp.hit(request.ip)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
     const parse = ResendVerificationSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -984,7 +1009,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       success: true,
       message: 'E-Mail-Adresse erfolgreich bestätigt!',
-      token: authToken,
       user: await loadUserDto(fastify.prisma, updatedUser.id, request.tenant?.id ?? null),
     };
   });

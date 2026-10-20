@@ -234,7 +234,13 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: shiftId },
         include: {
           tasks: { include: { signups: true } },
-          signups: { include: { user: true, task: true } },
+          // Nur Namen: das ganze User-Objekt enthielte Passwort-Hash, E-Mail und Cevi.DB-Rohdaten
+          signups: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true, ceviName: true } },
+              task: true,
+            },
+          },
         },
       });
 
@@ -536,6 +542,19 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       const shiftDate = new Date(shift.startTime);
       const userBirthDate = targetUser?.birthDate ? new Date(targetUser.birthDate) : null;
       const userAge = userBirthDate ? calculateAge(userBirthDate, shiftDate) : null;
+
+      // Wer sich selbst einträgt, muss bei einer Altersgrenze das Geburtsdatum angeben
+      // (sonst liesse sich «Bar ab 18» mit einem Konto ohne Geburtsdatum umgehen)
+      const strictMinAge = Boolean(shift.minAge || (chosenTask?.minAge && chosenTask.ageRequirementType === 'ALL'));
+      if (targetUserId === request.user.id && !isOkOrAdmin && strictMinAge && userAge === null) {
+        return reply.status(400).send({
+          error: 'Für diese Schicht gibt es ein Mindestalter. Bitte gib dein Geburtsdatum an.',
+          code: 'MISSING_INFO',
+          missingFields: ['BIRTH_DATE'],
+          missingQuestionIds: [],
+          missingSignupQuestionIds: [],
+        });
+      }
 
       // 1) Mindestalter der Schicht selbst
       if (shift.minAge && userAge !== null && userAge < shift.minAge) {

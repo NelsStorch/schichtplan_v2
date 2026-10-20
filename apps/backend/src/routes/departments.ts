@@ -4,6 +4,7 @@ import {
   CreateDepartmentFromCeviDbSchema,
   StufeInputSchema,
   UpdateDepartmentPersonSchema,
+  UpdateDepartmentSchema,
   type DepartmentCreationEligibilityDto,
   type DepartmentDirectoryItemDto,
   type DepartmentPersonDto,
@@ -12,7 +13,7 @@ import {
 } from '@schichtplan/shared';
 import { autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
-import { isDepartmentInsider } from '../services/departmentVisibility.js';
+import { isDepartmentInsider, isDepartmentManager } from '../services/departmentVisibility.js';
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
 
 const toStufeDto = (s: {
@@ -425,6 +426,11 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       if (!request.tenant) {
         return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
       }
+      // Namen und E-Mails aller Mitglieder: nur für wer hier plant (Abteilungsleitung, Planung, OK)
+      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+        return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder ein Event-OK' });
+      }
+      reply.header('Cache-Control', 'no-store');
 
       const members = await fastify.prisma.departmentMember.findMany({
         where: { departmentId: request.tenant.id },
@@ -596,33 +602,16 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/departments/current',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
-      if (!request.tenant) {
-        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
-      }
+      const tenant = await requireDeptAdmin(request, reply);
+      if (!tenant) return;
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      if (!member || (member.role !== 'ADMIN' && !request.user.isGlobalAdmin)) {
-        return reply
-          .status(403)
-          .send({ error: 'Nur die Abteilungsleitung darf das Logo und die Einstellungen anpassen' });
-      }
-
-      const { UpdateDepartmentSchema } = await import('@schichtplan/shared');
       const parse = UpdateDepartmentSchema.safeParse(request.body);
       if (!parse.success) {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
 
       const updated = await fastify.prisma.department.update({
-        where: { id: request.tenant.id },
+        where: { id: tenant.id },
         data: {
           name: parse.data.name !== undefined ? parse.data.name : undefined,
           logoUrl: parse.data.logoUrl !== undefined ? parse.data.logoUrl : undefined,

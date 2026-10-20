@@ -19,6 +19,7 @@ export async function applyProfileUpdate(
       ceviName: true,
       passwordHash: true,
       ceviDbId: true,
+      birthDate: true,
       homeDepartmentId: true,
       memberships: { select: { departmentId: true } },
     },
@@ -33,6 +34,10 @@ export async function applyProfileUpdate(
   if (input.birthDate !== undefined) {
     const date = new Date(`${input.birthDate}T00:00:00Z`);
     if (isNaN(date.getTime()) || date > new Date()) return { error: 'Ungültiges Geburtsdatum', status: 400 };
+    // Bei Cevi.DB-Konten kommt das Geburtsdatum aus Cevi.DB (zählt für Altersgrenzen): dort ändern
+    if (user.ceviDbId !== null && user.birthDate && user.birthDate.getTime() !== date.getTime()) {
+      return { error: 'Dein Geburtsdatum kommt aus Cevi.DB. Ändere es bitte dort.', status: 400 };
+    }
     // Bei Cevi-Name-Profilen ist das Geburtsdatum Teil des Logins: pro Abteilung eindeutig mit dem Namen
     if (user.ceviName && isCeviNameProfile(user)) {
       const departmentIds = [
@@ -54,7 +59,12 @@ export async function applyProfileUpdate(
   }
   if (input.email !== undefined) {
     const hasRealEmail = Boolean(user.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
-    if (!hasRealEmail) data.email = input.email.toLowerCase();
+    // Selbst eingetragen heisst unbestätigt: Die Adresse gilt erst nach einer Bestätigung als die eigene
+    if (!hasRealEmail) {
+      data.email = input.email.toLowerCase();
+      data.emailVerified = false;
+      data.emailVerifiedAt = null;
+    }
   }
 
   try {

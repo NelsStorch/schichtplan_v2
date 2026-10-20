@@ -19,7 +19,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
+import type { RequiredProfileField, ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import {
   Avatar,
   Button,
@@ -88,6 +88,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     shift: ShiftDto;
     task?: ShiftTaskDto;
     showOnce: boolean;
+    /** Nur für diese Schicht nötig, z. B. Geburtsdatum bei Mindestalter */
+    extraFields?: RequiredProfileField[];
   } | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
@@ -238,7 +240,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     } catch (err) {
       if (err instanceof ApiError && err.data.code === 'MISSING_INFO') {
         await load();
-        setParticipationFor({ shift, task, showOnce: true });
+        const extraFields = Array.isArray(err.data.missingFields)
+          ? (err.data.missingFields as RequiredProfileField[])
+          : [];
+        setParticipationFor({ shift, task, showOnce: true, extraFields });
       } else {
         toast({ title: 'Eintragen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
       }
@@ -687,6 +692,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         open={Boolean(participationFor)}
         event={event}
         showOnceQuestions={participationFor?.showOnce ?? false}
+        extraMissingFields={participationFor?.extraFields}
         shiftLabel={
           participationFor
             ? `${participationFor.shift.title}, ${fmtShortWeekday(participationFor.shift.startTime)} ${fmtTime(participationFor.shift.startTime)}`

@@ -24,6 +24,7 @@ export function ParticipationDialog({
   open,
   event,
   showOnceQuestions,
+  extraMissingFields = [],
   shiftLabel,
   onClose,
   onSaved,
@@ -31,12 +32,14 @@ export function ParticipationDialog({
   open: boolean;
   event: EventDetails;
   showOnceQuestions: boolean;
+  /** Angaben, die nur diese Schicht braucht (z. B. Geburtsdatum bei einem Mindestalter) */
+  extraMissingFields?: RequiredProfileField[];
   /** Schicht, für die gerade eingetragen wird (für die Fragen pro Eintragung) */
   shiftLabel?: string;
   onClose: () => void;
   onSaved: (signupAnswers: Record<string, string>) => void;
 }) {
-  const hasOnceStuff = event.viewer.missingFields.length > 0 || showOnceQuestions;
+  const hasOnceStuff = event.viewer.missingFields.length > 0 || extraMissingFields.length > 0 || showOnceQuestions;
   return (
     <Dialog
       open={open}
@@ -54,6 +57,7 @@ export function ParticipationDialog({
       <ParticipationForm
         event={event}
         showOnceQuestions={showOnceQuestions}
+        extraMissingFields={extraMissingFields}
         shiftLabel={shiftLabel}
         onCancel={onClose}
         onSaved={onSaved}
@@ -65,18 +69,20 @@ export function ParticipationDialog({
 function ParticipationForm({
   event,
   showOnceQuestions,
+  extraMissingFields,
   shiftLabel,
   onCancel,
   onSaved,
 }: {
   event: EventDetails;
   showOnceQuestions: boolean;
+  extraMissingFields: RequiredProfileField[];
   shiftLabel?: string;
   onCancel: () => void;
   onSaved: (signupAnswers: Record<string, string>) => void;
 }) {
   const { user, refresh } = usePortal();
-  const missing = new Set<RequiredProfileField>(event.viewer.missingFields);
+  const missing = new Set<RequiredProfileField>([...event.viewer.missingFields, ...extraMissingFields]);
   const onceQuestions = showOnceQuestions ? event.questions.filter((q) => q.scope !== 'PER_SIGNUP') : [];
   const signupQuestions = event.questions.filter((q) => q.scope === 'PER_SIGNUP');
   // Bereits gegebene Antworten vorausfüllen (nur einmalige; pro Eintragung startet leer)

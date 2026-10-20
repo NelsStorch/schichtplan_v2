@@ -1,13 +1,18 @@
 import { FastifyPluginAsync } from 'fastify';
 import { InstantiateTemplateSchema, toEventAccessType, type EventTemplateData } from '@schichtplan/shared';
 import { cleanRequiredFields } from '../services/profile.js';
+import { isDepartmentManager } from '../services/departmentVisibility.js';
 import { replaceAccessLists, resolveAccessLists, syncQuestions } from './events.js';
 
 const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Event-Vorlagen der Abteilung
-  fastify.get('/api/event-templates', async (request, reply) => {
+  fastify.get('/api/event-templates', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     if (!request.tenant) {
       return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+    }
+    // Vorlagen (mit Fragen und Freigaben) nur für wer hier plant
+    if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+      return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder ein Event-OK' });
     }
 
     const templates = await fastify.prisma.eventTemplate.findMany({
@@ -35,35 +40,42 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Details einer Event-Vorlage
-  fastify.get<{ Params: { id: string } }>('/api/event-templates/:id', async (request, reply) => {
-    if (!request.tenant) {
-      return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+  fastify.get<{ Params: { id: string } }>(
+    '/api/event-templates/:id',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+        return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder ein Event-OK' });
+      }
+
+      const template = await fastify.prisma.eventTemplate.findUnique({
+        where: { id: request.params.id },
+      });
+
+      if (!template || template.departmentId !== request.tenant.id) {
+        return reply.status(404).send({ error: 'Vorlage nicht gefunden' });
+      }
+
+      const data = template.data as unknown as EventTemplateData;
+      return {
+        id: template.id,
+        departmentId: template.departmentId,
+        title: template.title,
+        description: template.description,
+        accessType: toEventAccessType(template.accessType),
+        leadersOnly: template.leadersOnly,
+        requiredFields: cleanRequiredFields(template.requiredFields),
+        minShiftsPerPerson: template.minShiftsPerPerson ?? null,
+        shiftCount: data?.shifts?.length || 0,
+        createdAt: template.createdAt.toISOString(),
+        updatedAt: template.updatedAt.toISOString(),
+        data,
+      };
     }
-
-    const template = await fastify.prisma.eventTemplate.findUnique({
-      where: { id: request.params.id },
-    });
-
-    if (!template || template.departmentId !== request.tenant.id) {
-      return reply.status(404).send({ error: 'Vorlage nicht gefunden' });
-    }
-
-    const data = template.data as unknown as EventTemplateData;
-    return {
-      id: template.id,
-      departmentId: template.departmentId,
-      title: template.title,
-      description: template.description,
-      accessType: toEventAccessType(template.accessType),
-      leadersOnly: template.leadersOnly,
-      requiredFields: cleanRequiredFields(template.requiredFields),
-      minShiftsPerPerson: template.minShiftsPerPerson ?? null,
-      shiftCount: data?.shifts?.length || 0,
-      createdAt: template.createdAt.toISOString(),
-      updatedAt: template.updatedAt.toISOString(),
-      data,
-    };
-  });
+  );
 
   // Event aus Vorlage erzeugen (z.B. für das kommende Jahr)
   fastify.post<{ Params: { id: string } }>(
@@ -83,7 +95,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      if (!member || (member.role !== 'ADMIN' && member.role !== 'PLANNER' && !request.user.isGlobalAdmin)) {
+      if (!request.user.isGlobalAdmin && member?.role !== 'ADMIN' && member?.role !== 'PLANNER') {
         return reply.status(403).send({ error: 'Nur die Abteilungsleitung darf neue Events aus Vorlagen erstellen' });
       }
 
@@ -269,7 +281,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      if (!member || (member.role !== 'ADMIN' && member.role !== 'PLANNER' && !request.user.isGlobalAdmin)) {
+      if (!request.user.isGlobalAdmin && member?.role !== 'ADMIN' && member?.role !== 'PLANNER') {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen von Vorlagen' });
       }
 

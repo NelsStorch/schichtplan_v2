@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../db.js';
+import { createRateLimiter } from './rateLimit.js';
 
 /**
  * Cevi-Name-Profile: Konten ohne Cevi.DB und ohne Passwort. Sie melden sich nur an einer Abteilung
@@ -123,30 +124,13 @@ export async function resolveOrganizerUser(
 
 /* ------------------------------------------------------------------ Versuchsbremse */
 
-/**
- * Einfache Bremse im Speicher gegen das Durchprobieren von Geburtsdaten. Ein Backend-Prozess
- * reicht dafür (beim Neustart beginnt sie von vorn, das ist in Ordnung).
- */
-const attempts = new Map<string, number[]>();
-let lastCleanup = Date.now();
-
-function hit(key: string, windowMs: number, max: number): boolean {
-  const now = Date.now();
-  if (now - lastCleanup > 10 * 60 * 1000) {
-    for (const [k, times] of attempts) {
-      if (times.every((t) => now - t > 60 * 60 * 1000)) attempts.delete(k);
-    }
-    lastCleanup = now;
-  }
-  const recent = (attempts.get(key) ?? []).filter((t) => now - t < windowMs);
-  recent.push(now);
-  attempts.set(key, recent);
-  return recent.length > max;
-}
+/* Bremse im Speicher gegen das Durchprobieren von Geburtsdaten (siehe rateLimit.ts) */
+const ipLimiter = createRateLimiter(10 * 60 * 1000, 30);
+const missLimiter = createRateLimiter(15 * 60 * 1000, 8);
 
 /** Alle Anfragen pro IP: 30 in 10 Minuten. true = zu viele */
 export function tooManyRequests(ip: string): boolean {
-  return hit(`ip:${ip}`, 10 * 60 * 1000, 30);
+  return ipLimiter.hit(ip);
 }
 
 /**
@@ -154,7 +138,7 @@ export function tooManyRequests(ip: string): boolean {
  * Zählt nur, wenn das Geburtsdatum nicht zu einem Profil passt.
  */
 export function tooManyMisses(departmentId: string, ceviName: string): boolean {
-  return hit(`miss:${departmentId}:${ceviName.trim().toLowerCase()}`, 15 * 60 * 1000, 8);
+  return missLimiter.hit(`${departmentId}:${ceviName.trim().toLowerCase()}`);
 }
 
 export const RATE_LIMIT_ERROR = 'Zu viele Versuche. Bitte warte ein paar Minuten und versuch es dann nochmals.';

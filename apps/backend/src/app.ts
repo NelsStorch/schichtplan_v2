@@ -29,6 +29,24 @@ function hasPinoPretty(): boolean {
   }
 }
 
+/** Darf diese Herkunft (Origin-Header) mit Cookies auf die API zugreifen? */
+export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalhost: boolean): boolean {
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  const host = url.hostname.toLowerCase();
+  const root = rootDomain.toLowerCase();
+  if (url.protocol === 'https:' && (host === root || host.endsWith(`.${root}`))) return true;
+  return (
+    allowLocalhost &&
+    (url.protocol === 'http:' || url.protocol === 'https:') &&
+    (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost'))
+  );
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: 15 * 1024 * 1024, // 15 MB für Bild-Uploads (Base64)
@@ -45,11 +63,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // Base plugins
+  // Mit Cookies nur für die eigene Domain (alle Subdomains) und lokal für localhost
+  const rootDomain = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+  const allowLocalhost = process.env.NODE_ENV !== 'production';
   await app.register(cors, {
     origin: (origin, cb) => {
-      // In production behind Traefik on same domain, CORS isn't strictly needed for same-origin,
-      // but we allow subdomains and dev localhost
-      cb(null, true);
+      cb(null, !origin || isAllowedOrigin(origin, rootDomain, allowLocalhost));
     },
     credentials: true,
   });
