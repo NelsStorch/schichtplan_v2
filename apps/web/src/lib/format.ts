@@ -46,25 +46,32 @@ export function fmtDuration(startIso: string, endIso: string) {
 export const hoursBetween = (startIso: string, endIso: string) =>
   Math.max(0, (+new Date(endIso) - +new Date(startIso)) / 3_600_000);
 
+export function parseCutoffHour(cutoff: string = '04:00'): number {
+  if (!cutoff) return 4;
+  const match = cutoff.trim().match(/^(\d{1,2}):(\d{2})$/);
+  return match ? parseInt(match[1], 10) : 4;
+}
+
 /**
  * Geschäftstag einer Schicht (YYYY-MM-DD, Schweizer Zeit).
- * Regel aus der Legacy-App: Schichten, die vor 03:00 beginnen, gehören zum Vortag
- * (die Barschicht bis 02:00 ist noch "Samstag").
+ * Regel aus der Legacy-App: Schichten, die vor der Tageswechsel-Uhrzeit (Standard 04:00) beginnen,
+ * gehören zum Vortag (z. B. die Barschicht bis 03:00 ist noch "Samstag").
  */
-export function businessDayKey(iso: string) {
+export function businessDayKey(iso: string, cutoff: string = '04:00') {
+  const cutoffHour = parseCutoffHour(cutoff);
   const parts = Object.fromEntries(partsFmt.formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
   const date = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day));
-  if (+parts.hour < 3) date.setUTCDate(date.getUTCDate() - 1);
+  if (+parts.hour < cutoffHour) date.setUTCDate(date.getUTCDate() - 1);
   return date.toISOString().slice(0, 10);
 }
 
 /** ISO-Zeitpunkt mittags am Geschäftstag – für Wochentag-/Datumslabels. */
 export const dayKeyToIso = (key: string) => `${key}T12:00:00Z`;
 
-export function groupByBusinessDay<T extends { startTime: string }>(items: T[]) {
+export function groupByBusinessDay<T extends { startTime: string }>(items: T[], cutoff: string = '04:00') {
   const groups = new Map<string, T[]>();
   for (const item of [...items].sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime))) {
-    const key = businessDayKey(item.startTime);
+    const key = businessDayKey(item.startTime, cutoff);
     groups.set(key, [...(groups.get(key) ?? []), item]);
   }
   return [...groups.entries()].map(([key, list]) => ({ key, items: list }));

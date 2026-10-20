@@ -155,6 +155,9 @@ export const CreateEventSchema = z.object({
   ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
   minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
+  contactUserId: z.string().uuid().optional().nullable(),
+  dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional().default('04:00'),
+  responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
   organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
 });
 
@@ -163,6 +166,12 @@ export type CreateEventInput = z.infer<typeof CreateEventSchema>;
 /** Anlass bearbeiten: alle Felder optional. Listen (Whitelist, Stufen, Fragen) ersetzen die bisherigen. */
 export const UpdateEventSchema = z.object({
   title: z.string().trim().min(2, 'Titel ist erforderlich').max(120).optional(),
+  slug: z
+    .string()
+    .min(2, 'Slug erforderlich')
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, 'Slug darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten')
+    .optional(),
   description: z.string().max(5000).optional().nullable(),
   logoUrl: ImageUrlSchema.optional().nullable(),
   bannerUrl: ImageUrlSchema.optional().nullable(),
@@ -170,6 +179,9 @@ export const UpdateEventSchema = z.object({
   endDate: z.string().datetime().optional(),
   allowPublicSignup: z.boolean().optional(),
   minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
+  contactUserId: z.string().uuid().optional().nullable(),
+  dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional(),
+  responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
   requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).optional(),
@@ -297,6 +309,7 @@ export const CreateShiftSchema = z.object({
   description: z.string().max(2000).optional().nullable(),
   minAge: z.number().int().min(0).max(120).optional().nullable(),
   tasks: z.array(CreateShiftTaskSchema).max(50).optional(),
+  responsibleUserIds: z.array(z.string().uuid()).max(20).optional(),
 });
 
 export type CreateShiftInput = z.infer<typeof CreateShiftSchema>;
@@ -311,9 +324,16 @@ export const UpdateShiftSchema = z.object({
   description: z.string().max(2000).optional().nullable(),
   minAge: z.number().int().min(0).max(120).optional().nullable(),
   tasks: z.array(CreateShiftTaskSchema).max(50).optional(),
+  responsibleUserIds: z.array(z.string().uuid()).max(20).optional(),
 });
 
 export type UpdateShiftInput = z.infer<typeof UpdateShiftSchema>;
+
+export const SetDayResponsiblesSchema = z.object({
+  userIds: z.array(z.string().uuid()).max(20),
+});
+
+export type SetDayResponsiblesInput = z.infer<typeof SetDayResponsiblesSchema>;
 
 export const SignupShiftSchema = z.object({
   shiftId: z.string().uuid(),
@@ -353,6 +373,9 @@ export const InstantiateTemplateSchema = z.object({
   ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
   minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
+  contactUserId: z.string().uuid().optional().nullable(),
+  dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional().default('04:00'),
+  responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
 });
 
 export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;

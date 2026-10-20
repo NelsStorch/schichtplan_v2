@@ -186,6 +186,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             requiredFields,
             allowPublicSignup,
             minShiftsPerPerson: parse.data.minShiftsPerPerson ?? template.minShiftsPerPerson ?? null,
+            contactUserId: parse.data.contactUserId || null,
+            dayCutoffTime: parse.data.dayCutoffTime || '04:00',
+            responsibleMode: parse.data.responsibleMode || 'BY_SHIFT',
             organizers: {
               create: [
                 {

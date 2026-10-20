@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -54,6 +55,7 @@ import { EventAccessPanel } from '@/components/EventAccessPanel';
 import { EventRosterPanel } from '@/components/EventRosterPanel';
 import {
   AssignHelperDialog,
+  DayResponsiblesDialog,
   DuplicateShiftDialog,
   OrganizerDialog,
   SaveTemplateDialog,
@@ -87,6 +89,7 @@ interface HelperSummary {
 
 export default function EventOkManagePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
+  const router = useRouter();
   const { user, isDeptAdmin, isPlanner, loading: portalLoading } = usePortal();
   const toast = useToast();
   const confirm = useConfirm();
@@ -119,6 +122,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
   const [showEventSettings, setShowEventSettings] = useState(false);
   const [showOrganizerDialog, setShowOrganizerDialog] = useState(false);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [dayResponsiblesTarget, setDayResponsiblesTarget] = useState<{ dayDate: string; dayLabel: string } | null>(null);
 
   // Arbeiten-Katalog (Task Definitions)
   const [taskDefinitions, setTaskDefinitions] = useState<TaskDefinitionDto[]>([]);
@@ -179,7 +183,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
     }
   }, [tab, loadTemplates, loadTasks]);
 
-  const days = useMemo(() => groupByBusinessDay(event?.shifts ?? []), [event]);
+  const days = useMemo(() => groupByBusinessDay(event?.shifts ?? [], event?.dayCutoffTime), [event]);
   const distinctTasks = useMemo(() => {
     if (!event?.shifts) return [];
     const titles = new Set<string>();
@@ -733,11 +737,37 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                   const iso = dayKeyToIso(group.key);
                   return (
                     <section key={group.key} className="space-y-4">
-                      <header className="flex items-baseline justify-between border-b border-line pb-2">
-                        <h2 className="font-display text-2xl font-extrabold text-fg">
-                          {fmtWeekday(iso)}{' '}
-                          <span className="text-base font-normal text-fg-muted">{fmtDayMonth(iso)}</span>
-                        </h2>
+                      <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line pb-2">
+                        <div className="flex flex-wrap items-baseline gap-3">
+                          <h2 className="font-display text-2xl font-extrabold text-fg">
+                            {fmtWeekday(iso)}{' '}
+                            <span className="text-base font-normal text-fg-muted">{fmtDayMonth(iso)}</span>
+                          </h2>
+                          {event.responsibleMode === 'BY_DAY' && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {event.dayResponsibles?.[group.key]?.length ? (
+                                <Badge tone="neutral" size="sm" className="font-normal">
+                                  Tagesleitung: {event.dayResponsibles[group.key].map((r) => r.displayName).join(', ')}
+                                </Badge>
+                              ) : (
+                                <span className="text-2xs text-fg-subtle italic">Keine Tagesleitung hinterlegt</span>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-2xs"
+                                onClick={() =>
+                                  setDayResponsiblesTarget({
+                                    dayDate: group.key,
+                                    dayLabel: `${fmtWeekday(iso)} ${fmtDayMonth(iso)}`,
+                                  })
+                                }
+                              >
+                                Tagesleitung bearbeiten
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                         <span className="text-xs font-semibold text-fg-muted">
                           {group.items.length} Schicht(en)
                         </span>
@@ -762,6 +792,11 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                                       </Badge>
                                     )}
                                     {shift.category ? <Badge>{shift.category}</Badge> : null}
+                                    {shift.responsibles && shift.responsibles.length > 0 && (
+                                      <Badge tone="neutral" size="sm" className="max-w-[200px] truncate">
+                                        Leitung: {shift.responsibles.map((r) => r.displayName).join(', ')}
+                                      </Badge>
+                                    )}
                                     {shift.minAge ? (
                                       <Badge tone="warning">Schicht ab {shift.minAge} J.</Badge>
                                     ) : null}
@@ -780,6 +815,11 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
                                     {fmtTime(shift.startTime)} – {fmtTime(shift.endTime)} (
                                     {fmtDuration(shift.startTime, shift.endTime)})
                                   </p>
+                                  {isFull && event.contactUser && (
+                                    <p className="mt-1 text-2xs text-accent-ink font-semibold">
+                                      Fragen an: {event.contactUser.displayName}
+                                    </p>
+                                  )}
                                 </div>
 
                                 {/* Schicht-Aktionen */}
@@ -1329,6 +1369,18 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
         onClose={() => setShowOrganizerDialog(false)}
         onSaved={async () => {
           setShowOrganizerDialog(false);
+          await load();
+        }}
+      />
+
+      <DayResponsiblesDialog
+        open={Boolean(dayResponsiblesTarget)}
+        event={event}
+        dayDate={dayResponsiblesTarget?.dayDate ?? ''}
+        dayLabel={dayResponsiblesTarget?.dayLabel ?? ''}
+        onClose={() => setDayResponsiblesTarget(null)}
+        onSaved={async () => {
+          setDayResponsiblesTarget(null);
           await load();
         }}
       />

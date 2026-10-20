@@ -36,6 +36,18 @@ export interface EventOrganizerDto {
   createdAt: string;
 }
 
+export type EventResponsibleMode = 'BY_SHIFT' | 'BY_DAY';
+
+export interface ResponsiblePersonDto {
+  id: string;
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  ceviName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
 export interface EventDto {
   id: string;
   departmentId: string;
@@ -52,6 +64,11 @@ export interface EventDto {
   requiredFields: RequiredProfileField[];
   allowPublicSignup: boolean;
   minShiftsPerPerson?: number | null;
+  contactUserId?: string | null;
+  contactUser?: ResponsiblePersonDto | null;
+  dayCutoffTime?: string;
+  responsibleMode?: EventResponsibleMode;
+  dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   createdAt: string;
   shiftCount?: number;
   /** Summe der benötigten bzw. besetzten Plätze über alle Schichten */
@@ -99,6 +116,7 @@ export interface ShiftDto {
   minAge?: number | null;
   tasks?: ShiftTaskDto[];
   signups?: ShiftSignupDto[];
+  responsibles?: ResponsiblePersonDto[];
   freeSlots?: number;
 }
 

@@ -61,6 +61,15 @@ function FormActions({
   );
 }
 
+export interface DeptMemberItem {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  ceviName?: string | null;
+  displayName: string;
+}
+
 /* ------------------------------------------------------ Schicht anlegen / bearbeiten */
 
 export interface TaskFormItem {
@@ -116,11 +125,22 @@ function ShiftForm({
   const isEdit = Boolean(shift);
 
   const [availableTasks, setAvailableTasks] = useState<TaskDefinitionDto[]>([]);
+  const [members, setMembers] = useState<DeptMemberItem[]>([]);
+  const [responsibleUserIds, setResponsibleUserIds] = useState<string[]>(
+    () => shift?.responsibles?.map((r) => r.id) || []
+  );
+
   useEffect(() => {
     api<TaskDefinitionDto[]>('/api/tasks')
       .then((data) => setAvailableTasks(data))
       .catch(() => {});
-  }, []);
+
+    if (event.responsibleMode === 'BY_SHIFT') {
+      api<DeptMemberItem[]>('/api/departments/current/members')
+        .then((data) => setMembers(data))
+        .catch(() => {});
+    }
+  }, [event.responsibleMode]);
 
   const [form, setForm] = useState({
     title: shift?.title || '',
@@ -257,6 +277,7 @@ function ShiftForm({
         requiredSlots: totalSlots,
         minAge: form.minAge || undefined,
         description: form.description.trim() || undefined,
+        responsibleUserIds: event.responsibleMode === 'BY_SHIFT' ? responsibleUserIds : undefined,
         tasks: tasks.map((t) => ({
           id: t.id,
           taskDefinitionId: t.taskDefinitionId || undefined,
@@ -526,6 +547,65 @@ function ShiftForm({
         </div>
       </div>
 
+      {event.responsibleMode === 'BY_SHIFT' ? (
+        <div className="space-y-3 rounded-card border border-line bg-surface p-4">
+          <div>
+            <h4 className="text-sm font-bold text-fg">Schicht-Verantwortliche</h4>
+            <p className="text-xs text-fg-muted">
+              Diese Person(en) leiten die Schicht (z. B. Standleitung, Grillchef) und werden auf den Schichtkarten als Ansprechpersonen aufgeführt.
+            </p>
+          </div>
+
+          {responsibleUserIds.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {responsibleUserIds.map((userId) => {
+                const member = members.find((m) => m.userId === userId);
+                const shiftResp = shift?.responsibles?.find((r) => r.id === userId);
+                const name = member?.displayName || shiftResp?.displayName || 'Verantwortliche Person';
+                return (
+                  <Badge key={userId} tone="neutral" size="md" className="flex items-center gap-1.5 py-1">
+                    <span>{name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setResponsibleUserIds((prev) => prev.filter((id) => id !== userId))}
+                      className="ml-1 rounded p-0.5 hover:bg-fg/10 text-fg-muted hover:text-fg"
+                      title="Entfernen"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Select
+              value=""
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val && !responsibleUserIds.includes(val)) {
+                  setResponsibleUserIds((prev) => [...prev, val]);
+                }
+              }}
+            >
+              <option value="">+ Person als Schicht-Verantwortliche(n) hinzufügen…</option>
+              {members
+                .filter((m) => !responsibleUserIds.includes(m.userId))
+                .map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.displayName}
+                  </option>
+                ))}
+            </Select>
+          </div>
+        </div>
+      ) : (
+        <Callout tone="info">
+          <strong>Tages-Verantwortliche aktiv:</strong> Für diesen Anlass werden Verantwortliche pro Tag festgelegt. Alle Schichten an diesem Tag übernehmen automatisch die Tages-Verantwortlichen.
+        </Callout>
+      )}
+
       <Field label="Hinweise / Beschreibung">
         <Textarea
           rows={2}
@@ -566,15 +646,6 @@ export function AssignHelperDialog({
       {shift && <AssignHelperForm shift={shift} task={task} onCancel={onClose} onAssigned={onAssigned} />}
     </Dialog>
   );
-}
-
-interface DeptMemberItem {
-  id: string;
-  userId: string;
-  firstName: string;
-  lastName: string;
-  ceviName?: string | null;
-  displayName: string;
 }
 
 function AssignHelperForm({
@@ -1123,5 +1194,124 @@ function OrganizerForm({
       </Field>
       <FormActions onCancel={onCancel} saving={saving} label="Ins OK aufnehmen" />
     </form>
+  );
+}
+
+/* ------------------------------------------------------ Tages-Verantwortliche bearbeiten */
+
+export function DayResponsiblesDialog({
+  open,
+  event,
+  dayDate,
+  dayLabel,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  event: EventDetails;
+  dayDate: string;
+  dayLabel: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [members, setMembers] = useState<DeptMemberItem[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      api<DeptMemberItem[]>('/api/departments/current/members')
+        .then(setMembers)
+        .catch(() => {});
+      const existing = (event.dayResponsibles?.[dayDate] ?? []).map((r) => r.id);
+      setSelectedUserIds(existing);
+    }
+  }, [open, event, dayDate]);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await api(`/api/events/${event.slug}/days/${dayDate}/responsibles`, {
+        method: 'PUT',
+        json: { userIds: selectedUserIds },
+      });
+      toast({
+        title: 'Tages-Verantwortliche gespeichert',
+        description: `Für ${dayLabel} hinterlegt.`,
+      });
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(errorMessage(err));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      icon={<Shield />}
+      title="Tages-Verantwortliche"
+      description={`Verantwortliche Personen für ${dayLabel}`}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {error && <Callout tone="danger">{error}</Callout>}
+
+        <p className="text-xs text-fg-muted">
+          Die gewählten Personen gelten als Hauptansprechpersonen für alle Schichten an diesem Tag und werden im Schichtplan und bei den Schichten aufgeführt.
+        </p>
+
+        {selectedUserIds.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {selectedUserIds.map((userId) => {
+              const member = members.find((m) => m.userId === userId);
+              const existingResp = event.dayResponsibles?.[dayDate]?.find((r) => r.id === userId);
+              const name = member?.displayName || existingResp?.displayName || 'Verantwortliche Person';
+              return (
+                <Badge key={userId} tone="neutral" size="md" className="flex items-center gap-1.5 py-1">
+                  <span>{name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserIds((prev) => prev.filter((id) => id !== userId))}
+                    className="ml-1 rounded p-0.5 hover:bg-fg/10 text-fg-muted hover:text-fg"
+                    title="Entfernen"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </Badge>
+              );
+            })}
+          </div>
+        )}
+
+        <Field label="Person hinzufügen">
+          <Select
+            value=""
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val && !selectedUserIds.includes(val)) {
+                setSelectedUserIds((prev) => [...prev, val]);
+              }
+            }}
+          >
+            <option value="">-- Person aus Mitgliedern wählen --</option>
+            {members
+              .filter((m) => !selectedUserIds.includes(m.userId))
+              .map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName}
+                </option>
+              ))}
+          </Select>
+        </Field>
+
+        <FormActions onCancel={onClose} saving={saving} label="Speichern" />
+      </form>
+    </Dialog>
   );
 }

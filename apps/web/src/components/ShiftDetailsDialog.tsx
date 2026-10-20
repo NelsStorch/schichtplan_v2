@@ -7,7 +7,10 @@ import {
   Check,
   Clock,
   Edit,
+  HelpCircle,
   Lock,
+  Mail,
+  Phone,
   Shield,
   UserCheck,
   UserMinus,
@@ -25,7 +28,7 @@ import {
   cn,
   slotStatus,
 } from '@schichtplan/ui';
-import { fmtDuration, fmtTime, fmtWeekday, fmtDayMonth, isPast } from '@/lib/format';
+import { fmtDuration, fmtTime, fmtWeekday, fmtDayMonth, isPast, businessDayKey } from '@/lib/format';
 import { loginUrl } from '@/lib/api';
 import type { EventDetails } from '@/lib/types';
 
@@ -107,6 +110,12 @@ export function ShiftDetailsDialog({
             ageRequirementType: 'ALL' as const,
           },
         ];
+
+  const dayKey = businessDayKey(shift.startTime, event.dayCutoffTime);
+  const effectiveResponsibles =
+    event.responsibleMode === 'BY_DAY'
+      ? (event.dayResponsibles?.[dayKey] ?? [])
+      : (shift.responsibles ?? []);
 
   return (
     <Dialog
@@ -222,6 +231,79 @@ export function ShiftDetailsDialog({
             </p>
           )}
         </div>
+
+        {/* Schicht voll: Kontaktperson für Fragen */}
+        {status === 'full' && event.contactUser && (
+          <div className="rounded-card border border-accent/40 bg-accent/8 p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent-ink">
+                <HelpCircle className="size-5" />
+              </div>
+              <div className="space-y-1 text-xs">
+                <h4 className="font-semibold text-fg text-sm">Schicht ist voll besetzt</h4>
+                <p className="text-fg-muted">
+                  Hast du Fragen zu dieser Schicht oder möchtest dich als Springer melden? Wende dich an die verantwortliche Person:
+                </p>
+                <div className="pt-2 flex flex-wrap items-center gap-3">
+                  <span className="font-semibold text-fg">{event.contactUser.displayName}</span>
+                  {event.contactUser.phone && (
+                    <a
+                      href={`tel:${event.contactUser.phone}`}
+                      className="inline-flex items-center gap-1 text-accent-ink hover:underline font-mono"
+                    >
+                      <Phone className="size-3.5" />
+                      <span>{event.contactUser.phone}</span>
+                    </a>
+                  )}
+                  {event.contactUser.email && (
+                    <a
+                      href={`mailto:${event.contactUser.email}`}
+                      className="inline-flex items-center gap-1 text-accent-ink hover:underline"
+                    >
+                      <Mail className="size-3.5" />
+                      <span>{event.contactUser.email}</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Schicht- oder Tages-Verantwortliche */}
+        {effectiveResponsibles.length > 0 && (
+          <div className="rounded-card border border-line bg-surface p-4 sm:p-5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
+                {event.responsibleMode === 'BY_DAY' ? 'Tages-Verantwortliche(r)' : 'Schicht-Verantwortliche(r)'}
+              </h4>
+              <Badge tone="neutral" size="sm">
+                {effectiveResponsibles.length} {effectiveResponsibles.length === 1 ? 'Person' : 'Personen'}
+              </Badge>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {effectiveResponsibles.map((r) => (
+                <div key={r.id} className="flex items-center justify-between rounded-field border border-line/70 bg-surface-2 p-2.5">
+                  <div className="min-w-0">
+                    <span className="font-semibold text-xs text-fg block truncate">{r.displayName}</span>
+                    <div className="flex items-center gap-2 mt-0.5 text-2xs text-fg-muted">
+                      {r.phone && (
+                        <a href={`tel:${r.phone}`} className="inline-flex items-center gap-0.5 hover:text-accent-ink font-mono">
+                          <Phone className="size-3" /> {r.phone}
+                        </a>
+                      )}
+                      {r.email && (
+                        <a href={`mailto:${r.email}`} className="inline-flex items-center gap-0.5 hover:text-accent-ink">
+                          <Mail className="size-3" /> Mail
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Liste aller Arbeiten & Zuteilungen */}
         <div>

@@ -6,11 +6,13 @@ import {
   AddEventOrganizerSchema,
   CreateEventSchema,
   SaveAsTemplateSchema,
+  SetDayResponsiblesSchema,
   UnregisterHelperSchema,
   UpdateEventSchema,
   type EventQuestionInput,
   type EventQuestionDto,
   type EventQuestionType,
+  type ResponsiblePersonDto,
 } from '@schichtplan/shared';
 import {
   accessEventInclude,
@@ -198,6 +200,17 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         },
         include: {
           ...accessEventInclude,
+          contactUser: {
+            select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+          },
+          dayResponsibles: {
+            include: {
+              user: {
+                select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
           organizers: {
             include: {
               user: { select: { id: true, firstName: true, lastName: true, ceviName: true } },
@@ -207,6 +220,14 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           questions: { orderBy: { sortOrder: 'asc' } },
           shifts: {
             include: {
+              responsibles: {
+                include: {
+                  user: {
+                    select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                  },
+                },
+                orderBy: { createdAt: 'asc' },
+              },
               tasks: { orderBy: { createdAt: 'asc' } },
               signups: {
                 include: {
@@ -265,6 +286,36 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         .filter((q) => q.scope !== 'PER_SIGNUP' && q.required && !answers[q.id]?.trim())
         .map((q) => q.id);
 
+      const contactUser: ResponsiblePersonDto | null = event.contactUser
+        ? {
+            id: event.contactUser.id,
+            displayName: event.contactUser.ceviName
+              ? `${event.contactUser.firstName} / ${event.contactUser.ceviName}`
+              : `${event.contactUser.firstName} ${event.contactUser.lastName}`,
+            firstName: event.contactUser.firstName,
+            lastName: event.contactUser.lastName,
+            ceviName: event.contactUser.ceviName,
+            phone: event.contactUser.phone,
+            email: event.contactUser.email,
+          }
+        : null;
+
+      const dayResponsibles: Record<string, ResponsiblePersonDto[]> = {};
+      for (const dr of event.dayResponsibles ?? []) {
+        if (!dayResponsibles[dr.dayDate]) dayResponsibles[dr.dayDate] = [];
+        dayResponsibles[dr.dayDate].push({
+          id: dr.user.id,
+          displayName: dr.user.ceviName
+            ? `${dr.user.firstName} / ${dr.user.ceviName}`
+            : `${dr.user.firstName} ${dr.user.lastName}`,
+          firstName: dr.user.firstName,
+          lastName: dr.user.lastName,
+          ceviName: dr.user.ceviName,
+          phone: dr.user.phone,
+          email: dr.user.email,
+        });
+      }
+
       return {
         id: event.id,
         title: event.title,
@@ -280,6 +331,11 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         leadersOnly: event.leadersOnly,
         requiredFields: cleanRequiredFields(event.requiredFields),
         minShiftsPerPerson: event.minShiftsPerPerson ?? null,
+        contactUserId: event.contactUserId || null,
+        contactUser,
+        dayCutoffTime: event.dayCutoffTime || '04:00',
+        responsibleMode: (event.responsibleMode as 'BY_SHIFT' | 'BY_DAY') || 'BY_SHIFT',
+        dayResponsibles,
         audience: audienceLabel(event, request.tenant.name),
         allowedDepartments: event.allowedDepartments.map((a) => ({
           id: a.departmentId,
@@ -360,6 +416,18 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             };
           });
 
+          const responsibles: ResponsiblePersonDto[] = s.responsibles.map((r) => ({
+            id: r.user.id,
+            displayName: r.user.ceviName
+              ? `${r.user.firstName} / ${r.user.ceviName}`
+              : `${r.user.firstName} ${r.user.lastName}`,
+            firstName: r.user.firstName,
+            lastName: r.user.lastName,
+            ceviName: r.user.ceviName,
+            phone: r.user.phone,
+            email: r.user.email,
+          }));
+
           return {
             id: s.id,
             eventId: s.eventId,
@@ -372,6 +440,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             requiredSlots: s.requiredSlots,
             freeSlots: Math.max(0, s.requiredSlots - signups.length),
             minAge: s.minAge,
+            responsibles,
             tasks,
             signups,
           };
@@ -420,6 +489,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         leadersOnly,
         requiredFields,
         minShiftsPerPerson,
+        contactUserId,
+        dayCutoffTime,
+        responsibleMode,
         allowedDepartmentIds,
         allowedStufeIds,
         questions,
@@ -533,6 +605,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             leadersOnly,
             requiredFields,
             minShiftsPerPerson: minShiftsPerPerson ?? null,
+            contactUserId: contactUserId || null,
+            dayCutoffTime: dayCutoffTime || '04:00',
+            responsibleMode: responsibleMode || 'BY_SHIFT',
             organizers: {
               create: organizersToCreate,
             },
@@ -597,8 +672,49 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
       const body = parse.data;
-      if (new Date(body.endDate ?? event.endDate) < new Date(body.startDate ?? event.startDate)) {
+
+      const newStartDate = body.startDate ? new Date(body.startDate) : event.startDate;
+      const newEndDate = body.endDate ? new Date(body.endDate) : event.endDate;
+
+      if (newEndDate < newStartDate) {
         return reply.status(400).send({ error: 'Das Ende des Anlasses darf nicht vor dem Beginn liegen' });
+      }
+
+      // Prüfen, ob nach der Änderung alle existierenden Schichten innerhalb dieser Zeit-Range liegen
+      if (body.startDate || body.endDate) {
+        const outOfBoundsShift = await fastify.prisma.shift.findFirst({
+          where: {
+            eventId: event.id,
+            OR: [
+              { startTime: { lt: newStartDate } },
+              { endTime: { gt: newEndDate } },
+            ],
+          },
+          select: { title: true, startTime: true, endTime: true },
+        });
+
+        if (outOfBoundsShift) {
+          return reply.status(400).send({
+            error: `Zeitraum kann nicht geändert werden: Die Schicht «${outOfBoundsShift.title}» liegt ausserhalb des neuen Zeitraums. Bitte passe zuerst die Schichten an.`,
+          });
+        }
+      }
+
+      // Prüfen, ob der neue Slug bereits von einem anderen Event der Abteilung genutzt wird
+      let newSlug: string | undefined = undefined;
+      if (body.slug && body.slug !== event.slug) {
+        const slugConflict = await fastify.prisma.event.findUnique({
+          where: {
+            departmentId_slug: {
+              departmentId: request.tenant.id,
+              slug: body.slug,
+            },
+          },
+        });
+        if (slugConflict && slugConflict.id !== event.id) {
+          return reply.status(409).send({ error: 'Ein Event mit dieser Adresse (Slug) existiert bereits in dieser Abteilung' });
+        }
+        newSlug = body.slug;
       }
 
       // Listen immer zum (evtl. neuen) Typ passend neu bestimmen
@@ -619,6 +735,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: event.id },
           data: {
             title: body.title,
+            slug: newSlug,
             description: body.description,
             logoUrl: body.logoUrl,
             bannerUrl: body.bannerUrl,
@@ -629,6 +746,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             leadersOnly: body.leadersOnly,
             requiredFields: body.requiredFields,
             minShiftsPerPerson: body.minShiftsPerPerson !== undefined ? body.minShiftsPerPerson : undefined,
+            contactUserId: body.contactUserId !== undefined ? (body.contactUserId || null) : undefined,
+            dayCutoffTime: body.dayCutoffTime !== undefined ? body.dayCutoffTime : undefined,
+            responsibleMode: body.responsibleMode !== undefined ? body.responsibleMode : undefined,
           },
         });
         await replaceAccessLists(tx, event.id, lists.departmentIds, lists.stufeIds);
@@ -642,7 +762,95 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         slug: updated.slug,
         logoUrl: updated.logoUrl,
         bannerUrl: updated.bannerUrl,
+        startDate: updated.startDate.toISOString(),
+        endDate: updated.endDate.toISOString(),
         accessType: updated.accessType,
+      };
+    }
+  );
+
+  // Tagesverantwortliche setzen (Abteilungsleitung ODER Event-OK)
+  fastify.put<{ Params: { slug: string; dayDate: string } }>(
+    '/api/events/:slug/days/:dayDate/responsibles',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+
+      const { slug, dayDate } = request.params;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dayDate)) {
+        return reply.status(400).send({ error: 'Ungültiges Datumsformat (erwartet YYYY-MM-DD)' });
+      }
+
+      const event = await fastify.prisma.event.findUnique({
+        where: {
+          departmentId_slug: {
+            departmentId: request.tenant.id,
+            slug,
+          },
+        },
+        include: { organizers: true },
+      });
+
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Verwalten der Tagesverantwortlichen' });
+      }
+
+      const parse = SetDayResponsiblesSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      await fastify.prisma.$transaction(async (tx) => {
+        await tx.eventDayResponsible.deleteMany({
+          where: {
+            eventId: event.id,
+            dayDate,
+          },
+        });
+        if (parse.data.userIds.length > 0) {
+          await tx.eventDayResponsible.createMany({
+            data: parse.data.userIds.map((userId) => ({
+              eventId: event.id,
+              dayDate,
+              userId,
+            })),
+          });
+        }
+      });
+
+      const updated = await fastify.prisma.eventDayResponsible.findMany({
+        where: {
+          eventId: event.id,
+          dayDate,
+        },
+        include: {
+          user: {
+            select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      return {
+        dayDate,
+        responsibles: updated.map((r) => ({
+          id: r.user.id,
+          displayName: r.user.ceviName
+            ? `${r.user.firstName} / ${r.user.ceviName}`
+            : `${r.user.firstName} ${r.user.lastName}`,
+          firstName: r.user.firstName,
+          lastName: r.user.lastName,
+          ceviName: r.user.ceviName,
+          phone: r.user.phone,
+          email: r.user.email,
+        })),
       };
     }
   );
@@ -908,6 +1116,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           minShiftsPerPerson: event.minShiftsPerPerson ?? null,
           data: {
             shifts: shiftTemplates,
+            dayCutoffTime: event.dayCutoffTime,
+            responsibleMode: event.responsibleMode,
             questions: event.questions.map((q) => {
               const { id: _id, ...rest } = toQuestionDto(q);
               return rest;

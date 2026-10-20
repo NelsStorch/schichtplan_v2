@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { CreateShiftSchema, UpdateShiftSchema, SignupShiftSchema } from '@schichtplan/shared';
+import { CreateShiftSchema, UpdateShiftSchema, SignupShiftSchema, type ResponsiblePersonDto } from '@schichtplan/shared';
 import {
   accessEventInclude,
   accessUserSelect,
@@ -20,6 +20,29 @@ function calculateAge(birthDate: Date, targetDate: Date): number {
   return age;
 }
 
+function toResponsiblePersonDto(r: {
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    ceviName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  };
+}): ResponsiblePersonDto {
+  return {
+    id: r.user.id,
+    displayName: r.user.ceviName
+      ? `${r.user.firstName} / ${r.user.ceviName}`
+      : `${r.user.firstName} ${r.user.lastName}`,
+    firstName: r.user.firstName,
+    lastName: r.user.lastName,
+    ceviName: r.user.ceviName,
+    phone: r.user.phone,
+    email: r.user.email,
+  };
+}
+
 const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Schicht erstellen (Admin, Planner oder Event-OK)
   fastify.post(
@@ -31,8 +54,19 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
 
-      const { eventId, title, category, isSetupTeardown, startTime, endTime, requiredSlots: reqSlots, description, minAge, tasks } =
-        parse.data;
+      const {
+        eventId,
+        title,
+        category,
+        isSetupTeardown,
+        startTime,
+        endTime,
+        requiredSlots: reqSlots,
+        description,
+        minAge,
+        tasks,
+        responsibleUserIds,
+      } = parse.data;
       if (new Date(endTime) <= new Date(startTime)) {
         return reply.status(400).send({ error: 'Das Ende der Schicht muss nach dem Beginn liegen' });
       }
@@ -93,6 +127,12 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           requiredSlots: totalRequiredSlots,
           description: description || null,
           minAge: minAge || null,
+          responsibles:
+            responsibleUserIds && responsibleUserIds.length > 0
+              ? {
+                  create: responsibleUserIds.map((userId) => ({ userId })),
+                }
+              : undefined,
           tasks: {
             create: resolvedTasks.map((t) => ({
               taskDefinitionId: t.taskDefinitionId || null,
@@ -108,10 +148,21 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           tasks: {
             include: { signups: true },
           },
+          responsibles: {
+            include: {
+              user: {
+                select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
         },
       });
 
-      return shift;
+      return {
+        ...shift,
+        responsibles: shift.responsibles.map(toResponsiblePersonDto),
+      };
     }
   );
 
@@ -155,7 +206,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten dieser Schicht' });
       }
 
-      const { title, category, isSetupTeardown, startTime, endTime, description, minAge, tasks } = parse.data;
+      const { title, category, isSetupTeardown, startTime, endTime, description, minAge, tasks, responsibleUserIds } = parse.data;
       if (new Date(endTime ?? shift.endTime) <= new Date(startTime ?? shift.startTime)) {
         return reply.status(400).send({ error: 'Das Ende der Schicht muss nach dem Beginn liegen' });
       }
@@ -237,10 +288,25 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      if (responsibleUserIds !== undefined) {
+        await fastify.prisma.shiftResponsible.deleteMany({ where: { shiftId } });
+        if (responsibleUserIds.length > 0) {
+          await fastify.prisma.shiftResponsible.createMany({
+            data: responsibleUserIds.map((userId) => ({ shiftId, userId })),
+          });
+        }
+      }
+
       const updated = await fastify.prisma.shift.findUnique({
         where: { id: shiftId },
         include: {
           tasks: { include: { signups: true } },
+          responsibles: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
           // Nur Namen: das ganze User-Objekt enthielte Passwort-Hash, E-Mail und Cevi.DB-Rohdaten
           signups: {
             include: {
@@ -251,7 +317,14 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      return updated;
+      if (!updated) {
+        return reply.status(404).send({ error: 'Schicht nicht gefunden' });
+      }
+
+      return {
+        ...updated,
+        responsibles: updated.responsibles.map(toResponsiblePersonDto),
+      };
     }
   );
 
@@ -306,6 +379,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: shiftId },
         include: {
           tasks: true,
+          responsibles: true,
           event: { include: { organizers: true } },
         },
       });
@@ -345,6 +419,12 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           requiredSlots: shift.requiredSlots,
           description: shift.description,
           minAge: shift.minAge,
+          responsibles:
+            shift.responsibles.length > 0
+              ? {
+                  create: shift.responsibles.map((r) => ({ userId: r.userId })),
+                }
+              : undefined,
           tasks: {
             create: shift.tasks.map((t) => ({
               taskDefinitionId: t.taskDefinitionId || null,
@@ -358,10 +438,21 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         },
         include: {
           tasks: true,
+          responsibles: {
+            include: {
+              user: {
+                select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
         },
       });
 
-      return duplicated;
+      return {
+        ...duplicated,
+        responsibles: duplicated.responsibles.map(toResponsiblePersonDto),
+      };
     }
   );
 

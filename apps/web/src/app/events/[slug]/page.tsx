@@ -22,6 +22,7 @@ import {
 import type { RequiredProfileField, ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import {
   Avatar,
+  Badge,
   Button,
   Callout,
   CeviLogo,
@@ -42,7 +43,7 @@ import { ParticipationDialog } from '@/components/event/ParticipationDialog';
 import { ShiftGrid } from '@/components/event/ShiftGrid';
 import { NeededShifts, ShiftRows, type ShiftActions } from '@/components/event/ShiftList';
 import { shiftStats, shiftTasks } from '@/components/event/shift-utils';
-import { AssignHelperDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
+import { AssignHelperDialog, DayResponsiblesDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { ShiftDetailsDialog } from '@/components/ShiftDetailsDialog';
 import { ApiError, api, errorMessage, loginUrl, useLoginHref } from '@/lib/api';
 import {
@@ -95,6 +96,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOkForm, setShowOkForm] = useState(false);
+  const [dayResponsiblesTarget, setDayResponsiblesTarget] = useState<{ dayDate: string; dayLabel: string } | null>(null);
 
   // Deep-Link (?schicht=ID), Einladungs-Link (?zugang=TOKEN) und gespeicherte Ansicht
   useEffect(() => {
@@ -154,7 +156,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       .catch((err) => toast({ title: 'Link funktioniert nicht', description: errorMessage(err), tone: 'error' }));
   }, [pendingToken, portalLoading, user, slug, load, toast]);
 
-  const days = useMemo(() => groupByBusinessDay(event?.shifts ?? []), [event]);
+  const days = useMemo(() => groupByBusinessDay(event?.shifts ?? [], event?.dayCutoffTime), [event]);
   const distinctTasks = useMemo(() => {
     const titles = new Set<string>();
     for (const s of event?.shifts ?? []) for (const t of shiftTasks(s)) if (t.title.trim()) titles.add(t.title.trim());
@@ -355,6 +357,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     isMine,
     hasConflict: (shift) => Boolean(findConflictingShift(shift)),
     busyShiftId: busyShift,
+    contactName: event?.contactUser?.displayName,
+    dayResponsibles: event?.dayResponsibles,
+    responsibleMode: event?.responsibleMode,
+    dayCutoffTime: event?.dayCutoffTime,
     onOpen: (shift) => setSelectedShiftId(shift.id),
     onQuickSignup: quickSignup,
   };
@@ -657,13 +663,41 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
               const iso = dayKeyToIso(group.key);
               return (
                 <section key={group.key} aria-labelledby={`day-${group.key}`}>
-                  <header className="mb-3 flex items-end justify-between gap-4">
-                    <h2 id={`day-${group.key}`} className="flex flex-wrap items-baseline gap-x-2.5">
-                      <span className="font-display text-2xl font-extrabold tracking-[-0.03em] text-fg sm:text-3xl">
-                        {fmtWeekday(iso)}
-                      </span>
-                      <span className="text-sm font-semibold text-fg-subtle">{fmtDayMonth(iso)}</span>
-                    </h2>
+                  <header className="mb-3 flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                      <h2 id={`day-${group.key}`} className="flex flex-wrap items-baseline gap-x-2.5">
+                        <span className="font-display text-2xl font-extrabold tracking-[-0.03em] text-fg sm:text-3xl">
+                          {fmtWeekday(iso)}
+                        </span>
+                        <span className="text-sm font-semibold text-fg-subtle">{fmtDayMonth(iso)}</span>
+                      </h2>
+                      {event.responsibleMode === 'BY_DAY' && (
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          {event.dayResponsibles?.[group.key]?.length ? (
+                            <Badge tone="neutral" size="sm" className="font-normal">
+                              Tagesleitung: {event.dayResponsibles[group.key].map((r) => r.displayName).join(', ')}
+                            </Badge>
+                          ) : canManageShifts ? (
+                            <span className="text-2xs text-fg-subtle italic">Keine Tagesleitung hinterlegt</span>
+                          ) : null}
+                          {canManageShifts && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-2xs"
+                              onClick={() =>
+                                setDayResponsiblesTarget({
+                                  dayDate: group.key,
+                                  dayLabel: `${fmtWeekday(iso)} ${fmtDayMonth(iso)}`,
+                                })
+                              }
+                            >
+                              Tagesleitung bearbeiten
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <span
                       className={cn(
                         'tabular shrink-0 rounded-full px-2.5 py-1 text-xs font-bold',
@@ -771,6 +805,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         onClose={() => setShowOkForm(false)}
         onSaved={async () => {
           setShowOkForm(false);
+          await load();
+        }}
+      />
+      <DayResponsiblesDialog
+        open={Boolean(dayResponsiblesTarget)}
+        event={event}
+        dayDate={dayResponsiblesTarget?.dayDate ?? ''}
+        dayLabel={dayResponsiblesTarget?.dayLabel ?? ''}
+        onClose={() => setDayResponsiblesTarget(null)}
+        onSaved={async () => {
+          setDayResponsiblesTarget(null);
           await load();
         }}
       />

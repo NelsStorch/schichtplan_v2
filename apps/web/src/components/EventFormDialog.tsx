@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, type FormEvent } from 'react';
-import { CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
 import type { EventTemplateDto } from '@schichtplan/shared';
-import { Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
+import { Badge, Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import type { EventDetails } from '@/lib/types';
@@ -22,18 +22,33 @@ export interface EventFormValues {
   /** false = Eintragen geschlossen (nur noch das OK teilt ein) */
   allowPublicSignup: boolean;
   minShiftsPerPerson: number | null;
+  contactUserId: string | null;
+  dayCutoffTime: string;
+  responsibleMode: 'BY_SHIFT' | 'BY_DAY';
   access: EventAccessValues;
+}
+
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** Startwerte für «Design & Einstellungen» eines bestehenden Anlasses */
 export function eventFormInitial(event: EventDetails): Partial<EventFormValues> {
   return {
     title: event.title,
+    slug: event.slug,
+    startDate: toLocalInput(event.startDate),
+    endDate: toLocalInput(event.endDate),
     description: event.description ?? '',
     logoUrl: event.logoUrl ?? '',
     bannerUrl: event.bannerUrl ?? '',
     allowPublicSignup: event.allowPublicSignup,
     minShiftsPerPerson: event.minShiftsPerPerson ?? null,
+    contactUserId: event.contactUserId ?? null,
+    dayCutoffTime: event.dayCutoffTime ?? '04:00',
+    responsibleMode: event.responsibleMode ?? 'BY_SHIFT',
     access: {
       accessType: event.accessType,
       leadersOnly: event.leadersOnly,
@@ -84,6 +99,9 @@ const EMPTY: EventFormValues = {
   endDate: '',
   allowPublicSignup: true,
   minShiftsPerPerson: null,
+  contactUserId: null,
+  dayCutoffTime: '04:00',
+  responsibleMode: 'BY_SHIFT',
   access: EMPTY_ACCESS,
 };
 
@@ -148,6 +166,27 @@ function EventForm({
   const [form, setForm] = useState<EventFormValues>({ ...EMPTY, ...initial });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slugTouched, setSlugTouched] = useState(false);
+  const initialSlug = initial?.slug || eventSlug || '';
+
+  // 10s Countdown bei Adress-Änderung eines bestehenden Events
+  const [showSlugWarning, setShowSlugWarning] = useState(false);
+  const [countdown, setCountdown] = useState(10);
+
+  useEffect(() => {
+    if (!showSlugWarning) return;
+    setCountdown(10);
+    const timer = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showSlugWarning]);
 
   // OK-Mitglieder für neues Event
   const [organizers, setOrganizers] = useState<FormOrganizer[]>([]);
@@ -177,11 +216,11 @@ function EventForm({
 
   // Abteilungsmitglieder & Vorlagen laden
   useEffect(() => {
-    if (mode === 'create') {
-      api<DeptMemberItem[]>('/api/departments/current/members')
-        .then(setDeptMembers)
-        .catch(() => setDeptMembers([]));
+    api<DeptMemberItem[]>('/api/departments/current/members')
+      .then(setDeptMembers)
+      .catch(() => setDeptMembers([]));
 
+    if (mode === 'create') {
       api<EventTemplateDto[]>('/api/event-templates')
         .then(setTemplates)
         .catch(() => setTemplates([]));
@@ -235,8 +274,7 @@ function EventForm({
     setOrganizers((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const executeSave = async (slugToSave?: string) => {
     setSaving(true);
     setError(null);
     try {
@@ -246,8 +284,12 @@ function EventForm({
         logoUrl: form.logoUrl.trim() || null,
         bannerUrl: form.bannerUrl.trim() || null,
         minShiftsPerPerson: form.minShiftsPerPerson ?? null,
+        contactUserId: form.contactUserId || null,
+        dayCutoffTime: form.dayCutoffTime || '04:00',
+        responsibleMode: form.responsibleMode,
         ...accessPayload(form.access),
       };
+
       if (mode === 'create') {
         if (selectedTemplateId) {
           await api(`/api/event-templates/${selectedTemplateId}/instantiate`, {
@@ -290,17 +332,35 @@ function EventForm({
         }
         onSaved(form.slug);
       } else {
-        await api(`/api/events/${eventSlug}`, {
+        const targetSlug = slugToSave || form.slug;
+        const res = await api<{ id: string; slug: string }>(`/api/events/${eventSlug}`, {
           method: 'PATCH',
-          json: { ...shared, description: form.description.trim() || null, allowPublicSignup: form.allowPublicSignup },
+          json: {
+            ...shared,
+            slug: targetSlug !== initialSlug ? targetSlug : undefined,
+            startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
+            endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
+            description: form.description.trim() || null,
+            allowPublicSignup: form.allowPublicSignup,
+          },
         });
         toast({ title: 'Einstellungen gespeichert' });
-        onSaved(eventSlug ?? '');
+        onSaved(res.slug || targetSlug);
       }
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
       setSaving(false);
     }
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (mode === 'edit' && form.slug !== initialSlug) {
+      setShowSlugWarning(true);
+      return;
+    }
+    await executeSave();
   };
 
   // Verfügbare Mitglieder, die noch nicht im OK sind (Cevi-Name-Profile können keine Rolle haben)
@@ -324,6 +384,7 @@ function EventForm({
               onChange={(e) => {
                 const tId = e.target.value;
                 setSelectedTemplateId(tId);
+                setSlugTouched(false);
                 if (tId) {
                   const found = templates.find((t) => t.id === tId);
                   if (found) {
@@ -367,38 +428,99 @@ function EventForm({
             value={form.title}
             placeholder="Chilbi 2026"
             autoFocus={mode === 'create'}
-            onChange={(e) =>
+            onChange={(e) => {
+              const val = e.target.value;
               setForm((f) => ({
                 ...f,
-                title: e.target.value,
-                slug: mode === 'create' ? slugify(e.target.value) : f.slug,
-              }))
-            }
+                title: val,
+                slug: mode === 'create' && !slugTouched ? slugify(val) : f.slug,
+              }));
+            }}
           />
         </Field>
-        {mode === 'create' && (
-          <>
-            <Field label="Adresse (Slug)" required hint={`…/events/${form.slug || 'chilbi-2026'}`} className="sm:col-span-2">
-              <Input
-                value={form.slug}
-                pattern="[-a-z0-9]+"
-                onChange={(e) => set('slug', slugify(e.target.value))}
-                className="font-mono"
-              />
-            </Field>
-            <Field label="Beginn" required>
-              <Input type="datetime-local" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} />
-            </Field>
-            <Field label="Ende" required>
-              <Input
-                type="datetime-local"
-                value={form.endDate}
-                min={form.startDate || undefined}
-                onChange={(e) => set('endDate', e.target.value)}
-              />
-            </Field>
-          </>
-        )}
+
+        <Field
+          label={
+            <span className="flex items-center justify-between gap-2 flex-wrap">
+              <span>
+                Adresse (Slug) <span className="text-accent-ink" aria-hidden>*</span>
+              </span>
+              {mode === 'edit' && form.slug !== initialSlug ? (
+                <Badge tone="danger" size="sm" className="font-normal">
+                  Änderung bricht Links (10s Warnung)
+                </Badge>
+              ) : mode === 'edit' ? (
+                <Badge tone="outline" size="sm" className="font-normal text-fg-subtle">
+                  Änderung bricht geteilte Links
+                </Badge>
+              ) : null}
+            </span>
+          }
+          hint={
+            mode === 'create' ? (
+              <span>
+                <span className="font-mono text-fg-muted">…/events/{form.slug || 'chilbi-2026'}</span>
+                <span className="mx-1.5 text-line-strong">·</span>
+                <span>
+                  Empfehlung: Jahr ergänzen (z.&nbsp;B. <span className="font-mono">chilbi-2026</span>). Slugs sind abteilungsweit einmalig und bestimmen die Webadresse – so habt ihr nächstes Jahr wieder eine saubere Adresse.
+                </span>
+              </span>
+            ) : (
+              <span>
+                <span className="font-mono text-fg-muted">…/events/{form.slug}</span>
+                <span className="mx-1.5 text-line-strong">·</span>
+                <span className={form.slug !== initialSlug ? 'text-danger-ink font-semibold' : 'text-fg-subtle'}>
+                  Achtung: Eine Änderung macht alle bisher geteilten Links (WhatsApp, Einladungen) sowie Lesezeichen ungültig. Beim Speichern wird eine 10-sekündige Sicherheitsbestätigung verlangt.
+                </span>
+              </span>
+            )
+          }
+          className="sm:col-span-2"
+        >
+          <Input
+            value={form.slug}
+            pattern="[-a-z0-9]+"
+            required
+            placeholder="chilbi-2026"
+            onChange={(e) => {
+              setSlugTouched(true);
+              set('slug', slugify(e.target.value));
+            }}
+            className="font-mono"
+          />
+        </Field>
+
+        <Field
+          label={
+            <span>
+              Beginn <span className="text-accent-ink" aria-hidden>*</span>
+            </span>
+          }
+          hint={mode === 'edit' ? 'Muss vor allen bestehenden Schichten liegen' : undefined}
+        >
+          <Input
+            type="datetime-local"
+            value={form.startDate}
+            required
+            onChange={(e) => set('startDate', e.target.value)}
+          />
+        </Field>
+        <Field
+          label={
+            <span>
+              Ende <span className="text-accent-ink" aria-hidden>*</span>
+            </span>
+          }
+          hint={mode === 'edit' ? 'Muss nach allen bestehenden Schichten liegen' : undefined}
+        >
+          <Input
+            type="datetime-local"
+            value={form.endDate}
+            min={form.startDate || undefined}
+            required
+            onChange={(e) => set('endDate', e.target.value)}
+          />
+        </Field>
         <Field label="Beschreibung" className="sm:col-span-2">
           <Textarea
             rows={3}
@@ -540,7 +662,49 @@ function EventForm({
       )}
 
       <div className="space-y-4 rounded-card border border-line bg-surface-2/60 p-4 sm:p-5">
-        <h4 className="text-[13px] font-semibold text-fg">Schichten &amp; Helfer-Soll</h4>
+        <h4 className="text-[13px] font-semibold text-fg">Zuständigkeiten &amp; Schicht-Einstellungen</h4>
+
+        <Field
+          label="Schichtplan-Verantwortliche(r) für Fragen (optional)"
+          hint="Wird Helfer:innen angezeigt, wenn eine Schicht voll besetzt ist, damit sie sich bei Fragen oder weiterem Interesse direkt per Telefon oder E-Mail melden können."
+        >
+          <Select
+            value={form.contactUserId || ''}
+            onChange={(e) => set('contactUserId', e.target.value || null)}
+          >
+            <option value="">-- Keine Person ausgewählt --</option>
+            {deptMembers.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.displayName}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field
+          label="Verantwortliche für Schichten / Tage"
+          hint="Bestimmt, ob Zuständigkeiten pro einzelner Schicht oder für ganze Veranstaltungstage vergeben werden."
+        >
+          <Select
+            value={form.responsibleMode}
+            onChange={(e) => set('responsibleMode', e.target.value as 'BY_SHIFT' | 'BY_DAY')}
+          >
+            <option value="BY_SHIFT">Pro Schicht einzeln festlegen (z. B. Grillchef / Schichtleitung)</option>
+            <option value="BY_DAY">Pro Tag festlegen (gilt automatisch für alle Schichten des Tages)</option>
+          </Select>
+        </Field>
+
+        <Field
+          label="Tageswechsel-Uhrzeit"
+          hint="Ab welcher Uhrzeit Schichten zum neuen Tag zählen (z. B. 04:00 bei Chilbi oder Abendanlässen, damit Nachteinsätze bis 04:00 Uhr morgens noch zum Vortag gehören)."
+        >
+          <Input
+            type="time"
+            value={form.dayCutoffTime}
+            onChange={(e) => set('dayCutoffTime', e.target.value)}
+          />
+        </Field>
+
         <Field
           label="Mindestanzahl Schichten pro Person (optional)"
           hint="Zeigt dem OK im Helfer-Pool an, wer sein Schicht-Soll bereits erfüllt hat (z. B. 2 Schichten pro Leiter:in). Leer lassen für kein Soll."
@@ -627,6 +791,79 @@ function EventForm({
           {mode === 'create' ? 'Anlass erstellen' : 'Speichern'}
         </Button>
       </div>
+
+      {/* 10s Countdown-Warnungs-Dialog bei Adressänderung */}
+      {showSlugWarning && (
+        <Dialog
+          open={showSlugWarning}
+          onClose={() => setShowSlugWarning(false)}
+          size="md"
+          icon={<AlertTriangle className="text-danger-ink" />}
+          title="Achtung: Webadresse (Slug) ändern?"
+        >
+          <div className="space-y-4">
+            <Callout tone="danger">
+              <p className="font-semibold text-danger-ink">
+                Alle versendeten Links werden ungültig!
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">
+                Wenn du die Adresse von <strong className="text-fg font-mono">{initialSlug}</strong> zu{' '}
+                <strong className="text-fg font-mono">{form.slug}</strong> änderst, funktionieren alle bereits versendeten
+                Links (z.&nbsp;B. in WhatsApp-Gruppen, Einladungs-Mails, Flyern) sowie Lesezeichen sofort nicht mehr. Helfer:innen müssen den neuen Link erhalten.
+              </p>
+            </Callout>
+
+            <div className="rounded-card border border-line bg-surface-2 p-3 text-xs space-y-1.5 font-mono">
+              <div className="flex items-center justify-between text-fg-subtle">
+                <span>Alte URL:</span>
+                <span className="line-through text-danger-ink/80">…/events/{initialSlug}</span>
+              </div>
+              <div className="flex items-center justify-between font-semibold text-fg">
+                <span>Neue URL:</span>
+                <span className="text-accent-ink">…/events/{form.slug}</span>
+              </div>
+            </div>
+
+            <div className="rounded-card border border-line bg-surface-1 p-3 text-center">
+              <p className="text-xs text-fg-muted">
+                {countdown > 0 ? (
+                  <span>
+                    Sicherheits-Countdown: Bestätigung erst in{' '}
+                    <strong className="text-accent-ink text-sm tabular-nums">{countdown} Sekunden</strong>{' '}
+                    möglich…
+                  </span>
+                ) : (
+                  <span className="font-medium text-success-ink">
+                    Countdown abgelaufen. Du kannst die Änderung jetzt bestätigen.
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowSlugWarning(false)}
+              >
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                disabled={countdown > 0}
+                loading={saving}
+                onClick={async () => {
+                  setShowSlugWarning(false);
+                  await executeSave(form.slug);
+                }}
+                className={countdown === 0 ? 'bg-danger text-white hover:bg-danger-hover' : ''}
+              >
+                {countdown > 0 ? `Bitte warten (${countdown}s)` : 'Trotzdem ändern & speichern'}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </form>
   );
 }

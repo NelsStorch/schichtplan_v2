@@ -12,6 +12,8 @@ export interface ShiftTicketProps {
   canManage: boolean;
   needsLogin: boolean;
   busy?: boolean;
+  contactUser?: { id: string; displayName: string; phone?: string | null; email?: string | null } | null;
+  responsibles?: { id: string; displayName: string; phone?: string | null; email?: string | null }[];
   onSignup: (task?: ShiftTaskDto) => void;
   onCancel: (signupId?: string) => void;
   onRemoveHelper: (signupId: string, name: string) => void;
@@ -38,6 +40,8 @@ export function ShiftTicket({
   canManage,
   needsLogin,
   busy,
+  contactUser,
+  responsibles,
   onSignup,
   onCancel,
   onRemoveHelper,
@@ -135,6 +139,11 @@ export function ShiftTicket({
               </Badge>
             )}
             {shift.category ? <Badge>{shift.category}</Badge> : null}
+            {responsibles && responsibles.length > 0 && (
+              <Badge tone="neutral" className="max-w-[200px] truncate">
+                Leitung: {responsibles.map((r) => r.displayName).join(', ')}
+              </Badge>
+            )}
             {shift.minAge ? (
               <Badge tone="warning">Schicht ab {shift.minAge} J.</Badge>
             ) : null}
@@ -257,6 +266,11 @@ export function ShiftTicket({
               </span>{' '}
               · {STATUS_TEXT[status](free)}
             </p>
+            {status === 'full' && contactUser && (
+              <p className="mt-1 text-2xs font-semibold text-accent-ink">
+                Fragen an {contactUser.displayName}
+              </p>
+            )}
           </div>
 
           <div

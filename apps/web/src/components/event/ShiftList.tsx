@@ -3,7 +3,7 @@
 import { AlertCircle, Check, ChevronRight, Hammer, Plus, Timer } from 'lucide-react';
 import type { ShiftDto } from '@schichtplan/shared';
 import { Badge, Button, cn } from '@schichtplan/ui';
-import { fmtDayMonth, fmtShortWeekday, fmtTime } from '@/lib/format';
+import { businessDayKey, fmtDayMonth, fmtShortWeekday, fmtTime } from '@/lib/format';
 import { STATUS_STYLES, freeLabel, shiftStats, shiftTasks } from './shift-utils';
 
 export interface ShiftActions {
@@ -12,6 +12,10 @@ export interface ShiftActions {
   isMine: (shift: ShiftDto) => boolean;
   hasConflict?: (shift: ShiftDto) => boolean;
   busyShiftId: string | null;
+  contactName?: string | null;
+  dayResponsibles?: Record<string, { id: string; displayName: string }[]>;
+  responsibleMode?: 'BY_SHIFT' | 'BY_DAY';
+  dayCutoffTime?: string;
   onOpen: (shift: ShiftDto) => void;
   onQuickSignup: (shift: ShiftDto) => void;
 }
@@ -141,6 +145,12 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
         const showTasks = tasks.length > 1 || tasks[0]?.title !== shift.title;
         const mine = actions.isMine(shift);
         const style = STATUS_STYLES[stats.status];
+        const isFull = stats.free === 0;
+        const dayKey = businessDayKey(shift.startTime, actions.dayCutoffTime);
+        const responsibles =
+          actions.responsibleMode === 'BY_DAY'
+            ? actions.dayResponsibles?.[dayKey]
+            : shift.responsibles;
         return (
           <li key={shift.id}>
             <div
@@ -170,6 +180,11 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
                   {shift.isSetupTeardown && (
                     <Badge size="sm" tone="neutral">
                       <Hammer className="size-3" /> Auf-/Abbau
+                    </Badge>
+                  )}
+                  {responsibles && responsibles.length > 0 && (
+                    <Badge size="sm" tone="neutral" className="max-w-[180px] truncate">
+                      Leitung: {responsibles.map((r) => r.displayName).join(', ')}
                     </Badge>
                   )}
                   {shift.minAge ? (
@@ -225,6 +240,11 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
 
               <div className="flex shrink-0 flex-col items-end justify-between gap-2">
                 <span className={cn('tabular text-sm font-bold', style.text)}>{freeLabel(stats.free)}</span>
+                {isFull && actions.contactName && (
+                  <span className="text-2xs text-accent-ink font-semibold truncate max-w-[140px] text-right">
+                    Fragen: {actions.contactName}
+                  </span>
+                )}
                 {!stats.over && !mine && stats.free > 0 && actions.canSignup && (
                   actions.hasConflict?.(shift) ? (
                     <span

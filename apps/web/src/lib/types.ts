@@ -4,6 +4,8 @@ import type {
   EventViewerDto,
   RequiredProfileField,
   ShiftDto,
+  ResponsiblePersonDto,
+  EventResponsibleMode,
 } from '@schichtplan/shared';
 
 /** Antwort von GET /api/shifts/my */
@@ -59,4 +61,9 @@ export interface EventDetails {
   organizers?: EventOrganizer[];
   shifts: ShiftDto[];
   minShiftsPerPerson?: number | null;
+  contactUserId?: string | null;
+  contactUser?: ResponsiblePersonDto | null;
+  dayCutoffTime: string;
+  responsibleMode: EventResponsibleMode;
+  dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
 }
