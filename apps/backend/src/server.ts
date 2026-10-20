@@ -29,22 +29,27 @@ async function main() {
     });
   }
 
+  // Erinnerungs-Mails vor Schichten: nur wenn ausdrücklich eingeschaltet. Hooks müssen vor
+  // listen() registriert sein (danach wirft Fastify FST_ERR_INSTANCE_ALREADY_LISTENING).
+  if (process.env.SHIFT_REMINDERS_ENABLED === 'true') {
+    const run = () =>
+      sendDueShiftReminders(app.prisma)
+        .then((sent) => sent > 0 && app.log.info({ sent }, 'Schicht-Erinnerungen verschickt'))
+        .catch((err) => app.log.error(err, 'Schicht-Erinnerungen fehlgeschlagen'));
+    const timer = setInterval(run, REMINDER_INTERVAL_MS);
+    timer.unref();
+    const firstRun = setTimeout(run, 60 * 1000);
+    firstRun.unref();
+    app.addHook('onClose', async () => {
+      clearInterval(timer);
+      clearTimeout(firstRun);
+    });
+    app.log.info('Schicht-Erinnerungen eingeschaltet');
+  }
+
   try {
     await app.listen({ port: PORT, host: HOST });
     app.log.info(`Schichtplan Backend läuft auf http://${HOST}:${PORT}`);
-
-    // Erinnerungs-Mails vor Schichten: nur wenn ausdrücklich eingeschaltet
-    if (process.env.SHIFT_REMINDERS_ENABLED === 'true') {
-      const run = () =>
-        sendDueShiftReminders(app.prisma)
-          .then((sent) => sent > 0 && app.log.info({ sent }, 'Schicht-Erinnerungen verschickt'))
-          .catch((err) => app.log.error(err, 'Schicht-Erinnerungen fehlgeschlagen'));
-      const timer = setInterval(run, REMINDER_INTERVAL_MS);
-      timer.unref();
-      app.addHook('onClose', async () => clearInterval(timer));
-      setTimeout(run, 60 * 1000).unref();
-      app.log.info('Schicht-Erinnerungen eingeschaltet');
-    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);
