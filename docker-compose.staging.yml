@@ -48,6 +48,7 @@ services:
       SMTP_USER: ${SMTP_USER:-admin@cevi-schichtplan.ch}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-Cevi Schichtplan <admin@cevi-schichtplan.ch>}
+      SHIFT_REMINDERS_ENABLED: ${SHIFT_REMINDERS_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy

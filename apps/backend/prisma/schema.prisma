@@ -354,6 +354,8 @@ model ShiftSignup {
   guestPhone  String?
   isConfirmed Boolean    @default(true)
   notes       String?
+  /// Erinnerungs-Mail verschickt (oder vergeben, siehe services/shiftReminders.ts)
+  reminderSentAt DateTime? @map("reminder_sent_at")
   createdAt   DateTime   @default(now())
   shift       Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
   task        ShiftTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
