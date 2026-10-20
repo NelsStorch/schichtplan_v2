@@ -73,9 +73,14 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     }
     const user = await fastify.prisma.user.findUnique({
       where: { id: request.user.id },
-      select: { id: true, email: true, isGlobalAdmin: true },
+      select: { id: true, email: true, isGlobalAdmin: true, passwordChangedAt: true },
     });
     if (!user) return false;
+    // Nach einem neuen Passwort gelten ältere Tokens nicht mehr (iat ist in Sekunden)
+    const issuedAt = (request.user as { iat?: number }).iat;
+    if (user.passwordChangedAt && issuedAt !== undefined && (issuedAt + 1) * 1000 <= user.passwordChangedAt.getTime()) {
+      return false;
+    }
     request.user = {
       id: user.id,
       email: user.email || request.user.email,

@@ -16,7 +16,7 @@ import {
 } from '@schichtplan/ui';
 import { getLandingUrl, helpUrl } from '@schichtplan/shared/redirect';
 import type { CeviNameLoginErrorCode, DepartmentDirectoryItemDto, StufeRole } from '@schichtplan/shared';
-import { afterLogin, cleanReturnTo, departmentSlugFromReturnTo } from '@/lib/destination';
+import { afterLogin, cleanReturnTo, departmentSlugFromReturnTo, withReturnTo } from '@/lib/destination';
 
 type View = 'start' | 'ceviname' | 'ceviname_new' | 'password' | 'verify_sent';
 
@@ -687,6 +687,20 @@ function LoginContent() {
                   minLength={authMode === 'register' ? 8 : undefined}
                 />
               </Field>
+
+              {authMode === 'login' && (
+                <p className="-mt-2 text-right text-sm">
+                  <a
+                    href={withReturnTo(
+                      `/passwort-vergessen${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''}`,
+                      returnTo
+                    )}
+                    className="font-medium text-accent-ink underline-offset-4 hover:underline"
+                  >
+                    Passwort vergessen?
+                  </a>
+                </p>
+              )}
 
               {authMode === 'register' && (
                 <>

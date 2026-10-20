@@ -10,6 +10,7 @@ import tenantPlugin from './plugins/tenant.js';
 
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
+import passwordResetRoutes from './routes/passwordReset.js';
 import departmentRoutes from './routes/departments.js';
 import eventRoutes from './routes/events.js';
 import eventParticipationRoutes from './routes/eventParticipation.js';
@@ -87,6 +88,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Application routes
   await app.register(healthRoutes);
   await app.register(authRoutes);
+  await app.register(passwordResetRoutes);
   await app.register(departmentRoutes);
   await app.register(eventRoutes);
   await app.register(eventParticipationRoutes);
