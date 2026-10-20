@@ -149,7 +149,7 @@ export function MobilePwaIsometricGraphic({ className = '' }: { className?: stri
           <rect x="0" y="0" width="115" height="30" rx="15" fill="rgba(24, 24, 27, 0.92)" stroke="#f59e0b" strokeWidth="1" />
           <circle cx="15" cy="15" r="5" fill="#f59e0b" />
           <text x="26" y="19" fill="#fef3c7" fontSize="9" fontWeight="600" fontFamily="sans-serif">
-            ⚡ 100% Offline-PWA
+            ⚡ Ganz ohne App
           </text>
         </g>
       </svg>

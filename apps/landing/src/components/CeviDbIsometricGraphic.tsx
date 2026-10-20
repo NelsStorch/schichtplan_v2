@@ -127,7 +127,7 @@ export function CeviDbIsometricGraphic({ className = '' }: { className?: string 
           <circle cx="17" cy="17" r="7" fill="#3b82f6" />
           <path d="M14 17 L16 19 L20 15" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           <text x="32" y="21" fill="#f5f5f4" fontSize="10.5" fontWeight="700" fontFamily="sans-serif">
-            Hitobito OAuth
+            Cevi.DB-Login
           </text>
         </g>
 
@@ -136,7 +136,7 @@ export function CeviDbIsometricGraphic({ className = '' }: { className?: string 
           <rect
             x="0"
             y="0"
-            width="118"
+            width="140"
             height="34"
             rx="17"
             fill="rgba(28, 25, 23, 0.9)"
@@ -146,7 +146,7 @@ export function CeviDbIsometricGraphic({ className = '' }: { className?: string 
           <circle cx="17" cy="17" r="7" fill="#10b981" />
           <path d="M14 17 L16 19 L20 14" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           <text x="32" y="21" fill="#f5f5f4" fontSize="10.5" fontWeight="700" fontFamily="sans-serif">
-            Auto-Sync Rollen
+            Name & Abteilung
           </text>
         </g>
 
