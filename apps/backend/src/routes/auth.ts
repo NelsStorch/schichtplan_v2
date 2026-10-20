@@ -998,18 +998,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return u;
     });
 
-    const authToken = fastify.jwt.sign({
-      id: updatedUser.id,
-      email: updatedUser.email || `${updatedUser.id}@cevi-schichtplan.ch`,
-      isGlobalAdmin: updatedUser.isGlobalAdmin,
-    });
-
-    setAuthCookie(reply, authToken);
-
+    // Bewusst kein automatisches Login: Wer die Mail bekommt, hat das Konto nicht unbedingt angelegt
+    // (jemand kann ein Konto mit fremder E-Mail vorbereiten). Anmelden geht nur mit dem eigenen Passwort.
     return {
       success: true,
-      message: 'E-Mail-Adresse erfolgreich bestätigt!',
-      user: await loadUserDto(fastify.prisma, updatedUser.id, request.tenant?.id ?? null),
+      message: 'E-Mail-Adresse bestätigt. Melde dich jetzt mit deinem Passwort an.',
+      email: updatedUser.email,
+      name: updatedUser.ceviName || updatedUser.firstName,
     };
   });
 

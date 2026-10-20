@@ -13,7 +13,7 @@ import {
   ThemeToggle,
 } from '@schichtplan/ui';
 import { getLandingUrl } from '@schichtplan/shared/redirect';
-import { afterLogin, cleanReturnTo } from '@/lib/destination';
+import { cleanReturnTo, withReturnTo } from '@/lib/destination';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -57,15 +57,12 @@ function VerifyEmailContent() {
         }
 
         if (isMounted) {
-          const name = data.user?.ceviName || data.user?.firstName || '';
+          const name = data.name || '';
           setSuccess(
             name
-              ? `Hallo ${name}! Deine E-Mail-Adresse wurde erfolgreich bestätigt. Du wirst weitergeleitet …`
-              : 'Deine E-Mail-Adresse wurde erfolgreich bestätigt. Du wirst weitergeleitet …'
+              ? `Danke, ${name}! Deine E-Mail-Adresse ist bestätigt. Melde dich jetzt mit E-Mail und Passwort an.`
+              : 'Deine E-Mail-Adresse ist bestätigt. Melde dich jetzt mit E-Mail und Passwort an.'
           );
-          setTimeout(() => {
-            window.location.href = afterLogin(data.user, returnTo);
-          }, 1500);
         }
       } catch (err: any) {
         if (isMounted) {
@@ -152,6 +149,9 @@ function VerifyEmailContent() {
                 E-Mail bestätigt!
               </h1>
               <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">{success}</p>
+              <Button size="lg" className="mt-8 w-full" onClick={() => (window.location.href = withReturnTo('/', returnTo))}>
+                Zur Anmeldung
+              </Button>
             </div>
           )}
 
