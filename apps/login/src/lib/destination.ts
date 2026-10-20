@@ -1,4 +1,25 @@
 import { getDefaultDestination, safeReturnTo } from '@schichtplan/shared/redirect';
+import { RESERVED_SUBDOMAINS } from '@schichtplan/shared/constants';
+
+/**
+ * Abteilung, von der die Person kommt (illnau.cevi-schichtplan.ch → «illnau»), sonst null.
+ * Der Login mit Cevi-Name gibt es nur in diesem Fall.
+ */
+export function departmentSlugFromReturnTo(returnTo: string | null): string | null {
+  if (!returnTo || typeof window === 'undefined') return null;
+  let host: string;
+  try {
+    host = new URL(returnTo).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const own = window.location.hostname.toLowerCase();
+  const root = own === 'localhost' || own === '127.0.0.1' ? 'localhost' : own.replace(/^login\./, '');
+  if (!host.endsWith(`.${root}`)) return null;
+  const sub = host.slice(0, -(root.length + 1));
+  if (!sub || sub.includes('.') || (RESERVED_SUBDOMAINS as readonly string[]).includes(sub)) return null;
+  return sub;
+}
 
 /**
  * Weiterleitungsziel aus ?return_to, nur auf der eigenen Domain (login.<domain> → <domain> und Subdomains).

@@ -15,9 +15,19 @@ import {
   cn,
 } from '@schichtplan/ui';
 import { getLandingUrl, helpUrl } from '@schichtplan/shared/redirect';
-import { afterLogin, cleanReturnTo } from '@/lib/destination';
+import type { CeviNameLoginErrorCode, DepartmentDirectoryItemDto, StufeRole } from '@schichtplan/shared';
+import { afterLogin, cleanReturnTo, departmentSlugFromReturnTo } from '@/lib/destination';
 
-type View = 'start' | 'ceviname' | 'password' | 'verify_sent';
+type View = 'start' | 'ceviname' | 'ceviname_new' | 'password' | 'verify_sent';
+
+const STUFE_OPTIONS: { value: StufeRole | null; label: string }[] = [
+  { value: null, label: 'Nein' },
+  { value: 'TEILNEHMER', label: 'Teilnehmer*in' },
+  { value: 'LEITUNG', label: 'Leitung' },
+];
+
+/** 2010-03-14 → 14.03.2010 */
+const fmtBirthDate = (iso: string) => iso.split('-').reverse().join('.');
 
 // Fehlercodes, mit denen das Backend nach einem gescheiterten Cevi.DB-Login hierher zurückleitet
 const loginErrors: Record<string, string> = {
@@ -39,7 +49,10 @@ function destinationHost(returnTo: string | null): string | null {
 
 function LoginContent() {
   const searchParams = useSearchParams();
-  const returnTo = cleanReturnTo(searchParams.get('return_to'));
+  // Erst im Browser auswerten (braucht window.location): sonst rendert der Server ohne Ziel und
+  // der Browser mit Ziel, und React meldet einen Hydration-Fehler
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+  useEffect(() => setReturnTo(cleanReturnTo(searchParams.get('return_to'))), [searchParams]);
   const destination = destinationHost(returnTo);
   const [landingHref, setLandingHref] = useState('/');
   useEffect(() => setLandingHref(getLandingUrl()), []);
@@ -47,13 +60,25 @@ function LoginContent() {
   const [view, setView] = useState<View>('start');
   const [redirecting, setRedirecting] = useState(false);
 
-  // Cevi-Name
+  // Cevi-Name: nur, wenn die Person von einer Abteilung kommt (Login gilt nur für diese Abteilung)
+  const [department, setDepartment] = useState<DepartmentDirectoryItemDto | null>(null);
   const [quickCeviName, setQuickCeviName] = useState('');
+  const [quickBirthDate, setQuickBirthDate] = useState('');
   const [quickFirstName, setQuickFirstName] = useState('');
   const [quickLastName, setQuickLastName] = useState('');
-  const [quickBirthDate, setQuickBirthDate] = useState('');
   const [quickPhone, setQuickPhone] = useState('');
-  const [showQuickDetails, setShowQuickDetails] = useState(false);
+  const [quickStufen, setQuickStufen] = useState<Record<string, StufeRole>>({});
+  // Hinweis mit passendem Knopf, wenn das Konto einen anderen Login braucht
+  const [errorAction, setErrorAction] = useState<'cevidb' | 'password' | null>(null);
+
+  useEffect(() => {
+    const slug = departmentSlugFromReturnTo(returnTo);
+    if (!slug) return;
+    fetch('/api/departments/directory')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: DepartmentDirectoryItemDto[]) => setDepartment(list.find((d) => d.slug === slug) ?? null))
+      .catch(() => setDepartment(null));
+  }, [returnTo]);
 
   // E-Mail & Passwort
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -94,6 +119,7 @@ function LoginContent() {
   const goTo = (next: View) => {
     setView(next);
     setError(null);
+    setErrorAction(null);
     setSuccess(null);
     setResendNotice(null);
   };
@@ -118,41 +144,77 @@ function LoginContent() {
     }
   };
 
+  /** Cevi-Name-Login und -Registrierung: Antwort auswerten, bei Erfolg weiterleiten */
+  const handleCeviNameResponse = async (res: Response) => {
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setSuccess(`Hallo ${data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
+      setTimeout(() => {
+        window.location.href = afterLogin(data.user, returnTo);
+      }, 700);
+      return;
+    }
+    const code = data.code as CeviNameLoginErrorCode | undefined;
+    if (code === 'NOT_FOUND') {
+      setView('ceviname_new');
+      return;
+    }
+    if (code === 'EXISTS') setView('ceviname');
+    setErrorAction(code === 'USE_CEVIDB' ? 'cevidb' : code === 'USE_PASSWORD' ? 'password' : null);
+    setError(data.error || 'Das hat nicht geklappt. Bitte versuche es nochmals.');
+  };
+
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!department) return;
     setError(null);
+    setErrorAction(null);
     setSuccess(null);
     setLoading(true);
-
     try {
       const res = await fetch('/api/auth/ceviname-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          departmentSlug: department.slug,
           ceviName: quickCeviName.trim(),
-          firstName: quickFirstName.trim() || undefined,
-          lastName: quickLastName.trim() || undefined,
-          birthDate: quickBirthDate || undefined,
-          phone: quickPhone.trim() || undefined,
+          birthDate: quickBirthDate,
           returnTo: returnTo ?? undefined,
         }),
       });
+      await handleCeviNameResponse(res);
+    } catch {
+      setError('Keine Verbindung. Bitte versuche es nochmals.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (data.requiresPassword) {
-          setView('password');
-          setAuthMode('login');
-        }
-        throw new Error(data.error || 'Anmeldung fehlgeschlagen. Bitte versuche es nochmals.');
-      }
-
-      setSuccess(`Hallo ${data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
-      setTimeout(() => {
-        window.location.href = afterLogin(data.user, returnTo);
-      }, 700);
-    } catch (err: any) {
-      setError(err.message || 'Ein Fehler ist aufgetreten');
+  const handleQuickRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!department) return;
+    setError(null);
+    setErrorAction(null);
+    setSuccess(null);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/ceviname-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          departmentSlug: department.slug,
+          ceviName: quickCeviName.trim(),
+          birthDate: quickBirthDate,
+          firstName: quickFirstName.trim() || undefined,
+          lastName: quickLastName.trim() || undefined,
+          phone: quickPhone.trim() || undefined,
+          stufen: Object.entries(quickStufen).map(([stufeId, role]) => ({ stufeId, role })),
+          returnTo: returnTo ?? undefined,
+        }),
+      });
+      await handleCeviNameResponse(res);
+    } catch {
+      setError('Keine Verbindung. Bitte versuche es nochmals.');
     } finally {
       setLoading(false);
     }
@@ -223,6 +285,24 @@ function LoginContent() {
           <Callout tone="danger">
             {error}
           </Callout>
+          {errorAction === 'cevidb' && (
+            <a href={cevidbAuthUrl} className={buttonClasses({ className: 'w-full justify-between' })}>
+              Mit Cevi.DB anmelden <ArrowUpRight />
+            </a>
+          )}
+          {errorAction === 'password' && (
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={() => {
+                setAuthMode('login');
+                goTo('password');
+              }}
+            >
+              <KeyRound /> Mit E-Mail und Passwort anmelden
+            </Button>
+          )}
           {unverifiedEmail && (
             <div className="rounded-xl border border-line bg-surface p-3 text-xs flex flex-col gap-2">
               <span className="text-fg-muted">Bestätigungslink nicht erhalten?</span>
@@ -322,24 +402,27 @@ function LoginContent() {
             </div>
 
             <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface/70">
-              <li>
-                <button
-                  type="button"
-                  onClick={() => goTo('ceviname')}
-                  className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
-                    <UserRound className="size-[18px]" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-fg">Mit Cevi-Name</span>
-                    <span className="mt-0.5 block text-[13px] leading-snug text-fg-subtle">
-                      Ohne Passwort, für Helfer*innen, Eltern und Ehemalige
+              {/* Ohne Passwort nur, wenn die Person von einer Abteilung kommt: das Profil gehört zu dieser */}
+              {department && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => goTo('ceviname')}
+                    className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                  >
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
+                      <UserRound className="size-[18px]" />
                     </span>
-                  </span>
-                  <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
-                </button>
-              </li>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-fg">Mit Cevi-Name</span>
+                      <span className="mt-0.5 block text-[13px] leading-snug text-fg-subtle">
+                        Ohne Passwort, für Helfer*innen bei {department.name}
+                      </span>
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </button>
+                </li>
+              )}
               <li>
                 <button
                   type="button"
@@ -373,13 +456,13 @@ function LoginContent() {
           </button>
         )}
 
-        {view === 'ceviname' && (
+        {view === 'ceviname' && department && (
           <form key="ceviname" onSubmit={handleQuickSubmit} className="animate-fade-up">
             <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
               Mit Cevi-Name anmelden
             </h1>
             <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-              Kein Passwort nötig.
+              Für {department.name}. Kein Passwort nötig: Cevi-Name und Geburtsdatum sind dein Schlüssel.
             </p>
 
             <div className="mt-8 space-y-5">
@@ -392,71 +475,144 @@ function LoginContent() {
                   onChange={(e) => setQuickCeviName(e.target.value)}
                   autoComplete="nickname"
                   autoFocus
+                  required
                   minLength={2}
+                  maxLength={60}
                 />
               </Field>
 
               <Field
                 label="Geburtsdatum"
-                hint="Nur nötig für Schichten mit Altersgrenze, z. B. an der Bar."
+                required
+                hint="Gleich wie beim ersten Mal. So unterscheiden wir Personen mit gleichem Namen."
               >
                 <Input
                   type="date"
                   value={quickBirthDate}
                   onChange={(e) => setQuickBirthDate(e.target.value)}
                   autoComplete="bday"
+                  max={new Date().toISOString().slice(0, 10)}
+                  required
                 />
               </Field>
-
-              {showQuickDetails ? (
-                <div className="animate-fade-in space-y-5">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Vorname">
-                      <Input
-                        type="text"
-                        value={quickFirstName}
-                        onChange={(e) => setQuickFirstName(e.target.value)}
-                        autoComplete="given-name"
-                      />
-                    </Field>
-                    <Field label="Nachname">
-                      <Input
-                        type="text"
-                        value={quickLastName}
-                        onChange={(e) => setQuickLastName(e.target.value)}
-                        autoComplete="family-name"
-                      />
-                    </Field>
-                  </div>
-                  <Field label="Handynummer" hint="Für Notfälle während deiner Schicht.">
-                    <Input
-                      type="tel"
-                      value={quickPhone}
-                      onChange={(e) => setQuickPhone(e.target.value)}
-                      autoComplete="tel"
-                      placeholder="+41 79 000 00 00"
-                    />
-                  </Field>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowQuickDetails(true)}
-                  className="text-[13px] font-medium text-accent-ink underline-offset-4 transition hover:underline"
-                >
-                  Vor-, Nachname und Handynummer ergänzen
-                </button>
-              )}
 
               <Button
                 type="submit"
                 size="lg"
                 loading={loading}
-                disabled={!quickCeviName.trim() || !!success}
+                disabled={quickCeviName.trim().length < 2 || !quickBirthDate || !!success}
                 className="w-full"
               >
                 Weiter
               </Button>
+            </div>
+          </form>
+        )}
+
+        {view === 'ceviname_new' && department && (
+          <form key="ceviname_new" onSubmit={handleQuickRegister} className="animate-fade-up">
+            <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg text-balance">
+              Neu bei {department.name}?
+            </h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
+              Wir haben kein Profil für «{quickCeviName.trim()}», geboren am {fmtBirthDate(quickBirthDate)}, gefunden.
+              Tippfehler?{' '}
+              <button
+                type="button"
+                onClick={() => goTo('ceviname')}
+                className="font-medium text-accent-ink underline-offset-4 hover:underline"
+              >
+                Nochmals eingeben
+              </button>
+            </p>
+
+            <div className="mt-8 space-y-5">
+              {feedback}
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Vorname">
+                  <Input
+                    type="text"
+                    value={quickFirstName}
+                    onChange={(e) => setQuickFirstName(e.target.value)}
+                    autoComplete="given-name"
+                    maxLength={80}
+                  />
+                </Field>
+                <Field label="Nachname">
+                  <Input
+                    type="text"
+                    value={quickLastName}
+                    onChange={(e) => setQuickLastName(e.target.value)}
+                    autoComplete="family-name"
+                    maxLength={80}
+                  />
+                </Field>
+              </div>
+              <Field label="Handynummer" hint="Freiwillig. Damit dich das OK im Notfall erreicht.">
+                <Input
+                  type="tel"
+                  value={quickPhone}
+                  onChange={(e) => setQuickPhone(e.target.value)}
+                  autoComplete="tel"
+                  placeholder="+41 79 000 00 00"
+                />
+              </Field>
+
+              {department.stufen.length > 0 && (
+                <section aria-labelledby="stufen-titel">
+                  <h2 id="stufen-titel" className="text-sm font-semibold text-fg">
+                    In welchen Stufen bist du dabei?
+                  </h2>
+                  <p className="mt-1 text-[13px] text-fg-subtle">Wähle alle, die passen. Keine ist auch in Ordnung.</p>
+                  <ul className="mt-3 divide-y divide-line rounded-card border border-line bg-surface/70">
+                    {department.stufen.map((stufe) => {
+                      const role = quickStufen[stufe.id] ?? null;
+                      return (
+                        <li key={stufe.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                          <span className="text-sm font-semibold text-fg">{stufe.name}</span>
+                          <div
+                            role="radiogroup"
+                            aria-label={`Rolle in ${stufe.name}`}
+                            className="flex rounded-full bg-surface-2 p-0.5"
+                          >
+                            {STUFE_OPTIONS.map((option) => (
+                              <button
+                                key={option.label}
+                                type="button"
+                                role="radio"
+                                aria-checked={role === option.value}
+                                onClick={() =>
+                                  setQuickStufen((prev) => {
+                                    const next = { ...prev };
+                                    if (option.value) next[stufe.id] = option.value;
+                                    else delete next[stufe.id];
+                                    return next;
+                                  })
+                                }
+                                className={cn(
+                                  'rounded-full px-3 py-1.5 text-xs font-semibold transition',
+                                  role === option.value ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+                                )}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
+
+              <Button type="submit" size="lg" loading={loading} disabled={!!success} className="w-full">
+                Profil anlegen und weiter
+              </Button>
+              <p className="px-1 text-[13px] leading-relaxed text-fg-subtle">
+                Beim nächsten Mal meldest du dich hier wieder mit Cevi-Name und Geburtsdatum an. Für Aufgaben im OK
+                brauchst du ein Konto mit Cevi.DB oder mit E-Mail und Passwort.
+              </p>
             </div>
           </form>
         )}

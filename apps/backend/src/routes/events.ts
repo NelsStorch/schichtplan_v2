@@ -20,6 +20,7 @@ import {
   hasValidGrant,
   managerFlags,
 } from '../services/eventAccess.js';
+import { resolveOrganizerUser } from '../services/ceviNameLogin.js';
 import { isDepartmentInsider } from '../services/departmentVisibility.js';
 import { cleanRequiredFields, missingProfileFields } from '../services/profile.js';
 
@@ -457,20 +458,26 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (Array.isArray(requestedOrganizers) && requestedOrganizers.length > 0) {
         for (const item of requestedOrganizers) {
-          let targetUser = null;
-          if (item.userId) {
-            targetUser = await fastify.prisma.user.findUnique({ where: { id: item.userId } });
-          } else if (item.ceviName) {
-            targetUser = await fastify.prisma.user.findFirst({
-              where: { ceviName: { equals: item.ceviName.trim(), mode: 'insensitive' } },
-            });
-          } else if (item.email) {
-            targetUser = await fastify.prisma.user.findUnique({
-              where: { email: item.email.toLowerCase() },
-            });
+          // Der Ersteller selbst ist schon berechtigt (Abteilungsleitung oder Planung)
+          if (item.userId === request.user.id) {
+            if (!userIdsSeen.has(request.user.id)) {
+              userIdsSeen.add(request.user.id);
+              organizersToCreate.push({
+                userId: request.user.id,
+                role: item.role || 'OK_LEAD',
+                roleTitle: item.roleTitle?.trim() || 'Event-Leitung',
+              });
+            }
+            continue;
           }
+          const resolved = await resolveOrganizerUser(fastify.prisma, request.tenant.id, item);
+          if ('error' in resolved) {
+            const who = item.ceviName || item.email || 'Eine Person';
+            return reply.status(resolved.status).send({ error: `OK: ${who}: ${resolved.error}` });
+          }
+          const targetUser = resolved.user;
 
-          if (targetUser && !userIdsSeen.has(targetUser.id)) {
+          if (!userIdsSeen.has(targetUser.id)) {
             userIdsSeen.add(targetUser.id);
             organizersToCreate.push({
               userId: targetUser.id,
@@ -669,23 +676,12 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { userId, ceviName, email, role, roleTitle } = parse.data;
 
-      // Benutzer finden anhand ID, Cevi-Name oder E-Mail
-      let targetUser = null;
-      if (userId) {
-        targetUser = await fastify.prisma.user.findUnique({ where: { id: userId } });
-      } else if (ceviName) {
-        targetUser = await fastify.prisma.user.findFirst({
-          where: { ceviName: { equals: ceviName.trim(), mode: 'insensitive' } },
-        });
-      } else if (email) {
-        targetUser = await fastify.prisma.user.findUnique({
-          where: { email: email.toLowerCase() },
-        });
+      // Benutzer finden anhand ID, E-Mail oder Cevi-Name (nur Konten mit Cevi.DB oder Passwort)
+      const resolved = await resolveOrganizerUser(fastify.prisma, request.tenant.id, { userId, ceviName, email });
+      if ('error' in resolved) {
+        return reply.status(resolved.status).send({ error: resolved.error });
       }
-
-      if (!targetUser) {
-        return reply.status(404).send({ error: 'Benutzer für das OK nicht gefunden' });
-      }
+      const targetUser = resolved.user;
 
       const organizer = await fastify.prisma.eventOrganizer.upsert({
         where: {

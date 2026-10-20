@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from '../db.js';
 import { PLACEHOLDER_EMAIL_REGEX, type UpdateProfileInput } from '@schichtplan/shared';
+import { findCeviNameMatches, isCeviNameProfile } from './ceviNameLogin.js';
 
 /**
  * Profilangaben der Person selbst ändern (nur gesetzte Felder).
@@ -11,7 +12,17 @@ export async function applyProfileUpdate(
   userId: string,
   input: UpdateProfileInput
 ): Promise<{ ok: true } | { error: string; status: number }> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      ceviName: true,
+      passwordHash: true,
+      ceviDbId: true,
+      homeDepartmentId: true,
+      memberships: { select: { departmentId: true } },
+    },
+  });
   if (!user) return { error: 'Benutzerkonto nicht gefunden', status: 404 };
 
   const data: Prisma.UserUpdateInput = {};
@@ -22,6 +33,23 @@ export async function applyProfileUpdate(
   if (input.birthDate !== undefined) {
     const date = new Date(`${input.birthDate}T00:00:00Z`);
     if (isNaN(date.getTime()) || date > new Date()) return { error: 'Ungültiges Geburtsdatum', status: 400 };
+    // Bei Cevi-Name-Profilen ist das Geburtsdatum Teil des Logins: pro Abteilung eindeutig mit dem Namen
+    if (user.ceviName && isCeviNameProfile(user)) {
+      const departmentIds = [
+        ...new Set([user.homeDepartmentId, ...user.memberships.map((m) => m.departmentId)].filter(Boolean)),
+      ] as string[];
+      for (const departmentId of departmentIds) {
+        const clash = (await findCeviNameMatches(prisma, departmentId, user.ceviName, input.birthDate)).some(
+          (m) => m.id !== userId
+        );
+        if (clash) {
+          return {
+            error: 'In deiner Abteilung gibt es schon ein Profil mit diesem Cevi-Namen und Geburtsdatum.',
+            status: 409,
+          };
+        }
+      }
+    }
     data.birthDate = date;
   }
   if (input.email !== undefined) {

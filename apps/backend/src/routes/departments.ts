@@ -13,6 +13,7 @@ import {
 import { autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
 import { isDepartmentInsider } from '../services/departmentVisibility.js';
+import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
 
 const toStufeDto = (s: {
   id: string;
@@ -284,6 +285,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         ceviDbDepartmentLeader: true,
         homeDepartmentId: true,
         homeDepartmentSource: true,
+        passwordHash: true,
+        ceviDbId: true,
         memberships: { where: { departmentId: tenant.id }, select: { role: true } },
         stufen: {
           where: { stufe: { departmentId: tenant.id } },
@@ -305,6 +308,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         source: isHome ? (u.homeDepartmentSource === 'CEVIDB' ? 'CEVIDB' : 'SELF') : null,
         departmentRole: role(u.memberships[0]?.role),
         isCeviDbDepartmentLeader: u.ceviDbDepartmentLeader,
+        isCeviNameProfile: isCeviNameProfile(u),
         stufen: u.stufen
           .sort((a, b) => a.stufe.sortOrder - b.stufe.sortOrder)
           .map((s) => ({
@@ -331,9 +335,13 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, homeDepartmentId: true },
+        select: { id: true, homeDepartmentId: true, passwordHash: true, ceviDbId: true },
       });
       if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+
+      if (departmentRole && departmentRole !== 'HELPER' && isCeviNameProfile(user)) {
+        return reply.status(400).send({ error: CEVINAME_ROLE_ERROR });
+      }
 
       if (departmentRole && userId === request.user.id && departmentRole !== 'ADMIN') {
         return reply.status(400).send({ error: 'Du kannst dir die Abteilungsleitung nicht selbst entziehen.' });
@@ -428,6 +436,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
               lastName: true,
               ceviName: true,
               email: true,
+              passwordHash: true,
+              ceviDbId: true,
             },
           },
         },
@@ -444,6 +454,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         lastName: m.user.lastName,
         ceviName: m.user.ceviName,
         email: m.user.email,
+        // Nur Cevi-Name-Profil: kann eingeteilt, aber nicht ins OK aufgenommen werden
+        isCeviNameProfile: isCeviNameProfile(m.user),
         displayName: m.user.ceviName
           ? `${m.user.ceviName} (${m.user.firstName} ${m.user.lastName})`
           : `${m.user.firstName} ${m.user.lastName}`,

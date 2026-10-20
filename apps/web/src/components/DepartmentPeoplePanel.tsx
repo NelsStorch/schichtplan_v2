@@ -218,8 +218,11 @@ function PersonEditor({
               type="button"
               role="radio"
               aria-checked={deptRole === r}
-              // Die eigene Abteilungsleitung kann man nicht selbst entziehen
-              disabled={isSelf && person.departmentRole === 'ADMIN' && r !== 'ADMIN'}
+              // Die eigene Abteilungsleitung kann man nicht selbst entziehen; Cevi-Name-Profile bleiben Helfer*in
+              disabled={
+                (isSelf && person.departmentRole === 'ADMIN' && r !== 'ADMIN') ||
+                (person.isCeviNameProfile && r !== 'HELPER')
+              }
               onClick={() => setDeptRole(r)}
               className={cn(
                 'h-8 rounded-full border px-3 text-xs font-semibold transition disabled:opacity-40',
@@ -233,6 +236,12 @@ function PersonEditor({
         <p className="mt-2 text-xs leading-relaxed text-fg-muted">
           {ROLE_DESCRIPTIONS[deptRole]}
         </p>
+        {person.isCeviNameProfile && (
+          <p className="mt-2 text-xs leading-relaxed text-warning-ink">
+            Nur Cevi-Name-Profil (ohne Passwort): bleibt Helfer*in. Für Planung oder Abteilungsleitung braucht die
+            Person ein Konto mit Cevi.DB oder mit E-Mail und Passwort.
+          </p>
+        )}
         <div className="mt-2.5 rounded-card border border-line/60 bg-surface/60 p-2 text-2xs leading-normal text-fg-subtle">
           💡 <strong>Hinweis:</strong> Wer Schichten für einen bestimmten Anlass (z. B. Chilbi) planen darf, wird unabhängig von dieser Rolle direkt im jeweiligen Event unter <em>Einstellungen → OK-Team</em> festgelegt.
         </div>

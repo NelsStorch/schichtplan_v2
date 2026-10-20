@@ -29,7 +29,8 @@ export function safeReturnTo(
   const host = url.hostname.toLowerCase();
   const root = rootDomain.replace(/^\./, '').toLowerCase();
   const isOwnDomain = host === root || host.endsWith(`.${root}`);
-  const isLocal = allowLocalhost && (host === 'localhost' || host === '127.0.0.1');
+  // *.localhost für lokale Abteilungs-Subdomains (z. B. illnau.localhost:3000)
+  const isLocal = allowLocalhost && (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost'));
 
   if (isOwnDomain && url.protocol === 'https:') return url.toString();
   if (isLocal) return url.toString();

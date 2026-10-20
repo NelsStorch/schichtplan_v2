@@ -970,7 +970,11 @@ function OrganizerForm({
   return (
     <form onSubmit={submit} className="space-y-5">
       {error && <Callout tone="danger">{error}</Callout>}
-      <Field label="Cevi-Name oder E-Mail" required hint="Die Person braucht bereits ein Konto.">
+      <Field
+        label="Cevi-Name oder E-Mail"
+        required
+        hint="Die Person braucht ein Konto mit Cevi.DB oder mit E-Mail und Passwort. Bei gleichen Cevi-Namen die E-Mail angeben."
+      >
         <Input
           value={form.who}
           autoFocus

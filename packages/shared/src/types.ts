@@ -189,6 +189,8 @@ export interface UserDto {
   stufen?: UserStufeDto[];
   /** Hat die Abteilung noch nicht angegeben (auch nicht «keine») */
   needsDepartmentSetup?: boolean;
+  /** Nur Cevi-Name-Profil (ohne Cevi.DB und Passwort) */
+  isCeviNameProfile?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,8 +250,21 @@ export interface DepartmentPersonDto {
   departmentRole: 'ADMIN' | 'PLANNER' | 'HELPER' | null;
   /** Hat in Cevi.DB eine Abteilungsleitungs-Rolle (CEVIDB_DEPARTMENT_LEADER_ROLES) */
   isCeviDbDepartmentLeader: boolean;
+  /** Nur Cevi-Name-Profil (ohne Cevi.DB und Passwort): kann keine Rollen bekommen */
+  isCeviNameProfile: boolean;
   stufen: { stufeId: string; name: string; role: StufeRole; source: 'SELF' | 'CEVIDB' }[];
 }
+
+/** Antwort von POST /api/auth/ceviname-login, wenn es nicht direkt klappt */
+export type CeviNameLoginErrorCode =
+  /** Kein Profil mit diesem Cevi-Namen und Geburtsdatum in der Abteilung: Registrierung anbieten */
+  | 'NOT_FOUND'
+  /** Es gibt ein Konto, aber es ist mit Cevi.DB bzw. Passwort geschützt oder hat Rechte */
+  | 'USE_CEVIDB'
+  | 'USE_PASSWORD'
+  /** Profil existiert schon (bei der Registrierung) */
+  | 'EXISTS'
+  | 'RATE_LIMITED';
 
 // ---------------------------------------------------------------------------
 // Zugang zu Anlässen

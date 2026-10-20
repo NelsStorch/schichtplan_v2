@@ -67,17 +67,50 @@ export const RegisterHelperSchema = z.object({
 
 export type RegisterHelperInput = z.infer<typeof RegisterHelperSchema>;
 
+/** Geburtsdatum JJJJ-MM-TT, das es gibt, nicht in der Zukunft und nicht vor 1900 */
+const BirthDateSchema = z
+  .string({ error: 'Geburtsdatum fehlt' })
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Geburtsdatum im Format JJJJ-MM-TT (z.B. 2005-08-14)')
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00Z`);
+    return (
+      !Number.isNaN(date.getTime()) &&
+      date.toISOString().startsWith(value) &&
+      date.getUTCFullYear() >= 1900 &&
+      date.getTime() <= Date.now()
+    );
+  }, 'Bitte ein gültiges Geburtsdatum angeben');
+
+/**
+ * Login mit Cevi-Name: nur an einer Abteilung. Cevi-Name + Geburtsdatum + Abteilung bestimmen
+ * das Profil (gleiche Namen in einer Abteilung sind erlaubt, solange das Geburtsdatum anders ist).
+ */
 export const CeviNameQuickLoginSchema = z.object({
-  ceviName: z.string().min(2, 'Cevi-Name muss mindestens 2 Zeichen lang sein'),
-  firstName: z.string().min(2, 'Vorname ist erforderlich').optional(),
-  lastName: z.string().min(2, 'Nachname ist erforderlich').optional(),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Geburtsdatum im Format JJJJ-MM-TT (z.B. 2005-08-14)').optional(),
-  phone: z.string().optional(),
-  departmentSlug: z.string().optional(),
+  departmentSlug: z.string().trim().min(1, 'Abteilung fehlt'),
+  ceviName: z.string().trim().min(2, 'Cevi-Name muss mindestens 2 Zeichen lang sein').max(60),
+  birthDate: BirthDateSchema,
   returnTo: z.string().optional(),
 });
 
 export type CeviNameQuickLoginInput = z.infer<typeof CeviNameQuickLoginSchema>;
+
+/** Neues Cevi-Name-Profil an einer Abteilung, wenn der Login niemanden gefunden hat */
+export const CeviNameRegisterSchema = CeviNameQuickLoginSchema.extend({
+  firstName: z.string().trim().max(80).optional(),
+  lastName: z.string().trim().max(80).optional(),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9 ()\/-]{7,25}$/, 'Bitte eine gültige Handynummer angeben')
+    .optional()
+    .or(z.literal('')),
+  stufen: z
+    .array(z.object({ stufeId: z.string().uuid(), role: z.enum(['LEITUNG', 'TEILNEHMER']) }))
+    .max(20)
+    .default([]),
+});
+
+export type CeviNameRegisterInput = z.infer<typeof CeviNameRegisterSchema>;
 
 export const CreateEventOrganizerItemSchema = z.object({
   userId: z.string().uuid().optional(),

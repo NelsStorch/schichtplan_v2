@@ -70,6 +70,8 @@ interface DeptMemberItem {
   ceviName?: string | null;
   email?: string | null;
   displayName: string;
+  /** Nur Cevi-Name-Profil: kann nicht ins OK */
+  isCeviNameProfile?: boolean;
 }
 
 const EMPTY: EventFormValues = {
@@ -301,9 +303,9 @@ function EventForm({
     }
   };
 
-  // Verfügbare Mitglieder, die noch nicht im OK sind
+  // Verfügbare Mitglieder, die noch nicht im OK sind (Cevi-Name-Profile können keine Rolle haben)
   const availableMembers = deptMembers.filter(
-    (m) => !organizers.some((o) => o.userId === m.userId)
+    (m) => !m.isCeviNameProfile && !organizers.some((o) => o.userId === m.userId)
   );
 
   return (
