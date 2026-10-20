@@ -91,6 +91,8 @@ if [ "$backup" = "1" ]; then
     [ -s "`$file" ] || { echo "Backup ist leer"; exit 1; }
     echo "Backup: `$file (`$(du -h "`$file" | cut -f1))"
     ls -1t backups/pre-deploy-*.sql.gz | tail -n +11 | xargs -r rm --
+    # Hoechstens 40 Tage aufbewahren (Datenschutzerklaerung): geloeschte Konten nicht unbegrenzt in alten Dumps
+    find backups -maxdepth 1 -name 'pre-deploy-*.sql.gz' -mtime +40 -delete
   else
     echo "Keine laufende Datenbank gefunden, kein Backup (erster Deploy?)"
   fi

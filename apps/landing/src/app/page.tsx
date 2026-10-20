@@ -442,6 +442,9 @@ export default function LandingPage() {
             <a href={helpUrl()} className="hover:text-fg transition">
               Hilfe
             </a>
+            <Link href="/datenschutz" className="hover:text-fg transition">
+              Datenschutz
+            </Link>
             <a
               href="https://github.com/NelsStorch/schichtplan_v2"
               target="_blank"

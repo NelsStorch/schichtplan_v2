@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Link2 } from 'lucide-react';
 import { Button, Callout, CeviLogo, Field, Input, ThemeToggle } from '@schichtplan/ui';
 import { cleanReturnTo, withReturnTo } from '@/lib/destination';
+import { AuthFooter } from '@/components/AuthFooter';
 
 /**
  * Nach dem Cevi.DB-Login: Es gibt schon ein Konto mit Passwort und derselben E-Mail.
@@ -135,6 +136,8 @@ function LinkAccount() {
           </form>
         )}
       </main>
+
+      <AuthFooter />
     </div>
   );
 }

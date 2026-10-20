@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { CeviLogo, ThemeToggle } from '@schichtplan/ui';
+import { AuthFooter } from './AuthFooter';
 
 /** Rahmen der kleinen Login-Seiten (Kopf mit Logo, schmale Mitte) wie bei «Konto verknüpfen» */
 export function AuthShell({ children }: { children: ReactNode }) {
@@ -18,6 +19,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <main id="inhalt" className="relative mx-auto flex w-full max-w-[25rem] flex-1 flex-col justify-center px-5 pb-16">
         {children}
       </main>
+
+      <AuthFooter />
     </div>
   );
 }

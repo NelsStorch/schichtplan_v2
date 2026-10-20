@@ -117,6 +117,9 @@ export function helpUrl(path = '/'): string {
   return `${HELP_URL}${path}`;
 }
 
+/** Datenschutzerklärung auf der Landingpage, wie die Hilfe fest auf Produktion (gilt für alle Subdomains) */
+export const PRIVACY_URL = 'https://cevi-schichtplan.ch/datenschutz';
+
 /** Ziel nach dem Login ohne return_to: eigene Abteilung, sonst Landingpage (nie zurück aufs Login). */
 export function getDefaultDestination(homeDepartmentSlug?: string | null): string {
   return homeDepartmentSlug ? getDepartmentUrl(homeDepartmentSlug) : getLandingUrl();
