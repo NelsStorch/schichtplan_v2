@@ -161,6 +161,7 @@ export const CreateEventSchema = z.object({
   dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional().default('04:00'),
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
   contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional().default('BOTH'),
+  signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
@@ -188,6 +189,7 @@ export const UpdateEventSchema = z.object({
   dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional(),
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional(),
   contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional(),
+  signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
@@ -385,6 +387,7 @@ export const InstantiateTemplateSchema = z.object({
   dayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Uhrzeit muss im Format HH:MM angegeben werden (z. B. 04:00)').optional().default('04:00'),
   responsibleMode: z.enum(['BY_SHIFT', 'BY_DAY']).optional().default('BY_SHIFT'),
   contactVisibility: z.enum(['BOTH', 'PHONE', 'EMAIL', 'NONE']).optional().default('BOTH'),
+  signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
 });

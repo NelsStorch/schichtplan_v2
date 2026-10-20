@@ -27,6 +27,7 @@ export interface EventFormValues {
   dayCutoffTime: string;
   responsibleMode: 'BY_SHIFT' | 'BY_DAY';
   contactVisibility: EventContactVisibility;
+  signupOpensAt: string;
   attendanceMode: AttendanceMode;
   access: EventAccessValues;
 }
@@ -54,6 +55,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     dayCutoffTime: event.dayCutoffTime ?? '04:00',
     responsibleMode: event.responsibleMode ?? 'BY_SHIFT',
     contactVisibility: event.contactVisibility ?? 'BOTH',
+    signupOpensAt: event.signupOpensAt ? toLocalInput(event.signupOpensAt) : '',
     attendanceMode: event.attendanceMode ?? 'OFF',
     access: {
       accessType: event.accessType,
@@ -110,6 +112,7 @@ const EMPTY: EventFormValues = {
   dayCutoffTime: '04:00',
   responsibleMode: 'BY_SHIFT',
   contactVisibility: 'BOTH',
+  signupOpensAt: '',
   attendanceMode: 'OFF',
   access: EMPTY_ACCESS,
 };
@@ -303,6 +306,7 @@ function EventForm({
         dayCutoffTime: form.dayCutoffTime || '04:00',
         responsibleMode: form.responsibleMode,
         contactVisibility: form.contactVisibility,
+        signupOpensAt: form.signupOpensAt ? new Date(form.signupOpensAt).toISOString() : null,
         attendanceMode: form.attendanceMode,
         ...accessPayload(form.access),
       };
@@ -769,6 +773,17 @@ function EventForm({
               const val = e.target.value.trim();
               set('cancelDeadlineDays', val === '' ? null : Math.max(0, parseInt(val, 10) || 0));
             }}
+          />
+        </Field>
+
+        <Field
+          label="Freischaltung zum Eintragen (optional)"
+          hint="Datum und Uhrzeit, ab wann sich Helfer:innen selbst eintragen können. Leer lassen = sofort offen. Das OK kann Personen jederzeit auch vorab manuell einteilen."
+        >
+          <Input
+            type="datetime-local"
+            value={form.signupOpensAt}
+            onChange={(e) => set('signupOpensAt', e.target.value)}
           />
         </Field>
 

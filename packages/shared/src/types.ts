@@ -72,6 +72,7 @@ export interface EventDto {
   dayCutoffTime?: string;
   responsibleMode?: EventResponsibleMode;
   contactVisibility?: EventContactVisibility;
+  signupOpensAt?: string | null;
   attendanceMode?: AttendanceMode;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
   checkinToken?: string | null;
@@ -329,7 +330,8 @@ export type EventAccessReason =
   | 'WRONG_DEPARTMENT'
   | 'WRONG_STUFE'
   | 'LEADERS_ONLY'
-  | 'SIGNUP_CLOSED';
+  | 'SIGNUP_CLOSED'
+  | 'SIGNUP_NOT_YET_OPEN';
 
 export interface EventAccessDto {
   canSignup: boolean;

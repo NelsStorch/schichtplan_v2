@@ -39,6 +39,7 @@ import { AppShell } from '@/components/AppShell';
 import { EventFormDialog, eventFormInitial } from '@/components/EventFormDialog';
 import { AccessTypeBadge } from '@/components/event-meta';
 import { AccessNotice } from '@/components/event/AccessNotice';
+import { SignupCountdown } from '@/components/SignupCountdown';
 import { ParticipationDialog } from '@/components/event/ParticipationDialog';
 import { ShiftGrid } from '@/components/event/ShiftGrid';
 import { NeededShifts, ShiftRows, type ShiftActions } from '@/components/event/ShiftList';
@@ -196,8 +197,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const canManageShifts = isPlanner || isEventOk;
   const canManageEvent = isDeptAdmin || isOkLead;
   const needsLogin = !user;
-  // Eintragen-Knöpfe zeigen, wenn es geht oder nur noch der Login fehlt
-  const showSignup = access.canSignup || access.reason === 'LOGIN_REQUIRED';
+  // Eintragen-Knöpfe zeigen, wenn es geht oder nur noch der Login fehlt (und Freischaltzeit erreicht ist)
+  const isSignupTimeOpen = !event.signupOpensAt || new Date() >= new Date(event.signupOpensAt);
+  const showSignup = access.canSignup || (access.reason === 'LOGIN_REQUIRED' && isSignupTimeOpen);
   const isMine = (shift: ShiftDto) => Boolean(user && shift.signups?.some((s) => s.userId === user.id));
   const myShiftCount = event.shifts.filter(isMine).length;
 
@@ -515,8 +517,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           </div>
         </section>
 
-        {/* Hinweise: Einladungs-Link und Zugang */}
+        {/* Hinweise: Freischaltung, Einladungs-Link und Zugang */}
         <div className="mt-4 space-y-3">
+          {event.signupOpensAt && new Date() < new Date(event.signupOpensAt) && (
+            <SignupCountdown opensAt={event.signupOpensAt} onOpen={load} />
+          )}
           {pendingToken && !user && !portalLoading && (
             <Callout tone="info" title="Du hast einen Einladungs-Link">
               <p>Melde dich an, damit der Link gilt. Ein Cevi-Name ohne Passwort reicht.</p>
@@ -763,7 +768,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         onClose={() => setSelectedShiftId(null)}
         currentUser={user}
         needsLogin={needsLogin}
-        blockedReason={user && !access.canSignup ? access.message : null}
+        blockedReason={!access.canSignup ? access.message : null}
         canManage={canManageShifts}
         busy={Boolean(selectedShift && busyShift === selectedShift.id)}
         onSignup={(task) => {

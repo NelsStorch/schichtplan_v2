@@ -53,6 +53,15 @@ export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedI
       );
     case 'SIGNUP_CLOSED':
       return <Callout tone="info" title="Eintragen geschlossen">{access.message}</Callout>;
+    case 'SIGNUP_NOT_YET_OPEN':
+      return (
+        <Callout tone="info" title="Anmeldung noch nicht geöffnet">
+          <p>{access.message}</p>
+          <p className="mt-1 text-xs text-fg-muted">
+            Du kannst dir die Schichten und Arbeiten bereits in der Vorschau ansehen.
+          </p>
+        </Callout>
+      );
     default:
       return (
         <Callout tone="info" title="Für dich nicht freigeschaltet">

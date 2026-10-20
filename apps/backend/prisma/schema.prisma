@@ -182,6 +182,8 @@ model Event {
   responsibleMode   String            @default("BY_SHIFT") @map("responsible_mode")
   // Welche Kontaktdaten der Verantwortlichen sichtbar sind: "BOTH", "PHONE", "EMAIL", "NONE"
   contactVisibility String            @default("BOTH") @map("contact_visibility")
+  // Freischaltung zum Eintragen (null = sofort nach Veröffentlichung offen)
+  signupOpensAt     DateTime?         @map("signup_opens_at")
   // Austrage-Sperre in Tagen vor Anlassbeginn (null = keine Sperre, 0 = bis Anlassbeginn, z. B. 3 = bis 3 Tage vorher)
   cancelDeadlineDays Int?             @map("cancel_deadline_days")
   // Anwesenheit: "OFF", "OK_ONLY" (nur das OK hakt ab) oder "OK_AND_QR" (zusätzlich Selbst-Check-in per QR-Code)

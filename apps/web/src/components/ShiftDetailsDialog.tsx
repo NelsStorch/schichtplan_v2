@@ -30,6 +30,7 @@ import {
 } from '@schichtplan/ui';
 import { fmtDuration, fmtTime, fmtWeekday, fmtDayMonth, isPast, businessDayKey } from '@/lib/format';
 import { loginUrl } from '@/lib/api';
+import { SignupCountdown } from './SignupCountdown';
 import type { EventDetails } from '@/lib/types';
 
 export interface ShiftDetailsDialogProps {
@@ -231,6 +232,11 @@ export function ShiftDetailsDialog({
             </p>
           )}
         </div>
+
+        {/* Freischaltung ausstehend */}
+        {event.signupOpensAt && new Date() < new Date(event.signupOpensAt) && !canManage && (
+          <SignupCountdown opensAt={event.signupOpensAt} />
+        )}
 
         {/* Schicht voll: Kontaktperson für Fragen */}
         {status === 'full' && event.contactUser && (
@@ -479,12 +485,12 @@ export function ShiftDetailsDialog({
                         <span className="rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted border border-line">
                           Voll besetzt
                         </span>
-                      ) : blockedReason ? (
+                      ) : (blockedReason || (needsLogin && event.signupOpensAt && new Date() < new Date(event.signupOpensAt))) ? (
                         <span
-                          title={blockedReason}
+                          title={blockedReason || `Das Eintragen ist erst ab ${new Date(event.signupOpensAt!).toLocaleString('de-CH')} Uhr möglich.`}
                           className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted"
                         >
-                          <Lock className="size-3" /> Für dich nicht freigeschaltet
+                          <Lock className="size-3" /> {event.viewer?.access?.reason === 'SIGNUP_NOT_YET_OPEN' || (event.signupOpensAt && new Date() < new Date(event.signupOpensAt)) ? 'Noch nicht geöffnet' : 'Für dich nicht freigeschaltet'}
                         </span>
                       ) : needsLogin ? (
                         <a

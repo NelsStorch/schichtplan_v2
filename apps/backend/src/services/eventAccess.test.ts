@@ -136,6 +136,22 @@ describe('evaluateEventAccess', () => {
     expect(access).toMatchObject({ canSignup: false, reason: 'SIGNUP_CLOSED' });
   });
 
+  it('meldet noch nicht freigeschaltetes Eintragen vor dem Freischaltzeitpunkt', () => {
+    const future = new Date(Date.now() + 3600 * 1000 * 5); // in 5 Stunden
+    const access = evaluateEventAccess(event({ signupOpensAt: future }), 'X', user(), noFlags, false);
+    expect(access).toMatchObject({ canSignup: false, reason: 'SIGNUP_NOT_YET_OPEN' });
+    expect(access.message).toContain('Das Eintragen öffnet am');
+
+    // Das OK darf trotzdem eintragen
+    const okAccess = evaluateEventAccess(event({ signupOpensAt: future }), 'X', user(), { ...noFlags, isManager: true }, false);
+    expect(okAccess).toMatchObject({ canSignup: true, via: 'MANAGER' });
+
+    // Nach Ablauf des Freischaltzeitpunkts ist es offen
+    const past = new Date(Date.now() - 1000 * 60);
+    const pastAccess = evaluateEventAccess(event({ signupOpensAt: past }), 'X', user(), noFlags, false);
+    expect(pastAccess.canSignup).toBe(true);
+  });
+
   it('öffnet den Anlass mit einem eingelösten Zugangs-Link', () => {
     const ev = event({ accessType: 'DEPARTMENT' });
     expect(evaluateEventAccess(ev, 'X', user(), noFlags, false).canSignup).toBe(false);

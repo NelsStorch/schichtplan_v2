@@ -19,6 +19,7 @@ export interface AccessEvent {
   accessType: string;
   leadersOnly: boolean;
   allowPublicSignup: boolean;
+  signupOpensAt?: Date | null;
   organizers: { userId: string; role: string }[];
   allowedDepartments: { departmentId: string; department: { name: string } }[];
   allowedStufen: { stufeId: string; stufe: { departmentId: string; name: string } }[];
@@ -191,6 +192,26 @@ export function evaluateEventAccess(
 
   if (flags.isManager) return result(true, 'MANAGER', null, null, true);
 
+  const rules = user ? (hasGrant ? ({ ok: true } as const) : checkRules(event, user, departmentName)) : null;
+  const canSeeNames = rules ? rules.ok || isPublicAudience : isPublicAudience;
+
+  if (!event.allowPublicSignup) {
+    return result(false, null, 'SIGNUP_CLOSED', 'Eintragen ist geschlossen. Melde dich beim OK.', canSeeNames);
+  }
+
+  if (event.signupOpensAt && new Date() < new Date(event.signupOpensAt)) {
+    const d = new Date(event.signupOpensAt);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const formatted = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} um ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return result(
+      false,
+      null,
+      'SIGNUP_NOT_YET_OPEN',
+      `Das Eintragen öffnet am ${formatted} Uhr.`,
+      canSeeNames
+    );
+  }
+
   if (!user) {
     return result(
       false,
@@ -201,13 +222,7 @@ export function evaluateEventAccess(
     );
   }
 
-  const rules = hasGrant ? ({ ok: true } as const) : checkRules(event, user, departmentName);
-  const canSeeNames = rules.ok || isPublicAudience;
-
-  if (!event.allowPublicSignup) {
-    return result(false, null, 'SIGNUP_CLOSED', 'Eintragen ist geschlossen. Melde dich beim OK.', canSeeNames);
-  }
-  if (!rules.ok) return result(false, null, rules.reason, rules.message, canSeeNames);
+  if (!rules?.ok) return result(false, null, rules?.reason ?? null, rules?.message ?? null, canSeeNames);
   return result(true, hasGrant ? 'LINK' : 'RULES', null, null, true);
 }
 

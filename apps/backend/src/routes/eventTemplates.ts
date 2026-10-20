@@ -196,6 +196,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             dayCutoffTime: parse.data.dayCutoffTime || '04:00',
             responsibleMode: parse.data.responsibleMode || 'BY_SHIFT',
             contactVisibility: parse.data.contactVisibility || (template.data as any)?.contactVisibility || 'BOTH',
+            signupOpensAt: parse.data.signupOpensAt ? new Date(parse.data.signupOpensAt) : null,
             attendanceMode: instantiateAttendanceMode,
             checkinToken: instantiateAttendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
             organizers: {

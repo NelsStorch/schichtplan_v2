@@ -71,6 +71,7 @@ export interface EventDetails {
   responsibleMode: EventResponsibleMode;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   contactVisibility?: EventContactVisibility;
+  signupOpensAt?: string | null;
   cancelDeadlineDays?: number | null;
   attendanceMode?: AttendanceMode;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
