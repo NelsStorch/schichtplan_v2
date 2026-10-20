@@ -34,6 +34,7 @@ import {
   tooManyMisses,
   tooManyRequests,
 } from '../services/ceviNameLogin.js';
+import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
 
 function getCookieDomain(): string | undefined {
   if (process.env.COOKIE_DOMAIN) {
@@ -72,7 +73,7 @@ function cleanReturnTo(value: unknown, fallback = '/'): string {
 
 /** Zurück zur Login-Seite mit Fehlercode, statt rohes JSON im Browser anzuzeigen. */
 function loginErrorUrl(
-  code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_failed',
+  code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_failed' | 'cevidb_email_taken',
   returnTo: string | null
 ) {
   const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
@@ -119,7 +120,43 @@ function getLoginPortalBaseUrl(requestHost?: string): string {
 /** Login-Seite (login.<domain>), z. B. für die Abfrage der Abteilung nach dem Cevi.DB-Login */
 function loginPageUrl(path: string, returnTo: string) {
   const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
-  return `${base}${path}?return_to=${encodeURIComponent(returnTo)}`;
+  return returnTo ? `${base}${path}?return_to=${encodeURIComponent(returnTo)}` : `${base}${path}`;
+}
+
+/* ------------------------------------------------------------------ Konto verknüpfen */
+
+/**
+ * Cevi.DB-Login, der auf ein Passwort-Konto mit gleicher E-Mail trifft, wartet hier, bis die Person
+ * ihr Passwort bestätigt (oder abbricht). Im Speicher reicht: läuft nach 15 Minuten ab, und ein
+ * Neustart heisst nur, dass sich die Person nochmals mit Cevi.DB anmeldet.
+ */
+const PENDING_LINK_COOKIE = 'cevidb_link';
+const PENDING_LINK_TTL_SECONDS = 15 * 60;
+interface PendingLink {
+  profile: any;
+  returnTo: string | null;
+  tenantSlug: string | null;
+  userId: string;
+  expires: number;
+}
+const pendingLinks = new Map<string, PendingLink>();
+
+function createPendingLink(link: Omit<PendingLink, 'expires'>): string {
+  const now = Date.now();
+  for (const [key, value] of pendingLinks) if (value.expires < now) pendingLinks.delete(key);
+  const token = crypto.randomBytes(24).toString('base64url');
+  pendingLinks.set(token, { ...link, expires: now + PENDING_LINK_TTL_SECONDS * 1000 });
+  return token;
+}
+
+function readPendingLink(token: string | undefined): PendingLink | null {
+  if (!token) return null;
+  const link = pendingLinks.get(token);
+  if (!link || link.expires < Date.now()) {
+    pendingLinks.delete(token ?? '');
+    return null;
+  }
+  return link;
 }
 
 /** Profil der angemeldeten Person inkl. Heimabteilung und Stufen (GET /api/auth/me) */
@@ -351,119 +388,211 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
       }
 
-      const ceviDbId = profile.id;
-      const email = (profile.email || `cevidb_${ceviDbId}@cevi-schichtplan.ch`).toLowerCase();
-      const firstName = profile.first_name || profile.given_name || 'Cevianer*in';
-      const lastName = profile.last_name || profile.family_name || '';
-      const ceviName = profile.nickname || null;
-
-      let birthDate: Date | null = null;
-      if (profile.birthday) {
-        const parsedBirthday = new Date(profile.birthday);
-        if (!isNaN(parsedBirthday.getTime())) {
-          birthDate = parsedBirthday;
-        }
-      }
-
-      const now = new Date();
-
-      // Benutzer in DB finden oder erstellen
-      let user = await fastify.prisma.user.findFirst({
-        where: {
-          OR: [{ ceviDbId }, { email }],
-        },
-      });
-
-      // Adresse und Handynummer aus Cevi.DB übernehmen, ohne selbst erfasste Werte zu überschreiben
-      const extra = ceviDbProfileFields(profile);
-
-      if (!user) {
-        user = await fastify.prisma.user.create({
-          data: {
-            email,
-            ceviDbId,
-            firstName,
-            lastName,
-            ceviName,
-            birthDate,
-            address: extra.address,
-            phone: extra.phone,
-            emailVerified: true,
-            emailVerifiedAt: now,
-            ceviDbData: profile,
-            ceviDbSyncedAt: now,
-          },
-        });
-      } else {
-        user = await fastify.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            ceviDbId,
-            ceviName: ceviName || user.ceviName,
-            firstName: firstName || user.firstName,
-            lastName: lastName || user.lastName,
-            birthDate: birthDate || user.birthDate,
-            address: user.address || extra.address,
-            phone: user.phone || extra.phone,
-            emailVerified: true,
-            emailVerifiedAt: user.emailVerifiedAt || now,
-            ceviDbData: profile,
-            ceviDbSyncedAt: now,
-          },
-        });
-      }
-
-      if (!user.isGlobalAdmin && typeof ceviDbId === 'number' && bootstrapAdminCeviDbIds().has(ceviDbId)) {
-        user = await fastify.prisma.user.update({
-          where: { id: user.id },
-          data: { isGlobalAdmin: true },
-        });
-        fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
-      }
-
-      // Was der Schichtplan aus Cevi.DB braucht, in eigene Spalten schreiben (ceviDbData wird nie gelesen).
-      // Die eigene Abteilung kommt aus der Ortsgruppe, Stufen über die Cevi.DB-Gruppen der Rollen.
-      const derived = deriveCeviDbFields(profile);
-      await storeCeviDbFields(fastify.prisma, user.id, derived);
-      const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, derived.ortsgruppeId);
-      if (homeDepartment) {
-        await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
-      }
-
-      // Kommt die Person von einer Abteilungs-Subdomain, dort ebenfalls als Helfer eintragen
-      if (tenantSlug) {
-        const department = await fastify.prisma.department.findUnique({
-          where: { slug: tenantSlug },
-          select: { id: true },
-        });
-        if (department) {
-          await ensureHelperMembership(fastify.prisma, department.id, user.id);
-        }
-      }
-
-      const token = fastify.jwt.sign({
-        id: user.id,
-        email: user.email || `${user.id}@cevi-schichtplan.ch`,
-        isGlobalAdmin: user.isGlobalAdmin,
-      });
-
       reply.clearCookie('cevidb_oauth_state', { path: '/' });
-      setAuthCookie(reply, token);
-
-      // Ohne Ziel: Abteilungsseite, sonst Landingpage (nicht zurück auf die Login-Seite)
-      const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null);
-
-      // Abteilungsleitung, deren Ortsgruppe noch keinen Schichtplan hat: Abteilung anlegen anbieten
-      if (!homeDepartment && derived.isDepartmentLeader && derived.ortsgruppeId !== null) {
-        return reply.redirect(loginPageUrl('/abteilung-erstellen', target));
-      }
-      // Ortsgruppe ohne Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen
-      if (!homeDepartment && !user.departmentSetupAt) {
-        return reply.redirect(loginPageUrl('/abteilung', target));
-      }
-      return reply.redirect(target);
+      return reply.redirect(await finishCeviDbLogin(reply, profile, returnTo, tenantSlug));
     }
   );
+
+  /**
+   * Zweiter Teil des Cevi.DB-Logins (auch nach «Konto verknüpfen»): Konto finden oder anlegen,
+   * Angaben übernehmen, Cookie setzen. Gibt das Weiterleitungsziel zurück.
+   * `linkConfirmedUserId`: Passwort-Konto mit gleicher E-Mail, dessen Passwort eben bestätigt wurde.
+   */
+  async function finishCeviDbLogin(
+    reply: FastifyReply,
+    profile: any,
+    returnTo: string | null,
+    tenantSlug: string | null,
+    linkConfirmedUserId?: string
+  ): Promise<string> {
+    const ceviDbId = profile.id;
+    const email = (profile.email || `cevidb_${ceviDbId}@cevi-schichtplan.ch`).toLowerCase();
+    const firstName = profile.first_name || profile.given_name || 'Cevianer*in';
+    const lastName = profile.last_name || profile.family_name || '';
+    const ceviName = profile.nickname || null;
+
+    let birthDate: Date | null = null;
+    if (profile.birthday) {
+      const parsedBirthday = new Date(profile.birthday);
+      if (!isNaN(parsedBirthday.getTime())) {
+        birthDate = parsedBirthday;
+      }
+    }
+
+    const now = new Date();
+
+    // Benutzer finden: zuerst über die Cevi.DB-ID, sonst über die E-Mail (E-Mails sind eindeutig)
+    let user = await fastify.prisma.user.findUnique({ where: { ceviDbId } });
+    if (!user) {
+      const byEmail = await fastify.prisma.user.findUnique({ where: { email } });
+      if (byEmail && byEmail.ceviDbId !== null) {
+        // E-Mail gehört schon zu einer anderen Cevi.DB-Person: nicht überschreiben
+        fastify.log.warn({ userId: byEmail.id, ceviDbId }, 'Cevi.DB-Login: E-Mail gehört zu anderem Cevi.DB-Konto');
+        return loginErrorUrl('cevidb_email_taken', returnTo);
+      }
+      if (byEmail && byEmail.passwordHash && byEmail.id !== linkConfirmedUserId) {
+        // Passwort-Konto mit gleicher E-Mail: erst nach Passwort verknüpfen (login.<domain>/konto-verknuepfen)
+        const token = createPendingLink({ profile, returnTo, tenantSlug, userId: byEmail.id });
+        reply.setCookie(PENDING_LINK_COOKIE, token, {
+          path: '/',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: PENDING_LINK_TTL_SECONDS,
+        });
+        return loginPageUrl('/konto-verknuepfen', returnTo ?? '');
+      }
+      user = byEmail;
+    }
+
+    // Adresse und Handynummer aus Cevi.DB übernehmen, ohne selbst erfasste Werte zu überschreiben
+    const extra = ceviDbProfileFields(profile);
+
+    if (!user) {
+      user = await fastify.prisma.user.create({
+        data: {
+          email,
+          ceviDbId,
+          firstName,
+          lastName,
+          ceviName,
+          birthDate,
+          address: extra.address,
+          phone: extra.phone,
+          emailVerified: true,
+          emailVerifiedAt: now,
+          ceviDbData: profile,
+          ceviDbSyncedAt: now,
+        },
+      });
+    } else {
+      user = await fastify.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          ceviDbId,
+          ceviName: ceviName || user.ceviName,
+          firstName: firstName || user.firstName,
+          lastName: lastName || user.lastName,
+          birthDate: birthDate || user.birthDate,
+          address: user.address || extra.address,
+          phone: user.phone || extra.phone,
+          emailVerified: true,
+          emailVerifiedAt: user.emailVerifiedAt || now,
+          ceviDbData: profile,
+          ceviDbSyncedAt: now,
+        },
+      });
+    }
+
+    if (!user.isGlobalAdmin && typeof ceviDbId === 'number' && bootstrapAdminCeviDbIds().has(ceviDbId)) {
+      user = await fastify.prisma.user.update({
+        where: { id: user.id },
+        data: { isGlobalAdmin: true },
+      });
+      fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
+    }
+
+    // Was der Schichtplan aus Cevi.DB braucht, in eigene Spalten schreiben (ceviDbData wird nie gelesen).
+    // Die eigene Abteilung kommt aus der Ortsgruppe, Stufen über die Cevi.DB-Gruppen der Rollen.
+    const derived = deriveCeviDbFields(profile);
+    await storeCeviDbFields(fastify.prisma, user.id, derived);
+    const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, derived.ortsgruppeId);
+    if (homeDepartment) {
+      await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
+    }
+
+    // Kommt die Person von einer Abteilungs-Subdomain, dort ebenfalls als Helfer eintragen
+    let tenantDepartmentId: string | null = null;
+    if (tenantSlug) {
+      const department = await fastify.prisma.department.findUnique({
+        where: { slug: tenantSlug },
+        select: { id: true },
+      });
+      if (department) {
+        tenantDepartmentId = department.id;
+        await ensureHelperMembership(fastify.prisma, department.id, user.id);
+      }
+    }
+
+    // Frühere Cevi-Name-Profile derselben Person (Name, Geburtsdatum, Abteilung) ins Konto übernehmen.
+    // Ein Fehler hier darf den Login nicht verhindern.
+    try {
+      const merged = await mergeCeviNameProfilesInto(
+        fastify.prisma,
+        user,
+        [homeDepartment?.id, tenantDepartmentId].filter((id): id is string => Boolean(id))
+      );
+      if (merged > 0) {
+        fastify.log.info({ userId: user.id, merged }, 'Cevi-Name-Profile ins Cevi.DB-Konto übernommen');
+        user = await fastify.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      }
+    } catch (err) {
+      fastify.log.error({ err, userId: user.id }, 'Cevi-Name-Profile konnten nicht übernommen werden');
+    }
+
+    const token = fastify.jwt.sign({
+      id: user.id,
+      email: user.email || `${user.id}@cevi-schichtplan.ch`,
+      isGlobalAdmin: user.isGlobalAdmin,
+    });
+
+    setAuthCookie(reply, token);
+
+    // Ohne Ziel: Abteilungsseite, sonst Landingpage (nicht zurück auf die Login-Seite)
+    const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null);
+
+    // Abteilungsleitung, deren Ortsgruppe noch keinen Schichtplan hat: Abteilung anlegen anbieten
+    if (!homeDepartment && derived.isDepartmentLeader && derived.ortsgruppeId !== null) {
+      return loginPageUrl('/abteilung-erstellen', target);
+    }
+    // Ortsgruppe ohne Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen
+    if (!homeDepartment && !user.departmentSetupAt) {
+      return loginPageUrl('/abteilung', target);
+    }
+    return target;
+  }
+
+  // 2b. Cevi.DB mit bestehendem Passwort-Konto (gleiche E-Mail) verknüpfen: nur mit dessen Passwort.
+  //     Ohne Passwort kein Login, denn zwei Konten mit derselben E-Mail gibt es nicht.
+  fastify.get('/api/auth/cevidb/link', async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const link = readPendingLink(request.cookies[PENDING_LINK_COOKIE]);
+    if (!link) return reply.status(404).send({ error: 'Keine offene Verknüpfung. Melde dich nochmals mit Cevi.DB an.' });
+    const user = await fastify.prisma.user.findUnique({
+      where: { id: link.userId },
+      select: { email: true, ceviName: true, firstName: true },
+    });
+    if (!user) return reply.status(404).send({ error: 'Das Konto gibt es nicht mehr.' });
+    return { email: user.email, name: user.ceviName || user.firstName, returnTo: link.returnTo };
+  });
+
+  fastify.post('/api/auth/cevidb/link', async (request, reply) => {
+    if (tooManyRequests(request.ip)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR });
+    }
+    const token = request.cookies[PENDING_LINK_COOKIE];
+    const link = readPendingLink(token);
+    if (!link) return reply.status(404).send({ error: 'Die Verknüpfung ist abgelaufen. Melde dich nochmals mit Cevi.DB an.' });
+
+    const password = typeof (request.body as any)?.password === 'string' ? (request.body as any).password : '';
+    const user = await fastify.prisma.user.findUnique({ where: { id: link.userId } });
+    if (!user || !user.passwordHash || !password || !(await bcrypt.compare(password, user.passwordHash))) {
+      return reply.status(401).send({ error: 'Das Passwort stimmt nicht.' });
+    }
+
+    pendingLinks.delete(token!);
+    reply.clearCookie(PENDING_LINK_COOKIE, { path: '/' });
+    const redirectUrl = await finishCeviDbLogin(reply, link.profile, link.returnTo, link.tenantSlug, user.id);
+    fastify.log.info({ userId: user.id }, 'Passwort-Konto mit Cevi.DB verknüpft');
+    return { redirectUrl };
+  });
+
+  fastify.delete('/api/auth/cevidb/link', async (request, reply) => {
+    const token = request.cookies[PENDING_LINK_COOKIE];
+    if (token) pendingLinks.delete(token);
+    reply.clearCookie(PENDING_LINK_COOKIE, { path: '/' });
+    return { ok: true };
+  });
 
   // 3. Cevi-Name-Login (ohne Passwort, nur an einer Abteilung)
   //    Cevi-Name + Geburtsdatum + Abteilung bestimmen das Profil. Nur reine Cevi-Name-Profile ohne

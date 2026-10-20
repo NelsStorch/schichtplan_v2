@@ -35,6 +35,8 @@ const loginErrors: Record<string, string> = {
     'Die Anmeldung mit Cevi.DB ist im Moment nicht verfügbar. Melde dich bitte mit Cevi-Name oder E-Mail an.',
   cevidb_denied: 'Die Anmeldung bei Cevi.DB wurde abgebrochen.',
   cevidb_failed: 'Die Anmeldung mit Cevi.DB hat nicht geklappt. Bitte versuche es nochmals.',
+  cevidb_email_taken:
+    'Die E-Mail aus deinem Cevi.DB-Profil gehört schon zu einem anderen Cevi.DB-Konto. Melde dich bitte bei den Betreibern des Schichtplans.',
 };
 
 /** Hostname des Ziels (z. B. illnau.cevi-schichtplan.ch), damit sichtbar ist, wohin es nach dem Login geht. */
