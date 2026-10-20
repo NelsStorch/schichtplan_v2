@@ -16,7 +16,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { getLandingUrl, helpUrl } from '@schichtplan/shared';
+import { PRIVACY_URL, getLandingUrl, helpUrl } from '@schichtplan/shared';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 
@@ -100,16 +100,20 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
         </div>
       )}
 
-      <main className="flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-20">{children}</main>
+      <main className="flex-1 pb-12 md:pb-20">{children}</main>
 
-      <footer className="hidden border-t border-line/70 md:block">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-6 text-xs text-fg-subtle">
+      {/* Mobil Platz für die fixe Tab-Leiste lassen, damit Hilfe/Datenschutz erreichbar bleiben */}
+      <footer className="border-t border-line/70 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-6 text-xs text-fg-subtle md:px-6">
           <p>
             © {new Date().getFullYear()} {department?.name ?? 'Cevi'}
           </p>
           <div className="flex items-center gap-5">
             <a href={helpUrl()} className="transition hover:text-fg">
               Hilfe
+            </a>
+            <a href={PRIVACY_URL} className="transition hover:text-fg">
+              Datenschutz
             </a>
             <a href="https://cevi-schichtplan.ch" className="transition hover:text-fg">
               cevi-schichtplan.ch

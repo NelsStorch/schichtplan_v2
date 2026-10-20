@@ -6,6 +6,7 @@ import { Check, Database, Search, UsersRound } from 'lucide-react';
 import type { DepartmentDirectoryItemDto, StufeRole, UserDto } from '@schichtplan/shared';
 import { Button, Callout, CeviLogo, Input, ThemeToggle, cn } from '@schichtplan/ui';
 import { cleanReturnTo, finalDestination } from '@/lib/destination';
+import { AuthFooter } from '@/components/AuthFooter';
 
 const NONE = 'NONE';
 
@@ -246,6 +247,8 @@ function DepartmentSetup() {
           )}
         </div>
       </main>
+
+      <AuthFooter />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, LogOut, ShieldAlert } from 'lucide-react';
 import { Button, Callout, CeviLogo, ThemeToggle, buttonClasses } from '@schichtplan/ui';
-import type { UserDto } from '@schichtplan/shared';
+import { PRIVACY_URL, type UserDto } from '@schichtplan/shared';
 import { ApiError, api, errorMessage, loginUrl } from '../lib/api';
 import { UsersPanel } from './UsersPanel';
 
@@ -47,6 +47,15 @@ function Shell({ children, user, onLogout }: { children: React.ReactNode; user?:
       <main id="inhalt" className="relative mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-8 sm:px-6">
         {children}
       </main>
+
+      <footer className="border-t border-line/70">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-6 text-xs text-fg-subtle sm:px-6">
+          <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
+          <a href={PRIVACY_URL} className="transition hover:text-fg">
+            Datenschutz
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }

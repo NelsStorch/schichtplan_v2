@@ -12,7 +12,7 @@ import {
   Input,
   ThemeToggle,
 } from '@schichtplan/ui';
-import { getLandingUrl } from '@schichtplan/shared/redirect';
+import { PRIVACY_URL, getLandingUrl } from '@schichtplan/shared/redirect';
 import { cleanReturnTo, withReturnTo } from '@/lib/destination';
 
 function VerifyEmailContent() {
@@ -210,13 +210,18 @@ function VerifyEmailContent() {
 
       <footer className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-fg-subtle sm:px-8">
         <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
-        <a
-          href={returnTo ?? landingHref}
-          className="inline-flex items-center gap-1.5 font-medium text-fg-muted transition hover:text-fg"
-        >
-          <ArrowLeft className="size-3.5" />
-          Ohne Anmeldung zurück
-        </a>
+        <div className="flex items-center gap-5">
+          <a href={PRIVACY_URL} className="font-medium text-fg-muted transition hover:text-fg">
+            Datenschutz
+          </a>
+          <a
+            href={returnTo ?? landingHref}
+            className="inline-flex items-center gap-1.5 font-medium text-fg-muted transition hover:text-fg"
+          >
+            <ArrowLeft className="size-3.5" />
+            Ohne Anmeldung zurück
+          </a>
+        </div>
       </footer>
     </div>
   );

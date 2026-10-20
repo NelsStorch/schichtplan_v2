@@ -7,6 +7,7 @@ import type { DepartmentCreationEligibilityDto, UserDto } from '@schichtplan/sha
 import { getDepartmentUrl } from '@schichtplan/shared/redirect';
 import { Button, Callout, CeviLogo, Field, Input, ThemeToggle, buttonClasses } from '@schichtplan/ui';
 import { cleanReturnTo, finalDestination, withReturnTo } from '@/lib/destination';
+import { AuthFooter } from '@/components/AuthFooter';
 
 const slugify = (value: string) =>
   value
@@ -213,6 +214,8 @@ function CreateDepartment() {
           </div>
         )}
       </main>
+
+      <AuthFooter />
     </div>
   );
 }

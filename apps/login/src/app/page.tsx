@@ -14,7 +14,7 @@ import {
   buttonClasses,
   cn,
 } from '@schichtplan/ui';
-import { getLandingUrl, helpUrl } from '@schichtplan/shared/redirect';
+import { PRIVACY_URL, getLandingUrl, helpUrl } from '@schichtplan/shared/redirect';
 import type { CeviNameLoginErrorCode, DepartmentDirectoryItemDto, StufeRole } from '@schichtplan/shared';
 import { afterLogin, cleanReturnTo, departmentSlugFromReturnTo, withReturnTo } from '@/lib/destination';
 
@@ -797,6 +797,9 @@ function LoginContent() {
         <div className="flex items-center gap-5">
           <a href={helpUrl('/start/anmelden/')} className="font-medium text-fg-muted transition hover:text-fg">
             Hilfe zum Anmelden
+          </a>
+          <a href={PRIVACY_URL} className="font-medium text-fg-muted transition hover:text-fg">
+            Datenschutz
           </a>
           <a
             href={returnTo ?? landingHref}
