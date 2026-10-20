@@ -31,6 +31,7 @@ export async function applyProfileUpdate(
   if (input.lastName !== undefined) data.lastName = input.lastName;
   if (input.phone !== undefined) data.phone = input.phone;
   if (input.address !== undefined) data.address = input.address;
+  if (input.shiftReminders !== undefined) data.shiftRemindersEnabled = input.shiftReminders;
   if (input.birthDate !== undefined) {
     const date = new Date(`${input.birthDate}T00:00:00Z`);
     if (isNaN(date.getTime()) || date > new Date()) return { error: 'Ungültiges Geburtsdatum', status: 400 };

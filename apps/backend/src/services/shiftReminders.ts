@@ -3,7 +3,7 @@
  *
  * Nur wenn SHIFT_REMINDERS_ENABLED=true gesetzt ist (siehe server.ts): Alle 15 Minuten gehen Mails an
  * eingetragene Personen mit bestätigter, echter E-Mail, deren Schicht in den nächsten
- * REMINDER_LEAD_HOURS Stunden beginnt. Jede Eintragung bekommt höchstens eine Erinnerung:
+ * REMINDER_LEAD_HOURS Stunden beginnt, sofern sie es im Profil nicht abgeschaltet haben. Jede Eintragung bekommt höchstens eine Erinnerung:
  * `shift_signups.reminder_sent_at` wird vor dem Versand atomar gesetzt, so verschicken auch zwei
  * gleichzeitig laufende Backends (Zero-Downtime-Deploy) nichts doppelt. Schlägt der Versand fehl,
  * bleibt es bei dieser einen (verpassten) Erinnerung.
@@ -55,7 +55,7 @@ export async function sendDueShiftReminders(
     where: {
       reminderSentAt: null,
       userId: { not: null },
-      user: { emailVerified: true, email: { not: null } },
+      user: { emailVerified: true, email: { not: null }, shiftRemindersEnabled: true },
       shift: { startTime: { gt: now, lte: until } },
     },
     select: {

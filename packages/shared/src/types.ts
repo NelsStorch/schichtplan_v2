@@ -191,6 +191,8 @@ export interface UserDto {
   needsDepartmentSetup?: boolean;
   /** Nur Cevi-Name-Profil (ohne Cevi.DB und Passwort) */
   isCeviNameProfile?: boolean;
+  /** Möchte eine Erinnerungs-Mail vor den eigenen Schichten */
+  shiftReminders?: boolean;
 }
 
 // ---------------------------------------------------------------------------

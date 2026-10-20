@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventUrl, formatShiftTime, sendDueShiftReminders } from '../src/services/shiftReminders.js';
-import { createDepartment, createEvent, createShift, createTestApp, createUser, hasTestDb, resetDb } from './helpers.js';
+import { authCookie, createDepartment, createEvent, createShift, createTestApp, createUser, hasTestDb, resetDb } from './helpers.js';
 
 describe('formatShiftTime / eventUrl', () => {
   it('formatiert in Schweizer Zeit', () => {
@@ -57,5 +57,26 @@ describe.skipIf(!hasTestDb)('sendDueShiftReminders', () => {
     ]);
     expect(again).toEqual([0, 0]);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('lässt sich im Profil abschalten', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+    const user = await createUser(app, { email: 'aus@example.com' });
+    await app.prisma.shiftSignup.create({ data: { shiftId: shift.id, userId: user.id } });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { cookie: authCookie(app, user) },
+      payload: { shiftReminders: false },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().shiftReminders).toBe(false);
+
+    const send = vi.fn(async () => true);
+    expect(await sendDueShiftReminders(app.prisma, new Date('2030-06-01T08:00:00Z'), send)).toBe(0);
+    expect(send).not.toHaveBeenCalled();
   });
 });

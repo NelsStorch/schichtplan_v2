@@ -116,6 +116,8 @@ model User {
   departmentSetupAt    DateTime?   @map("department_setup_at")
   emailVerified       Boolean            @default(false) @map("email_verified")
   emailVerifiedAt     DateTime?          @map("email_verified_at")
+  /// Erinnerungs-Mail vor eigenen Schichten (im Profil abschaltbar)
+  shiftRemindersEnabled Boolean          @default(true) @map("shift_reminders_enabled")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
