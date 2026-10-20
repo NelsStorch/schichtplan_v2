@@ -43,16 +43,19 @@ jobs:
 
       - run: npm ci
 
-      - name: Shared-Paket bauen und Prisma-Client erzeugen
-        run: |
-          npm run build --workspace=packages/shared
-          npx --prefix apps/backend prisma generate
+      - name: Shared-Paket bauen
+        run: npm run build --workspace=packages/shared
+
+      - name: Prisma-Client erzeugen
+        working-directory: apps/backend
+        run: npx prisma generate
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Migrationen auf die Test-DB
-        run: npx --prefix apps/backend prisma migrate deploy
+        working-directory: apps/backend
+        run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 

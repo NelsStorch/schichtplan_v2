@@ -95,7 +95,7 @@ Die API-Tests in `apps/backend/test/` laufen gegen eine eigene, leere Test-Daten
 ```bash
 # Einmalig: Wegwerf-Postgres nur für Tests (nicht die Entwicklungs-DB!)
 docker run -d --name schichtplan-test-db -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=schichtplan_test -p 127.0.0.1:54329:5432 postgres:17-alpine
-DATABASE_URL=postgresql://test:test@127.0.0.1:54329/schichtplan_test npx --prefix apps/backend prisma migrate deploy
+(cd apps/backend && DATABASE_URL=postgresql://test:test@127.0.0.1:54329/schichtplan_test npx prisma migrate deploy)
 
 # Tests (shared vorher bauen: npm run build --workspace=packages/shared)
 TEST_DATABASE_URL=postgresql://test:test@127.0.0.1:54329/schichtplan_test npm test
