@@ -109,6 +109,10 @@ services:
       NODE_ENV: production
       PORT: 3001
       INTERNAL_API_URL: http://backend:4000
+      PRIVACY_CONTACT_NAME: ${PRIVACY_CONTACT_NAME:-}
+      PRIVACY_CONTACT_STREET: ${PRIVACY_CONTACT_STREET:-}
+      PRIVACY_CONTACT_CITY: ${PRIVACY_CONTACT_CITY:-}
+      PRIVACY_CONTACT_EMAIL: ${PRIVACY_CONTACT_EMAIL:-}
     depends_on:
       - backend
     networks:

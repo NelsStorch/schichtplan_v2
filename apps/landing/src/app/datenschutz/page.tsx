@@ -5,11 +5,20 @@ import { ArrowLeft } from "lucide-react";
 import { helpUrl } from "@schichtplan/shared";
 import { ThemeToggle } from "@schichtplan/ui";
 import { CeviLogo } from "@/components/CeviLogo";
+import { ContactReveal } from "./ContactReveal";
 
 export const metadata: Metadata = {
   title: "Datenschutzerklärung",
   description:
     "Welche Personendaten der Cevi Schichtplan bearbeitet, wozu und welche Rechte du hast (nDSG).",
+  // Nicht in Suchmaschinen, keine Kopie im Cache (zusätzlich zu robots.txt)
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    noarchive: true,
+    "max-snippet": 0,
+  },
 };
 
 // Rechtliche Stammdaten: Platzhalter in eckigen Klammern vor dem Livegang ausfüllen
@@ -115,15 +124,7 @@ export default function DatenschutzPage() {
           <p>
             Verantwortlich für die Datenbearbeitung auf dieser Plattform ist:
           </p>
-          <address className="rounded-card border border-line bg-surface p-4 not-italic text-fg">
-            [FIRMENNAME / NAME DES BETREIBERS]
-            <br />
-            [STRASSE NR.]
-            <br />
-            [PLZ ORT], Schweiz
-            <br />
-            E-Mail: [E-MAIL]
-          </address>
+          <ContactReveal />
           <p>
             Für Fragen zum Datenschutz und zur Ausübung deiner Rechte erreichst
             du uns unter dieser Adresse.
@@ -472,9 +473,10 @@ export default function DatenschutzPage() {
             </li>
           </List>
           <p>
-            Schreib uns dazu an [E-MAIL]. Wir können verlangen, dass du dich
-            ausweist. Ausserdem kannst du dich beim Eidgenössischen Datenschutz-
-            und Öffentlichkeitsbeauftragten (EDÖB) beschweren:{" "}
+            Schreib uns dazu an die E-Mail-Adresse unter Punkt 1. Wir können
+            verlangen, dass du dich ausweist. Ausserdem kannst du dich beim
+            Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten (EDÖB)
+            beschweren:{" "}
             <a
               href="https://www.edoeb.admin.ch"
               target="_blank"
