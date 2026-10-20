@@ -9,6 +9,25 @@ const HOST = process.env.HOST || '0.0.0.0';
 async function main() {
   const app = await buildApp();
 
+  // Docker stoppt alte Container beim Deploy mit SIGTERM: laufende Anfragen fertig beantworten,
+  // DB-Verbindungen schliessen, dann beenden (nach 10 s spätestens, Docker killt nach 10 s ohnehin)
+  let closing = false;
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => {
+      if (closing) return;
+      closing = true;
+      app.log.info({ signal }, 'Backend fährt herunter');
+      setTimeout(() => process.exit(1), 9_000).unref();
+      app.close().then(
+        () => process.exit(0),
+        (err) => {
+          app.log.error(err, 'Fehler beim Herunterfahren');
+          process.exit(1);
+        }
+      );
+    });
+  }
+
   try {
     await app.listen({ port: PORT, host: HOST });
     app.log.info(`Schichtplan Backend läuft auf http://${HOST}:${PORT}`);
