@@ -689,7 +689,7 @@ function EventForm({
             value={form.responsibleMode}
             onChange={(e) => set('responsibleMode', e.target.value as 'BY_SHIFT' | 'BY_DAY')}
           >
-            <option value="BY_SHIFT">Pro Schicht einzeln festlegen (z. B. Grillchef / Schichtleitung)</option>
+            <option value="BY_SHIFT">Pro Schicht einzeln festlegen</option>
             <option value="BY_DAY">Pro Tag festlegen (gilt automatisch für alle Schichten des Tages)</option>
           </Select>
         </Field>
