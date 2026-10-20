@@ -19,6 +19,7 @@
     "db:seed": "npm run db:seed --workspace=apps/backend",
     "db:studio": "npm run db:studio --workspace=apps/backend",
     "test": "npm run test --workspace=apps/backend",
+    "typecheck": "tsc --noEmit -p apps/backend && tsc --noEmit -p apps/web && tsc --noEmit -p apps/login && tsc --noEmit -p apps/landing && tsc --noEmit -p apps/admin",
     "hilfe:dev": "npm --prefix hilfe run dev",
     "hilfe:build": "npm --prefix hilfe run build",
     "hilfe:preview": "npm --prefix hilfe run preview"
