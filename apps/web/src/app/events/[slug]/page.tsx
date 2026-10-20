@@ -771,6 +771,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
       {/* Helfer manuell durch OK einteilen */}
       <AssignHelperDialog
+        eventSlug={slug}
         open={Boolean(assigningShift)}
         shift={assigningShift}
         task={assigningTask}

@@ -327,4 +327,54 @@ describe.skipIf(!hasTestDb)('Sicherheit der API', () => {
       expect(res.statusCode).toBe(200);
     });
   });
+
+  describe('Helfer-Pool', () => {
+    it('zeigt mit ?alle=1 nur die eigene Abteilung ohne Zugang, nie fremde Abteilungen', async () => {
+      const host = await createDepartment(app);
+      const other = await createDepartment(app);
+      const ok = await createUser(app, { homeDepartmentId: host.id });
+      const event = await createEvent(app, host.id, { accessType: 'WHITELIST_CEVIDB', organizerId: ok.id });
+      await app.prisma.eventAllowedDepartment.create({ data: { eventId: event.id, departmentId: other.id } });
+
+      // Eigene Abteilung ohne Cevi.DB: kein Zugang, darf aber eingeteilt werden
+      const ownNoAccess = await createUser(app, { homeDepartmentId: host.id });
+      // Fremde Abteilung ohne Cevi.DB: kein Zugang, darf nie erscheinen
+      const otherNoAccess = await createUser(app, { homeDepartmentId: other.id });
+      // Fremde Abteilung mit Cevi.DB: hat Zugang
+      const otherAccess = await createUser(app, { homeDepartmentId: other.id, ceviDbId: 990001 });
+      // Ohne Bezug zur Abteilung
+      const stranger = await createUser(app);
+
+      const cookie = authCookie(app, ok);
+      const ids = async (url: string) => {
+        const res = await inject(app, { method: 'GET', url, tenant: host.slug, cookie });
+        expect(res.statusCode).toBe(200);
+        return new Map<string, boolean>(res.json().items.map((i: { userId: string; hasAccess: boolean }) => [i.userId, i.hasAccess]));
+      };
+
+      const normal = await ids(`/api/events/${event.slug}/roster`);
+      expect(normal.has(ownNoAccess.id)).toBe(false);
+      expect(normal.get(otherAccess.id)).toBe(true);
+
+      const all = await ids(`/api/events/${event.slug}/roster?alle=1`);
+      expect(all.get(ownNoAccess.id)).toBe(false);
+      expect(all.get(otherAccess.id)).toBe(true);
+      expect(all.has(otherNoAccess.id)).toBe(false);
+      expect(all.has(stranger.id)).toBe(false);
+    });
+
+    it('verweigert den Pool ohne OK- oder Leitungsrolle', async () => {
+      const host = await createDepartment(app);
+      const event = await createEvent(app, host.id);
+      const helper = await createUser(app, { homeDepartmentId: host.id });
+      await addMember(app, host.id, helper.id, 'HELPER');
+      const res = await inject(app, {
+        method: 'GET',
+        url: `/api/events/${event.slug}/roster?alle=1`,
+        tenant: host.slug,
+        cookie: authCookie(app, helper),
+      });
+      expect(res.statusCode).toBe(403);
+    });
+  });
 });

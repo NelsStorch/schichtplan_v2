@@ -405,6 +405,31 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   /**
+   * Neue E-Mail aus Cevi.DB für ein bestehendes Konto übernehmen, wenn sie sich geändert hat und keinem
+   * anderen Konto gehört. Unbestätigt bei einem anderen Konto: dort lösen (wie beim ersten Login).
+   */
+  async function ceviDbEmailUpdate(
+    user: { id: string; email: string | null },
+    profileEmail: unknown
+  ): Promise<{ email?: string }> {
+    if (typeof profileEmail !== 'string' || !profileEmail.trim()) return {};
+    const email = profileEmail.trim().toLowerCase();
+    if (email === user.email) return {};
+    const other = await fastify.prisma.user.findUnique({ where: { email }, select: { id: true, emailVerified: true } });
+    if (other && other.id !== user.id) {
+      if (other.emailVerified) {
+        fastify.log.warn({ userId: user.id, otherId: other.id }, 'Cevi.DB-E-Mail gehört schon einem anderen Konto');
+        return {};
+      }
+      await fastify.prisma.$transaction([
+        fastify.prisma.emailVerificationToken.deleteMany({ where: { userId: other.id } }),
+        fastify.prisma.user.update({ where: { id: other.id }, data: { email: null } }),
+      ]);
+    }
+    return { email };
+  }
+
+  /**
    * Zweiter Teil des Cevi.DB-Logins (auch nach «Konto verknüpfen»): Konto finden oder anlegen,
    * Angaben übernehmen, Cookie setzen. Gibt das Weiterleitungsziel zurück.
    * `linkConfirmedUserId`: Passwort-Konto mit gleicher E-Mail, dessen Passwort eben bestätigt wurde.
@@ -467,7 +492,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       user = byEmail;
     }
 
-    // Adresse und Handynummer aus Cevi.DB übernehmen, ohne selbst erfasste Werte zu überschreiben
+    // Adresse aus Cevi.DB. Cevi.DB ist die Quelle: Was dort steht, ersetzt die lokalen Werte bei jedem Login.
+    // Fehlt ein Wert in Cevi.DB, bleibt der selbst erfasste. Die Handynummer liefert Cevi.DB nicht (Scope
+    // `with_roles` hat keine Telefonnummern), sie wird nur im Schichtplan erfasst.
     const extra = ceviDbProfileFields(profile);
 
     if (!user) {
@@ -480,7 +507,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           ceviName,
           birthDate,
           address: extra.address,
-          phone: extra.phone,
           emailVerified: true,
           emailVerifiedAt: now,
           ceviDbData: profile,
@@ -496,8 +522,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           firstName: firstName || user.firstName,
           lastName: lastName || user.lastName,
           birthDate: birthDate || user.birthDate,
-          address: user.address || extra.address,
-          phone: user.phone || extra.phone,
+          address: extra.address || user.address,
+          ...(await ceviDbEmailUpdate(user, profile.email)),
           emailVerified: true,
           emailVerifiedAt: user.emailVerifiedAt || now,
           ceviDbData: profile,

@@ -1317,6 +1317,7 @@ export default function EventOkManagePage({ params }: { params: Promise<{ slug: 
 
       <AssignHelperDialog
         open={assigningShift !== null}
+        eventSlug={event.slug}
         shift={assigningShift}
         task={assigningTask}
         onClose={() => {

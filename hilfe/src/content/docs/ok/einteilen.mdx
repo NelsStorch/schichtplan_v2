@@ -12,12 +12,26 @@ import Btn from '../../../components/Btn.astro';
 Im OK-Dashboard unter **Schichten & Einteilung** hat jede Arbeit den Knopf <Btn>Einteilen</Btn>. Im Anlass selbst öffnest du die Schicht und tippst auf <Btn>Helfer einteilen</Btn>.
 
 <Steps>
-1. Wähle **Abteilungsmitglied** und such die Person aus der Liste.
-2. Oder wähle **Gast / freier Name** und gib Name oder Cevi-Name ein, optional E-Mail und Telefon. Das ist für Leute ohne Konto, etwa die Nachbarin, die am Telefon zugesagt hat.
-3. Tippe auf <Btn variant="primary">Einteilen</Btn>.
+1. Hat die Schicht mehrere Arbeiten, wähl oben die **Arbeit** (mit Belegung). Vorgewählt ist die Arbeit, bei der du auf <Btn>Einteilen</Btn> getippt hast, sonst die erste mit freien Plätzen.
+2. Wähle **Person mit Konto** und such die Person in der Liste (siehe unten).
+3. Oder wähle **Gast / freier Name** und gib Name oder Cevi-Name ein, optional E-Mail und Telefon. Das ist für Leute ohne Konto, etwa die Nachbarin, die am Telefon zugesagt hat.
+4. Tippe auf <Btn variant="primary">Einteilen</Btn>.
 </Steps>
 
-Hat die Arbeit ein Mindestalter, zeigt das Fenster einen Hinweis. Für Mitglieder prüft der Schichtplan das Alter wie beim Selbsteintragen. Bei Gästen kennt er kein Alter, da bist du verantwortlich.
+### Die Personenliste
+
+Die Liste zeigt den Helfer-Pool des Anlasses. Bei jeder Person siehst du Abteilung, Stufen, das Alter am Schichtbeginn und rechts, **wie viele Schichten** sie an diesem Anlass schon hat. Gibt es ein Soll, steht dort zum Beispiel «1/2» (grün = erfüllt).
+
+- **Suchen** nach Name, Cevi-Name oder Stufe.
+- **Sortieren**: Vorgabe ist «Wenigste Schichten zuerst». So verteilst du die Arbeit gleichmässig. Auch möglich: meiste Schichten, Name, Alter.
+- **Abteilung** (bei Anlässen mit mehreren Abteilungen) und **Stufen** filtern. Mehrere Stufen lassen sich zusammen wählen.
+- **Nur ab … Jahren**: Hat die Schicht oder die Arbeit ein Mindestalter für alle, sind zu junge Personen ausgeblendet. Ausschalten zeigt sie mit «zu jung», wählen lassen sie sich trotzdem nicht. Personen ohne Geburtsdatum stehen mit «Alter unbekannt» in der Liste.
+- **Abgemeldete anzeigen**: Wer vom Anlass abgemeldet ist, fehlt standardmässig.
+- **Eigene Abteilung ohne Zugang anzeigen**: Personen eurer Abteilung, die die Zugangsregeln des Anlasses nicht erfüllen. Personen anderer Abteilungen erscheinen nur, wenn sie Zugang haben.
+
+Hinweise in der Liste: «schon in dieser Schicht» (nicht wählbar) und «gleichzeitig: …», wenn die Person zur selben Zeit schon eingeteilt ist.
+
+Hat eine Arbeit ein Mindestalter «mind. 1 in der Schicht», zeigt das Fenster einen Hinweis. Für Personen mit Konto prüft der Schichtplan das Alter wie beim Selbsteintragen. Bei Gästen kennt er kein Alter, da bist du verantwortlich.
 
 :::tip[Einteilen geht immer]
 Als OK teilst du auch ein, wenn das Eintragen geschlossen ist oder die Person die Zugangsregeln nicht erfüllt. Pflichtangaben und Fragen werden dabei nicht abgefragt.

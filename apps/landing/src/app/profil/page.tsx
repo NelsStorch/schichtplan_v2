@@ -117,6 +117,8 @@ export default function ProfilePage() {
   }, []);
 
   const hasRealEmail = Boolean(user?.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  // Geburtsdatum aus Cevi.DB zählt für Altersgrenzen: nur dort änderbar
+  const birthDateFromCeviDb = Boolean(user?.hasCeviDb && user.birthDate);
   const [resendingVerification, setResendingVerification] = useState(false);
 
   const handleProfileResend = async () => {
@@ -147,7 +149,7 @@ export default function ProfilePage() {
     if (form.firstName.trim()) payload.firstName = form.firstName.trim();
     if (form.lastName.trim()) payload.lastName = form.lastName.trim();
     if (form.phone.trim()) payload.phone = form.phone.trim();
-    if (form.birthDate) payload.birthDate = form.birthDate;
+    if (form.birthDate && !birthDateFromCeviDb) payload.birthDate = form.birthDate;
     if (form.address.trim()) payload.address = form.address.trim();
     if (!hasRealEmail && form.email.trim()) payload.email = form.email.trim();
     try {
@@ -279,8 +281,8 @@ export default function ProfilePage() {
               <div>
                 <h2 className="text-sm font-semibold text-fg-subtle">Deine Angaben</h2>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Manche Anlässe brauchen sie für die Eintragung. Bei Cevi.DB-Konten werden Name und Geburtsdatum beim
-                  nächsten Login aus Cevi.DB aktualisiert.
+                  Manche Anlässe brauchen sie für die Eintragung. Bei Cevi.DB-Konten werden Name, E-Mail, Geburtsdatum
+                  und Adresse bei jedem Login aus Cevi.DB aktualisiert.
                 </p>
               </div>
               {message && <Callout tone={message.tone}>{message.text}</Callout>}
@@ -294,8 +296,8 @@ export default function ProfilePage() {
                 <Field label="Handynummer">
                   <Input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} autoComplete="tel" placeholder="+41 79 000 00 00" />
                 </Field>
-                <Field label="Geburtsdatum">
-                  <Input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} autoComplete="bday" />
+                <Field label="Geburtsdatum" hint={birthDateFromCeviDb ? 'Aus Cevi.DB, nur dort änderbar' : undefined}>
+                  <Input type="date" value={form.birthDate} disabled={birthDateFromCeviDb} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} autoComplete="bday" />
                 </Field>
                 <Field label="Adresse" className="sm:col-span-2">
                   <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} autoComplete="street-address" placeholder="Dorfstrasse 1, 8307 Effretikon" />

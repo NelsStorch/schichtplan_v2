@@ -338,7 +338,10 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Helfer-Pool & Soll-Übersicht für das OK:
   // Alle Personen, die Zugriff auf den Event haben (inkl. Cevi-Name, Abteilung, Stufe, Alter, Schichten, Abmelde-Status).
-  fastify.get<{ Params: { slug: string } }>(
+  // `?alle=1`: zusätzlich Personen ohne Zugang (`hasAccess: false`), fürs Einteilen durch das OK. Nur aus der
+  // Abteilung des Anlasses (Heimabteilung oder Mitgliedschaft), wie die Mitgliederliste: nie Personen fremder
+  // Abteilungen (Whitelist) und nie Personen ohne Bezug zur Abteilung.
+  fastify.get<{ Params: { slug: string }; Querystring: { alle?: string } }>(
     '/api/events/:slug/roster',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
@@ -461,7 +464,12 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           hasAccess = check.ok;
         }
 
-        if (!hasAccess) continue;
+        if (!hasAccess) {
+          const inHostDepartment =
+            u.homeDepartmentId === event.departmentId ||
+            u.memberships.some((m) => m.departmentId === event.departmentId);
+          if (request.query.alle !== '1' || !inHostDepartment) continue;
+        }
 
         // Abteilung der Person ermitteln
         let deptId = u.homeDepartmentId;
@@ -514,6 +522,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
             endTime: s.shift.endTime.toISOString(),
             taskTitle: s.task?.title ?? null,
           })),
+          hasAccess,
           isDeregistered: Boolean(dereg),
           deregistrationReason: dereg?.reason ?? null,
           deregisteredAt: dereg?.createdAt ? dereg.createdAt.toISOString() : null,

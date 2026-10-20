@@ -405,6 +405,8 @@ export interface EventRosterItemDto {
   stufen: EventRosterStufeDto[];
   shiftCount: number;
   shifts: EventRosterShiftDto[];
+  /** Erfüllt die Zugangsregeln des Anlasses (nur mit `?alle=1` auch false) */
+  hasAccess: boolean;
   isDeregistered: boolean;
   deregistrationReason: string | null;
   deregisteredAt: string | null;
