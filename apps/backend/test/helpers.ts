@@ -51,6 +51,7 @@ export async function createUser(
     isGlobalAdmin: boolean;
     emailVerified: boolean;
     homeDepartmentId: string | null;
+    homeDepartmentSource: string | null;
   }> = {}
 ) {
   return app.prisma.user.create({
@@ -65,7 +66,12 @@ export async function createUser(
       isGlobalAdmin: data.isGlobalAdmin ?? false,
       emailVerified: data.emailVerified ?? true,
       homeDepartmentId: data.homeDepartmentId ?? null,
-      homeDepartmentSource: data.homeDepartmentId ? 'SELF' : null,
+      homeDepartmentSource:
+        data.homeDepartmentSource !== undefined
+          ? data.homeDepartmentSource
+          : data.homeDepartmentId
+            ? (data.ceviDbId ? 'CEVIDB' : 'SELF')
+            : null,
     },
   });
 }

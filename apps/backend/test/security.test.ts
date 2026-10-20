@@ -341,7 +341,7 @@ describe.skipIf(!hasTestDb)('Sicherheit der API', () => {
       // Fremde Abteilung ohne Cevi.DB: kein Zugang, darf nie erscheinen
       const otherNoAccess = await createUser(app, { homeDepartmentId: other.id });
       // Fremde Abteilung mit Cevi.DB: hat Zugang
-      const otherAccess = await createUser(app, { homeDepartmentId: other.id, ceviDbId: 990001 });
+      const otherAccess = await createUser(app, { homeDepartmentId: other.id, ceviDbId: 990001, homeDepartmentSource: 'CEVIDB' });
       // Ohne Bezug zur Abteilung
       const stranger = await createUser(app);
 
