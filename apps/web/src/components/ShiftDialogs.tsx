@@ -12,8 +12,16 @@ import {
   Trash2,
   UserPlus,
 } from 'lucide-react';
-import type { ShiftDto, ShiftTaskDto, TaskDefinitionDto, AgeRequirementType } from '@schichtplan/shared';
-import { DEFAULT_SHIFT_CATEGORIES } from '@schichtplan/shared';
+import {
+  DEFAULT_SHIFT_CATEGORIES,
+  toZurichInput,
+  zurichInputToIso,
+  type ShiftDto,
+  type ShiftTaskDto,
+  type TaskDefinitionDto,
+  type AgeRequirementType,
+} from '@schichtplan/shared';
+
 import {
   Avatar,
   Badge,
@@ -31,12 +39,8 @@ import { api, errorMessage } from '@/lib/api';
 import { fmtDayMonth, fmtTime, fmtWeekday } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 
-/** ISO -> Wert für <input type="datetime-local"> in lokaler Zeit */
-export function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+/** ISO -> Wert für <input type="datetime-local"> in Schweizer Zeit */
+export const toLocalInput = toZurichInput;
 
 function FormActions({
   onCancel,
@@ -270,8 +274,8 @@ function ShiftForm({
         title: form.title.trim(),
         category: form.category || undefined,
         isSetupTeardown: form.isSetupTeardown,
-        startTime: new Date(form.startTime).toISOString(),
-        endTime: new Date(form.endTime).toISOString(),
+        startTime: zurichInputToIso(form.startTime)!,
+        endTime: zurichInputToIso(form.endTime)!,
         requiredSlots: totalSlots,
         minAge: form.minAge || undefined,
         description: form.description.trim() || undefined,
@@ -678,8 +682,8 @@ function DuplicateShiftForm({
         method: 'POST',
         json: {
           title: title.trim(),
-          startTime: new Date(startTime).toISOString(),
-          endTime: new Date(endTime).toISOString(),
+          startTime: zurichInputToIso(startTime)!,
+          endTime: zurichInputToIso(endTime)!,
         },
       });
       toast({ title: 'Schicht dupliziert', description: title });

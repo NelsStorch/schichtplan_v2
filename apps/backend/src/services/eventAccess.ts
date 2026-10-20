@@ -8,6 +8,8 @@
 import type { PrismaClient } from '../db.js';
 import {
   accessTypeConfig,
+  formatZurichDateTime,
+  isSignupTimeOpen,
   type EventAccessDto,
   type EventAccessReason,
 } from '@schichtplan/shared';
@@ -199,15 +201,13 @@ export function evaluateEventAccess(
     return result(false, null, 'SIGNUP_CLOSED', 'Eintragen ist geschlossen. Melde dich beim OK.', canSeeNames);
   }
 
-  if (event.signupOpensAt && new Date() < new Date(event.signupOpensAt)) {
-    const d = new Date(event.signupOpensAt);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const formatted = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} um ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt)) {
+    const formatted = formatZurichDateTime(event.signupOpensAt);
     return result(
       false,
       null,
       'SIGNUP_NOT_YET_OPEN',
-      `Das Eintragen öffnet am ${formatted} Uhr.`,
+      `Das Eintragen öffnet am ${formatted}.`,
       canSeeNames
     );
   }

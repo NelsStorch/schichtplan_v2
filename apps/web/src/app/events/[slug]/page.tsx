@@ -19,7 +19,12 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import type { RequiredProfileField, ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
+import {
+  isSignupTimeOpen,
+  type RequiredProfileField,
+  type ShiftDto,
+  type ShiftTaskDto,
+} from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -198,8 +203,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const canManageEvent = isDeptAdmin || isOkLead;
   const needsLogin = !user;
   // Eintragen-Knöpfe zeigen, wenn es geht oder nur noch der Login fehlt (und Freischaltzeit erreicht ist)
-  const isSignupTimeOpen = !event.signupOpensAt || new Date() >= new Date(event.signupOpensAt);
-  const showSignup = access.canSignup || (access.reason === 'LOGIN_REQUIRED' && isSignupTimeOpen);
+  const isSignupTimeOpenNow = isSignupTimeOpen(event.signupOpensAt);
+  const showSignup = access.canSignup || (access.reason === 'LOGIN_REQUIRED' && isSignupTimeOpenNow);
   const isMine = (shift: ShiftDto) => Boolean(user && shift.signups?.some((s) => s.userId === user.id));
   const myShiftCount = event.shifts.filter(isMine).length;
 
@@ -519,8 +524,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
         {/* Hinweise: Freischaltung, Einladungs-Link und Zugang */}
         <div className="mt-4 space-y-3">
-          {event.signupOpensAt && new Date() < new Date(event.signupOpensAt) && (
-            <SignupCountdown opensAt={event.signupOpensAt} onOpen={load} />
+          {event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt) && (
+            <SignupCountdown
+              opensAt={event.signupOpensAt}
+              onOpen={load}
+              autoReload
+              reloadShiftId={selectedShiftId}
+            />
           )}
           {pendingToken && !user && !portalLoading && (
             <Callout tone="info" title="Du hast einen Einladungs-Link">

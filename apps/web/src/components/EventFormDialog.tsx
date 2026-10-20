@@ -2,7 +2,14 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
-import { ATTENDANCE_MODES, type AttendanceMode, type EventTemplateDto, type EventContactVisibility } from '@schichtplan/shared';
+import {
+  ATTENDANCE_MODES,
+  toZurichInput,
+  zurichInputToIso,
+  type AttendanceMode,
+  type EventTemplateDto,
+  type EventContactVisibility,
+} from '@schichtplan/shared';
 import { Badge, Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
@@ -32,19 +39,13 @@ export interface EventFormValues {
   access: EventAccessValues;
 }
 
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 /** Startwerte für «Design & Einstellungen» eines bestehenden Anlasses */
 export function eventFormInitial(event: EventDetails): Partial<EventFormValues> {
   return {
     title: event.title,
     slug: event.slug,
-    startDate: toLocalInput(event.startDate),
-    endDate: toLocalInput(event.endDate),
+    startDate: toZurichInput(event.startDate),
+    endDate: toZurichInput(event.endDate),
     description: event.description ?? '',
     logoUrl: event.logoUrl ?? '',
     bannerUrl: event.bannerUrl ?? '',
@@ -55,7 +56,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     dayCutoffTime: event.dayCutoffTime ?? '04:00',
     responsibleMode: event.responsibleMode ?? 'BY_SHIFT',
     contactVisibility: event.contactVisibility ?? 'BOTH',
-    signupOpensAt: event.signupOpensAt ? toLocalInput(event.signupOpensAt) : '',
+    signupOpensAt: event.signupOpensAt ? toZurichInput(event.signupOpensAt) : '',
     attendanceMode: event.attendanceMode ?? 'OFF',
     access: {
       accessType: event.accessType,
@@ -306,7 +307,7 @@ function EventForm({
         dayCutoffTime: form.dayCutoffTime || '04:00',
         responsibleMode: form.responsibleMode,
         contactVisibility: form.contactVisibility,
-        signupOpensAt: form.signupOpensAt ? new Date(form.signupOpensAt).toISOString() : null,
+        signupOpensAt: form.signupOpensAt ? zurichInputToIso(form.signupOpensAt) : null,
         attendanceMode: form.attendanceMode,
         ...accessPayload(form.access),
       };
@@ -320,8 +321,8 @@ function EventForm({
               slug: form.slug,
               logoUrl: shared.logoUrl ?? undefined,
               bannerUrl: shared.bannerUrl ?? undefined,
-              startDate: new Date(form.startDate).toISOString(),
-              endDate: new Date(form.endDate).toISOString(),
+              startDate: zurichInputToIso(form.startDate)!,
+              endDate: zurichInputToIso(form.endDate)!,
               allowPublicSignup: true,
             },
           });
@@ -337,8 +338,8 @@ function EventForm({
               slug: form.slug,
               logoUrl: shared.logoUrl ?? undefined,
               bannerUrl: shared.bannerUrl ?? undefined,
-              startDate: new Date(form.startDate).toISOString(),
-              endDate: new Date(form.endDate).toISOString(),
+              startDate: zurichInputToIso(form.startDate)!,
+              endDate: zurichInputToIso(form.endDate)!,
               allowPublicSignup: true,
               organizers: organizers.map((o) => ({
                 userId: o.userId,
@@ -359,8 +360,8 @@ function EventForm({
           json: {
             ...shared,
             slug: targetSlug !== initialSlug ? targetSlug : undefined,
-            startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
-            endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
+            startDate: form.startDate ? zurichInputToIso(form.startDate)! : undefined,
+            endDate: form.endDate ? zurichInputToIso(form.endDate)! : undefined,
             description: form.description.trim() || null,
             allowPublicSignup: form.allowPublicSignup,
           },
@@ -777,8 +778,8 @@ function EventForm({
         </Field>
 
         <Field
-          label="Freischaltung zum Eintragen (optional)"
-          hint="Datum und Uhrzeit, ab wann sich Helfer:innen selbst eintragen können. Leer lassen = sofort offen. Das OK kann Personen jederzeit auch vorab manuell einteilen."
+          label="Freischaltung zum Eintragen (Schweizer Zeit, optional)"
+          hint="Datum und Uhrzeit (Schweizer Zeit), ab wann sich Helfer:innen selbst eintragen können. Leer lassen = sofort offen. Das OK kann Personen jederzeit auch vorab manuell einteilen."
         >
           <Input
             type="datetime-local"

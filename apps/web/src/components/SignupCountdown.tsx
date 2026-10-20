@@ -1,31 +1,77 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Clock, Sparkles } from 'lucide-react';
 import { cn } from '@schichtplan/ui';
+import { formatZurichDateTime } from '@schichtplan/shared';
 
 interface SignupCountdownProps {
   opensAt: string;
   onOpen?: () => void;
   className?: string;
   compact?: boolean;
+  /** Seite automatisch neu laden, sobald der Countdown abläuft (Standard: true) */
+  autoReload?: boolean;
+  /** Optionale Schicht-ID, die nach dem Reload im Dialog geöffnet werden soll */
+  reloadShiftId?: string | null;
 }
 
-export function SignupCountdown({ opensAt, onOpen, className, compact = false }: SignupCountdownProps) {
+export function SignupCountdown({
+  opensAt,
+  onOpen,
+  className,
+  compact = false,
+  autoReload = true,
+  reloadShiftId,
+}: SignupCountdownProps) {
   const [diff, setDiff] = useState<number>(() => new Date(opensAt).getTime() - Date.now());
+  const hasTriggeredRef = useRef(false);
+  const reloadShiftIdRef = useRef(reloadShiftId);
+  reloadShiftIdRef.current = reloadShiftId;
 
   useEffect(() => {
     const target = new Date(opensAt).getTime();
+    const initialRemaining = target - Date.now();
+
+    // Falls der Zeitpunkt beim ersten Mount schon vorbei ist, nicht neu laden
+    if (initialRemaining <= 0) {
+      setDiff(0);
+      return;
+    }
 
     let animId: number | null = null;
     let timerId: ReturnType<typeof setInterval> | null = null;
+    let reloadTimerId: ReturnType<typeof setTimeout> | null = null;
+
+    const triggerOpen = () => {
+      if (hasTriggeredRef.current) return;
+      hasTriggeredRef.current = true;
+      setDiff(0);
+      onOpen?.();
+
+      if (autoReload && typeof window !== 'undefined') {
+        // 400ms Delay für die optische Rückmeldung ("Jetzt freigeschaltet!"),
+        // danach Seite neu laden, damit alle Daten, Berechtigungen und Eintragen-Knöpfe
+        // direkt frisch vom Server geladen werden.
+        reloadTimerId = setTimeout(() => {
+          const shiftId = reloadShiftIdRef.current;
+          if (shiftId) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('schicht', shiftId);
+            window.location.href = url.toString();
+          } else {
+            window.location.reload();
+          }
+        }, 400);
+      }
+    };
 
     const update = () => {
       const remaining = target - Date.now();
       setDiff(remaining);
 
       if (remaining <= 0) {
-        onOpen?.();
+        triggerOpen();
         return false;
       }
       return true;
@@ -36,7 +82,7 @@ export function SignupCountdown({ opensAt, onOpen, className, compact = false }:
       setDiff(remaining);
 
       if (remaining <= 0) {
-        onOpen?.();
+        triggerOpen();
         return;
       }
 
@@ -50,7 +96,7 @@ export function SignupCountdown({ opensAt, onOpen, className, compact = false }:
         };
         animId = requestAnimationFrame(loop);
       } else if (remaining <= 10 * 60 * 1000) {
-        // Zwischen 1 und 10 Minuten: Sekundentakt
+        // Zwischen 1 und 10 Minuten: Sekundentakt (250ms Poll für geschmeidigen Übergang)
         timerId = setInterval(() => {
           const rem = target - Date.now();
           setDiff(rem);
@@ -77,26 +123,40 @@ export function SignupCountdown({ opensAt, onOpen, className, compact = false }:
     return () => {
       if (animId !== null) cancelAnimationFrame(animId);
       if (timerId !== null) clearInterval(timerId);
+      if (reloadTimerId !== null) clearTimeout(reloadTimerId);
     };
-  }, [opensAt, onOpen]);
+  }, [opensAt, onOpen, autoReload]);
 
   if (diff <= 0) {
+    if (compact) {
+      return (
+        <span className={cn('inline-flex items-center gap-1.5 font-semibold text-success-ink', className)}>
+          <Sparkles className="size-4 animate-bounce text-success" />
+          <span>Jetzt freigeschaltet!</span>
+        </span>
+      );
+    }
     return (
-      <span className={cn('inline-flex items-center gap-1.5 font-semibold text-success-ink', className)}>
-        <Sparkles className="size-4 animate-bounce text-success" />
-        <span>Jetzt freigeschaltet!</span>
-      </span>
+      <div
+        className={cn(
+          'rounded-card border border-success/40 bg-success/10 p-3.5 sm:p-4 text-center transition-all duration-300 shadow-sm',
+          className
+        )}
+      >
+        <div className="flex items-center justify-center gap-2 text-sm sm:text-base font-bold text-success-ink">
+          <Sparkles className="size-5 animate-bounce text-success" />
+          <span>Jetzt freigeschaltet! Seite wird aktualisiert...</span>
+        </div>
+        <p className="mt-1 text-2xs text-fg-muted">Du kannst dich jetzt direkt für Schichten eintragen.</p>
+      </div>
     );
   }
 
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   if (diff > ONE_DAY_MS) {
-    const d = new Date(opensAt);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const formatted = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} um ${pad(d.getHours())}:${pad(d.getMinutes())} Uhr`;
     return (
       <span className={cn('text-xs text-fg-muted', className)}>
-        Öffnet am {formatted}
+        Öffnet am {formatZurichDateTime(opensAt)}
       </span>
     );
   }

@@ -18,7 +18,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
+import { formatZurichDateTime, isSignupTimeOpen, type ShiftDto, type ShiftTaskDto } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -234,8 +234,8 @@ export function ShiftDetailsDialog({
         </div>
 
         {/* Freischaltung ausstehend */}
-        {event.signupOpensAt && new Date() < new Date(event.signupOpensAt) && !canManage && (
-          <SignupCountdown opensAt={event.signupOpensAt} />
+        {event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt) && !canManage && (
+          <SignupCountdown opensAt={event.signupOpensAt} autoReload reloadShiftId={shift.id} />
         )}
 
         {/* Schicht voll: Kontaktperson für Fragen */}
@@ -485,12 +485,12 @@ export function ShiftDetailsDialog({
                         <span className="rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted border border-line">
                           Voll besetzt
                         </span>
-                      ) : (blockedReason || (needsLogin && event.signupOpensAt && new Date() < new Date(event.signupOpensAt))) ? (
+                      ) : (blockedReason || (needsLogin && event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt))) ? (
                         <span
-                          title={blockedReason || `Das Eintragen ist erst ab ${new Date(event.signupOpensAt!).toLocaleString('de-CH')} Uhr möglich.`}
+                          title={blockedReason || `Das Eintragen ist erst ab ${formatZurichDateTime(event.signupOpensAt!)} möglich.`}
                           className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted"
                         >
-                          <Lock className="size-3" /> {event.viewer?.access?.reason === 'SIGNUP_NOT_YET_OPEN' || (event.signupOpensAt && new Date() < new Date(event.signupOpensAt)) ? 'Noch nicht geöffnet' : 'Für dich nicht freigeschaltet'}
+                          <Lock className="size-3" /> {event.viewer?.access?.reason === 'SIGNUP_NOT_YET_OPEN' || (event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt)) ? 'Noch nicht geöffnet' : 'Für dich nicht freigeschaltet'}
                         </span>
                       ) : needsLogin ? (
                         <a
