@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   AlertCircle,
   Calendar,
@@ -75,6 +76,22 @@ export function ShiftDetailsDialog({
     ? signups.find((s) => s.userId === currentUser.id)
     : null;
   const isMine = Boolean(mySignupInShift);
+
+  const conflictingShift = useMemo(() => {
+    if (!currentUser || !shift || !event?.shifts) return null;
+    const sStart = new Date(shift.startTime).getTime();
+    const sEnd = new Date(shift.endTime).getTime();
+    return (
+      event.shifts.find((other) => {
+        if (other.id === shift.id) return false;
+        const isSignedUp = (other.signups ?? []).some((su) => su.userId === currentUser.id);
+        if (!isSignedUp) return false;
+        const otherStart = new Date(other.startTime).getTime();
+        const otherEnd = new Date(other.endTime).getTime();
+        return sStart < otherEnd && sEnd > otherStart;
+      }) || null
+    );
+  }, [currentUser, shift, event?.shifts]);
 
   const tasks =
     shift.tasks && shift.tasks.length > 0
@@ -366,6 +383,13 @@ export function ShiftDetailsDialog({
                       ) : isMineInOtherTask ? (
                         <div className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
                           <Check className="size-3.5 text-accent-ink" /> Du bist bereits für eine andere Arbeit eingeteilt
+                        </div>
+                      ) : conflictingShift ? (
+                        <div className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning-ink">
+                          <AlertCircle className="size-3.5 shrink-0 text-warning" />
+                          <span>
+                            Zeitkollision mit «{conflictingShift.title}» ({fmtTime(conflictingShift.startTime)} – {fmtTime(conflictingShift.endTime)} Uhr)
+                          </span>
                         </div>
                       ) : taskFull ? (
                         <span className="rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted border border-line">

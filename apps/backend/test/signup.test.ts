@@ -126,4 +126,65 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
     const byPlanner = await inject(app, { method: 'DELETE', url, tenant: department.slug, cookie: authCookie(app, planner) });
     expect(byPlanner.statusCode).toBe(200);
   });
+
+  it('blockiert Helfer*innen bei zeitlich überlappenden Schichten', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift1 = await createShift(app, event.id, {
+      title: 'Grill',
+      startTime: new Date('2030-06-01T10:00:00Z'),
+      endTime: new Date('2030-06-01T14:00:00Z'),
+    });
+    const shift2 = await createShift(app, event.id, {
+      title: 'Kasse',
+      startTime: new Date('2030-06-01T12:00:00Z'),
+      endTime: new Date('2030-06-01T16:00:00Z'),
+    });
+    const helper = await createUser(app);
+    const cookie = authCookie(app, helper);
+
+    // Erste Schicht eintragen -> OK
+    const first = await signup(department.slug, shift1.id, cookie);
+    expect(first.statusCode).toBe(200);
+
+    // Zweite überlappende Schicht eintragen -> 409 TIME_COLLISION
+    const second = await signup(department.slug, shift2.id, cookie);
+    expect(second.statusCode).toBe(409);
+    expect(second.json().code).toBe('TIME_COLLISION');
+  });
+
+  it('warnt das OK bei Zeitkollision und erlaubt Einteilen mit confirmCollision', async () => {
+    const department = await createDepartment(app);
+    const okLead = await createUser(app);
+    const event = await createEvent(app, department.id, { organizerId: okLead.id });
+    const shift1 = await createShift(app, event.id, {
+      title: 'Küche',
+      startTime: new Date('2030-06-01T10:00:00Z'),
+      endTime: new Date('2030-06-01T14:00:00Z'),
+    });
+    const shift2 = await createShift(app, event.id, {
+      title: 'Abwasch',
+      startTime: new Date('2030-06-01T12:00:00Z'),
+      endTime: new Date('2030-06-01T16:00:00Z'),
+    });
+    const helper = await createUser(app);
+    const okCookie = authCookie(app, okLead);
+
+    // OK teilt Helfer für Schicht 1 ein -> OK
+    const first = await signup(department.slug, shift1.id, okCookie, { userId: helper.id });
+    expect(first.statusCode).toBe(200);
+
+    // OK teilt Helfer für überlappende Schicht 2 ein OHNE Bestätigung -> 409 mit Warnung
+    const secondWithoutConfirm = await signup(department.slug, shift2.id, okCookie, { userId: helper.id });
+    expect(secondWithoutConfirm.statusCode).toBe(409);
+    expect(secondWithoutConfirm.json().code).toBe('TIME_COLLISION');
+
+    // OK teilt Helfer für überlappende Schicht 2 ein MIT confirmCollision: true -> 200 Erfolgreich
+    const secondWithConfirm = await signup(department.slug, shift2.id, okCookie, {
+      userId: helper.id,
+      confirmCollision: true,
+    });
+    expect(secondWithConfirm.statusCode).toBe(200);
+    expect(await app.prisma.shiftSignup.count({ where: { shiftId: shift2.id, userId: helper.id } })).toBe(1);
+  });
 });

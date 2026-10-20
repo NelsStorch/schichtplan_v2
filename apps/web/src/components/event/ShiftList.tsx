@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronRight, Hammer, Plus, Timer } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, Hammer, Plus, Timer } from 'lucide-react';
 import type { ShiftDto } from '@schichtplan/shared';
 import { Badge, Button, cn } from '@schichtplan/ui';
 import { fmtDayMonth, fmtShortWeekday, fmtTime } from '@/lib/format';
@@ -10,6 +10,7 @@ export interface ShiftActions {
   /** Kann sich die angemeldete Person selbst eintragen (Zugang ok oder Login möglich)? */
   canSignup: boolean;
   isMine: (shift: ShiftDto) => boolean;
+  hasConflict?: (shift: ShiftDto) => boolean;
   busyShiftId: string | null;
   onOpen: (shift: ShiftDto) => void;
   onQuickSignup: (shift: ShiftDto) => void;
@@ -97,6 +98,13 @@ export function NeededShifts({
                   {mine ? (
                     <span className="flex size-9 items-center justify-center rounded-full bg-success/15 text-success-ink">
                       <Check className="size-4" aria-label="Du bist dabei" />
+                    </span>
+                  ) : actions.hasConflict?.(shift) ? (
+                    <span
+                      title="Zeitkollision mit einer deiner Schichten"
+                      className="flex size-9 items-center justify-center rounded-full bg-warning/15 text-warning-ink border border-warning/30"
+                    >
+                      <AlertCircle className="size-4 text-warning" />
                     </span>
                   ) : actions.canSignup ? (
                     <Button
@@ -218,17 +226,27 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
               <div className="flex shrink-0 flex-col items-end justify-between gap-2">
                 <span className={cn('tabular text-sm font-bold', style.text)}>{freeLabel(stats.free)}</span>
                 {!stats.over && !mine && stats.free > 0 && actions.canSignup && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    loading={actions.busyShiftId === shift.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      actions.onQuickSignup(shift);
-                    }}
-                  >
-                    <Plus /> <span className="hidden sm:inline">Eintragen</span>
-                  </Button>
+                  actions.hasConflict?.(shift) ? (
+                    <span
+                      title="Zeitkollision mit einer deiner Schichten"
+                      className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning-ink"
+                    >
+                      <AlertCircle className="size-3.5 text-warning" />
+                      <span className="hidden sm:inline">Kollision</span>
+                    </span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={actions.busyShiftId === shift.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.onQuickSignup(shift);
+                      }}
+                    >
+                      <Plus /> <span className="hidden sm:inline">Eintragen</span>
+                    </Button>
+                  )
                 )}
               </div>
             </div>

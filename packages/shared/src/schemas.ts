@@ -325,6 +325,8 @@ export const SignupShiftSchema = z.object({
   guestPhone: z.string().trim().max(30).optional().nullable(),
   /** Antworten auf Fragen mit scope PER_SIGNUP (questionId -> Antwort) */
   answers: z.record(z.string().uuid(), z.string().trim().max(1000)).optional(),
+  /** OK/Admin kann Zeitkollision nach Bestätigung der Warnung ignorieren */
+  confirmCollision: z.boolean().optional(),
 });
 
 export type SignupShiftInput = z.infer<typeof SignupShiftSchema>;

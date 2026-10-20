@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import {
+  AlertTriangle,
   Clock,
   Copy,
   Crown,
@@ -13,7 +14,7 @@ import {
   UserCheck,
   UserPlus,
 } from 'lucide-react';
-import type { ShiftDto, ShiftTaskDto, TaskDefinitionDto, AgeRequirementType } from '@schichtplan/shared';
+import type { ShiftDto, ShiftTaskDto, TaskDefinitionDto, AgeRequirementType, ShiftCollisionCheckResult } from '@schichtplan/shared';
 import { DEFAULT_SHIFT_CATEGORIES } from '@schichtplan/shared';
 import {
   Avatar,
@@ -28,7 +29,7 @@ import {
   cn,
   useToast,
 } from '@schichtplan/ui';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, ApiError } from '@/lib/api';
 import { fmtDayMonth, fmtTime, fmtWeekday } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 
@@ -600,6 +601,9 @@ function AssignHelperForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [collisionWarning, setCollisionWarning] = useState<ShiftCollisionCheckResult | null>(null);
+  const [confirmCollision, setConfirmCollision] = useState(false);
+
   useEffect(() => {
     let active = true;
     api<DeptMemberItem[]>('/api/departments/current/members')
@@ -620,8 +624,51 @@ function AssignHelperForm({
     };
   }, []);
 
+  // Prüfe Zeitkollisionen im Voraus bei Auswahl einer Person
+  useEffect(() => {
+    let active = true;
+    setConfirmCollision(false);
+
+    if (mode === 'member' && selectedUserId) {
+      api<ShiftCollisionCheckResult>(`/api/shifts/${shift.id}/check-collision?userId=${selectedUserId}`)
+        .then((res) => {
+          if (active) setCollisionWarning(res.hasCollision ? res : null);
+        })
+        .catch(() => {
+          if (active) setCollisionWarning(null);
+        });
+    } else if (mode === 'guest' && guestName.trim().length >= 2) {
+      const timer = setTimeout(() => {
+        api<ShiftCollisionCheckResult>(
+          `/api/shifts/${shift.id}/check-collision?guestName=${encodeURIComponent(guestName.trim())}`
+        )
+          .then((res) => {
+            if (active) setCollisionWarning(res.hasCollision ? res : null);
+          })
+          .catch(() => {
+            if (active) setCollisionWarning(null);
+          });
+      }, 300);
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
+    } else {
+      setCollisionWarning(null);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [mode, selectedUserId, guestName, shift.id]);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (collisionWarning?.hasCollision && !confirmCollision) {
+      setError('Bitte bestätige die Zeitkollision mit dem Kontrollkästchen, um die Person trotzdem einzuteilen.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -633,6 +680,7 @@ function AssignHelperForm({
           guestName: mode === 'guest' ? guestName.trim() : undefined,
           guestEmail: mode === 'guest' && guestEmail ? guestEmail.trim() : undefined,
           guestPhone: mode === 'guest' && guestPhone ? guestPhone.trim() : undefined,
+          confirmCollision: confirmCollision ? true : undefined,
         },
       });
 
@@ -647,7 +695,16 @@ function AssignHelperForm({
       });
       onAssigned();
     } catch (err) {
-      setError(errorMessage(err));
+      if (err instanceof ApiError && err.data.code === 'TIME_COLLISION') {
+        setCollisionWarning({
+          hasCollision: true,
+          conflicts: (err.data.conflicts as any) || [],
+          message: err.message,
+        });
+        setError(err.message);
+      } else {
+        setError(errorMessage(err));
+      }
       setSaving(false);
     }
   };
@@ -716,13 +773,57 @@ function AssignHelperForm({
         </div>
       )}
 
+      {collisionWarning && collisionWarning.hasCollision && (
+        <div className="rounded-field border border-warning/40 bg-warning/10 p-3.5 text-xs text-warning-ink space-y-2.5">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
+            <div className="space-y-1 flex-1">
+              <p className="font-bold text-sm text-warning-ink">
+                Achtung: Zeitkollision
+              </p>
+              <p className="text-fg-muted">
+                {mode === 'member'
+                  ? `${members.find((m) => m.userId === selectedUserId)?.displayName || 'Diese Person'} ist zur gleichen Zeit bereits eingetragen:`
+                  : `«${guestName}» ist in diesem Event zur gleichen Zeit bereits eingetragen:`}
+              </p>
+              <ul className="space-y-1 pt-1">
+                {collisionWarning.conflicts.map((c) => (
+                  <li key={c.signupId} className="flex items-center gap-1.5 font-medium">
+                    <span className="size-1.5 rounded-full bg-warning shrink-0" />
+                    <span>
+                      <strong>{c.shiftTitle}</strong>
+                      {c.taskTitle ? ` (${c.taskTitle})` : ''}:{' '}
+                      {fmtWeekday(c.startTime)}, {fmtTime(c.startTime)} – {fmtTime(c.endTime)} Uhr
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 pt-2 border-t border-warning/20 font-semibold cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={confirmCollision}
+              onChange={(e) => setConfirmCollision(e.target.checked)}
+              className="size-4 rounded border-line text-warning focus:ring-warning"
+            />
+            <span>Trotzdem einteilen (Warnung bestätigen)</span>
+          </label>
+        </div>
+      )}
+
       {task?.minAge ? (
         <div className="rounded-field border border-warning/30 bg-warning/10 p-3 text-xs text-warning-ink">
           <strong>Hinweis Mindestalter:</strong> Für &quot;{task.title}&quot; gilt ein Mindestalter von {task.minAge} Jahren ({task.ageRequirementType === 'ALL' ? 'alle Helfer' : 'mind. 1 in Schicht'}).
         </div>
       ) : null}
 
-      <FormActions onCancel={onCancel} saving={saving} label="Einteilen" />
+      <FormActions
+        onCancel={onCancel}
+        saving={saving}
+        label={collisionWarning?.hasCollision && confirmCollision ? 'Trotzdem einteilen' : 'Einteilen'}
+      />
     </form>
   );
 }

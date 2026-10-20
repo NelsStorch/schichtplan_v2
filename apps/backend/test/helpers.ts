@@ -103,15 +103,15 @@ export async function createEvent(
 export async function createShift(
   app: FastifyInstance,
   eventId: string,
-  data: Partial<{ minAge: number | null; requiredSlots: number; title: string }> = {}
+  data: Partial<{ minAge: number | null; requiredSlots: number; title: string; startTime: Date; endTime: Date }> = {}
 ) {
   const requiredSlots = data.requiredSlots ?? 3;
   return app.prisma.shift.create({
     data: {
       eventId,
       title: data.title ?? 'Bar',
-      startTime: new Date('2030-06-01T18:00:00Z'),
-      endTime: new Date('2030-06-01T22:00:00Z'),
+      startTime: data.startTime ?? new Date('2030-06-01T18:00:00Z'),
+      endTime: data.endTime ?? new Date('2030-06-01T22:00:00Z'),
       requiredSlots,
       minAge: data.minAge ?? null,
       tasks: { create: [{ title: data.title ?? 'Bar', requiredSlots, minAge: null }] },

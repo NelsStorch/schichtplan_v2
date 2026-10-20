@@ -225,6 +225,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     }))
     .filter((d) => d.items.length > 0);
 
+  const findConflictingShift = (targetShift: ShiftDto) => {
+    if (!user || !event?.shifts) return null;
+    const sStart = new Date(targetShift.startTime).getTime();
+    const sEnd = new Date(targetShift.endTime).getTime();
+    return (
+      event.shifts.find((other) => {
+        if (other.id === targetShift.id) return false;
+        const isSignedUp = (other.signups ?? []).some((su) => su.userId === user.id);
+        if (!isSignedUp) return false;
+        const otherStart = new Date(other.startTime).getTime();
+        const otherEnd = new Date(other.endTime).getTime();
+        return sStart < otherEnd && sEnd > otherStart;
+      }) || null
+    );
+  };
+
   const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto, answers?: Record<string, string>) => {
     setBusyShift(shift.id);
     try {
@@ -244,6 +260,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           ? (err.data.missingFields as RequiredProfileField[])
           : [];
         setParticipationFor({ shift, task, showOnce: true, extraFields });
+      } else if (err instanceof ApiError && err.data.code === 'TIME_COLLISION') {
+        toast({ title: 'Zeitkollision', description: errorMessage(err), tone: 'error' });
       } else {
         toast({ title: 'Eintragen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
       }
@@ -259,6 +277,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     }
     if (!access.canSignup) {
       toast({ title: 'Eintragen nicht möglich', description: access.message ?? undefined, tone: 'error' });
+      return;
+    }
+    const conflict = findConflictingShift(shift);
+    if (conflict) {
+      toast({
+        title: 'Zeitkollision',
+        description: `Du bist zur gleichen Zeit bereits für die Schicht «${conflict.title}» (${fmtTime(conflict.startTime)} – ${fmtTime(conflict.endTime)} Uhr) eingetragen.`,
+        tone: 'error',
+      });
       return;
     }
     // Fragen «einmal pro Anlass» beim ersten Eintragen (oder wenn eine Pflichtfrage fehlt),
@@ -326,6 +353,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const actions: ShiftActions = {
     canSignup: showSignup,
     isMine,
+    hasConflict: (shift) => Boolean(findConflictingShift(shift)),
     busyShiftId: busyShift,
     onOpen: (shift) => setSelectedShiftId(shift.id),
     onQuickSignup: quickSignup,

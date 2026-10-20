@@ -9,6 +9,7 @@ import {
 } from '../services/eventAccess.js';
 import { missingProfileFields } from '../services/profile.js';
 import { validateAnswers } from './eventParticipation.js';
+import { findShiftCollisions, formatZurichTime } from '../services/shiftCollision.js';
 
 function calculateAge(birthDate: Date, targetDate: Date): number {
   let age = targetDate.getFullYear() - birthDate.getFullYear();
@@ -364,6 +365,83 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Zeitkollisionen prüfen (für Eintragen-Vorschau oder Admin-Zuweisung)
+  fastify.get<{
+    Params: { id: string };
+    Querystring: { userId?: string; guestName?: string };
+  }>(
+    '/api/shifts/:id/check-collision',
+    { preHandler: [fastify.optionalAuthenticate] },
+    async (request, reply) => {
+      const shiftId = request.params.id;
+      const { userId, guestName } = request.query;
+
+      const shift = await fastify.prisma.shift.findUnique({
+        where: { id: shiftId },
+        include: {
+          event: {
+            include: {
+              organizers: true,
+            },
+          },
+        },
+      });
+
+      if (!shift || (request.tenant && shift.event.departmentId !== request.tenant.id)) {
+        return reply.status(404).send({ error: 'Schicht nicht gefunden' });
+      }
+
+      if (!request.user) {
+        return reply.status(401).send({ error: 'Nicht angemeldet' });
+      }
+
+      const flags = await managerFlags(fastify.prisma, shift.event, request.user);
+      const isOkOrAdmin = flags.isManager;
+
+      let targetUserId: string | null = null;
+      let targetGuestName: string | null = null;
+
+      if (userId) {
+        if (userId !== request.user.id && !isOkOrAdmin) {
+          return reply.status(403).send({ error: 'Keine Berechtigung' });
+        }
+        targetUserId = userId;
+      } else if (guestName) {
+        if (!isOkOrAdmin) {
+          return reply.status(403).send({ error: 'Keine Berechtigung' });
+        }
+        targetGuestName = guestName;
+      } else {
+        targetUserId = request.user.id;
+      }
+
+      const conflicts = await findShiftCollisions(fastify.prisma, {
+        shiftId: shift.id,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        eventId: shift.eventId,
+        userId: targetUserId,
+        guestName: targetGuestName,
+      });
+
+      let message: string | undefined;
+      if (conflicts.length > 0) {
+        const first = conflicts[0];
+        if (first.sameShift) {
+          message = `Bereits in dieser Schicht eingetragen${first.taskTitle ? ` (${first.taskTitle})` : ''}.`;
+        } else {
+          message = `Bereits eingetragen für «${first.shiftTitle}»${first.taskTitle ? ` (${first.taskTitle})` : ''} (${formatZurichTime(first.startTime)} – ${formatZurichTime(first.endTime)} Uhr).`;
+        }
+      }
+
+      return {
+        hasCollision: conflicts.length > 0,
+        conflicts,
+        message,
+      };
+    }
+  );
+
   // In Schicht eintragen (oder durch OK einteilen)
   fastify.post<{ Params: { id: string } }>(
     '/api/shifts/:id/signup',
@@ -458,6 +536,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             email: true,
             firstName: true,
             lastName: true,
+            ceviName: true,
             phone: true,
             address: true,
             birthDate: true,
@@ -501,21 +580,55 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      // Prüfe Duplikate
-      if (targetUserId) {
-        const alreadySignedUp = shift.signups.some((s) => s.userId === targetUserId);
-        if (alreadySignedUp) {
-          return reply.status(409).send({ error: 'Diese Person ist für diese Schicht bereits eingetragen' });
+      // Zeitkollisionen & Duplikate prüfen (gleiche Schicht oder überlappende Schichten)
+      const allowCollision = Boolean(isOkOrAdmin && parse.data.confirmCollision);
+      const conflicts = await findShiftCollisions(fastify.prisma, {
+        shiftId,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        eventId: shift.eventId,
+        userId: targetUserId,
+        guestName,
+      });
+
+      if (conflicts.length > 0 && !allowCollision) {
+        const first = conflicts[0];
+        const sameShift = conflicts.some((c) => c.sameShift);
+        const isSelf = targetUserId === request.user.id;
+
+        let error: string;
+        if (sameShift) {
+          if (isSelf) {
+            error = first.taskTitle
+              ? `Du bist für diese Schicht bereits für die Arbeit «${first.taskTitle}» eingetragen.`
+              : 'Du bist für diese Schicht bereits eingetragen.';
+          } else {
+            error = first.taskTitle
+              ? `Diese Person ist für diese Schicht bereits für die Arbeit «${first.taskTitle}» eingetragen.`
+              : 'Diese Person ist für diese Schicht bereits eingetragen.';
+          }
+        } else {
+          const timeStr = `${formatZurichTime(first.startTime)} – ${formatZurichTime(first.endTime)} Uhr`;
+          if (isSelf) {
+            error = first.taskTitle
+              ? `Du bist zur gleichen Zeit bereits für die Schicht «${first.shiftTitle}» (${first.taskTitle}, ${timeStr}) eingetragen.`
+              : `Du bist zur gleichen Zeit bereits für die Schicht «${first.shiftTitle}» (${timeStr}) eingetragen.`;
+          } else {
+            const name =
+              targetUser?.ceviName ||
+              (targetUser ? `${targetUser.firstName} ${targetUser.lastName}`.trim() : guestName) ||
+              'Diese Person';
+            error = first.taskTitle
+              ? `${name} ist zur gleichen Zeit bereits für die Schicht «${first.shiftTitle}» (${first.taskTitle}, ${timeStr}) eingetragen.`
+              : `${name} ist zur gleichen Zeit bereits für die Schicht «${first.shiftTitle}» (${timeStr}) eingetragen.`;
+          }
         }
-      } else if (guestName) {
-        const nameConflict = shift.signups.some(
-          (s) => s.guestName?.toLowerCase() === guestName!.toLowerCase()
-        );
-        if (nameConflict) {
-          return reply.status(409).send({
-            error: `Jemand mit dem Namen "${guestName}" ist für diese Schicht bereits eingetragen`,
-          });
-        }
+
+        return reply.status(409).send({
+          error,
+          code: 'TIME_COLLISION',
+          conflicts,
+        });
       }
 
       // Prüfe freie Plätze in der Gesamtschicht
@@ -611,8 +724,44 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       // Eintragungen für den letzten Platz (oder ein Doppelklick) würden die Schicht sonst überbuchen.
       const result = await fastify.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM shifts WHERE id = ${shiftId} FOR UPDATE`;
-        if (targetUserId && (await tx.shiftSignup.count({ where: { shiftId, userId: targetUserId } })) > 0) {
-          return { error: 'Diese Person ist für diese Schicht bereits eingetragen' } as const;
+        if (!allowCollision) {
+          if (targetUserId) {
+            const overlapping = await tx.shiftSignup.findFirst({
+              where: {
+                userId: targetUserId,
+                shift: {
+                  startTime: { lt: shift.endTime },
+                  endTime: { gt: shift.startTime },
+                },
+              },
+              include: { shift: true },
+            });
+            if (overlapping) {
+              const isSame = overlapping.shiftId === shiftId;
+              return {
+                error: isSame
+                  ? 'Diese Person ist für diese Schicht bereits eingetragen'
+                  : `Zur gleichen Zeit besteht bereits eine Eintragung für «${overlapping.shift.title}»`,
+              } as const;
+            }
+          } else if (guestName) {
+            const overlapping = await tx.shiftSignup.findFirst({
+              where: {
+                shift: {
+                  eventId: shift.eventId,
+                  startTime: { lt: shift.endTime },
+                  endTime: { gt: shift.startTime },
+                },
+                guestName: { equals: guestName, mode: 'insensitive' },
+              },
+              include: { shift: true },
+            });
+            if (overlapping) {
+              return {
+                error: `Jemand mit dem Namen "${guestName}" ist zur gleichen Zeit bereits eingetragen`,
+              } as const;
+            }
+          }
         }
         if ((await tx.shiftSignup.count({ where: { shiftId } })) >= shift.requiredSlots) {
           return { error: 'Diese Schicht ist bereits voll belegt' } as const;

@@ -102,6 +102,22 @@ export interface ShiftDto {
   freeSlots?: number;
 }
 
+export interface ShiftTimeCollision {
+  signupId: string;
+  shiftId: string;
+  shiftTitle: string;
+  taskTitle?: string | null;
+  startTime: string;
+  endTime: string;
+  sameShift: boolean;
+}
+
+export interface ShiftCollisionCheckResult {
+  hasCollision: boolean;
+  conflicts: ShiftTimeCollision[];
+  message?: string;
+}
+
 export interface ShiftSignupDto {
   id: string;
   shiftId: string;
