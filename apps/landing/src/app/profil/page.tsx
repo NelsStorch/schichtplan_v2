@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpRight, Building2, CalendarDays, Database, LogOut, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Bell, Building2, CalendarDays, Database, LogOut, Trash2 } from 'lucide-react';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   PLACEHOLDER_LAST_NAME,
@@ -19,6 +19,7 @@ import {
   Callout,
   Field,
   Input,
+  Switch,
   ThemeToggle,
   buttonClasses,
   useConfirm,
@@ -163,6 +164,31 @@ export default function ProfilePage() {
       setMessage({ tone: 'danger', text: err instanceof Error ? err.message : 'Speichern hat nicht geklappt.' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** Erinnerungen sofort speichern (ohne «Speichern»-Knopf) */
+  const toggleReminders = async (enabled: boolean) => {
+    if (!user) return;
+    const previous = user;
+    setUser({ ...user, shiftReminders: enabled });
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shiftReminders: enabled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Speichern hat nicht geklappt.');
+      setUser(data as UserDto);
+      toast({ title: enabled ? 'Erinnerungen eingeschaltet' : 'Erinnerungen ausgeschaltet' });
+    } catch (err) {
+      setUser(previous);
+      toast({
+        title: 'Speichern hat nicht geklappt',
+        description: err instanceof Error ? err.message : undefined,
+        tone: 'error',
+      });
     }
   };
 
@@ -312,6 +338,23 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </form>
+
+            <section className="rounded-card border border-line bg-surface p-5">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">
+                <Bell className="size-4" /> Benachrichtigungen
+              </h2>
+              <Switch
+                className="mt-3"
+                checked={user.shiftReminders !== false}
+                onChange={toggleReminders}
+                label="Erinnerung vor meinen Schichten"
+                description={
+                  hasRealEmail && user.emailVerified
+                    ? `Etwa 24 Stunden vor jeder Schicht eine E-Mail an ${user.email}.`
+                    : 'Dafür braucht dein Konto eine bestätigte E-Mail-Adresse (siehe oben).'
+                }
+              />
+            </section>
 
             <section className="rounded-card border border-line bg-surface p-5">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">

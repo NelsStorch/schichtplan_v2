@@ -118,6 +118,8 @@ model User {
   emailVerifiedAt     DateTime?          @map("email_verified_at")
   /// Zuletzt gesetztes Passwort: ältere Login-Tokens gelten danach nicht mehr
   passwordChangedAt   DateTime?          @map("password_changed_at")
+  /// Erinnerungs-Mail vor eigenen Schichten (im Profil abschaltbar)
+  shiftRemindersEnabled Boolean          @default(true) @map("shift_reminders_enabled")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
@@ -357,6 +359,8 @@ model ShiftSignup {
   guestPhone  String?
   isConfirmed Boolean    @default(true)
   notes       String?
+  /// Erinnerungs-Mail verschickt (oder vergeben, siehe services/shiftReminders.ts)
+  reminderSentAt DateTime? @map("reminder_sent_at")
   createdAt   DateTime   @default(now())
   shift       Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
   task        ShiftTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)

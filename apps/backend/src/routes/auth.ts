@@ -209,6 +209,7 @@ async function loadUserDto(
       .map(toUserStufeDto),
     needsDepartmentSetup: user.departmentSetupAt === null,
     isCeviNameProfile: isCeviNameProfile(user),
+    shiftReminders: user.shiftRemindersEnabled,
   };
 }
 

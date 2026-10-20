@@ -192,6 +192,8 @@ export const UpdateProfileSchema = z.object({
   email: z.string().trim().email('Ungültige E-Mail-Adresse').max(254).optional(),
   birthDate: BirthDateSchema.optional(),
   address: z.string().trim().min(5, 'Bitte Strasse, PLZ und Ort angeben').max(200).optional(),
+  /** Erinnerungs-Mail vor eigenen Schichten */
+  shiftReminders: z.boolean().optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
