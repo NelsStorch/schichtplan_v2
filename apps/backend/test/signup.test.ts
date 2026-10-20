@@ -1,0 +1,129 @@
+import type { FastifyInstance } from 'fastify';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  addMember,
+  authCookie,
+  createDepartment,
+  createEvent,
+  createShift,
+  createTestApp,
+  createUser,
+  hasTestDb,
+  inject,
+  resetDb,
+} from './helpers.js';
+
+describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+  });
+  afterAll(async () => {
+    await app?.close();
+  });
+  beforeEach(async () => {
+    await resetDb(app);
+  });
+
+  async function signup(tenant: string, shiftId: string, cookie: string, payload: object = {}) {
+    return inject(app, { method: 'POST', url: `/api/shifts/${shiftId}/signup`, tenant, cookie, payload });
+  }
+
+  it('überbucht den letzten Platz auch bei gleichzeitigen Eintragungen nicht', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id, { requiredSlots: 1 });
+    const users = await Promise.all(Array.from({ length: 6 }, () => createUser(app)));
+
+    const results = await Promise.all(users.map((u) => signup(department.slug, shift.id, authCookie(app, u))));
+    expect(results.filter((r) => r.statusCode === 200)).toHaveLength(1);
+    expect(results.filter((r) => r.statusCode === 409)).toHaveLength(5);
+    expect(await app.prisma.shiftSignup.count({ where: { shiftId: shift.id } })).toBe(1);
+  });
+
+  it('trägt bei einem Doppelklick nur einmal ein', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id, { requiredSlots: 5 });
+    const user = await createUser(app);
+    const cookie = authCookie(app, user);
+
+    await Promise.all([signup(department.slug, shift.id, cookie), signup(department.slug, shift.id, cookie)]);
+    expect(await app.prisma.shiftSignup.count({ where: { shiftId: shift.id, userId: user.id } })).toBe(1);
+  });
+
+  it('verlangt ein Konto', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+    const res = await inject(app, { method: 'POST', url: `/api/shifts/${shift.id}/signup`, tenant: department.slug, payload: {} });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('lässt bei «nur Abteilung» Aussenstehende nicht eintragen', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id, { accessType: 'DEPARTMENT' });
+    const shift = await createShift(app, event.id);
+    const outsider = await createUser(app);
+    const member = await createUser(app, { homeDepartmentId: department.id });
+
+    const denied = await signup(department.slug, shift.id, authCookie(app, outsider));
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json().reason).toBe('NO_DEPARTMENT');
+
+    const ok = await signup(department.slug, shift.id, authCookie(app, member));
+    expect(ok.statusCode).toBe(200);
+  });
+
+  it('findet Schichten anderer Abteilungen nicht', async () => {
+    const department = await createDepartment(app);
+    const other = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+    const user = await createUser(app);
+    const res = await signup(other.slug, shift.id, authCookie(app, user));
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('lässt das OK Gäste eintragen, Helfer*innen aber nicht', async () => {
+    const department = await createDepartment(app);
+    const okLead = await createUser(app);
+    const event = await createEvent(app, department.id, { organizerId: okLead.id });
+    const shift = await createShift(app, event.id);
+
+    const byOk = await signup(department.slug, shift.id, authCookie(app, okLead), { guestName: 'Gast Eins' });
+    expect(byOk.statusCode).toBe(200);
+    const guest = await app.prisma.shiftSignup.findFirstOrThrow({ where: { shiftId: shift.id, guestName: 'Gast Eins' } });
+    expect(guest.userId).toBeNull();
+
+    // Ohne OK-Rechte wird guestName ignoriert: die Person trägt sich selbst ein
+    const helper = await createUser(app);
+    const self = await signup(department.slug, shift.id, authCookie(app, helper), { guestName: 'Fremder Name' });
+    expect(self.statusCode).toBe(200);
+    expect(await app.prisma.shiftSignup.count({ where: { guestName: 'Fremder Name' } })).toBe(0);
+    expect(await app.prisma.shiftSignup.count({ where: { userId: helper.id } })).toBe(1);
+  });
+
+  it('lässt nur die eigene Eintragung oder das OK austragen', async () => {
+    const department = await createDepartment(app);
+    const planner = await createUser(app);
+    await addMember(app, department.id, planner.id, 'PLANNER');
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+    const owner = await createUser(app);
+    const stranger = await createUser(app);
+    await signup(department.slug, shift.id, authCookie(app, owner));
+    const entry = await app.prisma.shiftSignup.findFirstOrThrow({ where: { userId: owner.id } });
+
+    const url = `/api/shifts/${shift.id}/signup?signupId=${entry.id}`;
+    const denied = await inject(app, { method: 'DELETE', url, tenant: department.slug, cookie: authCookie(app, stranger) });
+    expect(denied.statusCode).toBe(403);
+
+    const anonymous = await inject(app, { method: 'DELETE', url, tenant: department.slug });
+    expect(anonymous.statusCode).toBe(403);
+
+    const byPlanner = await inject(app, { method: 'DELETE', url, tenant: department.slug, cookie: authCookie(app, planner) });
+    expect(byPlanner.statusCode).toBe(200);
+  });
+});

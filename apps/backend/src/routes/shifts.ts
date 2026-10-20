@@ -601,36 +601,58 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      const signup = await fastify.prisma.shiftSignup.create({
-        data: {
-          shiftId,
-          taskId: chosenTask?.id || null,
-          userId: targetUserId,
-          guestName,
-          guestEmail,
-          guestPhone,
-          answers: {
-            create: Object.entries(signupAnswers).map(([questionId, value]) => ({ questionId, value })),
-          },
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              ceviName: true,
-              birthDate: true,
+      // Plätze und Doppel-Eintragung unter Sperre der Schicht nochmals prüfen: Zwei gleichzeitige
+      // Eintragungen für den letzten Platz (oder ein Doppelklick) würden die Schicht sonst überbuchen.
+      const result = await fastify.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM shifts WHERE id = ${shiftId} FOR UPDATE`;
+        if (targetUserId && (await tx.shiftSignup.count({ where: { shiftId, userId: targetUserId } })) > 0) {
+          return { error: 'Diese Person ist für diese Schicht bereits eingetragen' } as const;
+        }
+        if ((await tx.shiftSignup.count({ where: { shiftId } })) >= shift.requiredSlots) {
+          return { error: 'Diese Schicht ist bereits voll belegt' } as const;
+        }
+        if (chosenTask && (await tx.shiftSignup.count({ where: { taskId: chosenTask.id } })) >= chosenTask.requiredSlots) {
+          return {
+            error: `Für die Arbeit "${chosenTask.title}" sind alle Plätze belegt. Bitte wähle eine andere Arbeit.`,
+          } as const;
+        }
+
+        const created = await tx.shiftSignup.create({
+          data: {
+            shiftId,
+            taskId: chosenTask?.id || null,
+            userId: targetUserId,
+            guestName,
+            guestEmail,
+            guestPhone,
+            answers: {
+              create: Object.entries(signupAnswers).map(([questionId, value]) => ({ questionId, value })),
             },
           },
-          task: {
-            select: {
-              id: true,
-              title: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                ceviName: true,
+                birthDate: true,
+              },
+            },
+            task: {
+              select: {
+                id: true,
+                title: true,
+              },
             },
           },
-        },
+        });
+        return { signup: created } as const;
       });
+      if ('error' in result) {
+        return reply.status(409).send({ error: result.error });
+      }
+      const signup = result.signup;
 
       const displayName =
         signup.user?.ceviName ||
