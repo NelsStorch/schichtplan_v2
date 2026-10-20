@@ -4,7 +4,7 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
   return (
     <div className={`relative flex items-center justify-center select-none ${className}`}>
       <svg
-        viewBox="0 0 380 230"
+        viewBox="0 0 400 240"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto drop-shadow-2xl"
@@ -19,22 +19,22 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
             <stop offset="1" stopColor="#d6d3d1" />
           </linearGradient>
           <radialGradient id="fireGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.5" />
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.45" />
             <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
           </radialGradient>
         </defs>
 
         {/* Ambient Ground Glow */}
-        <ellipse cx="190" cy="160" rx="130" ry="45" fill="url(#fireGlow)" />
+        <ellipse cx="200" cy="160" rx="135" ry="46" fill="url(#fireGlow)" />
 
         {/* Isometric Ground Grid Lines */}
         <g opacity="0.25">
-          <path d="M70 150 L190 90 L310 150 L190 210 Z" stroke="#78716c" strokeWidth="1" fill="none" />
-          <path d="M100 150 L190 105 L280 150 L190 195 Z" stroke="#78716c" strokeWidth="1" fill="none" />
+          <path d="M80 150 L200 90 L320 150 L200 210 Z" stroke="#78716c" strokeWidth="1" fill="none" />
+          <path d="M110 150 L200 105 L290 150 L200 195 Z" stroke="#78716c" strokeWidth="1" fill="none" />
         </g>
 
         {/* 1. 3D Isometric Chilbi Festzelt (Left Side) */}
-        <g transform="translate(60, 75)">
+        <g transform="translate(65, 78)">
           {/* Tent walls */}
           <path d="M20 50 L70 75 L70 95 L20 70 Z" fill="#292524" stroke="#44403c" strokeWidth="1" />
           <path d="M70 75 L120 50 L120 70 L70 95 Z" fill="#1c1917" stroke="#44403c" strokeWidth="1" />
@@ -56,7 +56,7 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
         </g>
 
         {/* 2. 3D Isometric Campfire with Sparks (Center) */}
-        <g transform="translate(190, 150)">
+        <g transform="translate(200, 152)">
           {/* Wood Logs */}
           <line x1="-12" y1="4" x2="12" y2="-4" stroke="#78350f" strokeWidth="4" strokeLinecap="round" />
           <line x1="-10" y1="-4" x2="10" y2="4" stroke="#92400e" strokeWidth="4" strokeLinecap="round" />
@@ -73,7 +73,7 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
         </g>
 
         {/* 3. 3D Isometric Cevi Zelt / Jurte (Right Side) */}
-        <g transform="translate(225, 80)">
+        <g transform="translate(242, 82)">
           {/* Canvas Tent Roof in dark olive/brown */}
           <polygon points="50,15 10,55 50,75" fill="#3f3f46" stroke="#52525b" strokeWidth="1" />
           <polygon points="50,15 50,75 90,55" fill="#27272a" stroke="#52525b" strokeWidth="1" />
@@ -84,12 +84,13 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
           <polygon points="50,7 60,11 50,14" fill="#ef4444" />
         </g>
 
-        {/* Floating Event Cards in 3D Space */}
+        {/* Floating Event Cards in 3D Space (Clear of 3D objects) */}
         {/* Card 1: Chilbi 2026 */}
-        <g transform="translate(30, 25)">
-          <rect x="0" y="0" width="125" height="36" rx="10" fill="rgba(24, 24, 27, 0.92)" stroke="#e11d48" strokeWidth="1.2" />
+        <g transform="translate(22, 22)">
+          <rect x="0" y="3" width="128" height="36" rx="10" fill="rgba(0,0,0,0.4)" filter="blur(5px)" />
+          <rect x="0" y="0" width="128" height="36" rx="10" fill="rgba(24, 24, 27, 0.94)" stroke="#e11d48" strokeWidth="1.2" />
           <circle cx="16" cy="18" r="6" fill="#e11d48" />
-          <text x="28" y="17" fill="#ffffff" fontSize="10.5" fontWeight="bold" fontFamily="sans-serif">
+          <text x="28" y="17" fill="#ffffff" fontSize="10.5" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
             Chilbi 2026
           </text>
           <text x="28" y="27" fill="#fb7185" fontSize="8.5" fontFamily="monospace">
@@ -98,10 +99,11 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
         </g>
 
         {/* Card 2: PfiLa Lager */}
-        <g transform="translate(225, 25)">
-          <rect x="0" y="0" width="125" height="36" rx="10" fill="rgba(24, 24, 27, 0.92)" stroke="#10b981" strokeWidth="1.2" />
+        <g transform="translate(250, 22)">
+          <rect x="0" y="3" width="128" height="36" rx="10" fill="rgba(0,0,0,0.4)" filter="blur(5px)" />
+          <rect x="0" y="0" width="128" height="36" rx="10" fill="rgba(24, 24, 27, 0.94)" stroke="#10b981" strokeWidth="1.2" />
           <circle cx="16" cy="18" r="6" fill="#10b981" />
-          <text x="28" y="17" fill="#ffffff" fontSize="10.5" fontWeight="bold" fontFamily="sans-serif">
+          <text x="28" y="17" fill="#ffffff" fontSize="10.5" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
             PfiLa 2026
           </text>
           <text x="28" y="27" fill="#34d399" fontSize="8.5" fontFamily="monospace">
@@ -109,10 +111,11 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
           </text>
         </g>
 
-        {/* Card 3: Sommerlager (Floating Bottom) */}
-        <g transform="translate(130, 185)">
-          <rect x="0" y="0" width="120" height="28" rx="8" fill="rgba(24, 24, 27, 0.95)" stroke="#38bdf8" strokeWidth="1" />
-          <text x="14" y="18" fill="#e0f2fe" fontSize="10" fontWeight="600" fontFamily="sans-serif">
+        {/* Card 3: Sommerlager (Floating Bottom Center) */}
+        <g transform="translate(138, 196)">
+          <rect x="0" y="3" width="124" height="28" rx="8" fill="rgba(0,0,0,0.4)" filter="blur(4px)" />
+          <rect x="0" y="0" width="124" height="28" rx="8" fill="rgba(24, 24, 27, 0.95)" stroke="#38bdf8" strokeWidth="1" />
+          <text x="14" y="18" fill="#e0f2fe" fontSize="10" fontWeight="600" fontFamily="system-ui, -apple-system, sans-serif">
             🏕️ Sommerlager Aktiv
           </text>
         </g>

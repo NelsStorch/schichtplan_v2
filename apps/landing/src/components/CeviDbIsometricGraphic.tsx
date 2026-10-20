@@ -15,20 +15,16 @@ export function CeviDbIsometricGraphic({ className = '' }: { className?: string 
             <stop stopColor="#292524" />
             <stop offset="1" stopColor="#141210" />
           </linearGradient>
-          <linearGradient id="glassTop" x1="100" y1="110" x2="300" y2="190" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#3b82f6" stopOpacity="0.25" />
-            <stop offset="1" stopColor="#10b981" stopOpacity="0.1" />
-          </linearGradient>
           <linearGradient id="ceviRed" x1="170" y1="40" x2="230" y2="110" gradientUnits="userSpaceOnUse">
             <stop stopColor="#fb7185" />
             <stop offset="1" stopColor="#e11d48" />
           </linearGradient>
           <linearGradient id="beamGrad" x1="200" y1="30" x2="200" y2="150" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#e11d48" stopOpacity="0.6" />
+            <stop stopColor="#e11d48" stopOpacity="0.55" />
             <stop offset="1" stopColor="#e11d48" stopOpacity="0" />
           </linearGradient>
           <radialGradient id="goldGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.6" />
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.5" />
             <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
           </radialGradient>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -38,7 +34,7 @@ export function CeviDbIsometricGraphic({ className = '' }: { className?: string 
         </defs>
 
         {/* Ambient Glow */}
-        <ellipse cx="200" cy="150" rx="140" ry="50" fill="url(#goldGlow)" />
+        <ellipse cx="200" cy="155" rx="140" ry="50" fill="url(#goldGlow)" />
 
         {/* Isometric Base Plate / Pedestal (Layer 0) */}
         <g transform="translate(0, 15)">
@@ -112,46 +108,64 @@ export function CeviDbIsometricGraphic({ className = '' }: { className?: string 
           />
         </g>
 
-        {/* Floating 3D Badge Left: "Hitobito SSO" */}
-        <g transform="translate(45, 65)">
+        {/* Floating 3D Badge Left: "Cevi.DB-Login" (Clear margin from central shield) */}
+        <g transform="translate(22, 65)">
+          <rect
+            x="0"
+            y="3"
+            width="122"
+            height="34"
+            rx="17"
+            fill="rgba(0,0,0,0.4)"
+            filter="blur(5px)"
+          />
           <rect
             x="0"
             y="0"
-            width="115"
+            width="122"
             height="34"
             rx="17"
-            fill="rgba(28, 25, 23, 0.9)"
-            stroke="#44403c"
+            fill="rgba(28, 25, 23, 0.94)"
+            stroke="#3b82f6"
             strokeWidth="1.2"
           />
           <circle cx="17" cy="17" r="7" fill="#3b82f6" />
           <path d="M14 17 L16 19 L20 15" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          <text x="32" y="21" fill="#f5f5f4" fontSize="10.5" fontWeight="700" fontFamily="sans-serif">
+          <text x="32" y="21" fill="#f5f5f4" fontSize="10.5" fontWeight="700" fontFamily="system-ui, -apple-system, sans-serif">
             Cevi.DB-Login
           </text>
         </g>
 
-        {/* Floating 3D Badge Right: "Rollen & Name" */}
-        <g transform="translate(245, 75)">
+        {/* Floating 3D Badge Right: "Name & Abteilung" (Clear margin from central shield) */}
+        <g transform="translate(254, 75)">
+          <rect
+            x="0"
+            y="3"
+            width="128"
+            height="34"
+            rx="17"
+            fill="rgba(0,0,0,0.4)"
+            filter="blur(5px)"
+          />
           <rect
             x="0"
             y="0"
-            width="140"
+            width="128"
             height="34"
             rx="17"
-            fill="rgba(28, 25, 23, 0.9)"
+            fill="rgba(28, 25, 23, 0.94)"
             stroke="#10b981"
             strokeWidth="1.2"
           />
           <circle cx="17" cy="17" r="7" fill="#10b981" />
           <path d="M14 17 L16 19 L20 14" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          <text x="32" y="21" fill="#f5f5f4" fontSize="10.5" fontWeight="700" fontFamily="sans-serif">
+          <text x="30" y="21" fill="#f5f5f4" fontSize="10" fontWeight="700" fontFamily="system-ui, -apple-system, sans-serif">
             Name & Abteilung
           </text>
         </g>
 
         {/* Floating 3D Crypto-Key at Top Right */}
-        <g transform="translate(295, 30) rotate(-15)">
+        <g transform="translate(305, 26) rotate(-15)">
           <circle cx="14" cy="14" r="8" fill="none" stroke="#f59e0b" strokeWidth="3" />
           <path d="M21 14 L36 14 M31 14 L31 19 M35 14 L35 18" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
         </g>

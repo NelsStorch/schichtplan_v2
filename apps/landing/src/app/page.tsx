@@ -56,12 +56,12 @@ export default function LandingPage() {
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[640px] bg-campfire opacity-95 -z-10" />
 
       {/* Floating Glass Header */}
-      <header className="sticky top-4 z-header mx-auto w-full max-w-6xl px-4">
-        <div className="flex h-16 items-center justify-between rounded-full border border-line/80 bg-surface/85 px-4 sm:px-6 backdrop-blur-xl shadow-soft">
-          <Link href="/" className="flex items-center gap-3 group">
-            <CeviLogo className="size-9 transition-transform duration-200 group-hover:scale-105" />
-            <div className="flex flex-col">
-              <span className="font-display text-base font-extrabold tracking-tight text-fg">
+      <header className="sticky top-3 sm:top-4 z-header mx-auto w-full max-w-6xl px-3 sm:px-4">
+        <div className="flex h-14 sm:h-16 items-center justify-between rounded-full border border-line/80 bg-surface/85 px-3.5 sm:px-6 backdrop-blur-xl shadow-soft">
+          <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group min-w-0">
+            <CeviLogo className="size-8 sm:size-9 shrink-0 transition-transform duration-200 group-hover:scale-105" />
+            <div className="flex flex-col min-w-0">
+              <span className="font-display text-sm sm:text-base font-extrabold tracking-tight text-fg truncate">
                 Cevi Schichtplan
               </span>
               <span className="hidden text-[11px] font-medium text-fg-subtle sm:block">
@@ -70,7 +70,7 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <a
               href={helpUrl()}
               className={buttonClasses({
@@ -85,11 +85,11 @@ export default function LandingPage() {
             {me ? (
               <Link
                 href="/profil"
-                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-xs font-semibold text-fg transition hover:bg-surface-2"
+                className="flex items-center gap-1.5 sm:gap-2 rounded-full py-1 pl-1 pr-2.5 sm:pr-3 text-xs font-semibold text-fg transition hover:bg-surface-2"
                 aria-label="Dein Profil"
               >
                 <Avatar name={me.ceviName || me.firstName} size="sm" highlight className="size-7 text-[10px]" />
-                <span className="max-w-28 truncate">{me.ceviName || me.firstName}</span>
+                <span className="max-w-20 sm:max-w-28 truncate">{me.ceviName || me.firstName}</span>
               </Link>
             ) : (
               <Link
@@ -97,7 +97,7 @@ export default function LandingPage() {
                 className={buttonClasses({
                   variant: 'ghost',
                   size: 'sm',
-                  className: 'gap-1.5 text-xs font-semibold',
+                  className: 'gap-1.5 text-xs font-semibold px-2.5 sm:px-3',
                 })}
               >
                 <LogIn className="size-3.5 text-fg-muted" />
@@ -109,10 +109,11 @@ export default function LandingPage() {
               variant="primary"
               size="sm"
               onClick={goCreateDepartment}
-              className="text-xs font-semibold"
+              className="text-xs font-semibold px-2.5 sm:px-3.5"
             >
               <Plus className="size-3.5" />
-              <span>Abteilung anlegen</span>
+              <span className="hidden xs:inline sm:inline">Abteilung anlegen</span>
+              <span className="xs:hidden sm:hidden">Anlegen</span>
             </Button>
           </div>
         </div>
@@ -168,28 +169,28 @@ export default function LandingPage() {
                 </p>
 
                 {/* Proof Points Strip (Accurate & Zero False Claims) */}
-                <div className="mt-10 pt-8 border-t border-line/60 w-full grid grid-cols-3 gap-4 text-left">
+                <div className="mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-line/60 w-full grid grid-cols-3 gap-2 sm:gap-4 text-left">
                   <div>
-                    <div className="font-display text-xl sm:text-2xl font-extrabold text-fg tabular">
+                    <div className="font-display text-lg sm:text-xl md:text-2xl font-extrabold text-fg tabular">
                       1 Link
                     </div>
-                    <div className="text-2xs sm:text-xs text-fg-subtle mt-0.5">
+                    <div className="text-[11px] sm:text-xs text-fg-subtle mt-0.5 leading-snug">
                       für alle Helfer*innen
                     </div>
                   </div>
                   <div>
-                    <div className="font-display text-xl sm:text-2xl font-extrabold text-fg">
+                    <div className="font-display text-lg sm:text-xl md:text-2xl font-extrabold text-fg">
                       Handy
                     </div>
-                    <div className="text-2xs sm:text-xs text-fg-subtle mt-0.5">
+                    <div className="text-[11px] sm:text-xs text-fg-subtle mt-0.5 leading-snug">
                       ohne App-Installation
                     </div>
                   </div>
                   <div>
-                    <div className="font-display text-xl sm:text-2xl font-extrabold text-fg tabular">
+                    <div className="font-display text-lg sm:text-xl md:text-2xl font-extrabold text-fg tabular">
                       0 CHF
                     </div>
-                    <div className="text-2xs sm:text-xs text-fg-subtle mt-0.5">
+                    <div className="text-[11px] sm:text-xs text-fg-subtle mt-0.5 leading-snug">
                       für alle Cevi-Abteilungen
                     </div>
                   </div>
@@ -261,13 +262,13 @@ export default function LandingPage() {
             </div>
 
             {/* Asymmetrical Bento Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6">
               {/* Tile 1: Cevi.DB Single Sign-On (Large 7-cols) with 3D Isometric Graphic */}
               <div className="md:col-span-7">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-6 sm:p-8 h-full flex flex-col justify-between">
+                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
+                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display text-2xl font-bold text-fg">
+                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
                         Anmelden ohne neues Passwort
                       </h3>
                       <p className="mt-2 text-sm text-fg-muted leading-relaxed max-w-[50ch]">
@@ -278,11 +279,11 @@ export default function LandingPage() {
 
                     {/* Bespoke 3D Isometric Illustration */}
                     <div className="my-4">
-                      <CeviDbIsometricGraphic className="max-h-[220px]" />
+                      <CeviDbIsometricGraphic className="max-h-[200px] sm:max-h-[220px]" />
                     </div>
 
-                    <div className="pt-4 border-t border-line/80 flex items-center justify-between text-xs text-fg-muted">
-                      <span className="text-2xs text-emerald-400 font-semibold flex items-center gap-1.5">
+                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
+                      <span className="text-2xs text-emerald-400 font-semibold flex items-center gap-1.5 shrink-0">
                         <span className="size-2 rounded-full bg-emerald-400" />
                         Mit Cevi.DB oder Cevi-Name
                       </span>
@@ -294,10 +295,10 @@ export default function LandingPage() {
 
               {/* Tile 2: Eigene Subdomain (5-cols) with 3D Isometric Graphic */}
               <div className="md:col-span-5">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-6 sm:p-8 h-full flex flex-col justify-between">
+                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
+                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display text-2xl font-bold text-fg">
+                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
                         Eure eigene Adresse
                       </h3>
                       <p className="mt-2 text-sm text-fg-muted leading-relaxed">
@@ -308,11 +309,11 @@ export default function LandingPage() {
 
                     {/* Bespoke 3D Isometric Server & DNS Graphic */}
                     <div className="my-4">
-                      <SubdomainIsometricGraphic className="max-h-[200px]" />
+                      <SubdomainIsometricGraphic className="max-h-[190px] sm:max-h-[200px]" />
                     </div>
 
-                    <div className="pt-4 border-t border-line/80 flex items-center justify-between text-xs text-fg-subtle">
-                      <span className="font-mono text-accent-ink font-bold">eure-abteilung.cevi-schichtplan.ch</span>
+                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-subtle">
+                      <span className="font-mono text-accent-ink font-bold break-all sm:break-normal text-2xs sm:text-xs">eure-abteilung.cevi-schichtplan.ch</span>
                     </div>
                   </div>
                 </Card3DTilt>
@@ -320,10 +321,10 @@ export default function LandingPage() {
 
               {/* Tile 3: Multi-Event Unterstützung (5-cols) with 3D Isometric Graphic */}
               <div className="md:col-span-5">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-6 sm:p-8 h-full flex flex-col justify-between">
+                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
+                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display text-2xl font-bold text-fg">
+                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
                         Alle Anlässe an einem Ort
                       </h3>
                       <p className="mt-2 text-sm text-fg-muted leading-relaxed">
@@ -334,11 +335,11 @@ export default function LandingPage() {
 
                     {/* Bespoke 3D Isometric Architecture Graphic (Festzelt, Campfire, Jurte) */}
                     <div className="my-4">
-                      <MultiEventIsometricGraphic className="max-h-[200px]" />
+                      <MultiEventIsometricGraphic className="max-h-[190px] sm:max-h-[200px]" />
                     </div>
 
-                    <div className="pt-4 border-t border-line/80 flex items-center justify-between text-xs text-fg-muted">
-                      <span className="font-semibold text-fg">Beliebig viele Anlässe</span>
+                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
+                      <span className="font-semibold text-fg text-2xs sm:text-xs">Beliebig viele Anlässe</span>
                       <span className="text-2xs text-fg-subtle">Jedes OK sieht seinen Anlass</span>
                     </div>
                   </div>
@@ -347,10 +348,10 @@ export default function LandingPage() {
 
               {/* Tile 4: Mobil optimiert & PWA (7-cols) with 3D Isometric Smartphone Mockup */}
               <div className="md:col-span-7">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-6 sm:p-8 h-full flex flex-col justify-between">
+                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
+                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display text-2xl font-bold text-fg">
+                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
                         Gemacht fürs Handy
                       </h3>
                       <p className="mt-2 text-sm text-fg-muted leading-relaxed max-w-[50ch]">
@@ -361,12 +362,12 @@ export default function LandingPage() {
 
                     {/* Bespoke 3D Isometric Smartphone Mockup */}
                     <div className="my-4">
-                      <MobilePwaIsometricGraphic className="max-h-[220px]" />
+                      <MobilePwaIsometricGraphic className="max-h-[200px] sm:max-h-[220px]" />
                     </div>
 
-                    <div className="pt-4 border-t border-line/80 flex items-center justify-between text-xs text-fg-muted">
-                      <span className="flex items-center gap-2 text-emerald-400 font-semibold">
-                        <CheckCircle2 className="size-4" />
+                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
+                      <span className="flex items-center gap-1.5 sm:gap-2 text-emerald-400 font-semibold text-2xs sm:text-xs">
+                        <CheckCircle2 className="size-3.5 sm:size-4 shrink-0" />
                         Mindestalter wird automatisch geprüft
                       </span>
                       <span className="text-2xs text-fg-subtle">z. B. Bar ab 18</span>
@@ -379,18 +380,26 @@ export default function LandingPage() {
         </section>
 
         {/* Section 3: Epic Panoramic Campsite Night Visual */}
-        <section className="relative border-y border-line/60 bg-canvas overflow-hidden">
-          <CampsiteNightGraphic />
+        <section className="relative w-full min-h-[360px] sm:min-h-[420px] md:min-h-[480px] border-y border-line/60 bg-canvas overflow-hidden">
+          {/* Panoramic Campsite Graphic background (edge-to-edge) */}
+          <div className="absolute inset-0 w-full h-full pointer-events-none">
+            <CampsiteNightGraphic className="w-full h-full" />
+          </div>
+
+          {/* Vignette gradients for atmospheric depth & text legibility */}
           <div className="absolute inset-0 bg-gradient-to-t from-canvas via-transparent to-canvas/80 pointer-events-none" />
-          <div className="absolute inset-0 flex items-center justify-center p-6 text-center pointer-events-none">
-            <div className="max-w-xl backdrop-blur-md bg-surface/40 p-6 rounded-[2rem] border border-line/60 shadow-lift">
+          <div className="absolute inset-0 bg-canvas/20 pointer-events-none" />
+
+          {/* Centered Glass Quote Card */}
+          <div className="relative z-10 mx-auto max-w-6xl px-4 min-h-[360px] sm:min-h-[420px] md:min-h-[480px] flex items-center justify-center py-10 pointer-events-none">
+            <div className="max-w-xl backdrop-blur-md bg-surface/65 p-6 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-line/70 shadow-lift text-center pointer-events-auto">
               <span className="font-mono text-2xs tracking-widest text-accent uppercase font-bold">
                 Cevi Lager- & Festkultur
               </span>
-              <p className="font-display text-lg sm:text-xl font-bold text-fg mt-1">
+              <p className="font-display text-lg sm:text-xl md:text-2xl font-bold text-fg mt-2 leading-snug">
                 «Vom ersten Zeltaufbau bis zur letzten Schicht am Sonntagmorgen.»
               </p>
-              <p className="text-xs text-fg-subtle mt-1">
+              <p className="text-xs sm:text-sm text-fg-subtle mt-2">
                 Entwickelt mit Herzblut für Cevi-Leitende und Freiwillige.
               </p>
             </div>
@@ -417,7 +426,7 @@ export default function LandingPage() {
               </div>
               <a
                 href={helpUrl()}
-                className={buttonClasses({ variant: 'primary', size: 'md', className: 'h-12 shrink-0 justify-center font-semibold' })}
+                className={buttonClasses({ variant: 'primary', size: 'md', className: 'h-12 w-full sm:w-auto shrink-0 justify-center font-semibold' })}
               >
                 Zum Hilfe-Center
                 <ExternalLink className="size-4" />
@@ -430,15 +439,15 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-line/60 bg-surface/50 py-10 text-xs text-fg-subtle relative z-10">
-        <div className="mx-auto max-w-6xl px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mx-auto max-w-6xl px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div className="flex items-center gap-3">
-            <CeviLogo className="size-7" />
+            <CeviLogo className="size-7 shrink-0" />
             <span>
               © {new Date().getFullYear()} Cevi Schichtplan · Ein ehrenamtliches Projekt für Cevi-Abteilungen
             </span>
           </div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-5">
             <a href={helpUrl()} className="hover:text-fg transition">
               Hilfe
             </a>

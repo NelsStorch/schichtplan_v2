@@ -4,7 +4,7 @@ export function MobilePwaIsometricGraphic({ className = '' }: { className?: stri
   return (
     <div className={`relative flex items-center justify-center select-none ${className}`}>
       <svg
-        viewBox="0 0 380 230"
+        viewBox="0 0 400 240"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto drop-shadow-2xl"
@@ -24,19 +24,19 @@ export function MobilePwaIsometricGraphic({ className = '' }: { className?: stri
             <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
           </linearGradient>
           <radialGradient id="phoneGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.35" />
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.32" />
             <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
           </radialGradient>
         </defs>
 
         {/* Ambient Ground Glow */}
-        <ellipse cx="190" cy="165" rx="120" ry="40" fill="url(#phoneGlow)" />
+        <ellipse cx="200" cy="170" rx="130" ry="42" fill="url(#phoneGlow)" />
 
-        {/* Isometric 3D Smartphone (Angled at 25°) */}
-        <g transform="translate(115, 20)">
+        {/* Isometric 3D Smartphone (Angled at subtle skew & rotate) */}
+        <g transform="translate(132, 24)">
           {/* Phone Outer Shadow */}
           <path
-            d="M20 50 L100 10 L140 30 L60 200 L20 180 Z"
+            d="M15 50 L95 10 L140 30 L60 205 L15 185 Z"
             fill="rgba(0,0,0,0.5)"
             filter="blur(10px)"
           />
@@ -70,85 +70,106 @@ export function MobilePwaIsometricGraphic({ className = '' }: { className?: stri
           {/* Dynamic Island / Camera Notch */}
           <rect
             x="54"
-            y="12"
+            y="11"
             width="38"
-            height="10"
-            rx="5"
+            height="9"
+            rx="4.5"
             fill="#000000"
             transform="skewY(-10) rotate(5)"
           />
 
-          {/* Screen Content: Shift Card Mock */}
+          {/* Screen Content: Shift Card Mock with Clear Typography */}
           <g transform="skewY(-10) rotate(5)">
             {/* Header Status */}
-            <circle cx="22" cy="38" r="4" fill="#e11d48" />
-            <text x="32" y="41" fill="#e4e4e7" fontSize="8" fontWeight="bold" fontFamily="sans-serif">
+            <circle cx="20" cy="34" r="3.5" fill="#e11d48" />
+            <text x="28" y="37" fill="#f4f4f5" fontSize="8" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
               Chilbi Illnau
             </text>
+            <text x="96" y="37" fill="#71717a" fontSize="6.5" fontFamily="monospace">
+              LIVE
+            </text>
 
-            {/* In-app Shift row 1 */}
-            <rect x="14" y="52" width="117" height="30" rx="8" fill="#27272a" stroke="#3f3f46" strokeWidth="0.8" />
-            <text x="22" y="66" fill="#fafafa" fontSize="7.5" fontWeight="600" fontFamily="sans-serif">
+            {/* In-app Shift row 1: Grill & Pommes (Full) */}
+            <rect x="12" y="47" width="121" height="27" rx="7" fill="#27272a" stroke="#3f3f46" strokeWidth="0.8" />
+            <text x="20" y="59" fill="#fafafa" fontSize="7.5" fontWeight="600" fontFamily="system-ui, -apple-system, sans-serif">
               Grill & Pommes
             </text>
-            <text x="22" y="76" fill="#a1a1aa" fontSize="6.5" fontFamily="monospace">
+            <text x="20" y="68" fill="#a1a1aa" fontSize="6.5" fontFamily="monospace">
               18:00 - 21:00
             </text>
-            <rect x="94" y="58" width="30" height="14" rx="7" fill="#3f3f46" />
-            <text x="99" y="68" fill="#a1a1aa" fontSize="6" fontWeight="bold">
+            <rect x="97" y="53" width="28" height="13" rx="6.5" fill="#3f3f46" />
+            <text x="102" y="62.5" fill="#d4d4d8" fontSize="6" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
               VOLL
             </text>
 
-            {/* In-app Shift row 2 (Active/Checked) */}
-            <rect x="14" y="88" width="117" height="30" rx="8" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" strokeWidth="1" />
-            <text x="22" y="102" fill="#fafafa" fontSize="7.5" fontWeight="600" fontFamily="sans-serif">
+            {/* In-app Shift row 2: Barbetrieb (Active / Self enrolled) */}
+            <rect x="12" y="78" width="121" height="27" rx="7" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" strokeWidth="1" />
+            <text x="20" y="90" fill="#fafafa" fontSize="7.5" fontWeight="600" fontFamily="system-ui, -apple-system, sans-serif">
               Barbetrieb 16+
             </text>
-            <text x="22" y="112" fill="#34d399" fontSize="6.5" fontFamily="monospace">
+            <text x="20" y="99" fill="#34d399" fontSize="6.5" fontFamily="monospace">
               21:00 - 00:00 (Du!)
             </text>
-            <rect x="88" y="94" width="36" height="14" rx="7" fill="#10b981" />
-            <text x="92" y="104" fill="#ffffff" fontSize="6" fontWeight="bold">
+            <rect x="91" y="84" width="34" height="13" rx="6.5" fill="#10b981" />
+            <text x="96" y="93.5" fill="#ffffff" fontSize="6" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
               DABEI
             </text>
 
+            {/* In-app Shift row 3: Abbau Sonntag (Open slot) */}
+            <rect x="12" y="109" width="121" height="27" rx="7" fill="#27272a" stroke="#3f3f46" strokeWidth="0.8" />
+            <text x="20" y="121" fill="#fafafa" fontSize="7.5" fontWeight="600" fontFamily="system-ui, -apple-system, sans-serif">
+              Abbau Sonntag
+            </text>
+            <text x="20" y="130" fill="#a1a1aa" fontSize="6.5" fontFamily="monospace">
+              08:00 - 11:00
+            </text>
+            <rect x="91" y="115" width="34" height="13" rx="6.5" fill="rgba(245, 158, 11, 0.18)" stroke="#f59e0b" strokeWidth="0.8" />
+            <text x="96" y="124.5" fill="#fbbf24" fontSize="6" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
+              1 FREI
+            </text>
+
+            {/* Home indicator bar at bottom */}
+            <rect x="46" y="148" width="53" height="3" rx="1.5" fill="#52525b" />
+
             {/* Glass diagonal Sheen Overlay */}
-            <polygon points="6,6 80,6 6,120" fill="url(#sheen)" />
+            <polygon points="6,6 80,6 6,110" fill="url(#sheen)" />
           </g>
         </g>
 
-        {/* Floating 3D Holographic Notification Pill (Z=80 Depth Above Phone) */}
-        <g transform="translate(15, 80)">
+        {/* Floating Notification Pill Top-Left (Clear of Screen UI) */}
+        <g transform="translate(12, 38)">
           {/* Drop shadow */}
-          <rect x="0" y="4" width="165" height="46" rx="14" fill="rgba(0,0,0,0.5)" filter="blur(6px)" />
+          <rect x="0" y="3" width="126" height="38" rx="12" fill="rgba(0,0,0,0.5)" filter="blur(6px)" />
           {/* Card Body */}
           <rect
             x="0"
             y="0"
-            width="165"
-            height="46"
-            rx="14"
+            width="126"
+            height="38"
+            rx="12"
             fill="rgba(24, 24, 27, 0.94)"
             stroke="#10b981"
             strokeWidth="1.2"
           />
           {/* Icon Badge */}
-          <circle cx="22" cy="23" r="10" fill="#10b981" />
-          <path d="M18 23 L21 26 L26 20" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="18" cy="19" r="8" fill="#10b981" />
+          <path d="M15 19 L17.5 21.5 L21.5 16.5" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           {/* Text */}
-          <text x="38" y="19" fill="#ffffff" fontSize="9.5" fontWeight="bold" fontFamily="sans-serif">
+          <text x="32" y="16.5" fill="#ffffff" fontSize="8.5" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
             Schicht bestätigt!
           </text>
-          <text x="38" y="32" fill="#a1a1aa" fontSize="7.5" fontFamily="sans-serif">
-            Erinnerung im Kalender aktiv
+          <text x="32" y="27.5" fill="#a1a1aa" fontSize="6.5" fontFamily="system-ui, -apple-system, sans-serif">
+            Im Kalender eingetragen
           </text>
         </g>
 
-        {/* Floating Offline Badge Right */}
-        <g transform="translate(250, 150)">
-          <rect x="0" y="0" width="115" height="30" rx="15" fill="rgba(24, 24, 27, 0.92)" stroke="#f59e0b" strokeWidth="1" />
-          <circle cx="15" cy="15" r="5" fill="#f59e0b" />
-          <text x="26" y="19" fill="#fef3c7" fontSize="9" fontWeight="600" fontFamily="sans-serif">
+        {/* Floating Badge Bottom-Right (Clear of Phone Screen) */}
+        <g transform="translate(262, 162)">
+          {/* Drop shadow */}
+          <rect x="0" y="3" width="120" height="28" rx="14" fill="rgba(0,0,0,0.4)" filter="blur(5px)" />
+          <rect x="0" y="0" width="120" height="28" rx="14" fill="rgba(24, 24, 27, 0.94)" stroke="#f59e0b" strokeWidth="1" />
+          <circle cx="14" cy="14" r="4.5" fill="#f59e0b" />
+          <text x="25" y="17.5" fill="#fef3c7" fontSize="8.5" fontWeight="600" fontFamily="system-ui, -apple-system, sans-serif">
             ⚡ Ganz ohne App
           </text>
         </g>
