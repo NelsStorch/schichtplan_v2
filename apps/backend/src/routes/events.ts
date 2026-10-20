@@ -425,6 +425,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         questions,
         organizers: requestedOrganizers,
       } = parse.data;
+      if (new Date(endDate) < new Date(startDate)) {
+        return reply.status(400).send({ error: 'Das Ende des Anlasses darf nicht vor dem Beginn liegen' });
+      }
 
       const existing = await fastify.prisma.event.findUnique({
         where: {
@@ -594,6 +597,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
       const body = parse.data;
+      if (new Date(body.endDate ?? event.endDate) < new Date(body.startDate ?? event.startDate)) {
+        return reply.status(400).send({ error: 'Das Ende des Anlasses darf nicht vor dem Beginn liegen' });
+      }
 
       // Listen immer zum (evtl. neuen) Typ passend neu bestimmen
       const accessType = body.accessType ?? event.accessType;

@@ -128,6 +128,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         questions,
         allowPublicSignup,
       } = parse.data;
+      if (new Date(endDate) < new Date(startDate)) {
+        return reply.status(400).send({ error: 'Das Ende des Anlasses darf nicht vor dem Beginn liegen' });
+      }
 
       const existing = await fastify.prisma.event.findUnique({
         where: {

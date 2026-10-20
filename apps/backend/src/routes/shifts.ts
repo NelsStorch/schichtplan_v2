@@ -32,6 +32,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { eventId, title, category, isSetupTeardown, startTime, endTime, requiredSlots: reqSlots, description, minAge, tasks } =
         parse.data;
+      if (new Date(endTime) <= new Date(startTime)) {
+        return reply.status(400).send({ error: 'Das Ende der Schicht muss nach dem Beginn liegen' });
+      }
 
       // Event & Abteilung prüfen
       const event = await fastify.prisma.event.findUnique({
@@ -152,6 +155,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { title, category, isSetupTeardown, startTime, endTime, description, minAge, tasks } = parse.data;
+      if (new Date(endTime ?? shift.endTime) <= new Date(startTime ?? shift.startTime)) {
+        return reply.status(400).send({ error: 'Das Ende der Schicht muss nach dem Beginn liegen' });
+      }
 
       // Falls tasks übergeben wurden: Synchronisieren
       if (tasks && tasks.length > 0) {

@@ -128,4 +128,41 @@ describe.skipIf(!hasTestDb)('Rechte bei Anlässen', () => {
     });
     expect(visible.body).toContain('Geheimname');
   });
+
+  it('lehnt Schichten und Anlässe ab, die vor dem Beginn enden', async () => {
+    const department = await createDepartment(app);
+    const admin = await createUser(app);
+    await addMember(app, department.id, admin.id, 'ADMIN');
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+    const cookie = authCookie(app, admin);
+
+    const created = await inject(app, {
+      method: 'POST',
+      url: '/api/shifts',
+      tenant: department.slug,
+      cookie,
+      payload: { eventId: event.id, title: 'Grill', startTime: '2030-06-01T12:00:00.000Z', endTime: '2030-06-01T10:00:00.000Z' },
+    });
+    expect(created.statusCode).toBe(400);
+
+    // Nur das Ende geändert: verglichen wird mit dem bestehenden Beginn (18:00)
+    const patched = await inject(app, {
+      method: 'PATCH',
+      url: `/api/shifts/${shift.id}`,
+      tenant: department.slug,
+      cookie,
+      payload: { endTime: '2030-06-01T17:00:00.000Z' },
+    });
+    expect(patched.statusCode).toBe(400);
+
+    const eventPatch = await inject(app, {
+      method: 'PATCH',
+      url: `/api/events/${event.slug}`,
+      tenant: department.slug,
+      cookie,
+      payload: { endDate: '2030-05-01T00:00:00.000Z' },
+    });
+    expect(eventPatch.statusCode).toBe(400);
+  });
 });
