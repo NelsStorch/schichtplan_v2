@@ -95,7 +95,7 @@ export function Hero3DStage() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
           </span>
-          <span className="font-mono text-2xs font-bold text-fg">Cevi.DB Live-Sync</span>
+          <span className="font-mono text-2xs font-bold text-fg">Mit Cevi.DB</span>
           <ShieldCheck className="size-3.5 text-emerald-400" />
         </div>
 
