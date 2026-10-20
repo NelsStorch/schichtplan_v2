@@ -580,12 +580,13 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
 
+      // Einstellungen (Zugang, Design, Fragen) nur Abteilungsleitung und OK-Leitung, wie im Frontend.
+      // OK-Mitglieder planen Schichten, ändern aber nicht, wer sich eintragen darf.
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
-      if (!flags.isDeptAdmin && !isEventOk) {
+      if (!flags.isDeptAdmin && !flags.isOkLead) {
         return reply
           .status(403)
-          .send({ error: 'Nur die Abteilungsleitung oder das Event-OK dürfen dieses Event bearbeiten' });
+          .send({ error: 'Nur die Abteilungsleitung oder die OK-Leitung dürfen diesen Anlass bearbeiten' });
       }
 
       const parse = UpdateEventSchema.safeParse(request.body);
