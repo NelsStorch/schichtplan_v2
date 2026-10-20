@@ -113,7 +113,7 @@ function bootstrapAdminCeviDbIds(): Set<number> {
 }
 
 /** Basis-URL für das zentrale Login-Portal (login.<domain>) */
-function getLoginPortalBaseUrl(requestHost?: string): string {
+export function getLoginPortalBaseUrl(requestHost?: string): string {
   if (process.env.NODE_ENV !== 'production' || (requestHost && requestHost.includes('localhost'))) {
     return 'http://localhost:3002';
   }

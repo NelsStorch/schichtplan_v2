@@ -390,3 +390,21 @@ export const ResendVerificationSchema = z.object({
 });
 
 export type ResendVerificationInput = z.infer<typeof ResendVerificationSchema>;
+
+/** «Passwort vergessen»: Link an diese E-Mail schicken */
+export const RequestPasswordResetSchema = z.object({
+  email: z.string().trim().email('Ungültige E-Mail-Adresse').max(254),
+});
+
+export type RequestPasswordResetInput = z.infer<typeof RequestPasswordResetSchema>;
+
+/** Neues Passwort mit dem Token aus der E-Mail setzen */
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: z
+    .string()
+    .min(8, 'Passwort muss mindestens 8 Zeichen lang sein')
+    .max(200, 'Passwort darf höchstens 200 Zeichen lang sein'),
+});
+
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;

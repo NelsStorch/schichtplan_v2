@@ -119,8 +119,17 @@ function LinkAccount() {
                 Abbrechen
               </Button>
               <p className="px-1 text-[13px] leading-relaxed text-fg-subtle">
-                Passwort vergessen? Dann geht es im Moment nur über die Betreiber des Schichtplans
-                (admin@cevi-schichtplan.ch). Zwei Konten mit derselben E-Mail gibt es nicht.
+                Passwort vergessen?{' '}
+                <a
+                  href={withReturnTo(
+                    `/passwort-vergessen${info.email ? `?email=${encodeURIComponent(info.email)}` : ''}`,
+                    returnTo
+                  )}
+                  className="font-medium text-accent-ink underline-offset-4 hover:underline"
+                >
+                  Neues Passwort setzen
+                </a>
+                , danach nochmals mit Cevi.DB anmelden. Zwei Konten mit derselben E-Mail gibt es nicht.
               </p>
             </div>
           </form>

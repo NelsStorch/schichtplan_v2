@@ -55,5 +55,6 @@ export function afterLogin(
 
 /** Pfad im Login-Portal mit unverändertem Ziel */
 export function withReturnTo(path: string, returnTo: string | null): string {
-  return returnTo ? `${path}?return_to=${encodeURIComponent(returnTo)}` : path;
+  if (!returnTo) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}return_to=${encodeURIComponent(returnTo)}`;
 }
