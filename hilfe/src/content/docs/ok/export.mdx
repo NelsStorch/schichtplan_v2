@@ -11,18 +11,43 @@ import Path from '../../../components/Path.astro';
 
 | Was | Inhalt |
 | --- | --- |
-| **Schichtplan drucken** | Pro Tag eine Seite mit Zeit, Schicht, Arbeit und den Eingeteilten. <Btn>Mit leeren Zeilen</Btn> druckt für jeden freien Platz eine leere Zeile, zum Eintragen von Hand. |
+| **Schichtplan drucken oder als PDF** | <Btn>Drucken oder PDF</Btn> öffnet die Auswahl (siehe unten). |
 | **Schichtplan als Tabelle** | Eine Zeile pro Schicht und Arbeit mit Plätzen, Besetzung und Namen |
 | **Einteilung pro Person** | Wer wann wo hilft, nach Namen sortiert. Bei Gästen mit E-Mail und Telefon |
 | **Helfende mit Soll** | Alle Personen unter **Helfende** mit Stufe, Anzahl Schichten, Soll und Abmeldungen |
 | **Anwesenheitsliste** | Steht unter [Anwesenheit](/ok/anwesenheit/) |
 
+## Schichtplan drucken oder als PDF
+
+Der Schichtplan wird als PDF erstellt: mit dem Logo des Anlasses (sonst der Abteilung, sonst dem Cevi-Logo) und in der Farbe der Abteilung. Wähle zuerst die Art:
+
+| Art | Wofür |
+| --- | --- |
+| **Übersicht** | Alle Schichten pro Tag, kompakt: Zeit, Schicht, Arbeit, Besetzung (z. B. 3/4) und Namen. Freie Plätze stehen orange da. |
+| **Zum Aufhängen** | Grosse Schrift, jeder Platz eine eigene Zeile. Freie Plätze sind gestrichelte Zeilen, in die man sich von Hand einträgt. |
+| **Pro Person** | Alle Eingeteilten nach Namen, mit ihren Schichten. Zum Verteilen oder zum Nachschauen am Anlass. |
+
+Danach kannst du einstellen:
+
+- **Tage**: nur die gewählten Tage drucken.
+- **Querformat**: mehr Platz, wenn viele Namen in einer Zeile stehen.
+- **Jeder Tag auf einer neuen Seite**
+- **Details zeigen**: Kategorie (mit Farbbalken), Beschreibung, Altersgrenze und Verantwortliche.
+- **Nur offene Plätze**: druckt nur Arbeiten, bei denen noch Leute fehlen.
+
+Dann:
+
+- <Btn>Drucken</Btn> öffnet direkt den Druckdialog.
+- <Btn>PDF herunterladen</Btn> speichert die Datei, zum Beispiel zum Verschicken im OK oder zum Drucken im Copyshop.
+
+Jede Seite zeigt unten den Stand (Datum und Uhrzeit) und die Seitenzahl. So siehst du am Aushang, ob er noch aktuell ist.
+
+:::tip[Auf dem Handy oder Tablet]
+Dort öffnet <Btn>Drucken</Btn> das PDF. Drucke es über das Teilen- oder Druck-Symbol.
+:::
+
 Die Tabellen sind CSV-Dateien und öffnen sich direkt in Excel oder Numbers, auch mit Umlauten.
 
 :::caution[Personendaten]
 Die Listen enthalten Namen und teils Kontaktdaten. Gib sie nur im OK weiter, leg sie nicht in einen öffentlichen Ordner und lösch sie nach dem Anlass.
-:::
-
-:::note[Druckansicht blockiert?]
-Die Druckansicht öffnet sich in einem neuen Fenster. Blockiert der Browser es, erlaube Pop-ups für diese Seite.
 :::

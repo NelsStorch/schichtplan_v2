@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.9.0",
     "@schichtplan/shared": "*",
     "@schichtplan/ui": "*",
     "clsx": "^2.1.1",

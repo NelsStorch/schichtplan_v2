@@ -2,19 +2,22 @@
 
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { CalendarDays, ClipboardCheck, FileSpreadsheet, Printer, Users } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
 import type { EventRosterResponseDto } from '@schichtplan/shared';
-import { Button, Card, useToast } from '@schichtplan/ui';
+import { Button, Card, Chip, Dialog, Switch, cn, useToast } from '@schichtplan/ui';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { api, errorMessage } from '@/lib/api';
-import { downloadCsv, escapeHtml, openPrintWindow } from '@/lib/exportFile';
-import { dayKeyToIso, fmtDateRange, fmtDayMonth, fmtShortDate, fmtTime, fmtWeekday, groupByBusinessDay } from '@/lib/format';
+import { downloadCsv } from '@/lib/exportFile';
+import { dayKeyToIso, fmtShortDate, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay } from '@/lib/format';
+import { usePortal } from '@/lib/portal';
+import { PRINT_LAYOUTS, createShiftPlanPdf, downloadBlob, pdfFilename, printBlob, type PrintLayout } from '@/lib/printPlan';
 
 export default function ExportPage() {
   const { event, base } = useOkEvent();
   const toast = useToast();
   const [loadingRoster, setLoadingRoster] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   const days = groupByBusinessDay(event.shifts, event.dayCutoffTime);
   const sorted = days.flatMap((d) => [...d.items].sort((a, b) => a.startTime.localeCompare(b.startTime)).map((s) => ({ day: d.key, shift: s })));
 
@@ -91,40 +94,6 @@ export default function ExportPage() {
     }
   };
 
-  const printPlan = (withEmptyLines: boolean) => {
-    const body =
-      `<h1>${escapeHtml(event.title)}</h1><p class="sub">${escapeHtml(fmtDateRange(event.startDate, event.endDate))}</p>` +
-      days
-        .map((d) => {
-          const iso = dayKeyToIso(d.key);
-          const shifts = [...d.items].sort((a, b) => a.startTime.localeCompare(b.startTime));
-          const responsibles = event.dayResponsibles?.[d.key]?.map((r) => r.displayName).join(', ');
-          return `<section class="day"><h2>${escapeHtml(fmtWeekday(iso))} ${escapeHtml(fmtDayMonth(iso))}${
-            responsibles ? ` <small>Tagesleitung: ${escapeHtml(responsibles)}</small>` : ''
-          }</h2>
-          <table><thead><tr><th style="width:90px">Zeit</th><th style="width:28%">Schicht / Arbeit</th><th>Eingeteilt</th></tr></thead><tbody>
-          ${shifts
-            .flatMap((s) =>
-              (s.tasks ?? []).map((t) => {
-                const names = (s.signups ?? []).filter((su) => su.taskId === t.id).map((su) => escapeHtml(su.displayName));
-                const free = Math.max(0, t.requiredSlots - names.length);
-                const cells = withEmptyLines ? [...names, ...Array.from({ length: free }, () => '&nbsp;')] : names;
-                const list = withEmptyLines
-                  ? cells.map((c) => `<div style="border-bottom:1px solid #ccc;min-height:18px">${c}</div>`).join('')
-                  : `${names.join(', ') || '<span class="muted">niemand</span>'}${free ? ` <span class="muted">(${free} frei)</span>` : ''}`;
-                const label = (s.tasks?.length ?? 0) > 1 || t.title !== s.title ? `${escapeHtml(s.title)}<br><span class="muted">${escapeHtml(t.title)}</span>` : escapeHtml(s.title);
-                return `<tr><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${label}</td><td>${list}</td></tr>`;
-              })
-            )
-            .join('')}
-          </tbody></table></section>`;
-        })
-        .join('');
-    if (!openPrintWindow(`Schichtplan ${event.title}`, body)) {
-      toast({ title: 'Druckansicht blockiert', description: 'Bitte Pop-ups für diese Seite erlauben.', tone: 'error' });
-    }
-  };
-
   const empty = event.shifts.length === 0;
 
   return (
@@ -138,14 +107,11 @@ export default function ExportPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <ExportCard
           icon={<Printer className="size-5" />}
-          title="Schichtplan drucken"
-          text="Pro Tag eine Seite mit allen Schichten und Eingeteilten."
+          title="Schichtplan drucken oder als PDF"
+          text="Übersicht, Aushang mit Zeilen zum Eintragen oder Einteilung pro Person. Tage und Format wählbar."
         >
-          <Button size="sm" onClick={() => printPlan(false)} disabled={empty}>
-            Drucken
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => printPlan(true)} disabled={empty}>
-            Mit leeren Zeilen
+          <Button size="sm" onClick={() => setPrintOpen(true)} disabled={empty}>
+            <Printer className="size-4" /> Drucken oder PDF
           </Button>
         </ExportCard>
         <ExportCard
@@ -185,6 +151,7 @@ export default function ExportPage() {
           </Link>
         </ExportCard>
       </div>
+      <PrintDialog open={printOpen} onClose={() => setPrintOpen(false)} />
     </div>
   );
 }
@@ -201,5 +168,117 @@ function ExportCard({ icon, title, text, children }: { icon: ReactNode; title: s
       </div>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </Card>
+  );
+}
+
+function PrintDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { event } = useOkEvent();
+  const { department } = usePortal();
+  const toast = useToast();
+  const [busy, setBusy] = useState<'print' | 'download' | null>(null);
+  const days = groupByBusinessDay(event.shifts, event.dayCutoffTime).map((d) => d.key);
+  const [layout, setLayout] = useState<PrintLayout>('plan');
+  const [selectedDays, setSelectedDays] = useState<string[] | null>(null);
+  const [landscape, setLandscape] = useState(false);
+  const [pageBreakPerDay, setPageBreakPerDay] = useState(true);
+  const [showDetails, setShowDetails] = useState(true);
+  const [onlyOpen, setOnlyOpen] = useState(false);
+  const chosen = selectedDays ?? days;
+
+  const toggleDay = (key: string) =>
+    setSelectedDays(chosen.includes(key) ? chosen.filter((k) => k !== key) : days.filter((k) => k === key || chosen.includes(k)));
+
+  const run = async (action: 'print' | 'download') => {
+    const options = { layout, days: chosen, landscape, pageBreakPerDay, showDetails, onlyOpen };
+    setBusy(action);
+    try {
+      const blob = await createShiftPlanPdf(event, department, options);
+      if (action === 'print') printBlob(blob, pdfFilename(event, options));
+      else downloadBlob(blob, pdfFilename(event, options));
+    } catch (err) {
+      toast({ title: 'PDF konnte nicht erstellt werden', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Schichtplan drucken oder als PDF"
+      description="Als PDF mit Logo, direkt drucken oder herunterladen."
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => run('download')} loading={busy === 'download'} disabled={chosen.length === 0 || busy !== null}>
+            <Download className="size-4" /> PDF herunterladen
+          </Button>
+          <Button onClick={() => run('print')} loading={busy === 'print'} disabled={chosen.length === 0 || busy !== null}>
+            <Printer className="size-4" /> Drucken
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 text-[13px] font-semibold text-fg">Art</legend>
+          {PRINT_LAYOUTS.map((l) => (
+            <label
+              key={l.value}
+              className={cn(
+                'flex cursor-pointer items-start gap-3 rounded-tile border p-3 transition-colors',
+                layout === l.value ? 'border-fg bg-surface-2' : 'border-line hover:border-line-strong'
+              )}
+            >
+              <input
+                type="radio"
+                name="print-layout"
+                className="mt-1 accent-current"
+                checked={layout === l.value}
+                onChange={() => setLayout(l.value)}
+              />
+              <span>
+                <span className="block text-sm font-semibold text-fg">{l.label}</span>
+                <span className="block text-xs text-fg-muted">{l.text}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
+        {days.length > 1 && (
+          <fieldset>
+            <legend className="mb-2 text-[13px] font-semibold text-fg">Tage</legend>
+            <div className="flex flex-wrap gap-2">
+              {days.map((key) => (
+                <Chip key={key} selected={chosen.includes(key)} onClick={() => toggleDay(key)}>
+                  {fmtShortWeekday(dayKeyToIso(key))} {fmtShortDate(dayKeyToIso(key))}
+                </Chip>
+              ))}
+            </div>
+          </fieldset>
+        )}
+
+        <div className="flex flex-col gap-4">
+          <Switch checked={landscape} onChange={setLandscape} label="Querformat" description="Mehr Platz für viele Namen pro Zeile." />
+          {layout !== 'personen' && (
+            <>
+              <Switch checked={pageBreakPerDay} onChange={setPageBreakPerDay} label="Jeder Tag auf einer neuen Seite" />
+              <Switch
+                checked={showDetails}
+                onChange={setShowDetails}
+                label="Details zeigen"
+                description="Kategorie, Beschreibung, Altersgrenze und Verantwortliche."
+              />
+              <Switch
+                checked={onlyOpen}
+                onChange={setOnlyOpen}
+                label="Nur offene Plätze"
+                description="Zum Aufhängen, wenn noch Helfende gesucht werden."
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </Dialog>
   );
 }
