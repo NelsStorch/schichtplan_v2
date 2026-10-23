@@ -9,6 +9,7 @@ import {
   SetDayResponsiblesSchema,
   UnregisterHelperSchema,
   UpdateEventSchema,
+  ConfirmDeleteSchema,
   type EventQuestionInput,
   type EventQuestionDto,
   type EventQuestionType,
@@ -959,6 +960,44 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         role: organizer.role,
         roleTitle: organizer.roleTitle,
       };
+    }
+  );
+
+  // Anlass endgültig löschen: nur Abteilungsleitung (inkl. globale Admins), nicht die OK-Leitung.
+  // Zur Bestätigung muss das Kürzel mitkommen (Schutz vor einem versehentlichen Klick).
+  fastify.delete<{ Params: { slug: string } }>(
+    '/api/events/:slug',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      const event = await fastify.prisma.event.findUnique({
+        where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
+        select: { id: true, slug: true, title: true, departmentId: true, organizers: true },
+      });
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isDeptAdmin) {
+        return reply.status(403).send({ error: 'Nur die Abteilungsleitung darf einen Anlass löschen' });
+      }
+
+      const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
+      if (!parse.success || parse.data.confirm !== event.slug) {
+        return reply.status(400).send({ error: 'Zur Bestätigung das Kürzel des Anlasses genau eintippen.' });
+      }
+
+      // Kaskadiert zu Schichten, Eintragungen, OK, Fragen, Zugangs-Links, Protokoll und Nachrichten
+      await fastify.prisma.event.delete({ where: { id: event.id } });
+
+      request.log.warn(
+        { userId: request.user.id, eventId: event.id, slug: event.slug, departmentId: event.departmentId },
+        'Anlass von der Abteilungsleitung gelöscht'
+      );
+      return { message: `«${event.title}» wurde gelöscht` };
     }
   );
 

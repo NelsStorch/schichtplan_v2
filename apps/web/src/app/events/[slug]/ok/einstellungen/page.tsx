@@ -2,8 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Crown, Lock, Shield, UserPlus, X } from 'lucide-react';
-import { Avatar, Button, Callout, Card, EmptyState, useConfirm, useToast } from '@schichtplan/ui';
+import { Crown, Lock, Shield, Trash2, UserPlus, X } from 'lucide-react';
+import {
+  Avatar,
+  Button,
+  Callout,
+  Card,
+  Dialog,
+  EmptyState,
+  Field,
+  Input,
+  useConfirm,
+  useToast,
+} from '@schichtplan/ui';
 import { EventForm, eventFormInitial } from '@/components/EventFormDialog';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
@@ -19,6 +30,112 @@ const SECTIONS = [
   ['anwesenheit', 'Anwesenheit'],
   ['design', 'Design'],
 ] as const;
+
+/**
+ * Anlass endgültig löschen (nur Abteilungsleitung). Der Knopf wird erst aktiv, wenn das Kürzel
+ * eingetippt ist; das Backend prüft dasselbe nochmals.
+ */
+function DeleteEventSection({
+  slug,
+  title,
+  shiftCount,
+  signupCount,
+}: {
+  slug: string;
+  title: string;
+  shiftCount: number;
+  signupCount: number;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const close = () => {
+    if (busy) return;
+    setOpen(false);
+    setTyped('');
+    setError(null);
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/events/${slug}`, { method: 'DELETE', json: { confirm: typed.trim() } });
+      toast({ title: 'Anlass gelöscht', description: title, tone: 'success' });
+      router.replace('/');
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  };
+
+  const matches = typed.trim() === slug;
+
+  return (
+    <section id="loeschen" className="mt-6 scroll-mt-24">
+      <Card className="border-danger/30 bg-danger/5 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-display text-lg font-bold text-danger-ink">Anlass löschen</h3>
+            <p className="mt-0.5 text-sm text-fg-muted">
+              Löscht den Anlass mit allen Schichten, Eintragungen, dem OK, Fragen, Zugangs-Links, Protokoll und
+              Nachrichten. Das lässt sich nicht rückgängig machen. Nur die Abteilungsleitung kann das.
+            </p>
+          </div>
+          <Button variant="danger" className="shrink-0" onClick={() => setOpen(true)}>
+            <Trash2 aria-hidden /> Anlass löschen
+          </Button>
+        </div>
+      </Card>
+
+      <Dialog
+        open={open}
+        onClose={close}
+        title={`«${title}» löschen?`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={close} disabled={busy}>
+              Abbrechen
+            </Button>
+            <Button variant="danger" onClick={remove} disabled={busy || !matches}>
+              <Trash2 aria-hidden />
+              {busy ? 'Wird gelöscht …' : 'Endgültig löschen'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <Callout tone="danger">
+            Weg sind danach {shiftCount} Schichten mit {signupCount} Eintragungen und alles, was zum Anlass gehört. Die
+            Helfenden bekommen keine Nachricht. Wenn du sie informieren willst, schreib ihnen vorher unter «Nachrichten».
+          </Callout>
+          <Field
+            label={
+              <>
+                Zur Bestätigung <span className="font-mono text-danger-ink">{slug}</span> eintippen
+              </>
+            }
+            error={error ?? undefined}
+          >
+            <Input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && matches && !busy) remove();
+              }}
+            />
+          </Field>
+        </div>
+      </Dialog>
+    </section>
+  );
+}
 
 export default function SettingsPage() {
   const { event, reload, permissions } = useOkEvent();
@@ -146,6 +263,15 @@ export default function SettingsPage() {
           setFormKey((k) => k + 1);
         }}
       />
+
+      {permissions.canDeleteEvent && (
+        <DeleteEventSection
+          slug={event.slug}
+          title={event.title}
+          shiftCount={event.shifts?.length ?? 0}
+          signupCount={(event.shifts ?? []).reduce((sum, s) => sum + (s.signups?.length ?? 0), 0)}
+        />
+      )}
 
       <OrganizerDialog
         open={okDialog}

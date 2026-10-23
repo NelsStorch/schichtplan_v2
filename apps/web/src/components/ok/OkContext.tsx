@@ -15,6 +15,8 @@ export interface OkPermissions {
   canManage: boolean;
   /** Anlass-Einstellungen und OK-Team: Abteilungsleitung (inkl. globale Admins) und OK-Leitung */
   canEditSettings: boolean;
+  /** Anlass löschen: nur Abteilungsleitung (inkl. globale Admins), nicht die OK-Leitung */
+  canDeleteEvent: boolean;
   roleLabel: string;
 }
 
@@ -96,7 +98,8 @@ export function OkProvider({ slug, children }: { slug: string; children: ReactNo
         : isPlanner
           ? 'Planung'
           : '';
-    return { canManage, canEditSettings, roleLabel };
+    const canDeleteEvent = Boolean(isDeptAdmin || isGlobalAdmin);
+    return { canManage, canEditSettings, canDeleteEvent, roleLabel };
   }, [user, event, isDeptAdmin, isPlanner]);
 
   const stats = useMemo(() => computeStats(event), [event]);

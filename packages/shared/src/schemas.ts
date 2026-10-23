@@ -536,8 +536,8 @@ export const AdminUpdateDepartmentSchema = UpdateDepartmentSchema.extend({
 
 export type AdminUpdateDepartmentInput = z.infer<typeof AdminUpdateDepartmentSchema>;
 
-/** Löschen nur mit der Subdomain bzw. dem Anlass-Kürzel als Bestätigung */
-export const AdminConfirmDeleteSchema = z.object({
+/** Löschen nur mit der Subdomain bzw. dem Anlass-Kürzel als Bestätigung (Admin-Portal und Abteilungsleitung) */
+export const ConfirmDeleteSchema = z.object({
   confirm: z.string().trim().min(1, 'Bestätigung fehlt').max(100),
 });
 

@@ -6,7 +6,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { Prisma, PrismaClient } from '../db.js';
 import { z } from 'zod';
 import {
-  AdminConfirmDeleteSchema,
+  ConfirmDeleteSchema,
   AdminCreateDepartmentSchema,
   AdminSetMemberRoleSchema,
   AdminUpdateDepartmentSchema,
@@ -429,7 +429,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.delete<{ Params: { id: string } }>('/api/admin/departments/:id', guard, async (request, reply) => {
-    const parse = AdminConfirmDeleteSchema.safeParse(request.body ?? {});
+    const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
 
     const department = await fastify.prisma.department.findUnique({
@@ -609,7 +609,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.delete<{ Params: { id: string } }>('/api/admin/events/:id', guard, async (request, reply) => {
-    const parse = AdminConfirmDeleteSchema.safeParse(request.body ?? {});
+    const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
 
     const event = await fastify.prisma.event
