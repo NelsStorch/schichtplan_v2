@@ -582,6 +582,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       id: user.id,
       email: user.email || `${user.id}@cevi-schichtplan.ch`,
       isGlobalAdmin: user.isGlobalAdmin,
+      amr: 'cevidb',
     });
 
     setAuthCookie(reply, token);
@@ -786,6 +787,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         user.email ||
         `${(user.ceviName ?? 'helfer').toLowerCase().replace(/[^a-z0-9]/g, '')}@guest.cevi-schichtplan.ch`,
       isGlobalAdmin: user.isGlobalAdmin,
+      amr: 'ceviname',
     });
     setAuthCookie(reply, token);
     return {
@@ -832,6 +834,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       id: user.id,
       email: user.email || `${user.id}@cevi-schichtplan.ch`,
       isGlobalAdmin: user.isGlobalAdmin,
+      amr: 'password',
     });
 
     setAuthCookie(reply, token);

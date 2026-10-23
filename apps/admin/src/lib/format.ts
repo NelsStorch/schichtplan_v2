@@ -55,3 +55,18 @@ export const organizerRoleLabels: Record<string, string> = {
   OK_LEAD: 'OK-Leitung',
   OK_MEMBER: 'OK-Mitglied',
 };
+
+const eventDayFmt = new Intl.DateTimeFormat('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Zurich' });
+
+/** Zeitraum eines Anlasses: «14.06.2026» oder «14.06.2026 – 16.06.2026» (Schweizer Zeit) */
+export function formatEventRange(start: string, end: string) {
+  const a = eventDayFmt.format(new Date(start));
+  const b = eventDayFmt.format(new Date(end));
+  return a === b ? a : `${a} – ${b}`;
+}
+
+/** Name für Listen ohne den Platzhalter "(Helfer)" */
+export function personName(user: { firstName: string; lastName: string; ceviName: string | null }) {
+  const name = fullName(user);
+  return user.ceviName && user.ceviName !== name && user.ceviName !== user.firstName ? `${user.ceviName} (${name})` : name;
+}

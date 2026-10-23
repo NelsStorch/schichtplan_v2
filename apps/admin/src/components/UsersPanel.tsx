@@ -43,30 +43,6 @@ function buildQuery(params: { query: string; filter: Filter; sort: string; page:
   return search.toString();
 }
 
-function Stat({ label, value, loading }: { label: string; value?: number; loading: boolean }) {
-  return (
-    <div className="px-5 py-4">
-      <dt className="text-xs font-medium text-fg-subtle">{label}</dt>
-      <dd className="mt-1 font-display text-2xl font-bold leading-none tracking-tight text-fg tabular">
-        {loading || value === undefined ? <Skeleton className="h-6 w-12" /> : value.toLocaleString('de-CH')}
-      </dd>
-    </div>
-  );
-}
-
-function Overview({ overview, loading }: { overview: AdminOverviewDto | null; loading: boolean }) {
-  return (
-    <Card className="overflow-hidden">
-      <dl className="grid grid-cols-2 gap-px bg-line md:grid-cols-4 [&>div]:bg-surface">
-        <Stat label="Personen" value={overview?.users} loading={loading} />
-        <Stat label="Neu in 7 Tagen" value={overview?.newUsers7d} loading={loading} />
-        <Stat label="Abteilungen" value={overview?.departments} loading={loading} />
-        <Stat label="Anlässe" value={overview?.events} loading={loading} />
-      </dl>
-    </Card>
-  );
-}
-
 function PersonCell({ user }: { user: AdminUserListItemDto }) {
   const name = fullName(user);
   return (
@@ -107,11 +83,17 @@ function Departments({ user }: { user: AdminUserListItemDto }) {
   );
 }
 
-export function UsersPanel({ currentUserId }: { currentUserId?: string }) {
+export function UsersPanel({
+  currentUserId,
+  overview,
+  onChanged,
+}: {
+  currentUserId?: string;
+  overview: AdminOverviewDto | null;
+  onChanged: () => void;
+}) {
   const confirm = useConfirm();
   const toast = useToast();
-  const [overview, setOverview] = useState<AdminOverviewDto | null>(null);
-  const [overviewLoading, setOverviewLoading] = useState(true);
 
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -160,9 +142,7 @@ export function UsersPanel({ currentUserId }: { currentUserId?: string }) {
         setSelected(null);
       }
       setReload((n) => n + 1);
-      api<AdminOverviewDto>('/api/admin/overview')
-        .then(setOverview)
-        .catch(() => undefined);
+      onChanged();
     } catch (err) {
       toast({
         title: 'Fehler beim Löschen',
@@ -171,13 +151,6 @@ export function UsersPanel({ currentUserId }: { currentUserId?: string }) {
       });
     }
   };
-
-  useEffect(() => {
-    api<AdminOverviewDto>('/api/admin/overview')
-      .then(setOverview)
-      .catch(() => setOverview(null))
-      .finally(() => setOverviewLoading(false));
-  }, []);
 
   // Suche leicht verzögert, damit nicht jeder Tastendruck eine Abfrage auslöst
   useEffect(() => {
@@ -229,8 +202,6 @@ export function UsersPanel({ currentUserId }: { currentUserId?: string }) {
 
   return (
     <div className="space-y-6">
-      <Overview overview={overview} loading={overviewLoading} />
-
       <div className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row">
           <div className="relative flex-1">
@@ -486,11 +457,9 @@ export function UsersPanel({ currentUserId }: { currentUserId?: string }) {
         preview={selected}
         currentUserId={currentUserId}
         onClose={() => setSelected(null)}
-        onDeleted={() => {
+        onChanged={() => {
           setReload((n) => n + 1);
-          api<AdminOverviewDto>('/api/admin/overview')
-            .then(setOverview)
-            .catch(() => undefined);
+          onChanged();
         }}
       />
     </div>

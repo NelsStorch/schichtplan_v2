@@ -546,3 +546,24 @@ model EventMessage {
   @@index([eventId, createdAt])
   @@map("event_messages")
 }
+
+/// Protokoll aller Änderungen im Admin-Portal. Ohne Fremdschlüssel: Einträge bleiben, auch wenn
+/// Admin, Person, Abteilung oder Anlass später gelöscht werden (Namen werden mitgespeichert).
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  adminId     String?  @map("admin_id")
+  adminName   String   @map("admin_name")
+  // z. B. DEPARTMENT_DELETE, USER_ADMIN_GRANT, MEMBER_ROLE_SET
+  action      String
+  // USER, DEPARTMENT, EVENT
+  targetType  String   @map("target_type")
+  targetId    String?  @map("target_id")
+  targetLabel String   @map("target_label")
+  details     Json?
+  ip          String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
+}

@@ -9,6 +9,7 @@ import type {
   LoginMethod,
 } from '@schichtplan/shared';
 import { toCeviDbStufeDto } from '../services/homeDepartment.js';
+import { recordAdminAction } from '../services/adminAudit.js';
 
 const ListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -20,7 +21,7 @@ const ListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
-const userSelect = {
+export const userSelect = {
   id: true,
   email: true,
   firstName: true,
@@ -46,7 +47,7 @@ const userSelect = {
 
 type UserRow = Prisma.UserGetPayload<{ select: typeof userSelect }>;
 
-function loginMethods(user: Pick<UserRow, 'ceviDbId' | 'passwordHash'>): LoginMethod[] {
+export function loginMethods(user: Pick<UserRow, 'ceviDbId' | 'passwordHash'>): LoginMethod[] {
   const methods: LoginMethod[] = [];
   if (user.ceviDbId !== null) methods.push('CEVIDB');
   if (user.passwordHash) methods.push('PASSWORD');
@@ -54,7 +55,7 @@ function loginMethods(user: Pick<UserRow, 'ceviDbId' | 'passwordHash'>): LoginMe
   return methods;
 }
 
-function toListItem(user: UserRow): AdminUserListItemDto {
+export function toListItem(user: UserRow): AdminUserListItemDto {
   return {
     id: user.id,
     email: user.email,
@@ -333,10 +334,13 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         ? `${user.ceviName} (${user.firstName} ${user.lastName})`
         : `${user.firstName} ${user.lastName}`;
 
-      request.log.info(
-        { adminId: request.user.id, targetUserId, email: user.email, name: userDisplayName },
-        'Admin: Benutzer komplett gelöscht'
-      );
+      await recordAdminAction(fastify.prisma, request, {
+        action: 'USER_DELETE',
+        targetType: 'USER',
+        targetId: targetUserId,
+        targetLabel: userDisplayName,
+        details: { email: user.email, wasGlobalAdmin: user.isGlobalAdmin },
+      });
 
       return { success: true };
     }

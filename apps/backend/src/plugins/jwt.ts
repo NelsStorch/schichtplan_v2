@@ -2,18 +2,40 @@ import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import fastifyJwt from '@fastify/jwt';
 import fastifyCookie from '@fastify/cookie';
+import {
+  adminRequestProblem,
+  adminSecurityConfig,
+  adminSessionProblem,
+  type LoginMethodClaim,
+} from '../services/adminSecurity.js';
+import { createRateLimiter } from '../services/rateLimit.js';
 
 declare module 'fastify' {
+  interface FastifyRequest {
+    /** Von requireGlobalAdmin gesetzt: Anmeldeart und bis wann die Admin-Sitzung gilt */
+    adminSession?: { loginMethod: string | null; issuedAt: Date; expiresAt: Date };
+  }
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     optionalAuthenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-    /** Eingeloggt und in der Datenbank als globaler Admin geführt (nicht nur laut Token). */
+    /**
+     * Eingeloggt und in der Datenbank als globaler Admin geführt (nicht nur laut Token). Zusätzlich:
+     * nur auf admin./login., nur von derselben Seite, Anmeldung frisch (und in Produktion über Cevi.DB),
+     * Änderungen gebremst. Siehe services/adminSecurity.ts.
+     */
     requireGlobalAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
+    payload: {
+      id: string;
+      email: string;
+      isGlobalAdmin: boolean;
+      /** Anmeldeart, für die Admin-Schnittstelle (ältere Tokens haben keine) */
+      amr?: LoginMethodClaim;
+    };
     user: {
       id: string;
       email: string;
@@ -65,6 +87,9 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
    * Token prüfen und die Person frisch aus der DB laden: Ein Token gilt bis zu 30 Tage. Gelöschte
    * Konten sollen sofort draussen sein, und `isGlobalAdmin` gilt nur, solange es in der DB steht.
    */
+  /** iat und amr des geprüften Tokens (request.user wird danach durch die DB-Werte ersetzt) */
+  const tokenClaims = new WeakMap<FastifyRequest, { iat?: number; amr?: string }>();
+
   async function verifyAndLoad(request: FastifyRequest): Promise<boolean> {
     try {
       await request.jwtVerify();
@@ -78,6 +103,7 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     if (!user) return false;
     // Nach einem neuen Passwort gelten ältere Tokens nicht mehr (iat ist in Sekunden)
     const issuedAt = (request.user as { iat?: number }).iat;
+    tokenClaims.set(request, { iat: issuedAt, amr: (request.user as { amr?: string }).amr });
     if (user.passwordChangedAt && issuedAt !== undefined && (issuedAt + 1) * 1000 <= user.passwordChangedAt.getTime()) {
       return false;
     }
@@ -95,12 +121,58 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  const adminConfig = adminSecurityConfig();
+  // Änderungen pro Admin: 60 in 10 Minuten (normale Arbeit kommt nie hin, ein Skript schon)
+  const adminWriteLimiter = createRateLimiter(10 * 60 * 1000, 60);
+
   fastify.decorate('requireGlobalAdmin', async (request: FastifyRequest, reply: FastifyReply) => {
+    const header = (name: string) => {
+      const value = request.headers[name];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    const requestProblem = adminRequestProblem(
+      { host: request.host, origin: header('origin'), secFetchSite: header('sec-fetch-site') },
+      adminConfig
+    );
+    if (requestProblem) {
+      request.log.warn(
+        { problem: requestProblem, host: request.host, origin: header('origin'), url: request.url },
+        'Admin-Schnittstelle: Anfrage von fremder Seite abgelehnt'
+      );
+      return reply.status(403).send({ error: 'Kein Zugriff von dieser Seite', code: 'ADMIN_ORIGIN' });
+    }
+
     if (!(await verifyAndLoad(request))) {
       return reply.status(401).send({ error: 'Nicht autorisiert' });
     }
     if (!request.user.isGlobalAdmin) {
       return reply.status(403).send({ error: 'Kein Zugriff' });
+    }
+
+    const sessionProblem = adminSessionProblem(tokenClaims.get(request) ?? {}, adminConfig);
+    if (sessionProblem === 'NOT_CEVIDB') {
+      return reply.status(401).send({
+        error: 'Für den Admin-Bereich bitte mit Cevi.DB anmelden.',
+        code: 'REAUTH_CEVIDB',
+      });
+    }
+    if (sessionProblem === 'STALE') {
+      return reply.status(401).send({
+        error: 'Deine Anmeldung ist zu alt für den Admin-Bereich. Bitte melde dich neu an.',
+        code: 'REAUTH_REQUIRED',
+      });
+    }
+    const claims = tokenClaims.get(request) ?? {};
+    const issuedAt = new Date((claims.iat ?? 0) * 1000);
+    request.adminSession = {
+      loginMethod: claims.amr ?? null,
+      issuedAt,
+      expiresAt: new Date(issuedAt.getTime() + adminConfig.maxSessionAgeSeconds * 1000),
+    };
+
+    if (request.method !== 'GET' && request.method !== 'HEAD' && adminWriteLimiter.hit(request.user.id)) {
+      request.log.warn({ adminId: request.user.id, url: request.url }, 'Admin-Schnittstelle: Versuchsbremse');
+      return reply.status(429).send({ error: 'Zu viele Änderungen in kurzer Zeit. Bitte warte ein paar Minuten.' });
     }
   });
 

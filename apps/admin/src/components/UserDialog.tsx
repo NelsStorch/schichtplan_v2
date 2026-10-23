@@ -1,10 +1,27 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Building2, CalendarClock, Mail, Phone, Trash2, Users } from 'lucide-react';
-import { Avatar, Badge, Button, Callout, Dialog, EmptyState, Skeleton, useConfirm, useToast } from '@schichtplan/ui';
-import { getRootDomain, type AdminUserDetailDto, type AdminUserListItemDto } from '@schichtplan/shared';
-import { api, departmentUrl, errorMessage } from '../lib/api';
+import { ArrowUpRight, Building2, CalendarClock, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Callout,
+  Dialog,
+  EmptyState,
+  Select,
+  Skeleton,
+  Switch,
+  useConfirm,
+  useToast,
+} from '@schichtplan/ui';
+import {
+  getRootDomain,
+  type AdminDepartmentListItemDto,
+  type AdminUserDetailDto,
+  type AdminUserListItemDto,
+} from '@schichtplan/shared';
+import { api, departmentUrl, errorMessage, send } from '../lib/api';
 import {
   ageFromBirthDate,
   departmentRoleLabels,
@@ -45,24 +62,29 @@ export function UserDialog({
   preview,
   currentUserId,
   onClose,
-  onDeleted,
+  onChanged,
 }: {
   preview: AdminUserListItemDto | null;
   currentUserId?: string;
   onClose: () => void;
-  onDeleted?: () => void;
+  /** Nach Löschen oder geänderten Rollen: Listen neu laden */
+  onChanged?: () => void;
 }) {
   const confirm = useConfirm();
   const toast = useToast();
   const [detail, setDetail] = useState<AdminUserDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [departments, setDepartments] = useState<AdminDepartmentListItemDto[] | null>(null);
+  const [addDepartmentId, setAddDepartmentId] = useState('');
+  const [addRole, setAddRole] = useState('HELPER');
   const id = preview?.id;
 
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
-    setDetail(null);
     setError(null);
     api<AdminUserDetailDto>(`/api/admin/users/${encodeURIComponent(id)}`, { signal: controller.signal })
       .then(setDetail)
@@ -70,7 +92,19 @@ export function UserDialog({
         if (!controller.signal.aborted) setError(errorMessage(err));
       });
     return () => controller.abort();
-  }, [id]);
+  }, [id, reload]);
+
+  useEffect(() => {
+    if (!id) {
+      setDetail(null);
+      setAddDepartmentId('');
+      return;
+    }
+    if (departments) return;
+    api<{ items: AdminDepartmentListItemDto[] }>('/api/admin/departments')
+      .then((r) => setDepartments(r.items))
+      .catch(() => setDepartments([]));
+  }, [id, departments]);
 
   // Solange der Detail-Abruf läuft, reichen die Listendaten für alles ausser den Verknüpfungen.
   // Die ID-Prüfung verhindert einen Frame mit den Daten der zuvor geöffneten Person.
@@ -78,6 +112,51 @@ export function UserDialog({
   const user = loaded ?? preview;
   const loadingDetail = Boolean(preview) && !loaded && !error;
   const isSelf = Boolean(user && currentUserId && user.id === currentUserId);
+  const ceviNameOnly = Boolean(user?.loginMethods.includes('CEVINAME'));
+
+  /** Änderung speichern, danach Detail und Listen neu laden */
+  const change = async (action: () => Promise<unknown>, success: string) => {
+    setSaving(true);
+    try {
+      await action();
+      toast({ title: success, tone: 'success' });
+      setReload((n) => n + 1);
+      onChanged?.();
+    } catch (err) {
+      toast({ title: 'Nicht gespeichert', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setGlobalAdmin = async (value: boolean) => {
+    if (!user) return;
+    if (value) {
+      const ok = await confirm({
+        title: `${fullName(user)} zur globalen Admin machen?`,
+        description:
+          'Globale Admins sehen alle Personen mit Kontaktdaten, gelten in jeder Abteilung als Abteilungsleitung und können Abteilungen löschen.',
+        confirmLabel: 'Admin-Rechte geben',
+        cancelLabel: 'Abbrechen',
+      });
+      if (!ok) return;
+    }
+    await change(
+      () => send(`/api/admin/users/${user.id}`, 'PATCH', { isGlobalAdmin: value }),
+      value ? 'Ist jetzt globale Admin' : 'Admin-Rechte entzogen'
+    );
+  };
+
+  const setMembership = async (departmentId: string, role: string) => {
+    if (!user) return;
+    await change(
+      () =>
+        role
+          ? send(`/api/admin/departments/${departmentId}/members/${user.id}`, 'PUT', { role })
+          : send(`/api/admin/departments/${departmentId}/members/${user.id}`, 'DELETE'),
+      role ? `Rolle: ${departmentRoleLabels[role]}` : 'Rolle entfernt'
+    );
+  };
 
   const handleDelete = async () => {
     if (!user) return;
@@ -112,7 +191,7 @@ export function UserDialog({
         description: `${name} wurde vollständig gelöscht.`,
         tone: 'success',
       });
-      onDeleted?.();
+      onChanged?.();
       onClose();
     } catch (err) {
       toast({
@@ -229,6 +308,23 @@ export function UserDialog({
 
             <Section title="Konto">
               <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Switch
+                    checked={user.isGlobalAdmin}
+                    onChange={(value) => {
+                      // Vergeben nur an Cevi.DB-Konten, entziehen geht immer (ausser bei sich selbst)
+                      if (!saving && !isSelf && (!value || user.ceviDbId !== null)) setGlobalAdmin(value);
+                    }}
+                    label="Globale Admin"
+                    description={
+                      isSelf
+                        ? 'Deine eigenen Admin-Rechte kannst du hier nicht entziehen.'
+                        : user.ceviDbId === null && !user.isGlobalAdmin
+                          ? 'Nur für Konten mit Cevi.DB möglich. Die Person muss sich zuerst einmal mit Cevi.DB anmelden.'
+                          : 'Zugang zu diesem Admin-Portal (nur mit Cevi.DB-Anmeldung) und Leitungsrechte in allen Abteilungen. Alle Admins bekommen eine Mail.'
+                    }
+                  />
+                </div>
                 <Fact label="Cevi.DB-ID">
                   {user.ceviDbId !== null ? <span className="font-mono tabular">{user.ceviDbId}</span> : <Missing />}
                 </Fact>
@@ -275,9 +371,22 @@ export function UserDialog({
                         <span className="block truncate text-sm font-semibold text-fg">{m.departmentName}</span>
                         <span className="block truncate font-mono text-xs text-fg-subtle">{m.departmentSlug}</span>
                       </span>
-                      <Badge tone={m.role === 'ADMIN' ? 'accent' : 'neutral'}>
-                        {departmentRoleLabels[m.role] ?? m.role}
-                      </Badge>
+                      <span className="w-44 shrink-0">
+                        <Select
+                          value={m.role}
+                          disabled={saving}
+                          onChange={(e) => setMembership(m.departmentId, e.target.value)}
+                          aria-label={`Rolle in ${m.departmentName}`}
+                          className="h-10 text-sm sm:text-sm"
+                        >
+                          {['ADMIN', 'PLANNER', 'HELPER'].map((role) => (
+                            <option key={role} value={role} disabled={ceviNameOnly && role !== 'HELPER'}>
+                              {departmentRoleLabels[role]}
+                            </option>
+                          ))}
+                          <option value="">Rolle entfernen</option>
+                        </Select>
+                      </span>
                       <a
                         href={departmentUrl(m.departmentSlug)}
                         target="_blank"
@@ -290,6 +399,54 @@ export function UserDialog({
                     </li>
                   ))}
                 </ul>
+              )}
+              {departments && departments.some((d) => !user.memberships.some((m) => m.departmentId === d.id)) && (
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <div className="flex-1">
+                    <Select
+                      value={addDepartmentId}
+                      onChange={(e) => setAddDepartmentId(e.target.value)}
+                      aria-label="Abteilung wählen"
+                      className="h-10 text-sm sm:text-sm"
+                    >
+                      <option value="">Abteilung hinzufügen …</option>
+                      {departments
+                        .filter((d) => !user.memberships.some((m) => m.departmentId === d.id))
+                        .map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                    </Select>
+                  </div>
+                  <div className="sm:w-44">
+                    <Select
+                      value={addRole}
+                      onChange={(e) => setAddRole(e.target.value)}
+                      aria-label="Rolle"
+                      className="h-10 text-sm sm:text-sm"
+                    >
+                      {['ADMIN', 'PLANNER', 'HELPER'].map((role) => (
+                        <option key={role} value={role} disabled={ceviNameOnly && role !== 'HELPER'}>
+                          {departmentRoleLabels[role]}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-10"
+                    disabled={!addDepartmentId || saving || (ceviNameOnly && addRole !== 'HELPER')}
+                    onClick={async () => {
+                      await setMembership(addDepartmentId, addRole);
+                      setAddDepartmentId('');
+                    }}
+                  >
+                    <Plus aria-hidden />
+                    Hinzufügen
+                  </Button>
+                </div>
               )}
             </Section>
 

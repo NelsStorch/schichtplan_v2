@@ -18,6 +18,7 @@ import shiftRoutes from './routes/shifts.js';
 import attendanceRoutes from './routes/attendance.js';
 import eventMessageRoutes from './routes/eventMessages.js';
 import adminRoutes from './routes/admin.js';
+import adminManageRoutes from './routes/adminManage.js';
 import uploadRoutes from './routes/uploads.js';
 import eventTemplateRoutes from './routes/eventTemplates.js';
 import taskDefinitionRoutes from './routes/taskDefinitions.js';
@@ -100,6 +101,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(eventTemplateRoutes);
   await app.register(taskDefinitionRoutes);
   await app.register(adminRoutes);
+  await app.register(adminManageRoutes);
   await app.register(uploadRoutes);
 
   return app;

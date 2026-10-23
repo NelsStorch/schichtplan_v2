@@ -611,6 +611,127 @@ export interface AdminOverviewDto {
   signups: number;
 }
 
+export interface AdminDepartmentLeaderDto {
+  userId: string;
+  name: string;
+}
+
+export interface AdminDepartmentListItemDto {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  contactEmail: string | null;
+  ceviDbGroupId: number | null;
+  membersOnly: boolean;
+  /** Personen mit Abteilungsrolle (department_members) */
+  memberCount: number;
+  /** Personen mit dieser Heimabteilung */
+  homeUserCount: number;
+  eventCount: number;
+  /** Anlässe, die noch nicht vorbei sind */
+  upcomingEventCount: number;
+  signupCount: number;
+  /** Abteilungsleitung (Rolle ADMIN) */
+  leaders: AdminDepartmentLeaderDto[];
+  createdAt: string;
+}
+
+export interface AdminDepartmentPersonDto {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  ceviName: string | null;
+  email: string | null;
+  isGlobalAdmin: boolean;
+  loginMethods: LoginMethod[];
+  /** Rolle in der Abteilung, null = nur Heimabteilung */
+  role: string | null;
+  isHome: boolean;
+  /** CEVIDB oder SELF, nur bei Heimabteilung */
+  homeSource: string | null;
+}
+
+export interface AdminDepartmentStufeDto {
+  id: string;
+  name: string;
+  ceviDbGroupId: number | null;
+  memberCount: number;
+}
+
+export interface AdminDepartmentDetailDto extends AdminDepartmentListItemDto {
+  people: AdminDepartmentPersonDto[];
+  stufen: AdminDepartmentStufeDto[];
+  events: AdminEventListItemDto[];
+}
+
+export interface AdminEventListItemDto {
+  id: string;
+  title: string;
+  slug: string;
+  departmentId: string;
+  departmentName: string;
+  departmentSlug: string;
+  startDate: string;
+  endDate: string;
+  isPublished: boolean;
+  allowPublicSignup: boolean;
+  accessType: string;
+  shiftCount: number;
+  /** Summe der benötigten Plätze aller Schichten */
+  slotCount: number;
+  signupCount: number;
+  organizerCount: number;
+  createdAt: string;
+}
+
+export interface AdminEventListDto {
+  items: AdminEventListItemDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+/** Admin-Sitzung: Anmeldeart («cevidb», «password», «ceviname») und bis wann sie fürs Portal gilt */
+export interface AdminSessionDto {
+  loginMethod: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
+}
+
+/** Eintrag im Protokoll des Admin-Portals */
+export interface AdminAuditEntryDto {
+  id: string;
+  adminId: string | null;
+  adminName: string;
+  /** z. B. DEPARTMENT_DELETE, USER_ADMIN_GRANT, MEMBER_ROLE_SET */
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  targetLabel: string;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AdminAuditListDto {
+  items: AdminAuditEntryDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+/** Startseite des Admin-Portals: Kennzahlen, Hinweise und was als Nächstes ansteht */
+export interface AdminDashboardDto {
+  upcomingEvents: AdminEventListItemDto[];
+  recentUsers: AdminUserListItemDto[];
+  /** Abteilungen ohne Abteilungsleitung */
+  departmentsWithoutLeader: { id: string; name: string; slug: string }[];
+  signups7d: number;
+}
+
 /** Darf die angemeldete Person eine Abteilung (Subdomain) für ihre Ortsgruppe anlegen? */
 export interface DepartmentCreationEligibilityDto {
   eligible: boolean;

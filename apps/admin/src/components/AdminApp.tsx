@@ -1,10 +1,33 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ArrowUpRight, LogOut, ShieldAlert } from 'lucide-react';
-import { Button, Callout, CeviLogo, ThemeToggle, buttonClasses } from '@schichtplan/ui';
-import { PRIVACY_URL, type UserDto } from '@schichtplan/shared';
-import { ApiError, api, errorMessage, loginUrl } from '../lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ArrowUpRight,
+  Building2,
+  CalendarDays,
+  History,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  ShieldAlert,
+  Users,
+} from 'lucide-react';
+import { Button, Callout, CeviLogo, ThemeToggle, buttonClasses, cn } from '@schichtplan/ui';
+import {
+  PRIVACY_URL,
+  type AdminDepartmentListItemDto,
+  type AdminOverviewDto,
+  type AdminSessionDto,
+  type AdminUserListItemDto,
+  type UserDto,
+} from '@schichtplan/shared';
+import { ApiError, REAUTH_EVENT, api, errorMessage, isReauthCode, loginUrl } from '../lib/api';
+import { AuditPanel } from './AuditPanel';
+import { DashboardPanel, type AdminTab } from './DashboardPanel';
+import { DepartmentDialog } from './DepartmentDialog';
+import { DepartmentsPanel } from './DepartmentsPanel';
+import { EventsPanel } from './EventsPanel';
+import { UserDialog } from './UserDialog';
 import { UsersPanel } from './UsersPanel';
 
 type Session =
@@ -12,11 +35,22 @@ type Session =
   | { status: 'redirecting' }
   | { status: 'error'; message: string }
   | { status: 'forbidden'; user: UserDto }
-  | { status: 'ready'; user: UserDto };
+  | { status: 'reauth'; user: UserDto; code: 'REAUTH_REQUIRED' | 'REAUTH_CEVIDB'; message: string }
+  | { status: 'ready'; user: UserDto; adminSession: AdminSessionDto };
 
 const displayName = (user: Pick<UserDto, 'ceviName' | 'firstName'>) => user.ceviName || user.firstName;
 
-function Shell({ children, user, onLogout }: { children: React.ReactNode; user?: UserDto; onLogout?: () => void }) {
+function Shell({
+  children,
+  user,
+  onLogout,
+  nav,
+}: {
+  children: React.ReactNode;
+  user?: UserDto;
+  onLogout?: () => void;
+  nav?: React.ReactNode;
+}) {
   return (
     <div className="grain flex min-h-[100dvh] flex-col">
       <div aria-hidden className="bg-campfire pointer-events-none fixed inset-x-0 top-0 h-[40vh] opacity-60" />
@@ -42,6 +76,7 @@ function Shell({ children, user, onLogout }: { children: React.ReactNode; user?:
             )}
           </span>
         </div>
+        {nav}
       </header>
 
       <main id="inhalt" className="relative mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -69,7 +104,20 @@ export function AdminApp() {
 
   useEffect(() => {
     api<UserDto>('/api/auth/me')
-      .then((user) => setSession({ status: user.isGlobalAdmin ? 'ready' : 'forbidden', user }))
+      .then(async (user) => {
+        if (!user.isGlobalAdmin) return setSession({ status: 'forbidden', user });
+        // Die Admin-Schnittstelle verlangt eine frische Anmeldung (in Produktion über Cevi.DB)
+        try {
+          const adminSession = await api<AdminSessionDto>('/api/admin/session');
+          setSession({ status: 'ready', user, adminSession });
+        } catch (err) {
+          if (err instanceof ApiError && isReauthCode(err.code)) {
+            setSession({ status: 'reauth', user, code: err.code, message: err.message });
+            return;
+          }
+          setSession({ status: 'error', message: errorMessage(err) });
+        }
+      })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) {
           setSession({ status: 'redirecting' });
@@ -78,6 +126,19 @@ export function AdminApp() {
         }
         setSession({ status: 'error', message: errorMessage(err) });
       });
+  }, []);
+
+  // Läuft die Admin-Sitzung während der Arbeit ab, meldet das jede weitere Anfrage
+  useEffect(() => {
+    const onReauth = (e: Event) => {
+      const { code, message } = (e as CustomEvent<{ code: 'REAUTH_REQUIRED' | 'REAUTH_CEVIDB'; message: string }>)
+        .detail;
+      setSession((current) =>
+        current.status === 'ready' ? { status: 'reauth', user: current.user, code, message } : current
+      );
+    };
+    window.addEventListener(REAUTH_EVENT, onReauth);
+    return () => window.removeEventListener(REAUTH_EVENT, onReauth);
   }, []);
 
   const logout = async () => {
@@ -146,15 +207,191 @@ export function AdminApp() {
     );
   }
 
+  if (session.status === 'reauth') {
+    return (
+      <Shell user={session.user} onLogout={logout}>
+        <Centered>
+          <span className="flex size-12 items-center justify-center rounded-tile bg-accent/12 text-accent-ink">
+            <KeyRound className="size-6" aria-hidden />
+          </span>
+          <h1 className="mt-5 font-display text-[1.75rem] font-semibold leading-tight tracking-tight text-fg">
+            Bitte neu anmelden
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">{session.message}</p>
+          <p className="mt-3 text-sm leading-relaxed text-fg-subtle">
+            {session.code === 'REAUTH_CEVIDB'
+              ? 'Für den Admin-Bereich zählt nur die Anmeldung mit Cevi.DB, nicht E-Mail und Passwort.'
+              : 'Zum Schutz gilt eine Anmeldung im Admin-Bereich nur einige Stunden. Danach musst du dich neu anmelden, auch wenn du auf den Abteilungsseiten noch angemeldet bist.'}
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Button size="lg" onClick={logout}>
+              {session.code === 'REAUTH_CEVIDB' ? 'Mit Cevi.DB anmelden' : 'Neu anmelden'}
+            </Button>
+          </div>
+        </Centered>
+      </Shell>
+    );
+  }
+
+  return <AdminHome user={session.user} adminSession={session.adminSession} logout={logout} />;
+}
+
+const TABS: { id: AdminTab; label: string; icon: React.ReactNode; intro: string }[] = [
+  {
+    id: 'uebersicht',
+    label: 'Übersicht',
+    icon: <LayoutDashboard aria-hidden />,
+    intro: 'Kennzahlen über alle Abteilungen, was als Nächstes ansteht und was Aufmerksamkeit braucht.',
+  },
+  {
+    id: 'abteilungen',
+    label: 'Abteilungen',
+    icon: <Building2 aria-hidden />,
+    intro: 'Abteilungen anlegen, Einstellungen ändern, Leitung und Rollen vergeben oder eine Abteilung löschen.',
+  },
+  {
+    id: 'anlaesse',
+    label: 'Anlässe',
+    icon: <CalendarDays aria-hidden />,
+    intro: 'Alle Anlässe aller Abteilungen mit Belegung. Veröffentlichen, Eintragen öffnen oder schliessen, löschen.',
+  },
+  {
+    id: 'personen',
+    label: 'Personen',
+    icon: <Users aria-hidden />,
+    intro: 'Alle Konten über sämtliche Abteilungen. Rollen und globale Admin-Rechte vergeben.',
+  },
+  {
+    id: 'protokoll',
+    label: 'Protokoll',
+    icon: <History aria-hidden />,
+    intro: 'Jede Änderung im Admin-Portal: wer, wann, was. Einträge lassen sich nicht ändern oder löschen.',
+  },
+];
+
+const tabFromHash = (): AdminTab => {
+  const hash = window.location.hash.slice(1);
+  return TABS.some((t) => t.id === hash) ? (hash as AdminTab) : 'uebersicht';
+};
+
+const timeFmt = new Intl.DateTimeFormat('de-CH', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+
+function AdminHome({
+  user,
+  adminSession,
+  logout,
+}: {
+  user: UserDto;
+  adminSession: AdminSessionDto;
+  logout: () => void;
+}) {
+  const [tab, setTab] = useState<AdminTab>('uebersicht');
+  const [overview, setOverview] = useState<AdminOverviewDto | null>(null);
+  const [departments, setDepartments] = useState<AdminDepartmentListItemDto[] | null>(null);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [openDepartment, setOpenDepartment] = useState<string | null>(null);
+  const [openUser, setOpenUser] = useState<AdminUserListItemDto | null>(null);
+  const [usersReload, setUsersReload] = useState(0);
+
+  // Bereich im Hash (#abteilungen), damit Neu laden und Zurück funktionieren
+  useEffect(() => {
+    const sync = () => setTab(tabFromHash());
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
+
+  const navigate = (next: AdminTab) => {
+    if (next === 'uebersicht') history.pushState(null, '', window.location.pathname);
+    else window.location.hash = next;
+    setTab(next);
+    window.scrollTo({ top: 0 });
+  };
+
+  const refresh = useCallback(() => {
+    api<AdminOverviewDto>('/api/admin/overview')
+      .then(setOverview)
+      .catch(() => undefined);
+    api<{ items: AdminDepartmentListItemDto[] }>('/api/admin/departments')
+      .then((r) => setDepartments(r.items))
+      .catch(() => undefined)
+      .finally(() => setDepartmentsLoading(false));
+  }, []);
+
+  useEffect(refresh, [refresh]);
+
+  const current = TABS.find((t) => t.id === tab) ?? TABS[0];
+
+  const nav = (
+    <nav aria-label="Bereiche" className="mx-auto w-full max-w-6xl px-2 sm:px-4">
+      <ul className="-mb-px flex gap-1 overflow-x-auto">
+        {TABS.map((t) => (
+          <li key={t.id} className="shrink-0">
+            <a
+              href={t.id === 'uebersicht' ? '#' : `#${t.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(t.id);
+              }}
+              aria-current={tab === t.id ? 'page' : undefined}
+              className={cn(
+                'flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition [&_svg]:size-4',
+                tab === t.id ? 'border-accent text-fg' : 'border-transparent text-fg-muted hover:text-fg'
+              )}
+            >
+              {t.icon}
+              {t.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+
   return (
-    <Shell user={session.user} onLogout={logout}>
-      <div className="mb-7">
-        <h1 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight text-fg">Personen</h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-          Alle Konten über sämtliche Abteilungen. Nur für globale Admins sichtbar.
+    <Shell user={user} onLogout={logout} nav={nav}>
+      {adminSession.expiresAt && (
+        <p className="mb-4 text-xs text-fg-subtle">
+          Admin-Sitzung gültig bis {timeFmt.format(new Date(adminSession.expiresAt))}
+          {adminSession.loginMethod === 'cevidb' ? ' · angemeldet mit Cevi.DB' : ''}
         </p>
+      )}
+      <div className="mb-7">
+        <h1 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight text-fg">{current.label}</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">{current.intro}</p>
       </div>
-      <UsersPanel currentUserId={session.user.id} />
+
+      {tab === 'uebersicht' && (
+        <DashboardPanel
+          overview={overview}
+          onNavigate={navigate}
+          onOpenDepartment={setOpenDepartment}
+          onOpenUser={setOpenUser}
+        />
+      )}
+      {tab === 'abteilungen' && (
+        <DepartmentsPanel
+          departments={departments}
+          loading={departmentsLoading}
+          onOpen={setOpenDepartment}
+          onChanged={refresh}
+        />
+      )}
+      {tab === 'anlaesse' && <EventsPanel departments={departments ?? []} />}
+      {tab === 'protokoll' && <AuditPanel />}
+      {tab === 'personen' && (
+        <UsersPanel key={usersReload} currentUserId={user.id} overview={overview} onChanged={refresh} />
+      )}
+
+      <DepartmentDialog
+        departmentId={openDepartment}
+        onClose={() => setOpenDepartment(null)}
+        onChanged={() => {
+          refresh();
+          setUsersReload((n) => n + 1);
+        }}
+      />
+      <UserDialog preview={openUser} currentUserId={user.id} onClose={() => setOpenUser(null)} onChanged={refresh} />
     </Shell>
   );
 }

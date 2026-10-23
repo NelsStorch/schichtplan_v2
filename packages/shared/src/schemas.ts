@@ -48,7 +48,7 @@ export const ImageUrlSchema = z
 /** Akzentfarbe als #rrggbb */
 export const HexColorSchema = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Farbe im Format #rrggbb');
 
-const DepartmentSlugSchema = z
+export const DepartmentSlugSchema = z
   .string()
   .min(3, 'Subdomain muss mindestens 3 Zeichen lang sein')
   .max(30, 'Subdomain darf maximal 30 Zeichen lang sein')
@@ -510,3 +510,46 @@ export const ResetPasswordSchema = z.object({
 });
 
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin-Portal (nur globale Admins)
+// ---------------------------------------------------------------------------
+
+const CeviDbGroupIdSchema = z.number().int().positive().max(2_147_483_647);
+
+/** Abteilung durch globale Admins anlegen (ohne Cevi.DB-Prüfung), optional mit erster Abteilungsleitung */
+export const AdminCreateDepartmentSchema = z.object({
+  name: z.string().trim().min(2, 'Name muss mindestens 2 Zeichen lang sein').max(80),
+  slug: DepartmentSlugSchema,
+  ceviDbGroupId: CeviDbGroupIdSchema.optional().nullable(),
+  contactEmail: z.string().trim().email('Ungültige E-Mail-Adresse').max(254).optional().nullable(),
+  membersOnly: z.boolean().default(true),
+  leaderUserId: z.string().uuid().optional().nullable(),
+});
+
+export type AdminCreateDepartmentInput = z.infer<typeof AdminCreateDepartmentSchema>;
+
+export const AdminUpdateDepartmentSchema = UpdateDepartmentSchema.extend({
+  slug: DepartmentSlugSchema.optional(),
+  ceviDbGroupId: CeviDbGroupIdSchema.optional().nullable(),
+});
+
+export type AdminUpdateDepartmentInput = z.infer<typeof AdminUpdateDepartmentSchema>;
+
+/** Löschen nur mit der Subdomain bzw. dem Anlass-Kürzel als Bestätigung */
+export const AdminConfirmDeleteSchema = z.object({
+  confirm: z.string().trim().min(1, 'Bestätigung fehlt').max(100),
+});
+
+export const AdminSetMemberRoleSchema = z.object({
+  role: z.enum(['ADMIN', 'PLANNER', 'HELPER']),
+});
+
+export const AdminUpdateUserSchema = z.object({
+  isGlobalAdmin: z.boolean().optional(),
+});
+
+export const AdminUpdateEventSchema = z.object({
+  isPublished: z.boolean().optional(),
+  allowPublicSignup: z.boolean().optional(),
+});
