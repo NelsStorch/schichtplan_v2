@@ -164,6 +164,7 @@ export const CreateEventSchema = z.object({
   signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
+  overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
 });
 
@@ -192,6 +193,7 @@ export const UpdateEventSchema = z.object({
   signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
+  overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
   requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).optional(),
@@ -390,6 +392,7 @@ export const InstantiateTemplateSchema = z.object({
   signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
+  overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
 });
 
 export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;

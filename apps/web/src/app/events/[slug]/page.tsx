@@ -272,6 +272,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   const findConflictingShift = (targetShift: ShiftDto) => {
     if (!user || !event?.shifts) return null;
+    const tolerance = event.overlapToleranceMinutes ?? 15;
     const sStart = new Date(targetShift.startTime).getTime();
     const sEnd = new Date(targetShift.endTime).getTime();
     return (
@@ -281,9 +282,42 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         if (!isSignedUp) return false;
         const otherStart = new Date(other.startTime).getTime();
         const otherEnd = new Date(other.endTime).getTime();
-        return sStart < otherEnd && sEnd > otherStart;
+
+        // Keine Überlappung
+        if (sStart >= otherEnd || otherStart >= sEnd) return false;
+
+        // Verschachtelung (liegt komplett in der anderen) = IMMER Kollision
+        const isNested = (sStart <= otherStart && sEnd >= otherEnd) || (otherStart <= sStart && otherEnd >= sEnd);
+        if (isNested) return true;
+
+        // Überlappungszeit in Minuten
+        const overlapMinutes = (Math.min(sEnd, otherEnd) - Math.max(sStart, otherStart)) / (60 * 1000);
+        return overlapMinutes > tolerance;
       }) || null
     );
+  };
+
+  const findShiftHandover = (targetShift: ShiftDto) => {
+    if (!user || !event?.shifts) return null;
+    const tolerance = event.overlapToleranceMinutes ?? 15;
+    if (tolerance <= 0) return null;
+    const sStart = new Date(targetShift.startTime).getTime();
+    const sEnd = new Date(targetShift.endTime).getTime();
+    for (const other of event.shifts) {
+      if (other.id === targetShift.id) continue;
+      const isSignedUp = (other.signups ?? []).some((su) => su.userId === user.id);
+      if (!isSignedUp) continue;
+      const otherStart = new Date(other.startTime).getTime();
+      const otherEnd = new Date(other.endTime).getTime();
+      if (sStart >= otherEnd || otherStart >= sEnd) continue;
+      const isNested = (sStart <= otherStart && sEnd >= otherEnd) || (otherStart <= sStart && otherEnd >= sEnd);
+      if (isNested) continue;
+      const overlapMinutes = Math.round((Math.min(sEnd, otherEnd) - Math.max(sStart, otherStart)) / (60 * 1000));
+      if (overlapMinutes > 0 && overlapMinutes <= tolerance) {
+        return { otherShift: other, overlapMinutes };
+      }
+    }
+    return null;
   };
 
   const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto, answers?: Record<string, string>) => {
@@ -293,9 +327,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         method: 'POST',
         json: { taskId: task && task.id !== 'default' ? task.id : undefined, answers },
       });
+      const handover = findShiftHandover(shift);
+      const handoverDesc = handover
+        ? ` (${handover.overlapMinutes} Min. Übergabe mit «${handover.otherShift.title}»)`
+        : '';
       toast({
         title: 'Du bist eingetragen!',
-        description: `${shift.title}${task && task.title !== shift.title ? ` · ${task.title}` : ''}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
+        description: `${shift.title}${task && task.title !== shift.title ? ` · ${task.title}` : ''}${handoverDesc}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
       });
       await load();
     } catch (err) {
@@ -435,6 +473,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     canSignup: showSignup,
     isMine,
     hasConflict: (shift) => Boolean(findConflictingShift(shift)),
+    getHandover: (shift) => findShiftHandover(shift),
     busyShiftId: busyShift,
     contactName: event?.contactUser?.displayName,
     dayResponsibles: event?.dayResponsibles,

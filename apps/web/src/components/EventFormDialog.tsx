@@ -30,6 +30,7 @@ export interface EventFormValues {
   allowPublicSignup: boolean;
   minShiftsPerPerson: number | null;
   cancelDeadlineDays: number | null;
+  overlapToleranceMinutes: number;
   contactUserId: string | null;
   dayCutoffTime: string;
   responsibleMode: 'BY_SHIFT' | 'BY_DAY';
@@ -52,6 +53,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     allowPublicSignup: event.allowPublicSignup,
     minShiftsPerPerson: event.minShiftsPerPerson ?? null,
     cancelDeadlineDays: event.cancelDeadlineDays ?? null,
+    overlapToleranceMinutes: event.overlapToleranceMinutes ?? 15,
     contactUserId: event.contactUserId ?? null,
     dayCutoffTime: event.dayCutoffTime ?? '04:00',
     responsibleMode: event.responsibleMode ?? 'BY_SHIFT',
@@ -109,6 +111,7 @@ const EMPTY: EventFormValues = {
   allowPublicSignup: true,
   minShiftsPerPerson: null,
   cancelDeadlineDays: null,
+  overlapToleranceMinutes: 15,
   contactUserId: null,
   dayCutoffTime: '04:00',
   responsibleMode: 'BY_SHIFT',
@@ -258,6 +261,7 @@ export function EventForm({
             (form.cancelDeadlineDays as unknown as string) !== ''
               ? Number(form.cancelDeadlineDays)
               : null,
+          overlapToleranceMinutes: form.overlapToleranceMinutes ?? 15,
           contactUserId: form.contactUserId || null,
           dayCutoffTime: form.dayCutoffTime || '04:00',
           responsibleMode: form.responsibleMode,
@@ -424,6 +428,7 @@ export function EventForm({
           (form.cancelDeadlineDays as unknown as string) !== ''
             ? Number(form.cancelDeadlineDays)
             : null,
+        overlapToleranceMinutes: form.overlapToleranceMinutes ?? 15,
         contactUserId: form.contactUserId || null,
         dayCutoffTime: form.dayCutoffTime || '04:00',
         responsibleMode: form.responsibleMode,
@@ -544,6 +549,7 @@ export function EventForm({
                         slug: slugify(cleanTitle),
                         description: found.description || '',
                         cancelDeadlineDays: found.cancelDeadlineDays ?? null,
+                        overlapToleranceMinutes: found.overlapToleranceMinutes ?? 15,
                         access: {
                           accessType: found.accessType,
                           leadersOnly: found.leadersOnly,
@@ -852,6 +858,22 @@ export function EventForm({
               set('cancelDeadlineDays', val === '' ? null : Math.max(0, parseInt(val, 10) || 0));
             }}
           />
+        </Field>
+
+        <Field
+          label="Schicht-Überlappung für Übergaben"
+          hint="Erlaubt es Helfenden, sich für zwei aufeinanderfolgende Schichten einzutragen, die sich um wenige Minuten zur Einweisung/Übergabe überschneiden."
+        >
+          <Select
+            value={form.overlapToleranceMinutes ?? 15}
+            onChange={(e) => set('overlapToleranceMinutes', Number(e.target.value))}
+          >
+            <option value={0}>0 Minuten (Strikte Trennung, keine Überlappung)</option>
+            <option value={10}>10 Minuten</option>
+            <option value={15}>15 Minuten (Empfohlen für Feste, Chilbi & Lager)</option>
+            <option value={20}>20 Minuten</option>
+            <option value={30}>30 Minuten</option>
+          </Select>
         </Field>
 
         <Field

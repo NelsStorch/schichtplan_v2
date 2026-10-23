@@ -11,6 +11,7 @@ export interface ShiftActions {
   canSignup: boolean;
   isMine: (shift: ShiftDto) => boolean;
   hasConflict?: (shift: ShiftDto) => boolean;
+  getHandover?: (shift: ShiftDto) => { otherShift: ShiftDto; overlapMinutes: number } | null;
   busyShiftId: string | null;
   contactName?: string | null;
   dayResponsibles?: Record<string, { id: string; displayName: string }[]>;
@@ -59,6 +60,7 @@ export function NeededShifts({
         {needed.slice(0, limit).map(({ shift, stats }) => {
           const openTasks = shiftTasks(shift).filter((t) => t.filled < t.requiredSlots);
           const mine = actions.isMine(shift);
+          const handover = !mine ? actions.getHandover?.(shift) : null;
           return (
             <li key={shift.id}>
               <div
@@ -111,17 +113,27 @@ export function NeededShifts({
                       <AlertCircle className="size-4 text-warning" />
                     </span>
                   ) : actions.canSignup ? (
-                    <Button
-                      size="icon-sm"
-                      aria-label={`In ${shift.title} eintragen`}
-                      loading={actions.busyShiftId === shift.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        actions.onQuickSignup(shift);
-                      }}
-                    >
-                      <Plus />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {handover && (
+                        <span
+                          title={`Überschneidet sich um ${handover.overlapMinutes} Min. mit «${handover.otherShift.title}» zur Übergabe`}
+                          className="hidden sm:inline-flex items-center rounded-full bg-accent/15 px-1.5 py-0.5 text-2xs font-semibold text-accent-ink"
+                        >
+                          {handover.overlapMinutes}m
+                        </span>
+                      )}
+                      <Button
+                        size="icon-sm"
+                        aria-label={`In ${shift.title} eintragen`}
+                        loading={actions.busyShiftId === shift.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          actions.onQuickSignup(shift);
+                        }}
+                      >
+                        <Plus />
+                      </Button>
+                    </div>
                   ) : (
                     <ChevronRight className="size-4 text-fg-subtle" />
                   )}
@@ -146,6 +158,7 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
         const mine = actions.isMine(shift);
         const style = STATUS_STYLES[stats.status];
         const isFull = stats.free === 0;
+        const handover = !mine ? actions.getHandover?.(shift) : null;
         const dayKey = businessDayKey(shift.startTime, actions.dayCutoffTime);
         const responsibles =
           actions.responsibleMode === 'BY_DAY'
@@ -255,17 +268,27 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
                       <span className="hidden sm:inline">Kollision</span>
                     </span>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      loading={actions.busyShiftId === shift.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        actions.onQuickSignup(shift);
-                      }}
-                    >
-                      <Plus /> <span className="hidden sm:inline">Eintragen</span>
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      {handover && (
+                        <span
+                          title={`Überschneidet sich um ${handover.overlapMinutes} Min. mit «${handover.otherShift.title}» zur Schichtübergabe`}
+                          className="hidden md:inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-2xs font-semibold text-accent-ink"
+                        >
+                          {handover.overlapMinutes}m Übergabe
+                        </span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={actions.busyShiftId === shift.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          actions.onQuickSignup(shift);
+                        }}
+                      >
+                        <Plus /> <span className="hidden sm:inline">Eintragen</span>
+                      </Button>
+                    </div>
                   )
                 )}
               </div>
@@ -276,3 +299,5 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
     </ul>
   );
 }
+
+export const ShiftList = ShiftRows;

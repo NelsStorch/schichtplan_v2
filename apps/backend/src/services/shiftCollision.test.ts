@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { doIntervalsOverlap, formatZurichTime } from './shiftCollision.js';
+import { doIntervalsOverlap, hasShiftCollision, formatZurichTime } from './shiftCollision.js';
 
 describe('shiftCollision service', () => {
   describe('doIntervalsOverlap', () => {
@@ -45,28 +45,83 @@ describe('shiftCollision service', () => {
           '2026-10-24T14:00:00Z'
         )
       ).toBe(false);
+    });
+  });
 
-      // 12:00 - 14:00 und 10:00 - 12:00
+  describe('hasShiftCollision mit Übergabe-Toleranz', () => {
+    it('erlaubt Übergabeüberlappung innerhalb der Toleranz', () => {
+      // Schicht 1: 08:00 - 11:00, Schicht 2: 10:45 - 14:00 (15 Min. Überlappung)
+      // Bei Toleranz 15 Min. -> KEINE Kollision
       expect(
-        doIntervalsOverlap(
-          '2026-10-24T12:00:00Z',
+        hasShiftCollision(
+          '2026-10-24T08:00:00Z',
+          '2026-10-24T11:00:00Z',
+          '2026-10-24T10:45:00Z',
           '2026-10-24T14:00:00Z',
-          '2026-10-24T10:00:00Z',
-          '2026-10-24T12:00:00Z'
+          15
+        )
+      ).toBe(false);
+
+      // Schicht 3: 13:45 - 17:00, Schicht 4: 16:50 - 20:00 (10 Min. Überlappung)
+      // Bei Toleranz 15 Min. -> KEINE Kollision
+      expect(
+        hasShiftCollision(
+          '2026-10-24T13:45:00Z',
+          '2026-10-24T17:00:00Z',
+          '2026-10-24T16:50:00Z',
+          '2026-10-24T20:00:00Z',
+          15
         )
       ).toBe(false);
     });
 
-    it('erkennt getrennte Schichten ohne Überschneidung', () => {
-      // 10:00 - 12:00 und 14:00 - 16:00
+    it('blockiert Überschreitung der Toleranz', () => {
+      // 30 Min. Überlappung bei 15 Min. Toleranz -> KOLLISION
       expect(
-        doIntervalsOverlap(
-          '2026-10-24T10:00:00Z',
-          '2026-10-24T12:00:00Z',
+        hasShiftCollision(
+          '2026-10-24T08:00:00Z',
+          '2026-10-24T11:00:00Z',
+          '2026-10-24T10:30:00Z',
           '2026-10-24T14:00:00Z',
-          '2026-10-24T16:00:00Z'
+          15
         )
-      ).toBe(false);
+      ).toBe(true);
+
+      // 15 Min. Überlappung bei 10 Min. Toleranz -> KOLLISION
+      expect(
+        hasShiftCollision(
+          '2026-10-24T08:00:00Z',
+          '2026-10-24T11:00:00Z',
+          '2026-10-24T10:45:00Z',
+          '2026-10-24T14:00:00Z',
+          10
+        )
+      ).toBe(true);
+    });
+
+    it('blockiert vollständig verschachtelte Schichten trotz Toleranz', () => {
+      // Schicht B (10:00 - 10:10 = 10 Min) liegt komplett in Schicht A (09:00 - 12:00)
+      // Das ist kein Übergang, sondern echte Doppelbelegung -> KOLLISION
+      expect(
+        hasShiftCollision(
+          '2026-10-24T09:00:00Z',
+          '2026-10-24T12:00:00Z',
+          '2026-10-24T10:00:00Z',
+          '2026-10-24T10:10:00Z',
+          15
+        )
+      ).toBe(true);
+
+      // Umgekehrte Reihenfolge der Argumente
+      expect(
+        hasShiftCollision(
+          '2026-10-24T10:00:00Z',
+          '2026-10-24T10:10:00Z',
+          '2026-10-24T09:00:00Z',
+          '2026-10-24T12:00:00Z',
+          15
+        )
+      ).toBe(true);
     });
   });
 

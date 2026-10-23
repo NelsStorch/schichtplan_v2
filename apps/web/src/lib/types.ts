@@ -78,6 +78,7 @@ export interface EventDetails {
   contactVisibility?: EventContactVisibility;
   signupOpensAt?: string | null;
   cancelDeadlineDays?: number | null;
+  overlapToleranceMinutes?: number;
   attendanceMode?: AttendanceMode;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
   checkinToken?: string | null;

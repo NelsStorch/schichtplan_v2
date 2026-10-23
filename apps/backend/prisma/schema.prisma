@@ -186,6 +186,8 @@ model Event {
   signupOpensAt     DateTime?         @map("signup_opens_at")
   // Austrage-Sperre in Tagen vor Anlassbeginn (null = keine Sperre, 0 = bis Anlassbeginn, z. B. 3 = bis 3 Tage vorher)
   cancelDeadlineDays Int?             @map("cancel_deadline_days")
+  // Erlaubte Schicht-Überlappung für Übergaben in Minuten (Standard: 15)
+  overlapToleranceMinutes Int         @default(15) @map("overlap_tolerance_minutes")
   // Anwesenheit: "OFF", "OK_ONLY" (nur das OK hakt ab) oder "OK_AND_QR" (zusätzlich Selbst-Check-in per QR-Code)
   attendanceMode    String            @default("OFF") @map("attendance_mode")
   // Geheimer Code im QR-Link für den Selbst-Check-in (erneuerbar, alte Plakate werden damit ungültig)
@@ -413,6 +415,7 @@ model EventTemplate {
   requiredFields        String[]   @default([]) @map("required_fields")
   minShiftsPerPerson    Int?       @map("min_shifts_per_person")
   cancelDeadlineDays    Int?       @map("cancel_deadline_days")
+  overlapToleranceMinutes Int      @default(15) @map("overlap_tolerance_minutes")
   data                  Json       // Relative Struktur für Schichten und Arbeiten, dazu eigene Fragen und Zugangslisten
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt

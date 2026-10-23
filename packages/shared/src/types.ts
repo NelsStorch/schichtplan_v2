@@ -78,6 +78,7 @@ export interface EventDto {
   checkinToken?: string | null;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   cancelDeadlineDays?: number | null;
+  overlapToleranceMinutes?: number;
   createdAt: string;
   shiftCount?: number;
   /** Summe der benötigten bzw. besetzten Plätze über alle Schichten */
@@ -207,6 +208,7 @@ export interface EventTemplateDto {
   requiredFields: RequiredProfileField[];
   minShiftsPerPerson?: number | null;
   cancelDeadlineDays?: number | null;
+  overlapToleranceMinutes?: number;
   shiftCount: number;
   data: EventTemplateData;
   createdAt: string;

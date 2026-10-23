@@ -359,6 +359,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         contactVisibility,
         signupOpensAt: event.signupOpensAt ? event.signupOpensAt.toISOString() : null,
         cancelDeadlineDays: event.cancelDeadlineDays ?? null,
+        overlapToleranceMinutes: event.overlapToleranceMinutes ?? 15,
         attendanceMode: event.attendanceMode,
         checkinToken: access.isManager ? event.checkinToken : null,
         audience: audienceLabel(event, request.tenant.name),
@@ -523,6 +524,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         contactVisibility,
         signupOpensAt,
         cancelDeadlineDays,
+        overlapToleranceMinutes,
         attendanceMode,
         allowedDepartmentIds,
         allowedStufeIds,
@@ -643,6 +645,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             contactVisibility: contactVisibility || 'BOTH',
             signupOpensAt: signupOpensAt ? new Date(signupOpensAt) : null,
             cancelDeadlineDays: cancelDeadlineDays ?? null,
+            overlapToleranceMinutes: overlapToleranceMinutes ?? 15,
             attendanceMode: attendanceMode ?? 'OFF',
             checkinToken: attendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
             organizers: {
@@ -789,6 +792,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             contactVisibility: body.contactVisibility !== undefined ? body.contactVisibility : undefined,
             signupOpensAt: body.signupOpensAt !== undefined ? (body.signupOpensAt ? new Date(body.signupOpensAt) : null) : undefined,
             cancelDeadlineDays: body.cancelDeadlineDays !== undefined ? body.cancelDeadlineDays : undefined,
+            overlapToleranceMinutes: body.overlapToleranceMinutes !== undefined ? body.overlapToleranceMinutes : undefined,
             attendanceMode: body.attendanceMode,
             // Beim ersten Einschalten des Selbst-Check-ins einen Code erzeugen; der bestehende bleibt sonst gültig
             checkinToken:
@@ -812,6 +816,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         contactVisibility: updated.contactVisibility,
         signupOpensAt: updated.signupOpensAt ? updated.signupOpensAt.toISOString() : null,
         cancelDeadlineDays: updated.cancelDeadlineDays,
+        overlapToleranceMinutes: updated.overlapToleranceMinutes,
         attendanceMode: updated.attendanceMode,
       };
     }
@@ -1296,6 +1301,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           requiredFields: event.requiredFields,
           minShiftsPerPerson: event.minShiftsPerPerson ?? null,
           cancelDeadlineDays: event.cancelDeadlineDays ?? null,
+          overlapToleranceMinutes: event.overlapToleranceMinutes ?? 15,
           data: {
             shifts: shiftTemplates,
             dayCutoffTime: event.dayCutoffTime,
