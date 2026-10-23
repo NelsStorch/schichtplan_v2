@@ -101,7 +101,9 @@ describe.skipIf(!hasTestDb)('Rechte bei Anlässen', () => {
       tenant: department.slug,
       cookie: authCookie(app, outsider),
     });
-    expect(detail.statusCode).toBe(404);
+    expect(detail.statusCode).toBe(403);
+    expect(detail.json().code).toBe('MEMBERS_ONLY');
+    expect(detail.json().title).toBeUndefined();
 
     const own = await inject(app, { method: 'GET', url: '/api/events', tenant: department.slug, cookie: authCookie(app, insider) });
     expect(own.statusCode).toBe(200);

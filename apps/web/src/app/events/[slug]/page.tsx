@@ -4,12 +4,14 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  Building2,
   CalendarDays,
   CalendarSearch,
   Check,
   Crown,
   LayoutGrid,
   List,
+  Lock,
   LogIn,
   Palette,
   Plus,
@@ -49,7 +51,7 @@ import { NeededShifts, ShiftRows, type ShiftActions } from '@/components/event/S
 import { shiftStats, shiftTasks } from '@/components/event/shift-utils';
 import { AssignHelperDialog, DayResponsiblesDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { ShiftDetailsDialog } from '@/components/ShiftDetailsDialog';
-import { ApiError, api, errorMessage, loginUrl, useLoginHref } from '@/lib/api';
+import { ApiError, api, departmentSetupUrl, errorMessage, loginUrl, useLoginHref } from '@/lib/api';
 import {
   dayKeyToIso,
   fmtDateRange,
@@ -75,6 +77,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Interner Anlass einer Abteilung «nur für Mitglieder», die Person gehört (noch) nicht dazu
+  const [membersOnly, setMembersOnly] = useState(false);
   // Nicht ladbares Event-Logo -> Cevi-Standardlogo
   const [brokenLogo, setBrokenLogo] = useState<string | null>(null);
   const [view, setView] = useState<View>('list');
@@ -135,6 +139,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         await api<EventDetails>(`/api/events/${slug}${token ? `?zugang=${encodeURIComponent(token)}` : ''}`)
       );
     } catch (err) {
+      if (err instanceof ApiError && err.data.code === 'MEMBERS_ONLY') {
+        setMembersOnly(true);
+        return;
+      }
       setError(err instanceof ApiError && err.status === 404 ? 'Diesen Anlass gibt es nicht (mehr).' : errorMessage(err));
     }
   }, [slug]);
@@ -169,6 +177,37 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     () => event?.shifts.find((s) => s.id === selectedShiftId) ?? null,
     [event, selectedShiftId]
   );
+
+  if (membersOnly) {
+    // Nach dem Anmelden lädt die Seite neu (Rückleitung), dann klappt es für Mitglieder
+    if (portalLoading) return <EventSkeleton />;
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-xl px-4 pt-16 sm:px-6 sm:pt-24">
+          <EmptyState
+            icon={<Lock />}
+            title="Nur für Mitglieder"
+            description={
+              user
+                ? `Diesen Anlass sehen nur Mitglieder von ${department?.name ?? 'dieser Abteilung'}. Gehörst du dazu, gib deine Abteilung an. Sonst frag das OK nach einem Link.`
+                : `Diesen Anlass sehen nur Mitglieder von ${department?.name ?? 'dieser Abteilung'}. Melde dich an, dann siehst du ihn, wenn du dazugehörst.`
+            }
+            action={
+              user ? (
+                <a href={departmentSetupUrl()} className={buttonClasses({})}>
+                  <Building2 /> Abteilung angeben
+                </a>
+              ) : (
+                <a href={loginHref} className={buttonClasses({})}>
+                  <LogIn /> Anmelden
+                </a>
+              )
+            }
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (error) {
     return (

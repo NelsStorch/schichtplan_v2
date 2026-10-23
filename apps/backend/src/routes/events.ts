@@ -299,7 +299,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       const hasGrant = viewer ? await hasValidGrant(fastify.prisma, event.id, viewer.id) : false;
       const access = evaluateEventAccess(event, request.tenant.name, viewer, flags, hasGrant);
 
-      // «Nur für Mitglieder»: interne Anlässe sind für Aussenstehende unsichtbar (404), ausser mit Zugangs-Link.
+      // «Nur für Mitglieder»: interne Anlässe zeigen Aussenstehenden keine Details (403, ohne Anlass-Daten),
+      // ausser mit Zugangs-Link. Kein 404, sonst meinen Leute, der Link sei kaputt, statt sich anzumelden.
       // Öffentliche Anlässe (scope ANY) bleiben über ihren direkten Link für alle erreichbar.
       if (
         request.tenant.membersOnly &&
@@ -309,7 +310,13 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         !(await isValidLinkToken(event.id, request.query.zugang)) &&
         !(await isDepartmentInsider(fastify.prisma, request.tenant.id, viewer?.id))
       ) {
-        return reply.status(404).send({ error: 'Event nicht gefunden' });
+        reply.header('Cache-Control', 'no-store');
+        return reply.status(403).send({
+          error: viewer
+            ? 'Dieser Anlass ist nur für Mitglieder der Abteilung.'
+            : 'Dieser Anlass ist nur für Mitglieder der Abteilung. Bitte melde dich an.',
+          code: 'MEMBERS_ONLY',
+        });
       }
 
       const answers = Object.fromEntries((viewer?.eventAnswers ?? []).map((a) => [a.questionId, a.value]));
