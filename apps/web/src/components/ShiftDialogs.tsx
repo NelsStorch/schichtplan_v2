@@ -55,7 +55,7 @@ function FormActions({
   isDirty?: boolean;
 }) {
   return (
-    <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-line-strong bg-surface/95 px-5 py-3.5 backdrop-blur sm:-mx-7 sm:-mb-6 sm:px-7 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between shadow-lift z-10">
+    <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-xs">
         {isDirty ? (
           <span className="flex items-center gap-1.5 font-medium text-accent-ink">
@@ -65,7 +65,7 @@ function FormActions({
         ) : null}
       </div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="ghost" onClick={onCancel} type="button">
           Abbrechen
         </Button>
         <Button type="submit" loading={saving}>
@@ -112,6 +112,7 @@ export function ShiftFormDialog({
 }) {
   const confirm = useConfirm();
   const [isDirty, setIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
   const isEdit = Boolean(shift);
 
   const handleClose = async () => {
@@ -136,6 +137,26 @@ export function ShiftFormDialog({
       icon={isEdit ? <Clock /> : <Plus />}
       title={isEdit ? 'Schicht bearbeiten' : 'Neue Schicht'}
       description={`Für ${event.title}`}
+      footer={
+        <div className="flex w-full sm:!w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs">
+            {isDirty ? (
+              <span className="flex items-center gap-1.5 font-medium text-accent-ink">
+                <span className="size-2 rounded-full bg-accent animate-pulse" />
+                Ungespeicherte Änderungen
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" type="button" onClick={handleClose}>
+              Abbrechen
+            </Button>
+            <Button type="submit" form="shift-form" loading={saving}>
+              {isEdit ? 'Änderungen speichern' : 'Schicht anlegen'}
+            </Button>
+          </div>
+        </div>
+      }
     >
       <ShiftForm
         event={event}
@@ -146,6 +167,8 @@ export function ShiftFormDialog({
           onSaved();
         }}
         onDirtyChange={setIsDirty}
+        onSavingChange={setSaving}
+        formId="shift-form"
       />
     </Dialog>
   );
@@ -157,12 +180,16 @@ function ShiftForm({
   onCancel,
   onSaved,
   onDirtyChange,
+  onSavingChange,
+  formId,
 }: {
   event: EventDetails;
   shift?: ShiftDto | null;
   onCancel: () => void;
   onSaved: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onSavingChange?: (saving: boolean) => void;
+  formId?: string;
 }) {
   const toast = useToast();
   const isEdit = Boolean(shift);
@@ -314,13 +341,26 @@ function ShiftForm({
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    onSavingChange?.(true);
     setError(null);
+
+    if (!form.title.trim()) {
+      const msg = 'Bitte gib einen Schichttitel an.';
+      setError(msg);
+      toast({ tone: 'error', title: msg });
+      setSaving(false);
+      onSavingChange?.(false);
+      return;
+    }
 
     // Validierung
     for (const t of tasks) {
       if (!t.title.trim()) {
-        setError('Jede Arbeit muss einen Namen haben (z.B. Grill, Bar, Kasse).');
+        const msg = 'Jede Arbeit muss einen Namen haben (z.B. Grill, Bar, Kasse).';
+        setError(msg);
+        toast({ tone: 'error', title: msg });
         setSaving(false);
+        onSavingChange?.(false);
         return;
       }
     }
@@ -364,15 +404,20 @@ function ShiftForm({
         toast({ title: 'Schicht angelegt', description: form.title });
       }
 
+      setSaving(false);
+      onSavingChange?.(false);
       onSaved();
     } catch (err) {
-      setError(errorMessage(err));
+      const msg = errorMessage(err);
+      setError(msg);
+      toast({ tone: 'error', title: 'Fehler beim Speichern', description: msg });
       setSaving(false);
+      onSavingChange?.(false);
     }
   };
 
   return (
-    <form onSubmit={submit} className="space-y-5">
+    <form id={formId} onSubmit={submit} className="space-y-5">
       {error && <Callout tone="danger">{error}</Callout>}
 
       <Field label="Schichttitel" required>
@@ -673,7 +718,9 @@ function ShiftForm({
         />
       </Field>
 
-      <FormActions onCancel={onCancel} saving={saving} label={isEdit ? 'Änderungen speichern' : 'Schicht anlegen'} isDirty={isDirty} />
+      {!formId && (
+        <FormActions onCancel={onCancel} saving={saving} label={isEdit ? 'Änderungen speichern' : 'Schicht anlegen'} isDirty={isDirty} />
+      )}
     </form>
   );
 }
