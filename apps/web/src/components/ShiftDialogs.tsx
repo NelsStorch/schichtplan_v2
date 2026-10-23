@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
+  AlertCircle,
+  Check,
   Clock,
   Copy,
   Crown,
+  Loader2,
   Minus,
   Plus,
   Shield,
@@ -97,6 +100,13 @@ export interface TaskFormItem {
   description: string;
 }
 
+export interface ShiftFormStatus {
+  isDirty: boolean;
+  autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error';
+  validationError: string | null;
+  hasSavedChanges: boolean;
+}
+
 export function ShiftFormDialog({
   open,
   event,
@@ -111,12 +121,66 @@ export function ShiftFormDialog({
   onSaved: () => void;
 }) {
   const confirm = useConfirm();
-  const [isDirty, setIsDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const toast = useToast();
   const isEdit = Boolean(shift);
 
+  const saveRef = useRef<(() => Promise<boolean>) | null>(null);
+  const validationRef = useRef<(() => string | null) | null>(null);
+
+  const [status, setStatus] = useState<ShiftFormStatus>({
+    isDirty: false,
+    autoSaveStatus: 'idle',
+    validationError: null,
+    hasSavedChanges: false,
+  });
+
+  const handleFinish = async () => {
+    if (isEdit) {
+      if (status.isDirty) {
+        const err = validationRef.current?.();
+        if (err) {
+          toast({ tone: 'error', title: 'Bitte Eingaben korrigieren', description: err });
+          return;
+        }
+        const ok = await saveRef.current?.();
+        if (!ok) return;
+      }
+      if (status.hasSavedChanges || status.autoSaveStatus === 'saved') {
+        onSaved();
+      } else {
+        onClose();
+      }
+      return;
+    }
+  };
+
   const handleClose = async () => {
-    if (isDirty) {
+    if (isEdit) {
+      if (status.isDirty) {
+        const err = validationRef.current?.();
+        if (err) {
+          const ok = await confirm({
+            title: 'Ungültige Änderungen verwerfen?',
+            description: `Die Schicht hat noch Fehler (${err}) und kann so nicht automatisch gespeichert werden. Möchtest du diese Änderungen verwerfen?`,
+            confirmLabel: 'Änderungen verwerfen',
+            cancelLabel: 'Weiter bearbeiten',
+            tone: 'danger',
+          });
+          if (!ok) return;
+        } else {
+          await saveRef.current?.();
+        }
+      }
+      if (status.hasSavedChanges || status.autoSaveStatus === 'saved') {
+        onSaved();
+      } else {
+        onClose();
+      }
+      return;
+    }
+
+    // Neuerstellung:
+    if (status.isDirty) {
       const ok = await confirm({
         title: 'Änderungen verwerfen?',
         description: 'Du hast ungespeicherte Eingaben an dieser Schicht. Möchtest du wirklich abbrechen?',
@@ -126,7 +190,6 @@ export function ShiftFormDialog({
       });
       if (!ok) return;
     }
-    setIsDirty(false);
     onClose();
   };
 
@@ -140,20 +203,58 @@ export function ShiftFormDialog({
       footer={
         <div className="flex w-full sm:!w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs">
-            {isDirty ? (
+            {isEdit ? (
+              status.autoSaveStatus === 'saving' ? (
+                <span className="flex items-center gap-1.5 font-medium text-fg-muted">
+                  <Loader2 className="size-3.5 animate-spin text-accent" />
+                  Wird gespeichert…
+                </span>
+              ) : status.isDirty && status.validationError ? (
+                <span className="flex items-center gap-1.5 font-medium text-warning-ink" title={status.validationError}>
+                  <AlertCircle className="size-3.5 text-warning" />
+                  {status.validationError}
+                </span>
+              ) : status.isDirty ? (
+                <span className="flex items-center gap-1.5 font-medium text-accent-ink">
+                  <span className="size-2 rounded-full bg-accent animate-pulse" />
+                  Wird gespeichert…
+                </span>
+              ) : status.autoSaveStatus === 'saved' || status.hasSavedChanges ? (
+                <span className="flex items-center gap-1.5 font-medium text-success-ink">
+                  <Check className="size-3.5 text-success" />
+                  Automatisch gespeichert
+                </span>
+              ) : status.autoSaveStatus === 'error' ? (
+                <span className="flex items-center gap-1.5 font-medium text-danger-ink">
+                  <AlertCircle className="size-3.5 text-danger" />
+                  Fehler beim Speichern
+                </span>
+              ) : (
+                <span className="text-fg-subtle">Änderungen werden automatisch gespeichert</span>
+              )
+            ) : status.isDirty ? (
               <span className="flex items-center gap-1.5 font-medium text-accent-ink">
                 <span className="size-2 rounded-full bg-accent animate-pulse" />
-                Ungespeicherte Änderungen
+                Ungespeicherte Eingaben
               </span>
             ) : null}
           </div>
+
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="ghost" type="button" onClick={handleClose}>
-              Abbrechen
-            </Button>
-            <Button type="submit" form="shift-form" loading={saving}>
-              {isEdit ? 'Änderungen speichern' : 'Schicht anlegen'}
-            </Button>
+            {isEdit ? (
+              <Button type="button" onClick={handleFinish} loading={status.autoSaveStatus === 'saving'}>
+                Fertig
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" type="button" onClick={handleClose}>
+                  Abbrechen
+                </Button>
+                <Button type="submit" form="shift-form" loading={status.autoSaveStatus === 'saving'}>
+                  Schicht anlegen
+                </Button>
+              </>
+            )}
           </div>
         </div>
       }
@@ -162,12 +263,10 @@ export function ShiftFormDialog({
         event={event}
         shift={shift}
         onCancel={handleClose}
-        onSaved={() => {
-          setIsDirty(false);
-          onSaved();
-        }}
-        onDirtyChange={setIsDirty}
-        onSavingChange={setSaving}
+        onSaved={onSaved}
+        onStatusChange={setStatus}
+        saveRef={saveRef}
+        validationRef={validationRef}
         formId="shift-form"
       />
     </Dialog>
@@ -179,16 +278,18 @@ function ShiftForm({
   shift,
   onCancel,
   onSaved,
-  onDirtyChange,
-  onSavingChange,
+  onStatusChange,
+  saveRef,
+  validationRef,
   formId,
 }: {
   event: EventDetails;
   shift?: ShiftDto | null;
   onCancel: () => void;
   onSaved: () => void;
-  onDirtyChange?: (dirty: boolean) => void;
-  onSavingChange?: (saving: boolean) => void;
+  onStatusChange?: (status: ShiftFormStatus) => void;
+  saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  validationRef?: React.MutableRefObject<(() => string | null) | null>;
   formId?: string;
 }) {
   const toast = useToast();
@@ -244,9 +345,6 @@ function ShiftForm({
       },
     ];
   });
-
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Aktualisiere Task 0 wenn Schichttitel sich ändert und nur 1 Task vorhanden ist
   const handleTitleChange = (newTitle: string) => {
@@ -323,47 +421,51 @@ function ShiftForm({
 
   const totalSlots = tasks.reduce((sum, t) => sum + (t.requiredSlots || 1), 0);
 
-  const [initialJson] = useState(() => ({
-    form: JSON.stringify(form),
-    tasks: JSON.stringify(tasks),
-    resp: JSON.stringify(responsibleUserIds),
-  }));
+  const [saving, setSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const hasSavedChangesRef = useRef(false);
 
-  const isDirty =
-    JSON.stringify(form) !== initialJson.form ||
-    JSON.stringify(tasks) !== initialJson.tasks ||
-    JSON.stringify(responsibleUserIds) !== initialJson.resp;
+  const lastSavedSnapshotRef = useRef<string>(
+    JSON.stringify({
+      form,
+      tasks,
+      resp: responsibleUserIds,
+    })
+  );
 
-  useEffect(() => {
-    onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
+  const currentSnapshot = JSON.stringify({ form, tasks, resp: responsibleUserIds });
+  const isDirty = currentSnapshot !== lastSavedSnapshotRef.current;
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    onSavingChange?.(true);
-    setError(null);
-
-    if (!form.title.trim()) {
-      const msg = 'Bitte gib einen Schichttitel an.';
-      setError(msg);
-      toast({ tone: 'error', title: msg });
-      setSaving(false);
-      onSavingChange?.(false);
-      return;
-    }
-
-    // Validierung
+  const getValidationError = (): string | null => {
+    if (form.title.trim().length < 2) return 'Titel muss mindestens 2 Zeichen haben';
+    if (!form.startTime || !form.endTime) return 'Zeiten unvollständig';
+    const s = new Date(form.startTime).getTime();
+    const e = new Date(form.endTime).getTime();
+    if (isNaN(s) || isNaN(e)) return 'Ungültige Zeitangabe';
+    if (e <= s) return 'Ende muss nach Beginn liegen';
     for (const t of tasks) {
-      if (!t.title.trim()) {
-        const msg = 'Jede Arbeit muss einen Namen haben (z.B. Grill, Bar, Kasse).';
-        setError(msg);
-        toast({ tone: 'error', title: msg });
-        setSaving(false);
-        onSavingChange?.(false);
-        return;
-      }
+      if (t.title.trim().length < 2) return `«${t.title || 'Arbeit'}» braucht mind. 2 Zeichen`;
+      if ((t.requiredSlots || 0) < 1) return `«${t.title}» braucht mind. 1 Platz`;
     }
+    return null;
+  };
+
+  const validationError = isDirty ? getValidationError() : null;
+
+  const performSave = async ({ silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
+    const validationErr = getValidationError();
+    if (validationErr) {
+      setError(validationErr);
+      if (!silent) {
+        toast({ tone: 'error', title: validationErr });
+      }
+      return false;
+    }
+
+    setSaving(true);
+    setAutoSaveStatus('saving');
+    setError(null);
 
     try {
       const payload = {
@@ -392,7 +494,12 @@ function ShiftForm({
           method: 'PATCH',
           json: payload,
         });
-        toast({ title: 'Schicht aktualisiert', description: form.title });
+        lastSavedSnapshotRef.current = JSON.stringify({ form, tasks, resp: responsibleUserIds });
+        setAutoSaveStatus('saved');
+        hasSavedChangesRef.current = true;
+        if (!silent) {
+          toast({ title: 'Schicht aktualisiert', description: form.title });
+        }
       } else {
         await api('/api/shifts', {
           method: 'POST',
@@ -402,18 +509,54 @@ function ShiftForm({
           },
         });
         toast({ title: 'Schicht angelegt', description: form.title });
+        onSaved();
       }
 
       setSaving(false);
-      onSavingChange?.(false);
-      onSaved();
+      return true;
     } catch (err) {
       const msg = errorMessage(err);
       setError(msg);
+      setAutoSaveStatus('error');
       toast({ tone: 'error', title: 'Fehler beim Speichern', description: msg });
       setSaving(false);
-      onSavingChange?.(false);
+      return false;
     }
+  };
+
+  // Auto-Save Effect (nur beim Bearbeiten bestehender Schichten)
+  useEffect(() => {
+    if (!isEdit || !shift) return;
+    if (!isDirty || saving) return;
+
+    // Nur speichern, wenn keine Validierungsfehler vorliegen
+    const validationErr = getValidationError();
+    if (validationErr) return;
+
+    const timer = setTimeout(async () => {
+      await performSave({ silent: true });
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [form, tasks, responsibleUserIds, isDirty, saving, isEdit, shift]);
+
+  useEffect(() => {
+    onStatusChange?.({
+      isDirty,
+      autoSaveStatus: saving ? 'saving' : autoSaveStatus,
+      validationError,
+      hasSavedChanges: hasSavedChangesRef.current,
+    });
+  }, [isDirty, saving, autoSaveStatus, validationError, onStatusChange]);
+
+  useEffect(() => {
+    if (saveRef) saveRef.current = () => performSave({ silent: true });
+    if (validationRef) validationRef.current = getValidationError;
+  });
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    await performSave({ silent: false });
   };
 
   return (
