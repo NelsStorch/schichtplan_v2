@@ -14,6 +14,8 @@ import type {
 export interface MyShift {
   signupId: string;
   shiftId: string;
+  taskId?: string | null;
+  taskTitle?: string | null;
   title: string;
   category: string;
   description?: string;
@@ -27,6 +29,9 @@ export interface MyShift {
   departmentName: string;
   departmentSlug: string;
   createdAt: string;
+  isSignup?: boolean;
+  isResponsible?: boolean;
+  responsibleRole?: string | null;
 }
 
 export interface EventOrganizer {

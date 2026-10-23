@@ -38,6 +38,9 @@ interface MyShift {
   eventSlug: string;
   departmentName: string;
   departmentSlug: string;
+  isSignup?: boolean;
+  isResponsible?: boolean;
+  responsibleRole?: string | null;
 }
 
 const dateFmt = new Intl.DateTimeFormat('de-CH', {
@@ -378,6 +381,11 @@ export default function ProfilePage() {
                           <span className="block truncate text-sm font-semibold">
                             {s.title}
                             {s.taskTitle && s.taskTitle !== s.title ? ` · ${s.taskTitle}` : ''}
+                            {s.isResponsible && (
+                              <span className="ml-2 inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-xs font-bold text-accent-ink">
+                                {s.responsibleRole || 'Leitung'}
+                              </span>
+                            )}
                           </span>
                           <span className="block truncate text-xs text-fg-subtle">
                             {dateFmt.format(new Date(s.startTime))} · {s.eventTitle} · {s.departmentName}

@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import {
   addZurichDays,
+  toZurichInput,
   BulkShiftsSchema,
   CreateShiftSchema,
   UpdateShiftSchema,
@@ -1094,52 +1095,191 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Meine Schichten abfragen
+  // Meine Schichten abfragen (inkl. Schichten, bei denen man Schichtleitung oder Tagesleitung ist)
   fastify.get(
     '/api/shifts/my',
     { preHandler: [fastify.authenticate] },
     async (request) => {
-      const signups = await fastify.prisma.shiftSignup.findMany({
-        where: { userId: request.user.id },
-        include: {
-          task: { select: { id: true, title: true } },
-          shift: {
-            include: {
-              event: {
-                select: {
-                  id: true,
-                  title: true,
-                  slug: true,
-                  startDate: true,
-                  cancelDeadlineDays: true,
-                  department: { select: { name: true, slug: true } },
+      const [signups, shiftResp, dayResp] = await Promise.all([
+        fastify.prisma.shiftSignup.findMany({
+          where: { userId: request.user.id },
+          include: {
+            task: { select: { id: true, title: true } },
+            shift: {
+              include: {
+                event: {
+                  select: {
+                    id: true,
+                    title: true,
+                    slug: true,
+                    startDate: true,
+                    cancelDeadlineDays: true,
+                    department: { select: { name: true, slug: true } },
+                  },
                 },
               },
             },
           },
-        },
-        orderBy: { shift: { startTime: 'asc' } },
-      });
+        }),
+        fastify.prisma.shiftResponsible.findMany({
+          where: { userId: request.user.id },
+          include: {
+            shift: {
+              include: {
+                event: {
+                  select: {
+                    id: true,
+                    title: true,
+                    slug: true,
+                    startDate: true,
+                    cancelDeadlineDays: true,
+                    department: { select: { name: true, slug: true } },
+                  },
+                },
+              },
+            },
+          },
+        }),
+        fastify.prisma.eventDayResponsible.findMany({
+          where: { userId: request.user.id },
+          include: {
+            event: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+                startDate: true,
+                cancelDeadlineDays: true,
+                department: { select: { name: true, slug: true } },
+                shifts: true,
+              },
+            },
+          },
+        }),
+      ]);
 
-      return signups.map((su) => ({
-        signupId: su.id,
-        shiftId: su.shift.id,
-        taskId: su.task?.id || null,
-        taskTitle: su.task?.title || null,
-        title: su.shift.title,
-        category: su.shift.category,
-        description: su.shift.description,
-        startTime: su.shift.startTime.toISOString(),
-        endTime: su.shift.endTime.toISOString(),
-        eventId: su.shift.event.id,
-        eventTitle: su.shift.event.title,
-        eventSlug: su.shift.event.slug,
-        eventStartDate: su.shift.event.startDate.toISOString(),
-        cancelDeadlineDays: su.shift.event.cancelDeadlineDays,
-        departmentName: su.shift.event.department.name,
-        departmentSlug: su.shift.event.department.slug,
-        createdAt: su.createdAt.toISOString(),
-      }));
+      interface MyShiftItem {
+        signupId: string;
+        shiftId: string;
+        taskId: string | null;
+        taskTitle: string | null;
+        title: string;
+        category: string | null;
+        description: string | null;
+        startTime: string;
+        endTime: string;
+        eventId: string;
+        eventTitle: string;
+        eventSlug: string;
+        eventStartDate: string;
+        cancelDeadlineDays: number | null;
+        departmentName: string;
+        departmentSlug: string;
+        createdAt: string;
+        isSignup: boolean;
+        isResponsible: boolean;
+        responsibleRole: string | null;
+      }
+
+      const map = new Map<string, MyShiftItem>();
+
+      for (const su of signups) {
+        map.set(su.shift.id, {
+          signupId: su.id,
+          shiftId: su.shift.id,
+          taskId: su.task?.id || null,
+          taskTitle: su.task?.title || null,
+          title: su.shift.title,
+          category: su.shift.category,
+          description: su.shift.description,
+          startTime: su.shift.startTime.toISOString(),
+          endTime: su.shift.endTime.toISOString(),
+          eventId: su.shift.event.id,
+          eventTitle: su.shift.event.title,
+          eventSlug: su.shift.event.slug,
+          eventStartDate: su.shift.event.startDate.toISOString(),
+          cancelDeadlineDays: su.shift.event.cancelDeadlineDays,
+          departmentName: su.shift.event.department.name,
+          departmentSlug: su.shift.event.department.slug,
+          createdAt: su.createdAt.toISOString(),
+          isSignup: true,
+          isResponsible: false,
+          responsibleRole: null,
+        });
+      }
+
+      for (const sr of shiftResp) {
+        const existing = map.get(sr.shift.id);
+        if (existing) {
+          existing.isResponsible = true;
+          existing.responsibleRole = 'Schichtleitung';
+        } else {
+          map.set(sr.shift.id, {
+            signupId: `resp-${sr.shift.id}`,
+            shiftId: sr.shift.id,
+            taskId: null,
+            taskTitle: null,
+            title: sr.shift.title,
+            category: sr.shift.category,
+            description: sr.shift.description,
+            startTime: sr.shift.startTime.toISOString(),
+            endTime: sr.shift.endTime.toISOString(),
+            eventId: sr.shift.event.id,
+            eventTitle: sr.shift.event.title,
+            eventSlug: sr.shift.event.slug,
+            eventStartDate: sr.shift.event.startDate.toISOString(),
+            cancelDeadlineDays: sr.shift.event.cancelDeadlineDays,
+            departmentName: sr.shift.event.department.name,
+            departmentSlug: sr.shift.event.department.slug,
+            createdAt: sr.createdAt.toISOString(),
+            isSignup: false,
+            isResponsible: true,
+            responsibleRole: 'Schichtleitung',
+          });
+        }
+      }
+
+      for (const dr of dayResp) {
+        for (const s of dr.event.shifts) {
+          const shiftDate = toZurichInput(s.startTime).slice(0, 10);
+          if (shiftDate === dr.dayDate) {
+            const existing = map.get(s.id);
+            if (existing) {
+              existing.isResponsible = true;
+              existing.responsibleRole = existing.responsibleRole
+                ? `${existing.responsibleRole} & Tagesleitung`
+                : 'Tagesleitung';
+            } else {
+              map.set(s.id, {
+                signupId: `dayresp-${s.id}`,
+                shiftId: s.id,
+                taskId: null,
+                taskTitle: null,
+                title: s.title,
+                category: s.category,
+                description: s.description,
+                startTime: s.startTime.toISOString(),
+                endTime: s.endTime.toISOString(),
+                eventId: dr.event.id,
+                eventTitle: dr.event.title,
+                eventSlug: dr.event.slug,
+                eventStartDate: dr.event.startDate.toISOString(),
+                cancelDeadlineDays: dr.event.cancelDeadlineDays,
+                departmentName: dr.event.department.name,
+                departmentSlug: dr.event.department.slug,
+                createdAt: dr.createdAt.toISOString(),
+                isSignup: false,
+                isResponsible: true,
+                responsibleRole: 'Tagesleitung',
+              });
+            }
+          }
+        }
+      }
+
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
     }
   );
 

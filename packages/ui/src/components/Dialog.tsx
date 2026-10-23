@@ -15,6 +15,12 @@ export interface DialogProps {
   size?: 'sm' | 'md' | 'lg';
   children?: ReactNode;
   className?: string;
+  /**
+   * Wenn true, schliesst ein Klick auf den abgedunkelten Hintergrund den Dialog.
+   * Standard ist `false` (damit bei versehentlichem Klick neben das Fenster keine Formulareingaben verloren gehen).
+   * Dialoge werden über das «X», «Abbrechen» bzw. Esc geschlossen.
+   */
+  dismissOnBackdrop?: boolean;
 }
 
 const widths = { sm: 'sm:max-w-sm', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl' };
@@ -34,6 +40,7 @@ export function Dialog({
   size = 'md',
   children,
   className,
+  dismissOnBackdrop = false,
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -64,7 +71,7 @@ export function Dialog({
         onClose();
       }}
       onClick={(e) => {
-        if (e.target === ref.current) onClose();
+        if (dismissOnBackdrop && e.target === ref.current) onClose();
       }}
       aria-labelledby={titleId}
       className={cn(

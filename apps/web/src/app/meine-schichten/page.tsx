@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, CalendarPlus, Clock, LogIn, Ticket, UserMinus } from 'lucide-react';
+import { ArrowRight, CalendarPlus, Clock, Download, ExternalLink, LogIn, Shield, Ticket, UserMinus } from 'lucide-react';
 import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
@@ -16,18 +16,29 @@ import {
   groupByBusinessDay,
   hoursBetween,
 } from '@/lib/format';
-import { downloadIcs, type CalendarEntry } from '@/lib/ics';
+import { downloadIcs, googleCalendarUrl, type CalendarEntry } from '@/lib/ics';
 import { usePortal } from '@/lib/portal';
 import type { MyShift } from '@/lib/types';
 
-const toCalendar = (s: MyShift): CalendarEntry => ({
-  uid: s.signupId,
-  title: `${s.title} (${s.eventTitle})`,
-  description: [s.category, s.description].filter(Boolean).join('\n'),
-  location: s.departmentName,
-  start: s.startTime,
-  end: s.endTime,
-});
+const toCalendar = (s: MyShift): CalendarEntry => {
+  const rolePrefix = s.isResponsible ? `[${s.responsibleRole || 'Leitung'}] ` : '';
+  const taskSuffix = s.taskTitle && s.taskTitle !== s.title ? ` (${s.taskTitle})` : '';
+  return {
+    uid: s.signupId,
+    title: `${rolePrefix}${s.title}${taskSuffix} (${s.eventTitle})`,
+    description: [
+      s.isResponsible ? `Rolle: ${s.responsibleRole || 'Leitung'}` : null,
+      s.taskTitle && s.taskTitle !== s.title ? `Arbeit: ${s.taskTitle}` : null,
+      s.category ? `Kategorie: ${s.category}` : null,
+      s.description,
+      `Anlass: ${s.eventTitle}`,
+      `Abteilung: ${s.departmentName}`,
+    ].filter(Boolean).join('\n'),
+    location: s.departmentName,
+    start: s.startTime,
+    end: s.endTime,
+  };
+};
 
 export default function MyShiftsPage() {
   const { user, loading: sessionLoading } = usePortal();
@@ -182,11 +193,23 @@ export default function MyShiftsPage() {
                 <div aria-hidden className="absolute -right-20 -top-24 size-72 rounded-full bg-accent/25 blur-3xl" />
                 <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-fg-muted">Als Nächstes</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-fg-muted">Als Nächstes</p>
+                      {next.isResponsible && (
+                        <Badge tone="accent">
+                          <Shield className="size-3" /> {next.responsibleRole || 'Schichtleitung'}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="mt-1 font-display text-5xl font-extrabold tracking-[-0.03em] text-accent-ink sm:text-6xl">
                       {fmtRelativeDay(next.startTime)}
                     </p>
-                    <p className="mt-4 text-xl font-bold text-fg">{next.title}</p>
+                    <p className="mt-4 text-xl font-bold text-fg">
+                      {next.title}
+                      {next.taskTitle && next.taskTitle !== next.title && (
+                        <span className="ml-2 text-base font-normal text-fg-muted">({next.taskTitle})</span>
+                      )}
+                    </p>
                     <Link href={`/events/${next.eventSlug}`} className="block w-fit text-sm font-medium text-fg-muted hover:text-fg">
                       {next.eventTitle}
                     </Link>
@@ -196,19 +219,32 @@ export default function MyShiftsPage() {
                       {fmtTime(next.endTime)}
                     </p>
                   </div>
-                  <Button
-                    variant="secondary"
-                    onClick={() => downloadIcs(`schicht-${next.shiftId.slice(0, 8)}.ics`, [toCalendar(next)])}
-                  >
-                    <CalendarPlus /> In Kalender
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={googleCalendarUrl(toCalendar(next))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClasses({ variant: 'secondary' })}
+                      title="Direkt im Google Kalender eintragen"
+                    >
+                      <CalendarPlus className="size-4" /> Google Kalender
+                    </a>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => downloadIcs(`schicht-${next.shiftId.slice(0, 8)}.ics`, [toCalendar(next)])}
+                      title="Als .ics-Datei für Apple Kalender oder Outlook"
+                    >
+                      <Download className="size-4" /> .ics
+                    </Button>
+                  </div>
                 </div>
               </Card>
             )}
 
             {upcoming.length > 0 && (
               <section className="mt-12">
-                <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                   <h2 className="font-display text-2xl font-bold tracking-tight text-fg">Anstehend</h2>
                   {upcoming.length > 1 && (
                     <Button
@@ -216,7 +252,7 @@ export default function MyShiftsPage() {
                       size="sm"
                       onClick={() => downloadIcs('meine-schichten.ics', upcoming.map(toCalendar))}
                     >
-                      <CalendarPlus /> Alle exportieren
+                      <Download className="size-4" /> Alle als .ics exportieren
                     </Button>
                   )}
                 </div>
@@ -282,25 +318,58 @@ function Timeline({
                       <p className="text-xs text-fg-subtle">{fmtDuration(s.startTime, s.endTime)}</p>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex flex-wrap gap-1.5">
-                        <Badge>{s.category}</Badge>
+                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                        {s.category && <Badge>{s.category}</Badge>}
+                        {s.isResponsible && (
+                          <Badge tone="accent">
+                            <Shield className="size-3" /> {s.responsibleRole || 'Schichtleitung'}
+                          </Badge>
+                        )}
+                        {s.taskTitle && s.taskTitle !== s.title && (
+                          <Badge tone="neutral">{s.taskTitle}</Badge>
+                        )}
                       </div>
                       <p className="font-bold text-fg">{s.title}</p>
                       <Link href={`/events/${s.eventSlug}`} className="text-sm text-fg-muted hover:text-fg">
                         {s.eventTitle}
                       </Link>
                     </div>
-                    {onCancel && (
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        loading={busy === s.signupId}
-                        onClick={() => onCancel(s)}
-                        className="self-start sm:self-center"
+                    <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                      <a
+                        href={googleCalendarUrl(toCalendar(s))}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={buttonClasses({ variant: 'ghost', size: 'icon-sm' })}
+                        title="In Google Kalender eintragen"
                       >
-                        <UserMinus /> Austragen
+                        <CalendarPlus className="size-4" />
+                      </a>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => downloadIcs(`schicht-${s.shiftId.slice(0, 8)}.ics`, [toCalendar(s)])}
+                        title=".ics herunterladen"
+                      >
+                        <Download className="size-4" />
                       </Button>
-                    )}
+                      {s.isSignup !== false && onCancel ? (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          loading={busy === s.signupId}
+                          onClick={() => onCancel(s)}
+                        >
+                          <UserMinus /> Austragen
+                        </Button>
+                      ) : (
+                        <Link
+                          href={`/events/${s.eventSlug}`}
+                          className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+                        >
+                          Zum Anlass <ExternalLink className="size-3" />
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}

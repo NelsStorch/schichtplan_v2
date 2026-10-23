@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, type FormEvent, type ReactNode } from 'react';
-import { AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
+import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { AlertCircle, AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Save, Shield, Trash2, Users } from 'lucide-react';
 import {
   ATTENDANCE_MODES,
   toZurichInput,
@@ -219,6 +219,90 @@ export function EventForm({
   const [slugTouched, setSlugTouched] = useState(false);
   const initialSlug = initial?.slug || eventSlug || '';
 
+  // Auto-Save für Einstellungs-Seite (layout === 'page' && mode === 'edit')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const lastSavedSnapshotRef = useRef<string>(JSON.stringify({ ...EMPTY, ...initial }));
+
+  const isDirty = JSON.stringify(form) !== lastSavedSnapshotRef.current;
+
+  // Auto-Save Effect
+  useEffect(() => {
+    if (mode !== 'edit' || layout !== 'page' || !eventSlug) return;
+    if (!isDirty || saving) return;
+
+    // Slug-Änderung darf NIE im Hintergrund gespeichert werden (benötigt 10s Countdown)
+    if (form.slug !== initialSlug) return;
+
+    // Validierung: Mindestens Titel muss vorhanden sein
+    if (!form.title.trim()) return;
+
+    // Falls Start- und Enddatum gesetzt sind, muss Enddatum nach Startdatum liegen
+    if (form.startDate && form.endDate && new Date(form.endDate) <= new Date(form.startDate)) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setAutoSaveStatus('saving');
+      setError(null);
+      try {
+        const shared = {
+          title: form.title.trim(),
+          description: form.description.trim() || undefined,
+          logoUrl: form.logoUrl.trim() || null,
+          bannerUrl: form.bannerUrl.trim() || null,
+          minShiftsPerPerson: form.minShiftsPerPerson ?? null,
+          cancelDeadlineDays:
+            form.cancelDeadlineDays !== null &&
+            form.cancelDeadlineDays !== undefined &&
+            (form.cancelDeadlineDays as unknown as string) !== ''
+              ? Number(form.cancelDeadlineDays)
+              : null,
+          contactUserId: form.contactUserId || null,
+          dayCutoffTime: form.dayCutoffTime || '04:00',
+          responsibleMode: form.responsibleMode,
+          contactVisibility: form.contactVisibility,
+          signupOpensAt: form.signupOpensAt ? zurichInputToIso(form.signupOpensAt) : null,
+          attendanceMode: form.attendanceMode,
+          ...accessPayload(form.access),
+        };
+
+        await api(`/api/events/${eventSlug}`, {
+          method: 'PATCH',
+          json: {
+            ...shared,
+            startDate: form.startDate ? zurichInputToIso(form.startDate)! : undefined,
+            endDate: form.endDate ? zurichInputToIso(form.endDate)! : undefined,
+            description: form.description.trim() || null,
+            allowPublicSignup: form.allowPublicSignup,
+          },
+        });
+
+        lastSavedSnapshotRef.current = JSON.stringify(form);
+        setAutoSaveStatus('saved');
+        setLastSavedAt(new Date());
+      } catch (err) {
+        setAutoSaveStatus('error');
+        setError(errorMessage(err));
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [form, isDirty, saving, mode, layout, eventSlug, initialSlug]);
+
+  // Schutz beim Verlassen des Fensters mit ungespeicherten Daten
+  useEffect(() => {
+    if (layout !== 'page') return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty || autoSaveStatus === 'saving') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [layout, isDirty, autoSaveStatus]);
+
   // 10s Countdown bei Adress-Änderung eines bestehenden Events
   const [showSlugWarning, setShowSlugWarning] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -403,6 +487,9 @@ export function EventForm({
             allowPublicSignup: form.allowPublicSignup,
           },
         });
+        lastSavedSnapshotRef.current = JSON.stringify(form);
+        setAutoSaveStatus('saved');
+        setLastSavedAt(new Date());
         toast({ title: 'Einstellungen gespeichert' });
         onSaved(res.slug || targetSlug);
       }

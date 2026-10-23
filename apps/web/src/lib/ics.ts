@@ -10,6 +10,24 @@ export interface CalendarEntry {
 const stamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 const escape = (text: string) => text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (m) => `\\${m}`);
 
+/**
+ * Erzeugt eine direkte URL für Google Kalender mit Zeitzone Europe/Zurich.
+ * Start- und Endzeit werden in UTC formatiert (YYYYMMDDTHHmmssZ), Google rechnet mit ctz=Europe/Zurich.
+ */
+export function googleCalendarUrl(entry: CalendarEntry): string {
+  const startUtc = stamp(entry.start);
+  const endUtc = stamp(entry.end);
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: entry.title,
+    dates: `${startUtc}/${endUtc}`,
+    ctz: 'Europe/Zurich',
+  });
+  if (entry.description) params.set('details', entry.description);
+  if (entry.location) params.set('location', entry.location);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 /** Erzeugt eine .ics-Datei und startet den Download (Kalender-Integration wie in der Legacy-App). */
 export function downloadIcs(filename: string, entries: CalendarEntry[]) {
   const lines = [

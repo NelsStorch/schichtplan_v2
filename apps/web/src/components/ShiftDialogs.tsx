@@ -34,6 +34,7 @@ import {
   Textarea,
   cn,
   useToast,
+  useConfirm,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { fmtDayMonth, fmtTime, fmtWeekday } from '@/lib/format';
@@ -46,19 +47,31 @@ function FormActions({
   onCancel,
   saving,
   label,
+  isDirty,
 }: {
   onCancel: () => void;
   saving: boolean;
   label: string;
+  isDirty?: boolean;
 }) {
   return (
-    <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
-      <Button variant="ghost" onClick={onCancel}>
-        Abbrechen
-      </Button>
-      <Button type="submit" loading={saving}>
-        {label}
-      </Button>
+    <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-line-strong bg-surface/95 px-5 py-3.5 backdrop-blur sm:-mx-7 sm:-mb-6 sm:px-7 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between shadow-lift z-10">
+      <div className="text-xs">
+        {isDirty ? (
+          <span className="flex items-center gap-1.5 font-medium text-accent-ink">
+            <span className="size-2 rounded-full bg-accent animate-pulse" />
+            Ungespeicherte Änderungen
+          </span>
+        ) : null}
+      </div>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button variant="ghost" onClick={onCancel}>
+          Abbrechen
+        </Button>
+        <Button type="submit" loading={saving}>
+          {label}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -97,17 +110,43 @@ export function ShiftFormDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const confirm = useConfirm();
+  const [isDirty, setIsDirty] = useState(false);
   const isEdit = Boolean(shift);
+
+  const handleClose = async () => {
+    if (isDirty) {
+      const ok = await confirm({
+        title: 'Änderungen verwerfen?',
+        description: 'Du hast ungespeicherte Eingaben an dieser Schicht. Möchtest du wirklich abbrechen?',
+        confirmLabel: 'Änderungen verwerfen',
+        cancelLabel: 'Weiter bearbeiten',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+    setIsDirty(false);
+    onClose();
+  };
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       icon={isEdit ? <Clock /> : <Plus />}
       title={isEdit ? 'Schicht bearbeiten' : 'Neue Schicht'}
       description={`Für ${event.title}`}
     >
-      <ShiftForm event={event} shift={shift} onCancel={onClose} onSaved={onSaved} />
+      <ShiftForm
+        event={event}
+        shift={shift}
+        onCancel={handleClose}
+        onSaved={() => {
+          setIsDirty(false);
+          onSaved();
+        }}
+        onDirtyChange={setIsDirty}
+      />
     </Dialog>
   );
 }
@@ -117,11 +156,13 @@ function ShiftForm({
   shift,
   onCancel,
   onSaved,
+  onDirtyChange,
 }: {
   event: EventDetails;
   shift?: ShiftDto | null;
   onCancel: () => void;
   onSaved: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const toast = useToast();
   const isEdit = Boolean(shift);
@@ -254,6 +295,21 @@ function ShiftForm({
   };
 
   const totalSlots = tasks.reduce((sum, t) => sum + (t.requiredSlots || 1), 0);
+
+  const [initialJson] = useState(() => ({
+    form: JSON.stringify(form),
+    tasks: JSON.stringify(tasks),
+    resp: JSON.stringify(responsibleUserIds),
+  }));
+
+  const isDirty =
+    JSON.stringify(form) !== initialJson.form ||
+    JSON.stringify(tasks) !== initialJson.tasks ||
+    JSON.stringify(responsibleUserIds) !== initialJson.resp;
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -617,7 +673,7 @@ function ShiftForm({
         />
       </Field>
 
-      <FormActions onCancel={onCancel} saving={saving} label={isEdit ? 'Änderungen speichern' : 'Schicht anlegen'} />
+      <FormActions onCancel={onCancel} saving={saving} label={isEdit ? 'Änderungen speichern' : 'Schicht anlegen'} isDirty={isDirty} />
     </form>
   );
 }

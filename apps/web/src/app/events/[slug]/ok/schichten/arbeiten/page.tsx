@@ -31,10 +31,19 @@ export default function TaskCatalogPage() {
     load();
   }, [load]);
 
-  const remove = async (td: TaskDefinitionDto) => {
+  const remove = async (td: TaskDefinitionDto, usedIn: number) => {
+    if (usedIn > 0) {
+      toast({
+        title: 'Arbeit in Schichten verbaut',
+        description: `«${td.title}» wird aktuell in ${usedIn} Schicht(en) dieses Anlasses verwendet und kann nicht gelöscht werden.`,
+        tone: 'error',
+      });
+      return;
+    }
+
     const ok = await confirm({
       title: `Arbeit «${td.title}» löschen?`,
-      description: 'Sie verschwindet aus dem Katalog. Bestehende Schichten bleiben, wie sie sind.',
+      description: 'Sie wird aus dem Katalog entfernt. Nur Arbeiten, die aktuell in keinen Schichten verbaut sind, können gelöscht werden.',
       confirmLabel: 'Arbeit löschen',
       tone: 'danger',
     });
@@ -58,24 +67,29 @@ export default function TaskCatalogPage() {
       <OkPageHeader
         title="Arbeiten-Katalog"
         description="Typische Arbeiten wie Bar, Grill oder Kasse einmal anlegen und beim Planen in jede Schicht übernehmen."
-        help="/ok/arbeiten-katalog/"
+        help="/ok/schichten-und-arbeiten/#arbeiten-katalog"
         actions={
-          <Button size="sm" onClick={openNew}>
+          <Button onClick={openNew}>
             <Plus className="size-4" /> Neue Arbeit
           </Button>
         }
       />
 
-      <Callout tone="info" className="mb-6 flex items-start gap-2">
-        <Info className="mt-0.5 size-4 shrink-0" />
-        <span>Der Katalog gilt für die ganze Abteilung. Änderungen siehst du auch in allen anderen Anlässen.</span>
+      <Callout tone="info" className="mb-6">
+        <div className="flex items-start gap-2">
+          <Info className="mt-0.5 size-4 shrink-0 text-accent-ink" />
+          <div className="text-xs leading-relaxed text-fg-muted">
+            Hier verwaltet ihr typische Aufgaben eurer Abteilung. Beim Anlegen von Schichten könnt ihr sie mit einem Klick übernehmen.
+            Arbeiten, die aktuell in Schichten verbaut sind, können zum Schutz vor Datenverlust nicht gelöscht werden.
+          </div>
+        </div>
       </Callout>
 
       {tasks === null ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Skeleton className="h-40 rounded-card" />
-          <Skeleton className="h-40 rounded-card" />
-          <Skeleton className="h-40 rounded-card" />
+          <Skeleton className="h-44 rounded-card" />
+          <Skeleton className="h-44 rounded-card" />
+          <Skeleton className="h-44 rounded-card" />
         </div>
       ) : tasks.length === 0 ? (
         <EmptyState
@@ -117,8 +131,10 @@ export default function TaskCatalogPage() {
                         size="icon-sm"
                         variant="ghost"
                         aria-label={`${td.title} löschen`}
-                        onClick={() => remove(td)}
-                        className="text-fg-subtle hover:text-danger-ink"
+                        disabled={usedIn > 0}
+                        title={usedIn > 0 ? `In ${usedIn} Schicht(en) verwendet – kann nicht gelöscht werden` : 'Arbeit löschen'}
+                        onClick={() => remove(td, usedIn)}
+                        className={usedIn > 0 ? 'text-fg-subtle/40 cursor-not-allowed' : 'text-fg-subtle hover:text-danger-ink'}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -138,7 +154,7 @@ export default function TaskCatalogPage() {
                   </div>
                 </div>
                 <div className="mt-5 flex items-center justify-between border-t border-line pt-3 text-xs">
-                  <span className="text-fg-subtle">
+                  <span className={usedIn > 0 ? 'font-medium text-fg' : 'text-fg-subtle'}>
                     {usedIn === 0 ? 'In diesem Anlass nicht verwendet' : `In ${usedIn} Schicht${usedIn === 1 ? '' : 'en'}`}
                   </span>
                   <Link href={`${base}/schichten?neu=1`} className="font-bold text-accent-ink hover:underline">

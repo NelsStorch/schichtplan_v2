@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { CreateTaskDefinitionSchema, UpdateTaskDefinitionSchema } from '@schichtplan/shared';
+import { isDepartmentManager } from '../services/departmentVisibility.js';
 
 const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Arbeiten (Task-Definitionen) der aktuellen Abteilung
@@ -27,7 +28,7 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
     }));
   });
 
-  // Neue Arbeit im Katalog erstellen (Admin, Planner oder Helfer mit Berechtigung)
+  // Neue Arbeit im Katalog erstellen (Abteilungsleitung, Planung, Event-OK oder GlobalAdmin)
   fastify.post(
     '/api/tasks',
     { preHandler: [fastify.authenticate] },
@@ -36,27 +37,16 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
+      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Arbeiten' });
+      }
+
       const parse = CreateTaskDefinitionSchema.safeParse(request.body);
       if (!parse.success) {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
 
       const { title, description, minAge, ageRequirementType } = parse.data;
-
-      // Berechtigung: Admin, Planner oder GlobalAdmin
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      if (!isDeptAdmin && !request.user.isGlobalAdmin) {
-        return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Arbeiten' });
-      }
 
       // Prüfe ob bereits eine Arbeit mit identischem Titel existiert
       const existing = await fastify.prisma.taskDefinition.findFirst({
@@ -102,6 +92,10 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
+      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten von Arbeiten' });
+      }
+
       const parse = UpdateTaskDefinitionSchema.safeParse(request.body);
       if (!parse.success) {
         return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -113,20 +107,6 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!task || task.departmentId !== request.tenant.id) {
         return reply.status(404).send({ error: 'Arbeit nicht gefunden' });
-      }
-
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      if (!isDeptAdmin && !request.user.isGlobalAdmin) {
-        return reply.status(403).send({ error: 'Keine Berechtigung' });
       }
 
       const { title, description, minAge, ageRequirementType } = parse.data;
@@ -154,13 +134,17 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Arbeit löschen
+  // Arbeit löschen (nur wenn aktuell nicht in Schichten verbaut)
   fastify.delete<{ Params: { id: string } }>(
     '/api/tasks/:id',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+
+      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Arbeit' });
       }
 
       const task = await fastify.prisma.taskDefinition.findUnique({
@@ -171,18 +155,15 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Arbeit nicht gefunden' });
       }
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
+      // Prüfen, ob die Arbeit aktuell noch in Schichten verwendet wird
+      const usedCount = await fastify.prisma.shiftTask.count({
+        where: { taskDefinitionId: request.params.id },
       });
 
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      if (!isDeptAdmin && !request.user.isGlobalAdmin) {
-        return reply.status(403).send({ error: 'Keine Berechtigung' });
+      if (usedCount > 0) {
+        return reply.status(400).send({
+          error: `Diese Arbeit kann nicht gelöscht werden, da sie noch in ${usedCount} Schicht(en) verwendet wird.`,
+        });
       }
 
       await fastify.prisma.taskDefinition.delete({
