@@ -175,7 +175,10 @@ async function toDepartmentItems(prisma: PrismaClient, rows: DepartmentRow[]): P
  * wie beim Anlegen durch die Abteilungsleitung. Bestehende Rollen bleiben.
  */
 async function attachOrtsgruppe(prisma: PrismaClient, departmentId: string, ortsgruppeId: number) {
-  const people = await prisma.user.findMany({ where: { ceviDbOrtsgruppeId: ortsgruppeId }, select: { id: true } });
+  const people = await prisma.user.findMany({
+    where: { ceviDbOrtsgruppeId: ortsgruppeId },
+    select: { id: true, ceviDbDepartmentLeader: true },
+  });
   if (!people.length) return 0;
   await prisma.$transaction([
     prisma.user.updateMany({
@@ -183,10 +186,21 @@ async function attachOrtsgruppe(prisma: PrismaClient, departmentId: string, orts
       data: { homeDepartmentId: departmentId, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
     }),
     prisma.departmentMember.createMany({
-      data: people.map((p) => ({ departmentId, userId: p.id, role: 'HELPER' })),
+      data: people.map((p) => ({
+        departmentId,
+        userId: p.id,
+        role: p.ceviDbDepartmentLeader ? 'ADMIN' : 'HELPER',
+      })),
       skipDuplicates: true,
     }),
   ]);
+  const leaderIds = people.filter((p) => p.ceviDbDepartmentLeader).map((p) => p.id);
+  if (leaderIds.length) {
+    await prisma.departmentMember.updateMany({
+      where: { departmentId, userId: { in: leaderIds } },
+      data: { role: 'ADMIN' },
+    });
+  }
   for (const p of people) {
     await autoCreateCeviDbDepartmentStufen(prisma, departmentId, p.id);
   }
@@ -214,7 +228,10 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/api/admin/dashboard', guard, async () => {
     const now = new Date();
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const [upcomingRows, recentUsers, withoutLeader, signups7d] = await Promise.all([
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+
+    const [upcomingRows, recentUsers, allDepts, signups7d] = await Promise.all([
       fastify.prisma.event.findMany({
         where: { endDate: { gte: now } },
         orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
@@ -223,17 +240,51 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
       }),
       fastify.prisma.user.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 6, select: userSelect }),
       fastify.prisma.department.findMany({
-        where: { members: { none: { role: 'ADMIN' } } },
         orderBy: { name: 'asc' },
-        select: { id: true, name: true, slug: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          createdAt: true,
+          members: {
+            where: { role: 'ADMIN' },
+            select: { id: true },
+            take: 1,
+          },
+          events: {
+            select: { endDate: true },
+            orderBy: { endDate: 'desc' },
+            take: 1,
+          },
+        },
       }),
       fastify.prisma.shiftSignup.count({ where: { createdAt: { gte: weekAgo } } }),
     ]);
+
+    const withoutLeader = allDepts
+      .filter((d) => d.members.length === 0)
+      .map((d) => ({ id: d.id, name: d.name, slug: d.slug }));
+
+    const inactiveDepartments = allDepts
+      .filter((d) => {
+        const lastEvent = d.events[0];
+        if (!lastEvent) {
+          return d.createdAt < thirtyDaysAgo;
+        }
+        return lastEvent.endDate < sixMonthsAgo;
+      })
+      .map((d) => ({
+        id: d.id,
+        name: d.name,
+        slug: d.slug,
+        lastEventDate: d.events[0]?.endDate.toISOString() ?? null,
+      }));
 
     const dashboard: AdminDashboardDto = {
       upcomingEvents: await toEventItems(fastify.prisma, upcomingRows),
       recentUsers: recentUsers.map(toListItem),
       departmentsWithoutLeader: withoutLeader,
+      inactiveDepartments,
       signups7d,
     };
     return dashboard;
@@ -333,6 +384,18 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
     const { name, slug, ceviDbGroupId, contactEmail, membersOnly, leaderUserId } = parse.data;
 
+    if (ceviDbGroupId) {
+      const existingWithGroup = await fastify.prisma.department.findUnique({
+        where: { ceviDbGroupId },
+        select: { id: true, name: true, slug: true },
+      });
+      if (existingWithGroup) {
+        return reply.status(409).send({
+          error: `Für diese Cevi.DB-Ortsgruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
+        });
+      }
+    }
+
     if (leaderUserId) {
       const leader = await fastify.prisma.user.findUnique({
         where: { id: leaderUserId },
@@ -403,6 +466,18 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(409).send({ error: uniqueConflictMessage(err as Prisma.PrismaClientKnownRequestError) });
       }
       throw err;
+    }
+
+    if (data.ceviDbGroupId && data.ceviDbGroupId !== existing.ceviDbGroupId) {
+      const existingWithGroup = await fastify.prisma.department.findUnique({
+        where: { ceviDbGroupId: data.ceviDbGroupId },
+        select: { id: true, name: true, slug: true },
+      });
+      if (existingWithGroup) {
+        return reply.status(409).send({
+          error: `Für diese Cevi.DB-Ortsgruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
+        });
+      }
     }
 
     const newGroup = data.ceviDbGroupId;

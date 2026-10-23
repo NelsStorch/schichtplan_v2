@@ -36,7 +36,7 @@ const isUniqueViolation = (err: unknown) =>
 const NOT_ELIGIBLE_MESSAGES = {
   NOT_CEVIDB: 'Um eine Abteilung anzulegen, melde dich bitte mit Cevi.DB an.',
   NOT_LEADER:
-    'Nur die Abteilungsleitung (Rolle «Abteilungsleiter/-in» in Cevi.DB) kann eine Abteilung anlegen.',
+    'Einen neuen Schichtplan für eine Abteilung kann nur die Abteilungsleitung anlegen. Bitte wende dich an deine Abteilungsleitung: Sie kann den Schichtplan für eure Abteilung anlegen und dir danach unter «Personen» die Rolle «Planung» geben, damit du Anlässe erstellen kannst – oder sie erstellt den Anlass direkt für dich.',
   NO_ORTSGRUPPE: 'In Cevi.DB ist für dich keine Ortsgruppe hinterlegt.',
   EXISTS: 'Für deine Ortsgruppe gibt es bereits eine Abteilung.',
 } as const;
@@ -549,19 +549,30 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           });
 
           // Alle bereits angemeldeten Cevi.DB-Personen dieser Ortsgruppe (inkl. der anlegenden Person)
-          // bekommen die neue Abteilung als Heimabteilung und werden Helfer*innen
+          // bekommen die neue Abteilung als Heimabteilung und werden Helfer*innen bzw. Abteilungsleitung
           const people = await tx.user.findMany({
             where: { ceviDbOrtsgruppeId: ortsgruppeId },
-            select: { id: true },
+            select: { id: true, ceviDbDepartmentLeader: true },
           });
           await tx.user.updateMany({
             where: { ceviDbOrtsgruppeId: ortsgruppeId },
             data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
           });
           await tx.departmentMember.createMany({
-            data: people.map((p) => ({ departmentId: created.id, userId: p.id, role: 'HELPER' })),
+            data: people.map((p) => ({
+              departmentId: created.id,
+              userId: p.id,
+              role: p.ceviDbDepartmentLeader ? 'ADMIN' : 'HELPER',
+            })),
             skipDuplicates: true,
           });
+          const leaderIds = people.filter((p) => p.ceviDbDepartmentLeader).map((p) => p.id);
+          if (leaderIds.length) {
+            await tx.departmentMember.updateMany({
+              where: { departmentId: created.id, userId: { in: leaderIds } },
+              data: { role: 'ADMIN' },
+            });
+          }
 
           return { department: created, memberIds: people.map((p) => p.id) };
         });

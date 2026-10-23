@@ -493,7 +493,10 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!request.user.isGlobalAdmin && (!member || (member.role !== 'ADMIN' && member.role !== 'PLANNER'))) {
-        return reply.status(403).send({ error: 'Nur die Abteilungsleitung darf Events erstellen' });
+        return reply.status(403).send({
+          error:
+            'Anlässe können nur von der Abteilungsleitung oder Personen mit der Rolle «Planung» erstellt werden. Bitte wende dich an deine Abteilungsleitung: Sie kann dir die Rolle «Planung» geben oder den Anlass für dich erstellen.',
+        });
       }
 
       const parse = CreateEventSchema.safeParse(request.body);

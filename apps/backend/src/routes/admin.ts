@@ -31,6 +31,10 @@ export const userSelect = {
   birthDate: true,
   isGlobalAdmin: true,
   ceviDbId: true,
+  ceviDbOrtsgruppeId: true,
+  ceviDbOrtsgruppeName: true,
+  ceviDbDepartmentLeader: true,
+  ceviDbLeaderGroupName: true,
   // passwordHash wird nur gelesen, um "hat Passwort" abzuleiten, und nie ausgeliefert
   passwordHash: true,
   createdAt: true,
@@ -74,6 +78,10 @@ export function toListItem(user: UserRow): AdminUserListItemDto {
       departmentSlug: m.department.slug,
       role: m.role,
     })),
+    ceviDbOrtsgruppeId: user.ceviDbOrtsgruppeId,
+    ceviDbOrtsgruppeName: user.ceviDbOrtsgruppeName,
+    ceviDbDepartmentLeader: user.ceviDbDepartmentLeader,
+    ceviDbLeaderGroupName: user.ceviDbLeaderGroupName,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

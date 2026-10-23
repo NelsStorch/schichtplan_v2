@@ -39,16 +39,31 @@ function roleClassOf(role: Record<string, unknown>): string | null {
   return typeof roleClass === 'string' ? roleClass : null;
 }
 
+/** Prüft, ob eine Rolle als Abteilungsleitung zählt (aus Konfiguration oder flexibler Suffix-Erkennung). */
+export function isDepartmentLeaderRole(roleClass: string, configuredRoles: string[]): boolean {
+  if (configuredRoles.includes(roleClass)) return true;
+  const normalized = roleClass.toLowerCase();
+  return (
+    normalized.endsWith('::abteilungsleiter') ||
+    normalized.endsWith('::abteilungsleiterin') ||
+    normalized.endsWith('::abteilungsleitung')
+  );
+}
+
 export function ceviDbLeadership(profile: unknown): CeviDbLeadership {
   const { departmentLeaderRoleClasses } = cevidbConfig();
   const leaderRole = profileRoles(profile).find((role) => {
     const roleClass = roleClassOf(role);
-    return roleClass !== null && departmentLeaderRoleClasses.includes(roleClass);
+    return roleClass !== null && isDepartmentLeaderRole(roleClass, departmentLeaderRoleClasses);
   });
+
+  const ortsgruppeId =
+    ortsgruppeIdFromProfile(profile) ??
+    (leaderRole ? parseCeviDbGroupId(leaderRole.group_id) : null);
 
   return {
     isLeader: Boolean(leaderRole),
-    ortsgruppeId: ortsgruppeIdFromProfile(profile),
+    ortsgruppeId,
     leaderGroupName: leaderRole && typeof leaderRole.group_name === 'string' ? leaderRole.group_name : null,
   };
 }

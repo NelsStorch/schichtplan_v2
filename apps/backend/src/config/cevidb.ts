@@ -52,9 +52,21 @@ export function cevidbConfig(): CeviDbConfig {
     ortsgruppeField: process.env.CEVIDB_ORTSGRUPPE_FIELD?.trim() || 'ortsgruppe_id',
     departmentLeaderRoleClasses: list(process.env.CEVIDB_DEPARTMENT_LEADER_ROLES, [
       'Group::Jungschar::Abteilungsleiter',
+      'Group::Jungschar::Abteilungsleiterin',
+      'Group::Abteilung::Abteilungsleiter',
+      'Group::Abteilung::Abteilungsleiterin',
+      'Group::Ortsgruppe::Abteilungsleiter',
+      'Group::Ortsgruppe::Abteilungsleiterin',
     ]),
     stufeRoleClassPrefix: process.env.CEVIDB_STUFE_ROLE_PREFIX?.trim() || 'Group::Stufe::',
-    stufeLeaderRoles: list(process.env.CEVIDB_STUFE_LEADER_ROLES, ['Gruppenleiter', 'Stufenleiter']),
-    stufeParticipantRoles: list(process.env.CEVIDB_STUFE_PARTICIPANT_ROLES, ['Teilnehmer']),
+    stufeLeaderRoles: list(process.env.CEVIDB_STUFE_LEADER_ROLES, [
+      'Gruppenleiter',
+      'Gruppenleiterin',
+      'Stufenleiter',
+      'Stufenleiterin',
+      'Stufenleitung',
+      'Gruppenleitung',
+    ]),
+    stufeParticipantRoles: list(process.env.CEVIDB_STUFE_PARTICIPANT_ROLES, ['Teilnehmer', 'Teilnehmerin']),
   };
 }

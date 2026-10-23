@@ -328,6 +328,38 @@ export function UserDialog({
                 <Fact label="Cevi.DB-ID">
                   {user.ceviDbId !== null ? <span className="font-mono tabular">{user.ceviDbId}</span> : <Missing />}
                 </Fact>
+                {user.ceviDbId !== null && (
+                  <>
+                    <Fact label="Cevi.DB-Ortsgruppe">
+                      {user.ceviDbOrtsgruppeName ? (
+                        <span>
+                          {user.ceviDbOrtsgruppeName}
+                          {user.ceviDbOrtsgruppeId && (
+                            <span className="ml-1.5 font-mono text-xs font-normal tabular text-fg-muted">
+                              (ID {user.ceviDbOrtsgruppeId})
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <Missing />
+                      )}
+                    </Fact>
+                    <Fact label="Cevi.DB-Abteilungsleitung">
+                      {user.ceviDbDepartmentLeader ? (
+                        <span className="inline-flex items-center gap-1.5 font-medium text-accent-ink">
+                          Ja
+                          {user.ceviDbLeaderGroupName && (
+                            <span className="font-normal text-fg-muted">
+                              ({user.ceviDbLeaderGroupName})
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-fg-muted">Nein</span>
+                      )}
+                    </Fact>
+                  </>
+                )}
                 <Fact label="Registriert">{formatDateTime(user.createdAt)}</Fact>
                 <Fact label="Zuletzt geändert">{formatDateTime(user.updatedAt)}</Fact>
                 <Fact label="Eintragungen">

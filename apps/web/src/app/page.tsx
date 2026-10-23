@@ -25,9 +25,11 @@ export default function DepartmentHomePage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('createEvent=1')) {
-      setShowEventForm(true);
+      if (isPlanner) {
+        setShowEventForm(true);
+      }
     }
-  }, []);
+  }, [isPlanner]);
 
   const lockedOut = Boolean(department?.membersOnly && !department.viewerIsMember);
 
@@ -124,7 +126,7 @@ export default function DepartmentHomePage() {
             description={
               isPlanner
                 ? 'Lege den ersten Anlass an. Danach planst du die Schichten und teilst den Link mit deinen Helfer*innen.'
-                : 'Für diese Abteilung sind momentan keine Schichtpläne offen. Schau bald wieder vorbei.'
+                : 'Für diese Abteilung sind momentan keine Schichtpläne offen. Wenn du einen Anlass planen möchtest, wende dich an deine Abteilungsleitung: Sie kann dir die Rolle «Planung» geben oder den Anlass für dich anlegen.'
             }
             action={
               isPlanner && (

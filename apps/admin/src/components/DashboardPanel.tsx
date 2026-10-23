@@ -93,6 +93,29 @@ export function DashboardPanel({
         </Callout>
       )}
 
+      {data && data.inactiveDepartments && data.inactiveDepartments.length > 0 && (
+        <Callout tone="info" title="Inaktive Abteilungen">
+          <p className="mt-1 text-xs text-fg-muted">
+            Keine Anlässe in den letzten 6 Monaten oder vor über 30 Tagen angelegt ohne Anlass:
+          </p>
+          <span className="mt-2 flex flex-wrap gap-2">
+            {data.inactiveDepartments.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => onOpenDepartment(d.id)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-fg transition-colors hover:border-line-strong hover:bg-surface-2"
+              >
+                <span>{d.name}</span>
+                <span className="font-normal text-fg-muted">
+                  {d.lastEventDate ? `(Zuletzt ${formatDate(d.lastEventDate)})` : '(Noch keine Anlässe)'}
+                </span>
+              </button>
+            ))}
+          </span>
+        </Callout>
+      )}
+
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section>
           <SectionHeader title="Als Nächstes" action={{ label: 'Alle Anlässe', onClick: () => onNavigate('anlaesse') }} />

@@ -542,6 +542,10 @@ export interface AdminUserListItemDto {
   loginMethods: LoginMethod[];
   signupCount: number;
   memberships: AdminUserMembershipDto[];
+  ceviDbOrtsgruppeId?: number | null;
+  ceviDbOrtsgruppeName?: string | null;
+  ceviDbDepartmentLeader?: boolean;
+  ceviDbLeaderGroupName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -729,6 +733,8 @@ export interface AdminDashboardDto {
   recentUsers: AdminUserListItemDto[];
   /** Abteilungen ohne Abteilungsleitung */
   departmentsWithoutLeader: { id: string; name: string; slug: string }[];
+  /** Inaktive Abteilungen (keine Anlässe in den letzten 6 Monaten oder älter als 30 Tage ohne Anlass) */
+  inactiveDepartments?: { id: string; name: string; slug: string; lastEventDate: string | null }[];
   signups7d: number;
 }
 

@@ -201,12 +201,21 @@ function CreateDepartment() {
                   Mit Cevi.DB anmelden <ArrowUpRight />
                 </a>
               </>
-            ) : (
+            ) : eligibility.reason === 'NO_ORTSGRUPPE' ? (
               <p className="text-[15px] leading-relaxed text-fg-muted">
-                {eligibility.reason === 'NO_ORTSGRUPPE'
-                  ? 'In Cevi.DB ist für dich keine Ortsgruppe hinterlegt. Melde dich bei der Cevi.DB-Verwaltung eurer Abteilung.'
-                  : 'Eine neue Abteilung kann nur die Abteilungsleitung anlegen (Rolle «Abteilungsleiter*in» in Cevi.DB). Frag eure Abteilungsleitung, ob sie den Schichtplan anlegt.'}
+                In Cevi.DB ist für dich keine Ortsgruppe hinterlegt. Melde dich bei der Cevi.DB-Verwaltung eurer Abteilung.
               </p>
+            ) : (
+              <div className="space-y-4">
+                <Callout tone="info" title="Nur für die Abteilungsleitung">
+                  <p className="text-[14px] leading-relaxed">
+                    Einen neuen Schichtplan für eine Abteilung kann nur die Abteilungsleitung anlegen (offizielle Rolle «Abteilungsleiter*in» in Cevi.DB).
+                  </p>
+                  <p className="mt-2 text-[14px] leading-relaxed">
+                    <strong>Was du tun kannst:</strong> Bitte eure Abteilungsleitung, den Schichtplan einmalig anzulegen. Danach kann sie dir unter <em>Abteilung → Personen</em> die Rolle <strong>Planung</strong> geben, damit du selbstständig Events erstellen kannst – oder sie erstellt den Anlass direkt für dich.
+                  </p>
+                </Callout>
+              </div>
             )}
             <Button variant="ghost" className="w-full" onClick={later}>
               Weiter

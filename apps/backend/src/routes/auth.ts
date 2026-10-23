@@ -226,6 +226,19 @@ async function ensureHelperMembership(
   });
 }
 
+/** Trägt die Person als Abteilungsleitung (ADMIN) ein bzw. befördert sie dazu. */
+async function ensureLeaderMembership(
+  prisma: FastifyInstance['prisma'],
+  departmentId: string,
+  userId: string
+) {
+  await prisma.departmentMember.upsert({
+    where: { departmentId_userId: { departmentId, userId } },
+    update: { role: 'ADMIN' },
+    create: { departmentId, userId, role: 'ADMIN' },
+  });
+}
+
 function clearAuthCookie(reply: FastifyReply) {
   const domain = getCookieDomain();
   reply.clearCookie(AUTH_COOKIE_NAME, {
@@ -546,10 +559,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     await storeCeviDbFields(fastify.prisma, user.id, derived);
     const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, derived.ortsgruppeId);
     if (homeDepartment) {
-      await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
+      if (derived.isDepartmentLeader) {
+        await ensureLeaderMembership(fastify.prisma, homeDepartment.id, user.id);
+      } else {
+        await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
+      }
     }
 
-    // Kommt die Person von einer Abteilungs-Subdomain, dort ebenfalls als Helfer eintragen
+    // Kommt die Person von einer Abteilungs-Subdomain, dort als Helfer eintragen (nur in der eigenen Heimabteilung Leitung)
     let tenantDepartmentId: string | null = null;
     if (tenantSlug) {
       const department = await fastify.prisma.department.findUnique({
@@ -558,7 +575,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
       if (department) {
         tenantDepartmentId = department.id;
-        await ensureHelperMembership(fastify.prisma, department.id, user.id);
+        if (homeDepartment && department.id === homeDepartment.id && derived.isDepartmentLeader) {
+          await ensureLeaderMembership(fastify.prisma, department.id, user.id);
+        } else {
+          await ensureHelperMembership(fastify.prisma, department.id, user.id);
+        }
       }
     }
 

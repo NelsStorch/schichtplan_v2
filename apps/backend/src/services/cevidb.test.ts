@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveCeviDbFields, parseCeviDbGroupId } from './cevidb.js';
+import { deriveCeviDbFields, isDepartmentLeaderRole, parseCeviDbGroupId } from './cevidb.js';
 import { ceviDbProfileFields, missingProfileFields, personLabel } from './profile.js';
 
 const profile = {
@@ -47,6 +47,13 @@ describe('deriveCeviDbFields', () => {
   it('übersteht leere oder kaputte Profile', () => {
     expect(deriveCeviDbFields(null)).toMatchObject({ ortsgruppeId: null, isDepartmentLeader: false, stufen: [] });
     expect(deriveCeviDbFields({ roles: 'kaputt' }).stufen).toEqual([]);
+  });
+
+  it('erkennt Abteilungsleiter, Abteilungsleiterin und Abteilungsleitung flexibel', () => {
+    expect(isDepartmentLeaderRole('Group::Jungschar::Abteilungsleiter', [])).toBe(true);
+    expect(isDepartmentLeaderRole('Group::Jungschar::Abteilungsleiterin', [])).toBe(true);
+    expect(isDepartmentLeaderRole('Group::Abteilung::Abteilungsleitung', [])).toBe(true);
+    expect(isDepartmentLeaderRole('Group::Stufe::Stufenleiter', [])).toBe(false);
   });
 });
 
