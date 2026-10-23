@@ -61,7 +61,7 @@ const KITCHEN_WISDOMS = [
   'Regel #2 der Lagerküche: Hunger ist der beste Koch, aber ein funktionierender Server schadet auch nicht.',
   'Pfadfinder-Tipp: Bei Systemabstürzen hilft tief durchatmen, Krawatte richten und beherzt auf «Nochmal versuchen» drücken.',
   'Wer den Kochlöffel schwingt, bestimmt die Musik – ausser der Server kocht über.',
-  'Ein echter Cevianer verliert nie die Nerven – er macht einfach ein kurzes Lagerfeuer-Päuschen.',
+  'Echte Cevianer*innen verlieren nie die Nerven – sie machen einfach ein kurzes Lagerfeuer-Päuschen.',
   'Selbst der beste Spähtrupp stolpert mal über eine Wurzel im Code.',
   'Schoggi-Banane heilt fast alles. Notfalls hilft auch ein Seiten-Reload.',
 ];
@@ -72,7 +72,7 @@ const STIR_REACTIONS = [
   'Suppe blubbert munter weiter. Der Server holt tief Luft...',
   'Achtung, heisse Gamelle! Nicht die Finger verbrennen.',
   'Boden ist noch nicht angebrannt – wir sind guter Dinge!',
-  'Küchenchef nickt anerkennend. Jetzt nochmal «Neu laden» probieren!',
+  'Das Küchenteam nickt anerkennend. Jetzt nochmal «Neu laden» probieren!',
   'Volle Kochstufe erreicht! Zeit für ein Festmahl!',
 ];
 
@@ -126,7 +126,7 @@ export function ErrorView({
     setTimeout(() => setIsPotBumping(false), 350);
 
     const particleTexts = ['Blubber! 🫧', '+1 Prise Maggi 🧂', 'Umgerührt! 🥄', 'Lecker 🍲', 'Zisch! 💨'];
-    const text = stirs === 9 ? '🎖️ Küchenchef!' : particleTexts[Math.floor(Math.random() * particleTexts.length)];
+    const text = stirs === 9 ? '🎖️ Küchenprofi!' : particleTexts[Math.floor(Math.random() * particleTexts.length)];
     const id = Date.now() + Math.random();
     const x = Math.floor(Math.random() * 80) - 40;
 

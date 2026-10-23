@@ -356,7 +356,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   };
 
   const cancel = async (shift: ShiftDto, signupId?: string, name?: string) => {
-    // Falls Helfer:in sich selbst austragen möchte, Austrag-Sperre prüfen
+    // Falls Helfer*in sich selbst austragen möchte, Austrag-Sperre prüfen
     const isSelfCancel = !name;
     if (
       isSelfCancel &&

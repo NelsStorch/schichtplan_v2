@@ -554,7 +554,7 @@ function ShiftForm({
           <div>
             <h4 className="text-sm font-bold text-fg">Schicht-Verantwortliche</h4>
             <p className="text-xs text-fg-muted">
-              Diese Person(en) leiten die Schicht (z. B. Standleitung, Grillchef) und werden auf den Schichtkarten als Ansprechpersonen aufgeführt.
+              Diese Person(en) leiten die Schicht (z. B. Standleitung, Grillleitung) und werden auf den Schichtkarten als Ansprechpersonen aufgeführt.
             </p>
           </div>
 
@@ -915,7 +915,7 @@ function OrganizerForm({
       <Field label="Ressort / Funktion">
         <Input
           value={form.roleTitle}
-          placeholder="Bau & Grillchef"
+          placeholder="Bau & Grill"
           onChange={(e) => setForm({ ...form, roleTitle: e.target.value })}
         />
       </Field>

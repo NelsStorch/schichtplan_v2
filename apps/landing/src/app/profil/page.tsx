@@ -64,7 +64,7 @@ export default function ProfilePage() {
     const confirmed = await confirm({
       title: 'Konto wirklich löschen?',
       description:
-        'Möchtest du dein Benutzerkonto wirklich unwiderruflich löschen? Alle deine Schichteintragungen und Verknüpfungen werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
+        'Möchtest du dein Konto wirklich unwiderruflich löschen? Alle deine Schichteintragungen und Verknüpfungen werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
       confirmLabel: 'Mein Konto endgültig löschen',
       cancelLabel: 'Abbrechen',
       tone: 'danger',
@@ -397,7 +397,7 @@ export default function ProfilePage() {
                   <div>
                     <h2 className="text-sm font-semibold text-danger-ink">Konto löschen</h2>
                     <p className="mt-1 text-xs text-fg-muted">
-                      Löscht dein Benutzerkonto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem Cevi Schichtplan.
+                      Löscht dein Konto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem Cevi Schichtplan.
                     </p>
                   </div>
                   <Button

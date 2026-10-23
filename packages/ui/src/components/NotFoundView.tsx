@@ -53,11 +53,11 @@ const SCOUT_WISDOMS = [
   'Regel #1 an der Chilbi: Kein Schichtplan überlebt den ersten Ansturm am Samstagabend unversehrt.',
   'Der Kompass zeigt immer nach Norden – ausser du hältst dein Taschenmesser daneben.',
   'Im Zweifelsfall immer dem Duft von frisch gebratenen Bratwürsten oder Crêpes folgen.',
-  'Ein echter Cevianer verirrt sich nicht – er erkundet nur unerschlossene Nebenpfade.',
+  'Echte Cevianer*innen verirren sich nicht – sie erkunden nur unerschlossene Nebenpfade.',
   'Der Knoten hält bombenfest. Niemand weiss zwar genau welcher Knoten es ist, aber er hält.',
   'Das K-Weg Liederbuch hat über 200 Lieder. Gesungen werden am Lagerfeuer trotzdem immer dieselben drei.',
   'Wer zu spät zur Schicht antritt, muss beim Zeltabbau die krummen Heringe geradedrücken.',
-  'Es gibt kein schlechtes Wetter für Helfer:innen – nur zu dünne Regenpellerinen.',
+  'Es gibt kein schlechtes Wetter für Helfer*innen – nur zu dünne Regenpellerinen.',
   'Tipp der Lagerleitung: Immer den roten Kreidemarkierungen an den Bäumen nachgehen.',
   'Die beste Schicht ist diejenige, bei der es am Schluss Gratis-Kuchen und heissen Tee gibt.',
 ];
@@ -458,7 +458,7 @@ export function NotFoundView({
             {logs >= 10 && (
               <Badge tone="success" className="animate-scale-in">
                 <Award className="size-3 mr-1" />
-                Ehren-Feuermeister:in!
+                Ehren-Feuermeister*in!
               </Badge>
             )}
           </div>

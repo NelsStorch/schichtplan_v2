@@ -1059,7 +1059,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       reply.header('Cache-Control', 'no-store');
       const user = await loadUserDto(fastify.prisma, request.user.id, request.tenant?.id ?? null);
       if (!user) {
-        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+        return reply.status(404).send({ error: 'Person nicht gefunden' });
       }
       return user;
     }
@@ -1102,7 +1102,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!user) {
-        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+        return reply.status(404).send({ error: 'Person nicht gefunden' });
       }
 
       // Nur Accounts über Cevi.DB oder Passwort dürfen sich selbst löschen
@@ -1154,7 +1154,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       request.log.info(
         { userId, email: user.email, name: userDisplayName, ceviDbId: user.ceviDbId, hasPassword: Boolean(user.passwordHash) },
-        'Benutzer hat sein Konto selbst gelöscht'
+        'Person hat ihr Konto selbst gelöscht'
       );
 
       return { success: true, message: 'Dein Konto wurde erfolgreich gelöscht.' };
@@ -1176,7 +1176,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: userId },
         select: { homeDepartmentId: true, homeDepartmentSource: true, ceviDbId: true },
       });
-      if (!current) return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+      if (!current) return reply.status(404).send({ error: 'Person nicht gefunden' });
 
       const fromCeviDb = current.homeDepartmentSource === 'CEVIDB';
       const departmentId = fromCeviDb ? current.homeDepartmentId : parse.data.departmentId;
@@ -1248,7 +1248,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!user) {
-        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+        return reply.status(404).send({ error: 'Person nicht gefunden' });
       }
 
       return {

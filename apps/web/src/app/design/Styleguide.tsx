@@ -55,7 +55,7 @@ const sampleShift = (filled: number, total: number, extra: Partial<ShiftDto> = {
   endTime: iso(52.5),
   requiredSlots: total,
   freeSlots: total - filled,
-  signups: ['Helfer 1', 'Helfer 2', 'Helfer 3', 'Helfer 4'].slice(0, filled).map((name, i) => ({
+  signups: ['Person 1', 'Person 2', 'Person 3', 'Person 4'].slice(0, filled).map((name, i) => ({
     id: `s${i}`,
     shiftId: 'demo',
     displayName: name,
@@ -192,7 +192,7 @@ export function Styleguide() {
               <SlotMeter filled={9} total={20} />
             </div>
             <div className="flex -space-x-2">
-              {['Helfer 1', 'Helfer 2', 'Helfer 3', 'Helfer 4'].map((n, i) => (
+              {['Person 1', 'Person 2', 'Person 3', 'Person 4'].map((n, i) => (
                 <Avatar key={n} name={n} highlight={i === 0} className="ring-2 ring-canvas" />
               ))}
             </div>

@@ -151,7 +151,7 @@ export function Hero3DStage() {
             <div className="flex items-center justify-between text-xs mb-1.5">
               <span className="font-semibold text-fg flex items-center gap-1.5">
                 <Users className="size-3.5 text-accent" />
-                Helfer-Besetzung
+                Besetzung
               </span>
               <span className="font-mono text-accent-ink font-bold tabular">
                 {enrolled ? '86%' : '82%'}

@@ -205,7 +205,7 @@ function CreateDepartment() {
               <p className="text-[15px] leading-relaxed text-fg-muted">
                 {eligibility.reason === 'NO_ORTSGRUPPE'
                   ? 'In Cevi.DB ist für dich keine Ortsgruppe hinterlegt. Melde dich bei der Cevi.DB-Verwaltung eurer Abteilung.'
-                  : 'Eine neue Abteilung kann nur die Abteilungsleitung anlegen (Rolle «Abteilungsleiter/-in» in Cevi.DB). Frag eure Abteilungsleitung, ob sie den Schichtplan anlegt.'}
+                  : 'Eine neue Abteilung kann nur die Abteilungsleitung anlegen (Rolle «Abteilungsleiter*in» in Cevi.DB). Frag eure Abteilungsleitung, ob sie den Schichtplan anlegt.'}
               </p>
             )}
             <Button variant="ghost" className="w-full" onClick={later}>

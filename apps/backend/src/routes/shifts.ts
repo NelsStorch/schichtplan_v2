@@ -629,7 +629,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         targetUserId = requestedUserId;
         targetUser = await fastify.prisma.user.findUnique({ where: { id: targetUserId } });
         if (!targetUser) {
-          return reply.status(404).send({ error: 'Ausgewählter Benutzer nicht gefunden' });
+          return reply.status(404).send({ error: 'Ausgewählte Person nicht gefunden' });
         }
       } else if (isOkOrAdmin && reqGuestName) {
         // OK trägt manuellen Gast/Helfer ein
@@ -653,7 +653,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
         if (!self) {
-          return reply.status(401).send({ error: 'Benutzerkonto nicht gefunden' });
+          return reply.status(401).send({ error: 'Konto nicht gefunden' });
         }
         targetUser = self;
 
@@ -798,7 +798,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           // Alle müssen das Mindestalter haben
           if (userAge !== null && userAge < chosenTask.minAge) {
             return reply.status(403).send({
-              error: `Für die Arbeit "${chosenTask.title}" müssen alle Helfer mindestens ${chosenTask.minAge} Jahre alt sein. Alter: ${userAge} Jahre.`,
+              error: `Für die Arbeit "${chosenTask.title}" müssen alle Helfenden mindestens ${chosenTask.minAge} Jahre alt sein. Alter: ${userAge} Jahre.`,
             });
           }
         } else if (chosenTask.ageRequirementType === 'AT_LEAST_ONE') {

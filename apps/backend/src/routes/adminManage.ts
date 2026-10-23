@@ -651,7 +651,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
         select: { id: true, isGlobalAdmin: true, ceviDbId: true, firstName: true, lastName: true, ceviName: true },
       })
       .catch(() => null);
-    if (!user) return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+    if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
 
     if (isGlobalAdmin !== undefined && isGlobalAdmin !== user.isGlobalAdmin) {
       // Admins melden sich mit Cevi.DB an (stärker als ein eigenes Passwort, siehe adminSecurity.ts)

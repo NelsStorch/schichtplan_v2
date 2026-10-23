@@ -15,7 +15,7 @@ interface PortalState {
   logout: () => Promise<void>;
   /** Abteilungsleitung (oder globaler Admin) */
   isDeptAdmin: boolean;
-  /** Abteilungsleitung oder Schichtplaner:in */
+  /** Abteilungsleitung oder Schichtplaner*in */
   isPlanner: boolean;
 }
 

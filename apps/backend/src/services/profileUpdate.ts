@@ -24,7 +24,7 @@ export async function applyProfileUpdate(
       memberships: { select: { departmentId: true } },
     },
   });
-  if (!user) return { error: 'Benutzerkonto nicht gefunden', status: 404 };
+  if (!user) return { error: 'Konto nicht gefunden', status: 404 };
 
   const data: Prisma.UserUpdateInput = {};
   if (input.firstName !== undefined) data.firstName = input.firstName;

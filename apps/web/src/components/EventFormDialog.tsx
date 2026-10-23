@@ -702,7 +702,7 @@ export function EventForm({
                 <label className="text-[11px] font-medium text-fg-subtle block mb-1">Ressort / Bezeichnung (optional)</label>
                 <input
                   type="text"
-                  placeholder="z.B. Bau & Technik, Kassier, Grillchef"
+                  placeholder="z. B. Bau & Technik, Kasse, Grill"
                   value={newRoleTitle}
                   onChange={(e) => setNewRoleTitle(e.target.value)}
                   className="w-full rounded-field border border-line bg-surface-1 px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
@@ -769,7 +769,7 @@ export function EventForm({
 
         <Field
           label="Soll: Schichten pro Person (optional)"
-          hint="Unter «Helfende» siehst du dann, wer sein Soll erfüllt hat. Leer lassen = kein Soll."
+          hint="Unter «Helfende» siehst du dann, wer das Soll erfüllt hat. Leer lassen = kein Soll."
         >
           <Input
             type="number"

@@ -236,7 +236,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!user) {
-        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+        return reply.status(404).send({ error: 'Person nicht gefunden' });
       }
 
       request.log.info({ adminId: request.user.id, userId: user.id }, 'Admin: Userdetail abgerufen');
@@ -280,7 +280,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       const targetUserId = request.params.id;
 
       if (targetUserId === request.user.id) {
-        return reply.status(400).send({ error: 'Du kannst dein eigenes Administratorkonto nicht löschen.' });
+        return reply.status(400).send({ error: 'Du kannst dein eigenes Admin-Konto nicht löschen.' });
       }
 
       const user = await fastify.prisma.user.findUnique({
@@ -296,13 +296,13 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!user) {
-        return reply.status(404).send({ error: 'Benutzer nicht gefunden' });
+        return reply.status(404).send({ error: 'Person nicht gefunden' });
       }
 
       if (user.isGlobalAdmin) {
         const adminCount = await fastify.prisma.user.count({ where: { isGlobalAdmin: true } });
         if (adminCount <= 1) {
-          return reply.status(400).send({ error: 'Der letzte globale Administrator kann nicht gelöscht werden.' });
+          return reply.status(400).send({ error: 'Das letzte Konto mit globalen Admin-Rechten kann nicht gelöscht werden.' });
         }
       }
 

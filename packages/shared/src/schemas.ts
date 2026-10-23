@@ -301,7 +301,7 @@ export const CreateShiftTaskSchema = z.object({
   taskDefinitionId: z.string().uuid().optional().nullable(),
   title: z.string().trim().min(2, 'Titel der Arbeit erforderlich').max(120),
   description: z.string().max(2000).optional().nullable(),
-  requiredSlots: z.number().int().min(1, 'Mindestens 1 Helfer benötigt').max(500).default(1),
+  requiredSlots: z.number().int().min(1, 'Mindestens 1 Platz nötig').max(500).default(1),
   minAge: z.number().int().min(0).max(120).optional().nullable(),
   ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']).default('ALL'),
 });
@@ -463,7 +463,7 @@ export type BulkShiftsInput = z.infer<typeof BulkShiftsSchema>;
 export type UnregisterHelperInput = z.infer<typeof UnregisterHelperSchema>;
 
 export const EventDeregistrationSchema = z.object({
-  userId: z.string().uuid('Ungültige Benutzer-ID'),
+  userId: z.string().uuid('Ungültige Personen-ID'),
   reason: z.string().trim().max(200, 'Grund darf maximal 200 Zeichen lang sein').optional(),
 });
 

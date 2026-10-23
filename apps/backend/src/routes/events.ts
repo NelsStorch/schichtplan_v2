@@ -1062,7 +1062,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       const flags = await managerFlags(fastify.prisma, event, request.user);
       if (!flags.isManager) {
-        return reply.status(403).send({ error: 'Keine Berechtigung zum Abmelden von Helfern' });
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Abmelden von Helfenden' });
       }
 
       const parse = UnregisterHelperSchema.safeParse(request.body);

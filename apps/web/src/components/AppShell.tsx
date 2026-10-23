@@ -183,7 +183,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: 'Abteilungsleitung',
   PLANNER: 'Schichtplanung',
-  HELPER: 'Helfer:in',
+  HELPER: 'Helfer*in',
 };
 
 function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -193,13 +193,13 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const [deleting, setDeleting] = useState(false);
 
   if (!user) return null;
-  const role = user.isGlobalAdmin ? 'Plattform-Admin' : ROLE_LABEL[user.departmentRole ?? ''] ?? 'Helfer:in';
+  const role = user.isGlobalAdmin ? 'Plattform-Admin' : ROLE_LABEL[user.departmentRole ?? ''] ?? 'Helfer*in';
 
   const handleDeleteAccount = async () => {
     const confirmed = await confirm({
       title: 'Konto wirklich löschen?',
       description:
-        'Möchtest du dein Benutzerkonto wirklich unwiderruflich löschen? Alle deine Schichteintragungen und Verknüpfungen werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
+        'Möchtest du dein Konto wirklich unwiderruflich löschen? Alle deine Schichteintragungen und Verknüpfungen werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
       confirmLabel: 'Mein Konto endgültig löschen',
       cancelLabel: 'Abbrechen',
       tone: 'danger',

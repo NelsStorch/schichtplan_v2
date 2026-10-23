@@ -296,7 +296,7 @@ export default function CeviDbDataPage() {
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-fg-muted">
               Diese Seite enthält vertrauliche Personendaten und OAuth-Rohdaten der Cevi.DB. Sie ist
-              <strong> ausschliesslich für globale Plattform-Administratoren</strong> freigeschaltet.
+              <strong> ausschliesslich für globale Plattform-Admins</strong> freigeschaltet.
             </p>
             <div className="mt-6 rounded-2xl border border-line/70 bg-surface-1 p-5 text-left text-xs text-fg-muted">
               <p className="font-semibold text-fg flex items-center gap-1.5">
@@ -329,7 +329,7 @@ export default function CeviDbDataPage() {
               Admin-Authentifizierung erforderlich
             </h1>
             <p className="mt-3 text-base text-fg-muted">
-              Bitte melde dich mit deinem autorisierten Administrator-Konto via Cevi.DB an, um die Daten einzusehen.
+              Bitte melde dich mit deinem Admin-Konto via Cevi.DB an, um die Daten einzusehen.
             </p>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -370,7 +370,7 @@ export default function CeviDbDataPage() {
           </Callout>
         ) : !data?.user ? (
           <div className="text-center py-12">
-            <p className="text-sm text-fg-muted">Keine Benutzerdaten verfügbar.</p>
+            <p className="text-sm text-fg-muted">Keine Personendaten verfügbar.</p>
           </div>
         ) : (
           /* Vollständige Cevi.DB Datenanzeige für Admins */
@@ -381,7 +381,7 @@ export default function CeviDbDataPage() {
                 <div className="flex items-center gap-2">
                   <UserCheck className="size-4 text-accent shrink-0" />
                   <span className="text-xs font-semibold text-fg">
-                    Admin-Inspektor: Benutzer auswählen
+                    Admin-Inspektor: Person auswählen
                   </span>
                   <Badge tone="accent" className="text-2xs">
                     {userList.length} Cevi.DB Konten

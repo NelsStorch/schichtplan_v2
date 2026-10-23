@@ -163,7 +163,7 @@ export function UserDialog({
     if (isSelf) {
       toast({
         title: 'Nicht möglich',
-        description: 'Du kannst dein eigenes Administratorkonto nicht löschen.',
+        description: 'Du kannst dein eigenes Admin-Konto nicht löschen.',
         tone: 'error',
       });
       return;
@@ -173,7 +173,7 @@ export function UserDialog({
     const confirmed = await confirm({
       title: `${name} wirklich löschen?`,
       description: `Möchtest du das Konto von ${name} wirklich unwiderruflich löschen? Alle Schichteintragungen, Abteilungs- und OK-Mitgliedschaften werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`,
-      confirmLabel: 'Benutzer endgültig löschen',
+      confirmLabel: 'Person endgültig löschen',
       cancelLabel: 'Abbrechen',
       tone: 'danger',
       countdownSeconds: 7,
@@ -187,7 +187,7 @@ export function UserDialog({
         method: 'DELETE',
       });
       toast({
-        title: 'Benutzer gelöscht',
+        title: 'Person gelöscht',
         description: `${name} wurde vollständig gelöscht.`,
         tone: 'success',
       });
@@ -219,7 +219,7 @@ export function UserDialog({
               className="sm:mr-auto"
             >
               <Trash2 className="size-4" aria-hidden />
-              {deleting ? 'Wird gelöscht …' : 'Benutzer löschen'}
+              {deleting ? 'Wird gelöscht …' : 'Person löschen'}
             </Button>
           )}
           <Button variant="secondary" onClick={onClose} disabled={deleting}>
@@ -526,7 +526,7 @@ export function UserDialog({
                 <div className="rounded-card border border-danger/30 bg-danger/5 p-4 sm:p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-danger-ink">Benutzerkonto unwiderruflich löschen</h4>
+                      <h4 className="text-sm font-semibold text-danger-ink">Konto unwiderruflich löschen</h4>
                       <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                         Entfernt diese Person mitsamt allen Schichten, Abteilungsrollen und Verknüpfungen vollständig aus der Datenbank.
                       </p>
@@ -539,7 +539,7 @@ export function UserDialog({
                       className="shrink-0"
                     >
                       <Trash2 className="size-4" aria-hidden />
-                      {deleting ? 'Wird gelöscht …' : 'Benutzer löschen'}
+                      {deleting ? 'Wird gelöscht …' : 'Person löschen'}
                     </Button>
                   </div>
                 </div>

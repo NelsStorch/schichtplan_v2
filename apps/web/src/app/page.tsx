@@ -123,7 +123,7 @@ export default function DepartmentHomePage() {
             title="Gerade keine Anlässe"
             description={
               isPlanner
-                ? 'Lege den ersten Anlass an. Danach planst du die Schichten und teilst den Link mit deinen Helfer:innen.'
+                ? 'Lege den ersten Anlass an. Danach planst du die Schichten und teilst den Link mit deinen Helfer*innen.'
                 : 'Für diese Abteilung sind momentan keine Schichtpläne offen. Schau bald wieder vorbei.'
             }
             action={

@@ -164,7 +164,7 @@ export function ShiftDetailsDialog({
                 size="sm"
                 onClick={() => onAssignHelper(shift)}
               >
-                <UserPlus className="size-3.5" /> Helfer einteilen
+                <UserPlus className="size-3.5" /> Person einteilen
               </Button>
             )}
             {canManage && onEditShift && (
@@ -281,7 +281,7 @@ export function ShiftDetailsDialog({
           <div className="rounded-card border border-line bg-surface p-4 sm:p-5 space-y-2.5">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
-                {event.responsibleMode === 'BY_DAY' ? 'Tages-Verantwortliche(r)' : 'Schicht-Verantwortliche(r)'}
+                {event.responsibleMode === 'BY_DAY' ? 'Tages-Verantwortliche*r' : 'Schicht-Verantwortliche*r'}
               </h4>
               <Badge tone="neutral" size="sm">
                 {effectiveResponsibles.length} {effectiveResponsibles.length === 1 ? 'Person' : 'Personen'}
@@ -394,7 +394,7 @@ export function ShiftDetailsDialog({
                         <Badge tone="warning" size="sm">
                           {task.ageRequirementType === 'ALL' ? (
                             <>
-                              <AlertCircle className="size-3" /> Mindestalter ab {task.minAge} Jahren (alle Helfer dieser Arbeit)
+                              <AlertCircle className="size-3" /> Mindestalter ab {task.minAge} Jahren (alle Helfenden dieser Arbeit)
                             </>
                           ) : (
                             <>
@@ -409,7 +409,7 @@ export function ShiftDetailsDialog({
                   {/* Eingetragene Personen */}
                   <div className="rounded-field border border-line/60 bg-surface-2/40 p-3">
                     <span className="mb-2 block text-2xs font-bold uppercase tracking-wider text-fg-subtle">
-                      Eingeteilte Helfer ({taskFilled}/{taskTotal})
+                      Eingeteilte Helfende ({taskFilled}/{taskTotal})
                     </span>
 
                     {taskSignups.length === 0 ? (
@@ -417,7 +417,7 @@ export function ShiftDetailsDialog({
                         Noch niemand eingetragen. Sei die erste Person!
                       </p>
                     ) : (
-                      <ul className="flex flex-wrap gap-1.5" aria-label="Eingetragene Helfer">
+                      <ul className="flex flex-wrap gap-1.5" aria-label="Eingetragene Helfende">
                         {taskSignups.map((s) => {
                           const isCurrentUser = currentUser && s.userId === currentUser.id;
                           return (

@@ -111,7 +111,7 @@ export function UsersPanel({
     if (target.id === currentUserId) {
       toast({
         title: 'Nicht möglich',
-        description: 'Du kannst dein eigenes Administratorkonto nicht löschen.',
+        description: 'Du kannst dein eigenes Admin-Konto nicht löschen.',
         tone: 'error',
       });
       return;
@@ -121,7 +121,7 @@ export function UsersPanel({
     const confirmed = await confirm({
       title: `${name} wirklich löschen?`,
       description: `Möchtest du das Konto von ${name} wirklich unwiderruflich löschen? Alle Schichteintragungen, Abteilungs- und OK-Mitgliedschaften werden dabei vollständig entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`,
-      confirmLabel: 'Benutzer endgültig löschen',
+      confirmLabel: 'Person endgültig löschen',
       cancelLabel: 'Abbrechen',
       tone: 'danger',
       countdownSeconds: 7,
@@ -134,7 +134,7 @@ export function UsersPanel({
         method: 'DELETE',
       });
       toast({
-        title: 'Benutzer gelöscht',
+        title: 'Person gelöscht',
         description: `${name} wurde vollständig gelöscht.`,
         tone: 'success',
       });
@@ -359,7 +359,7 @@ export function UsersPanel({
                           size="icon"
                           onClick={() => handleDeleteUser(user)}
                           aria-label={`${fullName(user)} löschen`}
-                          title="Benutzer löschen"
+                          title="Person löschen"
                           className="text-fg-subtle transition hover:bg-danger/10 hover:text-danger-ink"
                         >
                           <Trash2 className="size-4" aria-hidden />
@@ -400,7 +400,7 @@ export function UsersPanel({
                           handleDeleteUser(user);
                         }}
                         aria-label={`${fullName(user)} löschen`}
-                        title="Benutzer löschen"
+                        title="Person löschen"
                         className="text-fg-subtle hover:bg-danger/10 hover:text-danger-ink"
                       >
                         <Trash2 className="size-4" aria-hidden />
