@@ -4,6 +4,8 @@ import {
   toZurichInput,
   BulkShiftsSchema,
   CreateShiftSchema,
+  CreateShiftSeriesSchema,
+  calculateShiftSeriesIntervals,
   UpdateShiftSchema,
   SignupShiftSchema,
   type BulkShiftsResultDto,
@@ -178,6 +180,156 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         responsibles: shift.responsibles.map((r) =>
           toResponsiblePersonDto(r, event.contactVisibility || 'BOTH')
         ),
+      };
+    }
+  );
+
+  // Schicht-Serie erstellen (Raster-Planung für Stände und aufeinanderfolgende Schichten)
+  fastify.post(
+    '/api/shifts/series',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const parse = CreateShiftSeriesSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      const {
+        eventId,
+        title,
+        category,
+        isSetupTeardown,
+        startTime,
+        endTime,
+        durationMinutes,
+        overlapMinutes,
+        firstShiftIncludesOverlap,
+        description,
+        minAge,
+        tasks,
+        responsibleUserIds,
+      } = parse.data;
+
+      if (new Date(endTime) <= new Date(startTime)) {
+        return reply.status(400).send({ error: 'Das Ende der Serie muss nach dem Beginn liegen' });
+      }
+
+      // Event & Abteilung prüfen
+      const event = await fastify.prisma.event.findUnique({
+        where: { id: eventId },
+        include: { organizers: true },
+      });
+
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+
+      // Prüfe Berechtigung: Abteilungsleitung, Planner oder Event-OK
+      const member = await fastify.prisma.departmentMember.findUnique({
+        where: {
+          departmentId_userId: {
+            departmentId: event.departmentId,
+            userId: request.user.id,
+          },
+        },
+      });
+
+      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
+      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
+
+      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+        return reply
+          .status(403)
+          .send({ error: 'Keine Berechtigung zum Erstellen von Schichten für dieses Event' });
+      }
+
+      const intervals = calculateShiftSeriesIntervals({
+        startTime,
+        endTime,
+        durationMinutes,
+        overlapMinutes,
+        firstShiftIncludesOverlap,
+      });
+
+      if (intervals.length === 0) {
+        return reply.status(400).send({ error: 'Keine Schichten generiert. Zeitraum oder Dauer prüfen.' });
+      }
+
+      if (intervals.length > 50) {
+        return reply.status(400).send({ error: 'Maximal 50 Schichten pro Serie erlaubt.' });
+      }
+
+      const resolvedTasks =
+        tasks && tasks.length > 0
+          ? tasks
+          : [
+              {
+                title,
+                description: description || null,
+                requiredSlots: 1,
+                minAge: minAge || null,
+                ageRequirementType: 'ALL' as const,
+                taskDefinitionId: null,
+              },
+            ];
+
+      const totalRequiredSlots = resolvedTasks.reduce((sum, t) => sum + (t.requiredSlots || 1), 0);
+
+      const createdShifts = await fastify.prisma.$transaction(
+        intervals.map((interval) =>
+          fastify.prisma.shift.create({
+            data: {
+              eventId,
+              title,
+              category: category || null,
+              isSetupTeardown: isSetupTeardown ?? false,
+              startTime: interval.startTime,
+              endTime: interval.endTime,
+              requiredSlots: totalRequiredSlots,
+              description: description || null,
+              minAge: minAge || null,
+              responsibles:
+                responsibleUserIds && responsibleUserIds.length > 0
+                  ? {
+                      create: responsibleUserIds.map((userId) => ({ userId })),
+                    }
+                  : undefined,
+              tasks: {
+                create: resolvedTasks.map((t) => ({
+                  taskDefinitionId: t.taskDefinitionId || null,
+                  title: t.title,
+                  description: t.description || null,
+                  requiredSlots: t.requiredSlots || 1,
+                  minAge: t.minAge || null,
+                  ageRequirementType: t.ageRequirementType || 'ALL',
+                })),
+              },
+            },
+            include: {
+              tasks: {
+                include: { signups: true },
+              },
+              responsibles: {
+                include: {
+                  user: {
+                    select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                  },
+                },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+          })
+        )
+      );
+
+      return {
+        count: createdShifts.length,
+        shifts: createdShifts.map((shift) => ({
+          ...shift,
+          responsibles: shift.responsibles.map((r) =>
+            toResponsiblePersonDto(r, event.contactVisibility || 'BOTH')
+          ),
+        })),
       };
     }
   );

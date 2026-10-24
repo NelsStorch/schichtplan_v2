@@ -2,13 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CalendarDays, CheckSquare, Filter, LayoutList, Plus, Rows3, Search } from 'lucide-react';
+import { CalendarDays, CheckSquare, Filter, LayoutList, Plus, Rows3, Search, Sparkles } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import { Badge, Button, Chip, EmptyState, Input, Select, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { BulkShiftBar } from '@/components/ok/BulkShiftBar';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { ShiftCard } from '@/components/ok/ShiftCard';
+import { ShiftSeriesDialog } from '@/components/ok/ShiftSeriesDialog';
 import { ShiftTimeline } from '@/components/ok/ShiftTimeline';
 import { AssignHelperDialog, DayResponsiblesDialog, DuplicateShiftDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { api, errorMessage } from '@/lib/api';
@@ -35,6 +36,7 @@ function ShiftsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [showShiftForm, setShowShiftForm] = useState(params.get('neu') === '1');
+  const [showSeriesForm, setShowSeriesForm] = useState(false);
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [duplicatingShift, setDuplicatingShift] = useState<ShiftDto | null>(null);
   const [assigning, setAssigning] = useState<{ shift: ShiftDto; task: ShiftTaskDto } | null>(null);
@@ -168,6 +170,9 @@ function ShiftsPage() {
           <>
             <Button size="sm" variant={selecting ? 'primary' : 'secondary'} onClick={selecting ? stopSelecting : () => setSelecting(true)}>
               <CheckSquare className="size-4" /> {selecting ? 'Fertig' : 'Auswählen'}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowSeriesForm(true)}>
+              <Sparkles className="size-4" /> Serie erstellen
             </Button>
             <Button size="sm" onClick={openNew}>
               <Plus className="size-4" /> Neue Schicht
@@ -442,6 +447,15 @@ function ShiftsPage() {
         onClose={() => setDayTarget(null)}
         onSaved={async () => {
           setDayTarget(null);
+          await reload();
+        }}
+      />
+      <ShiftSeriesDialog
+        open={showSeriesForm}
+        event={event}
+        onClose={() => setShowSeriesForm(false)}
+        onCreated={async () => {
+          setShowSeriesForm(false);
           await reload();
         }}
       />

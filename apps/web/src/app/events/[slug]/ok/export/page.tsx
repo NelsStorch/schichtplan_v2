@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
-import { CalendarDays, ClipboardCheck, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
+import { Award, CalendarDays, ClipboardCheck, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
 import type { EventRosterResponseDto } from '@schichtplan/shared';
 import { Button, Card, Chip, Dialog, Switch, cn, useToast } from '@schichtplan/ui';
+import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { api, errorMessage } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportFile';
 import { dayKeyToIso, fmtShortDate, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay } from '@/lib/format';
+import { DEFAULT_HELPER_STATS_CONFIG, computeHelperStats, exportHelperHoursCsv } from '@/lib/helperStats';
 import { usePortal } from '@/lib/portal';
 import { PRINT_LAYOUTS, createShiftPlanPdf, downloadBlob, pdfFilename, printBlob, type PrintLayout } from '@/lib/printPlan';
 
@@ -18,6 +20,15 @@ export default function ExportPage() {
   const toast = useToast();
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const [helperHoursOpen, setHelperHoursOpen] = useState(false);
+  const [roster, setRoster] = useState<EventRosterResponseDto | null>(null);
+
+  useEffect(() => {
+    api<EventRosterResponseDto>(`/api/events/${event.slug}/roster`)
+      .then((data) => setRoster(data))
+      .catch(() => {});
+  }, [event.slug]);
+
   const days = groupByBusinessDay(event.shifts, event.dayCutoffTime);
   const sorted = days.flatMap((d) => [...d.items].sort((a, b) => a.startTime.localeCompare(b.startTime)).map((s) => ({ day: d.key, shift: s })));
 
@@ -94,6 +105,11 @@ export default function ExportPage() {
     }
   };
 
+  const exportHelperHours = () => {
+    const { helpers, summary } = computeHelperStats(event, roster, DEFAULT_HELPER_STATS_CONFIG);
+    exportHelperHoursCsv(event.slug, helpers, summary, DEFAULT_HELPER_STATS_CONFIG);
+  };
+
   const empty = event.shifts.length === 0;
 
   return (
@@ -142,6 +158,20 @@ export default function ExportPage() {
           </Button>
         </ExportCard>
         <ExportCard
+          icon={<Award className="size-5" />}
+          title="Helferstunden & Bon-Auswertung"
+          text="Wer hat wie viele Stunden geleistet? Berechne Verpflegungsbons (z. B. 1 Bon je 3h) und T-Shirts für Helfende sowie Gesamtstunden für J+S / Cevi-Jahresbericht."
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setHelperHoursOpen(true)} disabled={empty}>
+              <Award className="size-4" /> Auswertung öffnen
+            </Button>
+            <Button size="sm" variant="secondary" onClick={exportHelperHours} disabled={empty}>
+              <FileSpreadsheet className="size-4" /> CSV herunterladen
+            </Button>
+          </div>
+        </ExportCard>
+        <ExportCard
           icon={<ClipboardCheck className="size-5" />}
           title="Anwesenheitsliste"
           text="Liste zum Abhaken und Auswertung, wer da war."
@@ -152,6 +182,12 @@ export default function ExportPage() {
         </ExportCard>
       </div>
       <PrintDialog open={printOpen} onClose={() => setPrintOpen(false)} />
+      <HelperHoursDialog
+        open={helperHoursOpen}
+        event={event}
+        roster={roster}
+        onClose={() => setHelperHoursOpen(false)}
+      />
     </div>
   );
 }

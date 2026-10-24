@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronDown, ChevronUp, Filter, Info, Mail, Search, UserCheck, UserMinus, Users, X } from 'lucide-react';
+import { Award, ChevronDown, ChevronUp, Filter, Info, Mail, Search, UserCheck, UserMinus, Users, X } from 'lucide-react';
 import type { EventRosterResponseDto } from '@schichtplan/shared';
 import {
   Avatar,
@@ -21,10 +21,12 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
+import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { api, errorMessage } from '@/lib/api';
 import { fmtShortWeekday, fmtTime } from '@/lib/format';
+import { formatMinutes } from '@/lib/helperStats';
 
 type Status = 'ALL' | 'WITH' | 'WITHOUT' | 'UNDER' | 'DEREGISTERED';
 
@@ -34,6 +36,7 @@ interface PersonShift {
   title: string;
   taskTitle: string | null;
   startTime: string;
+  endTime: string;
 }
 
 interface PersonRow {
@@ -71,6 +74,7 @@ function HelpersPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deregTarget, setDeregTarget] = useState<PersonRow | null>(null);
+  const [showHoursDialog, setShowHoursDialog] = useState(false);
 
   const loadRoster = useCallback(async () => {
     try {
@@ -101,6 +105,7 @@ function HelpersPage() {
           title: shift.title,
           taskTitle: su.taskTitle ?? null,
           startTime: shift.startTime,
+          endTime: shift.endTime,
         };
         if (su.userId) {
           shiftsByUser.set(su.userId, [...(shiftsByUser.get(su.userId) ?? []), entry]);
@@ -254,6 +259,11 @@ function HelpersPage() {
         title="Helfende"
         description="Alle Personen, die bei diesem Anlass helfen können oder schon eingetragen sind. Wer nicht helfen kann, meldest du hier ab, dann zählt das Soll nicht."
         help="/ok/helfer-pool/"
+        actions={
+          <Button size="sm" variant="secondary" onClick={() => setShowHoursDialog(true)}>
+            <Award className="size-4" /> Helferstunden & Bons
+          </Button>
+        }
       />
 
       {rosterError && <Callout tone="danger" className="mb-6">Personen konnten nicht geladen werden: {rosterError}</Callout>}
@@ -378,6 +388,12 @@ function HelpersPage() {
             const isOpen = expanded === row.key;
             const target = minShifts && !row.isGuest ? minShifts : null;
             const met = target ? row.shifts.length >= target : row.shifts.length > 0;
+            const totalMins = row.shifts.reduce((sum, s) => {
+              const start = new Date(s.startTime).getTime();
+              const end = new Date(s.endTime).getTime();
+              return sum + Math.max(0, Math.round((end - start) / (60 * 1000)));
+            }, 0);
+
             return (
               <div key={row.key} className={cn('px-4 py-3', row.isDeregistered && 'bg-surface-2/40')}>
                 <div className="flex items-center gap-3">
@@ -405,7 +421,12 @@ function HelpersPage() {
                           .join(' · ')}
                       </span>
                     </span>
-                    <span className="hidden shrink-0 sm:block">
+                    <span className="hidden shrink-0 sm:flex sm:items-center sm:gap-2">
+                      {totalMins > 0 && (
+                        <span className="font-mono text-xs font-semibold text-fg-muted">
+                          {formatMinutes(totalMins)}
+                        </span>
+                      )}
                       {row.isDeregistered ? (
                         <Badge tone="neutral">Abgemeldet</Badge>
                       ) : (
@@ -420,7 +441,12 @@ function HelpersPage() {
 
                 {isOpen && (
                   <div className="mt-3 space-y-3 pl-7 sm:pl-[4.25rem]">
-                    <div className="sm:hidden">
+                    <div className="flex items-center gap-2 sm:hidden">
+                      {totalMins > 0 && (
+                        <span className="font-mono text-xs font-semibold text-fg-muted">
+                          {formatMinutes(totalMins)}
+                        </span>
+                      )}
                       {row.isDeregistered ? (
                         <Badge tone="neutral">Abgemeldet</Badge>
                       ) : (
@@ -498,6 +524,13 @@ function HelpersPage() {
           setDeregTarget(null);
           await loadRoster();
         }}
+      />
+
+      <HelperHoursDialog
+        open={showHoursDialog}
+        event={event}
+        roster={roster}
+        onClose={() => setShowHoursDialog(false)}
       />
     </div>
   );

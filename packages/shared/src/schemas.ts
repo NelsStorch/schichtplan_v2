@@ -326,6 +326,24 @@ export const CreateShiftSchema = z.object({
 
 export type CreateShiftInput = z.infer<typeof CreateShiftSchema>;
 
+export const CreateShiftSeriesSchema = z.object({
+  eventId: z.string().uuid(),
+  title: z.string().trim().min(2, 'Titel erforderlich').max(120),
+  category: z.string().max(80).optional().nullable(),
+  isSetupTeardown: z.boolean().optional().default(false),
+  startTime: z.string().datetime(),
+  endTime: z.string().datetime(),
+  durationMinutes: z.number().int().min(15, 'Dauer muss mindestens 15 Minuten sein').max(1440),
+  overlapMinutes: z.number().int().min(0).max(120).optional().default(0),
+  firstShiftIncludesOverlap: z.boolean().optional().default(false),
+  description: z.string().max(2000).optional().nullable(),
+  minAge: z.number().int().min(0).max(120).optional().nullable(),
+  tasks: z.array(CreateShiftTaskSchema).max(50).optional(),
+  responsibleUserIds: z.array(z.string().uuid()).max(20).optional(),
+});
+
+export type CreateShiftSeriesInput = z.infer<typeof CreateShiftSeriesSchema>;
+
 export const UpdateShiftSchema = z.object({
   title: z.string().trim().min(2).max(120).optional(),
   category: z.string().max(80).optional().nullable(),
