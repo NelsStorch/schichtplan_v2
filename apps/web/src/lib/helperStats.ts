@@ -38,35 +38,25 @@ export interface HelperPersonStat {
 
   // Trennung Anlass vs. Auf-/Abbau
   eventMinutes: number;
+  eventHours: number;
   setupMinutes: number;
+  setupHours: number;
 
   // Anwesenheiten
   attendedMinutes: number;
+  attendedHours: number;
   attendedShiftCount: number;
   shiftCount: number;
-
-  // Auswertung Bons & Geschenke
-  bonCount: number;
-  tshirtEligible: boolean;
 }
 
 export interface HelperStatsConfig {
-  /** 'HOURS' = 1 Bon pro X Stunden, 'SHIFTS' = 1 Bon pro geleistete Schicht */
-  bonCalculationMode: 'HOURS' | 'SHIFTS';
-  /** Stunden für 1 Bon (Standard: 3) */
-  hoursPerBon: number;
-  /** Mindeststunden für Helfergeschenk / T-Shirt (Standard: 4) */
-  tshirtMinHours: number;
-  /** Nur bestätigte Anwesenheiten ('ATTENDED') zählen */
+  /** Nur bestätigte Anwesenheiten ('PRESENT') werten */
   countAttendedOnly: boolean;
   /** Auf- und Abbau-Schichten einbeziehen */
   includeSetupTeardown: boolean;
 }
 
 export const DEFAULT_HELPER_STATS_CONFIG: HelperStatsConfig = {
-  bonCalculationMode: 'HOURS',
-  hoursPerBon: 3,
-  tshirtMinHours: 4,
   countAttendedOnly: false,
   includeSetupTeardown: true,
 };
@@ -74,13 +64,12 @@ export const DEFAULT_HELPER_STATS_CONFIG: HelperStatsConfig = {
 export interface HelperStatsSummary {
   totalHelpers: number;
   activeHelpers: number;
+  totalShifts: number;
   totalMinutes: number;
   totalHours: number;
   totalSetupHours: number;
   totalEventHours: number;
   avgHoursPerHelper: number;
-  totalBons: number;
-  totalTshirts: number;
 }
 
 /** Formatiert Minuten lesbar, z. B. "4h 30m" oder "2h" */
@@ -93,7 +82,7 @@ export function formatMinutes(totalMinutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-/** Berechnet die Helferstunden, Bons und T-Shirt-Ansprüche */
+/** Berechnet die Helferstunden-Statistik für J+S und Jahresbericht */
 export function computeHelperStats(
   event: EventDetails,
   roster: EventRosterResponseDto | null,
@@ -123,7 +112,11 @@ export function computeHelperStats(
           firstName: su.userFirstName ?? undefined,
           lastName: su.userLastName ?? undefined,
           ceviName: su.userCeviName ?? null,
-          subName: isGuest ? 'Gast, vom OK eingetragen' : su.userCeviName ? `${su.userFirstName || ''} ${su.userLastName || ''}`.trim() : null,
+          subName: isGuest
+            ? 'Gast, vom OK eingetragen'
+            : su.userCeviName
+              ? `${su.userFirstName || ''} ${su.userLastName || ''}`.trim()
+              : null,
           departmentName: null,
           stufen: [],
           age: su.userAge ?? null,
@@ -135,12 +128,13 @@ export function computeHelperStats(
           totalHours: 0,
           formattedTime: '0h',
           eventMinutes: 0,
+          eventHours: 0,
           setupMinutes: 0,
+          setupHours: 0,
           attendedMinutes: 0,
+          attendedHours: 0,
           attendedShiftCount: 0,
           shiftCount: 0,
-          bonCount: 0,
-          tshirtEligible: false,
         };
         helpersMap.set(key, helper);
       }
@@ -175,13 +169,12 @@ export function computeHelperStats(
     }
   }
 
-  // 3. Stunden, Bons & Kriterien pro Helfer berechnen
+  // 3. Stunden pro Helfer berechnen
   const helpersList: HelperPersonStat[] = [];
   let sumMinutes = 0;
   let sumSetupMinutes = 0;
   let sumEventMinutes = 0;
-  let sumBons = 0;
-  let sumTshirts = 0;
+  let sumShifts = 0;
   let activeHelpersCount = 0;
 
   for (const helper of helpersMap.values()) {
@@ -218,28 +211,13 @@ export function computeHelperStats(
     helper.totalHours = Math.round((relevantMinutes / 60) * 10) / 10;
     helper.formattedTime = formatMinutes(relevantMinutes);
     helper.eventMinutes = eventMin;
+    helper.eventHours = Math.round((eventMin / 60) * 10) / 10;
     helper.setupMinutes = setupMin;
+    helper.setupHours = Math.round((setupMin / 60) * 10) / 10;
     helper.attendedMinutes = attendedMin;
+    helper.attendedHours = Math.round((attendedMin / 60) * 10) / 10;
     helper.attendedShiftCount = attendedCount;
     helper.shiftCount = helper.shifts.length;
-
-    // Bons berechnen
-    if (config.bonCalculationMode === 'HOURS') {
-      const hPerBon = Math.max(0.5, config.hoursPerBon || 3);
-      helper.bonCount = Math.floor(relevantMinutes / (hPerBon * 60));
-    } else {
-      // Pro Schicht
-      const qualifyingShifts = helper.shifts.filter((s) => {
-        if (config.countAttendedOnly && s.attendance !== 'PRESENT') return false;
-        if (!config.includeSetupTeardown && s.isSetupTeardown) return false;
-        return true;
-      });
-      helper.bonCount = qualifyingShifts.length;
-    }
-
-    // T-Shirt / Helfergeschenk
-    const tshirtMinMinutes = (config.tshirtMinHours || 4) * 60;
-    helper.tshirtEligible = relevantMinutes >= tshirtMinMinutes;
 
     if (relevantMinutes > 0) {
       activeHelpersCount++;
@@ -248,8 +226,7 @@ export function computeHelperStats(
     sumMinutes += relevantMinutes;
     sumSetupMinutes += setupMin;
     sumEventMinutes += eventMin;
-    sumBons += helper.bonCount;
-    if (helper.tshirtEligible) sumTshirts++;
+    sumShifts += helper.shifts.length;
 
     helpersList.push(helper);
   }
@@ -264,24 +241,22 @@ export function computeHelperStats(
   const summary: HelperStatsSummary = {
     totalHelpers: helpersList.length,
     activeHelpers: activeHelpersCount,
+    totalShifts: sumShifts,
     totalMinutes: sumMinutes,
     totalHours,
     totalSetupHours: Math.round((sumSetupMinutes / 60) * 10) / 10,
     totalEventHours: Math.round((sumEventMinutes / 60) * 10) / 10,
     avgHoursPerHelper,
-    totalBons: sumBons,
-    totalTshirts: sumTshirts,
   };
 
   return { helpers: helpersList, summary };
 }
 
-/** Exportiert die Helferstunden und Bon-Auswertung als Excel-CSV */
+/** Exportiert die Helferstunden-Statistik als Excel-CSV */
 export function exportHelperHoursCsv(
   eventSlug: string,
   helpers: HelperPersonStat[],
-  summary: HelperStatsSummary,
-  config: HelperStatsConfig
+  summary: HelperStatsSummary
 ) {
   const rows: (string | number)[][] = [
     [
@@ -300,8 +275,6 @@ export function exportHelperHoursCsv(
       'Gesamtzeit',
       'Anlass-Stunden',
       'Auf-/Abbau-Stunden',
-      `Verpflegungsbons (${config.bonCalculationMode === 'HOURS' ? `je ${config.hoursPerBon}h` : 'pro Schicht'})`,
-      `Helfergeschenk/T-Shirt (ab ${config.tshirtMinHours}h)`,
       'Eingeteilte Schichten',
     ],
   ];
@@ -328,10 +301,8 @@ export function exportHelperHoursCsv(
       h.shiftCount,
       h.totalHours,
       h.formattedTime,
-      Math.round((h.eventMinutes / 60) * 10) / 10,
-      Math.round((h.setupMinutes / 60) * 10) / 10,
-      h.bonCount,
-      h.tshirtEligible ? 'Ja' : 'Nein',
+      h.eventHours,
+      h.setupHours,
       shiftDetails,
     ]);
   }
@@ -349,15 +320,13 @@ export function exportHelperHoursCsv(
     `${summary.activeHelpers} aktive Helfende`,
     '',
     '',
-    '',
+    summary.totalShifts,
     summary.totalHours,
     formatMinutes(summary.totalMinutes),
     summary.totalEventHours,
     summary.totalSetupHours,
-    summary.totalBons,
-    summary.totalTshirts,
     `Durchschnitt: ${summary.avgHoursPerHelper} Std./Person`,
   ]);
 
-  downloadCsv(`helferstunden-bons-${eventSlug}.csv`, rows);
+  downloadCsv(`helferstunden-${eventSlug}.csv`, rows);
 }

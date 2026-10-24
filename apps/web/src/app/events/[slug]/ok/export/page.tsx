@@ -2,7 +2,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Award, CalendarDays, ClipboardCheck, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Clock, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
 import type { EventRosterResponseDto } from '@schichtplan/shared';
 import { Button, Card, Chip, Dialog, Switch, cn, useToast } from '@schichtplan/ui';
 import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
@@ -107,7 +107,7 @@ export default function ExportPage() {
 
   const exportHelperHours = () => {
     const { helpers, summary } = computeHelperStats(event, roster, DEFAULT_HELPER_STATS_CONFIG);
-    exportHelperHoursCsv(event.slug, helpers, summary, DEFAULT_HELPER_STATS_CONFIG);
+    exportHelperHoursCsv(event.slug, helpers, summary);
   };
 
   const empty = event.shifts.length === 0;
@@ -158,13 +158,13 @@ export default function ExportPage() {
           </Button>
         </ExportCard>
         <ExportCard
-          icon={<Award className="size-5" />}
-          title="Helferstunden & Bon-Auswertung"
-          text="Wer hat wie viele Stunden geleistet? Berechne Verpflegungsbons (z. B. 1 Bon je 3h) und T-Shirts für Helfende sowie Gesamtstunden für J+S / Cevi-Jahresbericht."
+          icon={<Clock className="size-5" />}
+          title="Helferstunden-Statistik"
+          text="Wer hat wie viele Stunden geleistet? Übersicht aller Helfenden mit Gesamtstunden für J+S und Cevi-Jahresbericht (Auf-/Abbau und Anlass getrennt, als Tabelle und CSV-Export)."
         >
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => setHelperHoursOpen(true)} disabled={empty}>
-              <Award className="size-4" /> Auswertung öffnen
+              <Clock className="size-4" /> Statistik öffnen
             </Button>
             <Button size="sm" variant="secondary" onClick={exportHelperHours} disabled={empty}>
               <FileSpreadsheet className="size-4" /> CSV herunterladen

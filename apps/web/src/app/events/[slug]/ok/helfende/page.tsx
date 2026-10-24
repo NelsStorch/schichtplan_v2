@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Award, ChevronDown, ChevronUp, Filter, Info, Mail, Search, UserCheck, UserMinus, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, Filter, Info, Mail, Search, UserCheck, UserMinus, Users, X } from 'lucide-react';
 import type { EventRosterResponseDto } from '@schichtplan/shared';
 import {
   Avatar,
@@ -261,7 +261,7 @@ function HelpersPage() {
         help="/ok/helfer-pool/"
         actions={
           <Button size="sm" variant="secondary" onClick={() => setShowHoursDialog(true)}>
-            <Award className="size-4" /> Helferstunden & Bons
+            <Clock className="size-4" /> Helferstunden-Statistik
           </Button>
         }
       />
