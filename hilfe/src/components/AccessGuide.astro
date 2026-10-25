@@ -1,0 +1,190 @@
+---
+/**
+ * Visuelle 3-Wege-Entscheidungshilfe für den Anlass-Zugang.
+ * Hilft OKs sofort zu entscheiden, welcher Modus für ihren Anlass der richtige ist.
+ */
+import Globe from '@lucide/astro/icons/globe';
+import ShieldCheck from '@lucide/astro/icons/shield-check';
+import LinkIcon from '@lucide/astro/icons/link';
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+
+const recommendations = [
+  {
+    icon: Globe,
+    title: 'Chilbi, Festwirtschaft & Jubiläum',
+    setting: 'Öffentlich (PUBLIC)',
+    text: 'Jede*r darf sich eintragen. Ideal für Eltern, Ehemalige und Bekannte. Cevi-Name und Geburtsdatum genügen.',
+    link: '#wer-darf-sich-eintragen',
+    badge: 'Häufigste Wahl',
+    accent: 'var(--accent)',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Lager, Weekend & interne Anlässe',
+    setting: 'Eigene Abteilung (Cevi.DB)',
+    text: 'Nur Personen, die in Cevi.DB eurer Ortsgruppe zugeordnet sind. Niemand Externes kann sich eintragen.',
+    link: '#wer-darf-sich-eintragen',
+    badge: 'Sicher & intern',
+    accent: '#3b82f6',
+  },
+  {
+    icon: LinkIcon,
+    title: 'Kuchenbuffet & ausgewählte Helfer',
+    setting: 'Nur mit Zugangs-Link',
+    text: 'Anlass auf «Eigene Abteilung» belassen und gezielt einen Gruppen- oder Einzel-Link per WhatsApp verschicken.',
+    link: '/ok/zugangs-links/',
+    badge: 'Per Einladung',
+    accent: '#10b981',
+  },
+];
+---
+
+<div class="ag-guide not-content">
+  <div class="ag-guide-header">
+    <span class="ag-guide-kicker">Entscheidungshilfe</span>
+    <h3 class="ag-guide-title">Welcher Zugang passt zu deinem Anlass?</h3>
+  </div>
+
+  <div class="ag-guide-cards">
+    {recommendations.map((rec) => {
+      const Icon = rec.icon;
+      return (
+        <article class="ag-card">
+          <div class="ag-card-top">
+            <span class="ag-icon" style={`--icon-acc: ${rec.accent}`}>
+              <Icon size={20} strokeWidth={2} aria-hidden="true" />
+            </span>
+            <span class="ag-badge">{rec.badge}</span>
+          </div>
+
+          <h4 class="ag-title">{rec.title}</h4>
+          <div class="ag-setting">👉 <b>{rec.setting}</b></div>
+          <p class="ag-desc">{rec.text}</p>
+
+          <a href={rec.link} class="ag-link">
+            <span>Anleitung lesen</span>
+            <ArrowRight size={14} strokeWidth={2.2} aria-hidden="true" />
+          </a>
+        </article>
+      );
+    })}
+  </div>
+</div>
+
+<style>
+  .ag-guide {
+    margin-block: 2rem;
+    padding: 1.5rem;
+    border-radius: var(--radius-card);
+    border: 1px solid rgb(var(--line));
+    background:
+      radial-gradient(80% 120% at 100% 0%, rgb(var(--accent) / 0.05), transparent 70%),
+      rgb(var(--surface-2) / 0.4);
+  }
+
+  .ag-guide-kicker {
+    display: inline-block;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--accent-ink));
+    margin-bottom: 0.25rem;
+  }
+
+  .ag-guide-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: rgb(var(--fg));
+    margin: 0 0 1.25rem;
+  }
+
+  .ag-guide-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .ag-guide-cards {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .ag-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.125rem;
+    border-radius: 1rem;
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--line));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .ag-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+
+  .ag-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+    background: rgb(var(--surface-2));
+    color: var(--icon-acc);
+  }
+
+  .ag-badge {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: rgb(var(--surface-2));
+    color: rgb(var(--fg-muted));
+  }
+
+  .ag-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: rgb(var(--fg));
+    margin: 0 0 0.35rem;
+    line-height: 1.3;
+  }
+
+  .ag-setting {
+    font-size: 0.75rem;
+    color: rgb(var(--accent-ink));
+    margin-bottom: 0.5rem;
+  }
+
+  .ag-desc {
+    font-size: 0.8125rem;
+    color: rgb(var(--fg-muted));
+    line-height: 1.45;
+    margin: 0 0 1rem;
+    flex-grow: 1;
+  }
+
+  .ag-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(var(--fg));
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .ag-link:hover {
+    color: rgb(var(--accent-ink));
+    text-decoration: underline;
+  }
+</style>

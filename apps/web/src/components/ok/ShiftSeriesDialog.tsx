@@ -7,12 +7,14 @@ import {
   Clock,
   Info,
   Layers,
+  LifeBuoy,
   Sparkles,
   Users,
 } from 'lucide-react';
 import {
   DEFAULT_SHIFT_CATEGORIES,
   calculateShiftSeriesIntervals,
+  helpUrl,
   toZurichInput,
   zurichInputToIso,
   type TaskDefinitionDto,
@@ -210,7 +212,19 @@ export function ShiftSeriesDialog({
       onClose={onClose}
       icon={<Layers />}
       title="Schicht-Serie erstellen (Raster-Planung)"
-      description={`Automatische Schicht-Generierung für Stände oder Arbeiten bei ${event.title}`}
+      description={
+        <span>
+          Automatische Schicht-Generierung für Stände oder Arbeiten bei {event.title}.{' '}
+          <a
+            href={helpUrl('/ok/schichten-planen/#schichtserien-erstellen-raster-planung')}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-accent-ink hover:underline"
+          >
+            <LifeBuoy className="size-3.5 inline" /> Anleitung im Hilfe-Center
+          </a>
+        </span>
+      }
       size="lg"
       footer={
         <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">

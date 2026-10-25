@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
-import { AlertCircle, AlertTriangle, CalendarPlus, Check, Crown, Palette, Plus, Save, Shield, Trash2, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CalendarPlus, Check, Crown, LifeBuoy, Palette, Plus, Save, Shield, Trash2, Users } from 'lucide-react';
 import {
   ATTENDANCE_MODES,
+  helpUrl,
   toZurichInput,
   zurichInputToIso,
   type AttendanceMode,
@@ -801,7 +802,19 @@ export function EventForm({
         )}
         <Field
           label="Eintragen erst ab (optional)"
-          hint="Schweizer Zeit. Leer lassen = sofort offen. Das OK kann vorher schon Personen einteilen."
+          hint={
+            <span>
+              Schweizer Zeit. Leer lassen = sofort offen. Mit Live-Countdown bei Restzeit.{' '}
+              <a
+                href={helpUrl('/ok/anlass-erstellen/#die-angaben')}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-accent-ink hover:underline inline-flex items-center gap-0.5"
+              >
+                <LifeBuoy className="size-3 inline" /> Hilfe
+              </a>
+            </span>
+          }
         >
           <Input
             type="datetime-local"
@@ -812,7 +825,19 @@ export function EventForm({
 
         <Field
           label="Austrage-Sperre in Tagen vor Beginn (optional)"
-          hint="Ab so vielen Tagen vor Beginn können sich Helfende nicht mehr selbst austragen, nur noch das OK. 0 = bis zum Beginn möglich, leer = immer möglich."
+          hint={
+            <span>
+              Ab so vielen Tagen vor Beginn können sich Helfende nicht mehr selbst austragen, nur noch das OK.{' '}
+              <a
+                href={helpUrl('/ok/anlass-erstellen/#die-angaben')}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-accent-ink hover:underline inline-flex items-center gap-0.5"
+              >
+                <LifeBuoy className="size-3 inline" /> Hilfe
+              </a>
+            </span>
+          }
         >
           <Input
             type="number"
@@ -829,7 +854,19 @@ export function EventForm({
 
         <Field
           label="Schicht-Überlappung für Übergaben"
-          hint="Erlaubt es Helfenden, sich für zwei aufeinanderfolgende Schichten einzutragen, die sich um wenige Minuten zur Einweisung/Übergabe überschneiden."
+          hint={
+            <span>
+              Erlaubt es Helfenden, sich für zwei aufeinanderfolgende Schichten einzutragen, die sich zur Einweisung/Übergabe kurz überschneiden.{' '}
+              <a
+                href={helpUrl('/ok/anlass-erstellen/#die-angaben')}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-accent-ink hover:underline inline-flex items-center gap-0.5"
+              >
+                <LifeBuoy className="size-3 inline" /> Hilfe
+              </a>
+            </span>
+          }
         >
           <Select
             value={form.overlapToleranceMinutes ?? 15}

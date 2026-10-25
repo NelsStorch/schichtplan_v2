@@ -20,6 +20,11 @@ import {
   type AccessUser,
 } from '../services/eventAccess.js';
 import { personLabel } from '../services/profile.js';
+import {
+  disambiguatePersonNames,
+  extractPrimaryStufe,
+  type DisambiguationCandidate,
+} from '../services/disambiguation.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
 
 /** Fehlermeldung bei ungültiger Antwort (Auswahl nicht in den Optionen, Ja/Nein falsch), sonst null */
@@ -277,6 +282,14 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
               phone: true,
               birthDate: true,
               homeDepartment: { select: { name: true } },
+              stufen: {
+                select: { stufe: { select: { id: true, name: true, sortOrder: true } } },
+                orderBy: { stufe: { sortOrder: 'asc' } },
+              },
+              ceviDbStufen: {
+                select: { groupName: true, isPrimary: true },
+                orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }],
+              },
             },
           },
         },
@@ -324,6 +337,25 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
             ? Object.fromEntries(answers.filter((a) => a.userId === u.id).map((a) => [a.questionId, a.value]))
             : {},
         });
+      }
+
+      // Eindeutige Namen für alle Personen im Roster berechnen (A1)
+      const rosterCandidates: DisambiguationCandidate[] = [];
+      for (const [key, p] of byPerson.entries()) {
+        const su = signups.find((s) => (s.user ? `u:${s.user.id}` === key : `g:${(s.guestName || '').toLowerCase()}` === key));
+        rosterCandidates.push({
+          personKey: key,
+          ceviName: su?.user?.ceviName ?? null,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          guestName: su?.guestName ?? null,
+          stufe: extractPrimaryStufe(su?.user),
+          departmentName: p.homeDepartmentName,
+        });
+      }
+      const rosterDisambiguated = disambiguatePersonNames(rosterCandidates);
+      for (const [key, p] of byPerson.entries()) {
+        p.displayName = rosterDisambiguated.get(key) || p.displayName;
       }
 
       return [...byPerson.values()].sort((a, b) => a.displayName.localeCompare(b.displayName, 'de'));
@@ -522,6 +554,20 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           deregistrationReason: dereg?.reason ?? null,
           deregisteredAt: dereg?.createdAt ? dereg.createdAt.toISOString() : null,
         });
+      }
+
+      // Eindeutige Namen für alle Personen im Helfer-Pool berechnen (A1 für Druck-Sachen & Abteilungs-Pool)
+      const poolCandidates: DisambiguationCandidate[] = items.map((i) => ({
+        personKey: i.userId,
+        ceviName: i.ceviName,
+        firstName: i.firstName,
+        lastName: i.lastName,
+        stufe: i.stufen[0]?.name ?? null,
+        departmentName: i.departmentName,
+      }));
+      const poolDisambiguated = disambiguatePersonNames(poolCandidates);
+      for (const item of items) {
+        item.displayName = poolDisambiguated.get(item.userId) || item.displayName;
       }
 
       // Sortierung: Name aufsteigend

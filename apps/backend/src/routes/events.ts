@@ -43,6 +43,11 @@ import {
 import { cleanRequiredFields, missingProfileFields } from '../services/profile.js';
 import { generateCheckinToken } from '../services/attendance.js';
 import { moveEventByDays } from '../services/eventRange.js';
+import {
+  disambiguatePersonNames,
+  extractPrimaryStufe,
+  type DisambiguationCandidate,
+} from '../services/disambiguation.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -285,7 +290,22 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                 include: {
                   task: true,
                   user: {
-                    select: { id: true, firstName: true, lastName: true, ceviName: true, birthDate: true },
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      ceviName: true,
+                      birthDate: true,
+                      homeDepartment: { select: { id: true, name: true } },
+                      stufen: {
+                        select: { stufe: { select: { id: true, name: true, sortOrder: true } } },
+                        orderBy: { stufe: { sortOrder: 'asc' } },
+                      },
+                      ceviDbStufen: {
+                        select: { groupName: true, isPrimary: true },
+                        orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }],
+                      },
+                    },
                   },
                 },
                 orderBy: { createdAt: 'asc' },
@@ -417,16 +437,43 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           roleTitle: o.roleTitle,
           createdAt: o.createdAt.toISOString(),
         })),
-        shifts: event.shifts.map((s) => {
-          const signups = s.signups.map((su) => {
-            const isOwn = Boolean(viewer && su.userId === viewer.id);
-            const showName = access.canSeeNames || isOwn;
-            const displayName = showName
-              ? su.user?.ceviName ||
-                (su.user ? `${su.user.firstName} ${su.user.lastName}`.trim() : null) ||
-                su.guestName ||
-                'Helfer*in'
-              : 'Belegt';
+        shifts: (() => {
+          // Eindeutige Namen für alle Personen berechnen, die eine Schicht im Anlass haben (A1)
+          const disambiguationCandidates = new Map<string, DisambiguationCandidate>();
+          for (const s of event.shifts) {
+            for (const su of s.signups) {
+              const isOwn = Boolean(viewer && su.userId === viewer.id);
+              const showName = access.canSeeNames || isOwn;
+              if (!showName) continue;
+
+              const personKey = su.user?.id || `guest:${su.id}`;
+              if (!disambiguationCandidates.has(personKey)) {
+                disambiguationCandidates.set(personKey, {
+                  personKey,
+                  ceviName: su.user?.ceviName ?? null,
+                  firstName: su.user?.firstName ?? null,
+                  lastName: su.user?.lastName ?? null,
+                  guestName: su.guestName ?? null,
+                  stufe: extractPrimaryStufe(su.user),
+                  departmentName: su.user?.homeDepartment?.name ?? null,
+                });
+              }
+            }
+          }
+          const disambiguatedNames = disambiguatePersonNames([...disambiguationCandidates.values()]);
+
+          return event.shifts.map((s) => {
+            const signups = s.signups.map((su) => {
+              const isOwn = Boolean(viewer && su.userId === viewer.id);
+              const showName = access.canSeeNames || isOwn;
+              const personKey = su.user?.id || `guest:${su.id}`;
+              const displayName = showName
+                ? disambiguatedNames.get(personKey) ||
+                  su.user?.ceviName ||
+                  (su.user ? `${su.user.firstName} ${su.user.lastName}`.trim() : null) ||
+                  su.guestName ||
+                  'Helfer*in'
+                : 'Belegt';
             const userAge =
               access.isManager && su.user?.birthDate ? ageAt(su.user.birthDate, s.startTime) : null;
 
@@ -494,7 +541,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             tasks,
             signups,
           };
-        }),
+        });
+      })(),
       };
     }
   );

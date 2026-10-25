@@ -1,6 +1,6 @@
 ---
 title: In eine Schicht eintragen
-description: Anlass öffnen, eine Schicht mit freiem Platz wählen, eintragen. Hier steht, was du auf dem Weg siehst.
+description: Eine passende Schicht finden, eintragen und im Plan sehen, wer sonst noch hilft.
 audience: [helfer]
 numbered: true
 ---
@@ -9,13 +9,9 @@ import { Steps } from '@astrojs/starlight/components';
 import Btn from '../../../components/Btn.astro';
 import ShiftRowMock from '../../../components/ShiftRowMock.astro';
 
-## Den Anlass finden
+Eintragen geht schnell. Du brauchst die Seite des Anlasses (den Link hat dir das OK geschickt oder du findest ihn auf der Startseite deiner Abteilung).
 
-Meistens bekommst du vom OK einen Link, zum Beispiel per WhatsApp. Er sieht so aus: `illnau.cevi-schichtplan.ch/events/chilbi-2026`. Tipp ihn an, fertig.
-
-Ohne Link öffnest du die Seite deiner Abteilung. Unter **Anlässe** stehen alle laufenden Anlässe, der nächste gross oben. Vergangene Anlässe sind weiter unten aufgelistet.
-
-## Den Plan lesen
+## Was du siehst
 
 Oben siehst du das Banner mit Titel, Datum und für wen der Anlass ist. Rechts daneben (auf dem Handy darunter) steht, wie viele **Plätze frei** sind.
 
@@ -54,6 +50,10 @@ Passt nichts mehr, hilft <Btn>Filter zurücksetzen</Btn>.
 </Steps>
 
 Nicht angemeldet? Dann heisst der Knopf <Btn variant="primary">Anmelden & eintragen</Btn>. Nach dem Login kommst du zurück zum Anlass.
+
+:::tip[Schichtübergaben & Folgeschichten]
+Du kannst dich problemlos für zwei aufeinanderfolgende Schichten eintragen. Überschneiden sich die Schichten um ein paar Minuten (z. B. 10–15 Minuten zur Schichtübergabe oder Einweisung), erlaubt der Schichtplan dies automatisch. Nur bei grösseren zeitlichen Überschneidungen blockiert das System.
+:::
 
 :::tip[Eine Schicht im Detail ansehen]
 Tippe irgendwo auf die Schicht. Du siehst alle Arbeiten, wer schon eingetragen ist, Hinweise des OK und das Mindestalter.

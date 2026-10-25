@@ -1,0 +1,228 @@
+---
+/**
+ * Nachbau der mobilen Erfolgsseite nach dem QR-Code-Check-in.
+ * Zeigt Helfer*innen und OK auf einen Blick, wie der Check-in auf dem Smartphone aussieht.
+ */
+import Check from '@lucide/astro/icons/check';
+import Clock from '@lucide/astro/icons/clock';
+import QrCode from '@lucide/astro/icons/qr-code';
+import Sparkles from '@lucide/astro/icons/sparkles';
+---
+
+<figure class="checkin-mock not-content">
+  <div class="phone-frame">
+    <div class="phone-notch">
+      <span class="phone-camera"></span>
+    </div>
+
+    <div class="phone-screen">
+      <div class="phone-header">
+        <span class="phone-event">Chilbi 2026</span>
+        <span class="phone-badge">
+          <QrCode size={12} strokeWidth={2.4} aria-hidden="true" />
+          Live Check-in
+        </span>
+      </div>
+
+      <div class="success-card">
+        <div class="success-icon-wrap">
+          <span class="success-icon">
+            <Check size={28} strokeWidth={3} aria-hidden="true" />
+          </span>
+          <span class="sparkle-dot">
+            <Sparkles size={14} strokeWidth={2.2} aria-hidden="true" />
+          </span>
+        </div>
+
+        <h4 class="success-title">Du bist eingecheckt!</h4>
+        <p class="success-sub">Deine Anwesenheit wurde für diese Schicht bestätigt.</p>
+
+        <div class="shift-card">
+          <div class="shift-time">
+            <Clock size={14} strokeWidth={2} aria-hidden="true" />
+            <span>Samstag · 17:00 – 20:00</span>
+          </div>
+          <div class="shift-name">Grill &amp; Bar</div>
+          <div class="shift-role">Arbeit: <b>Grillmeister*in</b></div>
+        </div>
+
+        <div class="phone-footer-note">
+          Danke für deinen Einsatz! Du kannst dieses Fenster jetzt schliessen.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <figcaption>
+    So sieht die Bestätigung auf dem Smartphone aus. Keine App-Installation nötig: Der Standard-Kamera-Scan genügt.
+  </figcaption>
+</figure>
+
+<style>
+  .checkin-mock {
+    margin-block: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-frame {
+    width: 100%;
+    max-width: 340px;
+    border-radius: 2.25rem;
+    border: 3px solid rgb(var(--line-strong));
+    background: rgb(var(--surface));
+    box-shadow: 0 20px 40px -15px rgb(0 0 0 / 0.25), var(--shadow-soft);
+    padding: 0.625rem;
+    box-sizing: border-box;
+  }
+
+  .phone-notch {
+    display: flex;
+    justify-content: center;
+    padding-bottom: 0.5rem;
+  }
+
+  .phone-camera {
+    width: 3.5rem;
+    height: 0.375rem;
+    border-radius: 999px;
+    background: rgb(var(--line-strong) / 0.7);
+  }
+
+  .phone-screen {
+    border-radius: 1.625rem;
+    background:
+      radial-gradient(100% 60% at 50% 0%, rgb(var(--accent) / 0.12), transparent 70%),
+      rgb(var(--surface-2) / 0.6);
+    border: 1px solid rgb(var(--line));
+    padding: 1.25rem 1rem 1.5rem;
+    text-align: center;
+  }
+
+  .phone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .phone-event {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 800;
+    color: rgb(var(--fg));
+  }
+
+  .phone-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgb(var(--accent) / 0.12);
+    color: rgb(var(--accent-ink));
+    font-size: 0.6875rem;
+    font-weight: 700;
+  }
+
+  .success-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .success-icon-wrap {
+    position: relative;
+    margin-bottom: 0.875rem;
+  }
+
+  .success-icon {
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 1rem;
+    background: #10b981;
+    color: #ffffff;
+    box-shadow: 0 8px 20px -4px rgba(16, 185, 129, 0.4);
+  }
+
+  .sparkle-dot {
+    position: absolute;
+    top: -0.25rem;
+    right: -0.35rem;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    background: rgb(var(--accent));
+    color: #ffffff;
+    border: 2px solid rgb(var(--surface));
+  }
+
+  .success-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: rgb(var(--fg));
+    margin: 0 0 0.25rem;
+  }
+
+  .success-sub {
+    font-size: 0.75rem;
+    color: rgb(var(--fg-muted));
+    margin: 0 0 1rem;
+    line-height: 1.4;
+  }
+
+  .shift-card {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.875rem;
+    border-radius: 1rem;
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--line));
+    text-align: left;
+    margin-bottom: 0.875rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shift-time {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: rgb(var(--accent-ink));
+    margin-bottom: 0.25rem;
+  }
+
+  .shift-name {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: rgb(var(--fg));
+  }
+
+  .shift-role {
+    font-size: 0.75rem;
+    color: rgb(var(--fg-subtle));
+    margin-top: 0.15rem;
+  }
+
+  .phone-footer-note {
+    font-size: 0.6875rem;
+    color: rgb(var(--fg-subtle));
+    line-height: 1.35;
+  }
+
+  figcaption {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: rgb(var(--fg-subtle));
+    text-align: center;
+    max-width: 340px;
+  }
+</style>

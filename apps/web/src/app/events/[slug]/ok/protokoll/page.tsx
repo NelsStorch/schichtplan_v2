@@ -68,7 +68,7 @@ export default function LogPage() {
       <OkPageHeader
         title="Protokoll"
         description="Wer sich wann ein- oder ausgetragen hat und wer die Anwesenheit erfasst hat."
-        help="/ok/auswertung/"
+        help="/ok/auswertung/#aktivitaets-protokoll"
         actions={
           <Button variant="secondary" size="sm" loading={loading} onClick={load}>
             <RefreshCw className="size-3.5" /> Aktualisieren

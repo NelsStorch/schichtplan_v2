@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Filter,
   Layers,
+  LifeBuoy,
   Search,
   SlidersHorizontal,
   TrendingUp,
@@ -15,7 +16,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import type { EventRosterResponseDto } from '@schichtplan/shared';
+import { helpUrl, type EventRosterResponseDto } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -80,7 +81,19 @@ export function HelperHoursDialog({
       onClose={onClose}
       icon={<Clock />}
       title="Helferstunden & Einsatz-Statistik"
-      description={`Übersicht der geleisteten Arbeits- und Einsatzstunden für ${event.title} (J+S / Cevi-Jahresbericht)`}
+      description={
+        <span>
+          Übersicht der geleisteten Arbeits- und Einsatzstunden für {event.title}.{' '}
+          <a
+            href={helpUrl('/ok/auswertung/#helferstunden--einsatz-statistik')}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-accent-ink hover:underline"
+          >
+            <LifeBuoy className="size-3.5 inline" /> Anleitung im Hilfe-Center
+          </a>
+        </span>
+      }
       size="lg"
       footer={
         <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">

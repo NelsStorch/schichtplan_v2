@@ -67,7 +67,7 @@ export default function TaskCatalogPage() {
       <OkPageHeader
         title="Arbeiten-Katalog"
         description="Typische Arbeiten wie Bar, Grill oder Kasse einmal anlegen und beim Planen in jede Schicht übernehmen."
-        help="/ok/schichten-und-arbeiten/#arbeiten-katalog"
+        help="/ok/arbeiten-katalog/"
         actions={
           <Button onClick={openNew}>
             <Plus className="size-4" /> Neue Arbeit

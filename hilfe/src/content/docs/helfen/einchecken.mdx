@@ -4,18 +4,24 @@ description: Am Anlass den QR-Code scannen, damit das OK weiss, dass du da bist.
 audience: [helfer]
 ---
 
-Manche Anlässe haben am Eingang ein Plakat mit einem QR-Code «Anwesenheit». Damit meldest du dem OK, dass du für deine Schicht da bist.
+import QrCheckinMock from '../../../components/QrCheckinMock.astro';
 
-1. Scanne den Code mit der Kamera deines Handys.
-2. Melde dich an, falls du noch nicht angemeldet bist. Du kommst danach automatisch zurück.
-3. Fertig: Du siehst «Du bist eingecheckt» und die Schicht, für die du abgehakt wurdest.
+Manche Anlässe haben am Eingang oder beim Festbüro ein Plakat mit einem QR-Code «Anwesenheit». Damit meldest du dem OK schnell und kontaktlos, dass du für deine Schicht da bist.
 
-## Wann es klappt
+1. **Scanne den QR-Code** mit der Standard-Kamera deines Smartphones.
+2. **Melde dich an**, falls du im Browser noch nicht eingeloggt bist. Du gelangst danach automatisch zurück.
+3. **Fertig:** Auf dem Bildschirm erscheint sofort die Bestätigung «Du bist eingecheckt!» samt Schichttitel und Uhrzeit.
 
-Einchecken geht **ab 30 Minuten vor Beginn deiner Schicht bis zu ihrem Ende**. Bist du zu früh, zeigt die Seite, wann deine nächste Schicht beginnt. Scann den Code dann einfach nochmals.
+<QrCheckinMock />
 
-Du musst für die Schicht eingetragen sein. Hilfst du spontan mit, melde dich beim OK: es trägt dich ein und hakt dich ab.
+## Wann das Einchecken klappt
 
-## «Dieser QR-Code ist nicht (mehr) gültig»
+Einchecken geht **ab 30 Minuten vor Beginn deiner Schicht bis zu ihrem regulären Ende**.
+- **Zu früh da?** Die Seite zeigt dir an, wann deine nächste Schicht beginnt. Scanne den Code einfach kurz vor Beginn nochmals.
+- **Nicht eingetragen?** Du musst für die Schicht eingetragen sein. Hilfst du spontan mit, melde dich kurz beim OK: Es teilt dich ein und hakt dich direkt ab.
 
-Das OK hat den Code erneuert. Frag nach dem aktuellen Plakat.
+## Häufige Fragen zum Check-in
+
+- **Brauche ich eine spezielle App?** Nein, die normale Kamera-App deines Smartphones genügt völlig.
+- **«Dieser QR-Code ist nicht mehr gültig»:** Das OK hat aus Sicherheitsgründen einen neuen Code generiert. Frag beim Festbüro oder OK nach dem aktuellen Plakat.
+- **Kein Internetempfang auf dem Festplatz?** Kein Problem: Das OK kann dich in seiner Anwesenheitsliste jederzeit auch manuell als «Da» abhaken.

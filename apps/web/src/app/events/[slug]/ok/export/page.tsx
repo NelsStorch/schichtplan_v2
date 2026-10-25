@@ -160,7 +160,7 @@ export default function ExportPage() {
         <ExportCard
           icon={<Clock className="size-5" />}
           title="Helferstunden-Statistik"
-          text="Wer hat wie viele Stunden geleistet? Übersicht aller Helfenden mit Gesamtstunden für J+S und Cevi-Jahresbericht (Auf-/Abbau und Anlass getrennt, als Tabelle und CSV-Export)."
+          text="Wer hat wie viele Stunden geleistet? Übersicht aller Helfenden mit Gesamtstunden für Helfer-Bons und Jahresbericht (Auf-/Abbau und Anlass getrennt, als Tabelle und CSV-Export)."
         >
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => setHelperHoursOpen(true)} disabled={empty}>

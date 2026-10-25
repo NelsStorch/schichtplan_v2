@@ -1,61 +1,67 @@
 ---
-title: Häufige Fragen
-description: Kurze Antworten, sortiert nach Thema. Ein Link führt jeweils zur ganzen Anleitung.
+title: Häufige Fragen (FAQ)
+description: Kurze Antworten auf Fragen, die immer wieder auftauchen.
 audience: [helfer, ok, abteilung]
 ---
 
 import FaqItem from '../../../components/FaqItem.astro';
 
-## Anmelden und Konto
+## Für Helfer\*innen
 
 <FaqItem q="Brauche ich ein Konto, um mich einzutragen?">
-Ja. Ein Cevi-Name ohne Passwort reicht, die Anmeldung dauert zehn Sekunden. Ansehen kannst du die meisten Pläne auch ohne Konto. [Anmelden](/start/anmelden/)
+Ja, aber ohne Passwort geht es auch: Auf der Seite deiner Abteilung reichen Cevi-Name und Geburtsdatum. [Anmelden](/start/anmelden/)
 </FaqItem>
 
 <FaqItem q="Muss ich mich bei jeder Abteilung neu anmelden?">
-Nein. Ein Login gilt für alle Abteilungen und Anlässe.
+Nein. Bist du einmal angemeldet, gilt das für alle Abteilungen auf `cevi-schichtplan.ch`.
 </FaqItem>
 
 <FaqItem q="Wo ist «Mit Cevi-Name»?">
-Diesen Login gibt es nur, wenn du von der Seite einer Abteilung kommst. Öffne zuerst die Abteilung, zum Beispiel `illnau.cevi-schichtplan.ch`, und tippe dort auf «Anmelden». [Anmelden](/start/anmelden/)
+Auf `login.cevi-schichtplan.ch` gibt es nur Cevi.DB und E-Mail. Den schnellen Login mit Cevi-Name findest du auf der Seite deiner eigenen Abteilung. [Anmelden](/start/anmelden/)
 </FaqItem>
 
 <FaqItem q="In meiner Abteilung heisst noch jemand wie ich.">
-Kein Problem. Beim Cevi-Name-Login unterscheidet euch das Geburtsdatum. Nur Name **und** Geburtsdatum zusammen müssen in einer Abteilung einmalig sein.
+Haben zwei Personen denselben Cevi-Namen, unterscheidet der Schichtplan sie im Anlass automatisch: Zuerst wird die Stufe in Klammern angehängt (z. B. «Falk (Hiskia)»). Bei Anlässen mit mehreren Abteilungen wird die Abteilung angehängt («Falk (Wetzikon)») oder beides («Falk (Hiskia, Wetzikon)»). Reicht das nicht aus, setzt der Schichtplan den Vornamen davor («Max v/o Falk»), notfalls auch den Nachnamen («Max Muster v/o Falk»). So ist auf dem Plan immer eindeutig klar, wer gemeint ist.
 </FaqItem>
 
 <FaqItem q="Ich habe mein Passwort vergessen.">
-Tippe auf der Login-Seite unter dem Passwort-Feld auf **Passwort vergessen?**. Du bekommst einen Link per E-Mail, mit dem du ein neues Passwort setzt ([so geht's](/start/anmelden/#passwort-vergessen)). Hast du ein Cevi.DB-Konto, kannst du dich auch einfach damit anmelden.
+Auf der Login-Seite tippe auf «Passwort vergessen» und gib deine E-Mail ein. Du bekommst einen Link, mit dem du ein neues Passwort setzt.
 </FaqItem>
 
 <FaqItem q="Ich war mit Cevi-Name angemeldet und nutze jetzt Cevi.DB. Was passiert mit meinen Schichten?">
-Der Schichtplan übernimmt sie beim Login mit Cevi.DB automatisch, wenn Cevi-Name, Geburtsdatum und Abteilung übereinstimmen. Dann wandern Schichten, Antworten und Stufen ins Cevi.DB-Konto, und das alte Profil verschwindet. Passt etwas nicht zusammen, zum Beispiel ein anderes Geburtsdatum, bleiben es zwei Profile. Dann hilft die [Kontaktadresse](/wissen/kontakt/).
+Melde dich mit Cevi.DB an. Stimmen Cevi-Name und Geburtstag überein, führt der Schichtplan die Profile zusammen. Deine Schichten bleiben erhalten.
 </FaqItem>
 
 <FaqItem q="Beim Cevi.DB-Login fragt der Schichtplan nach einem Passwort.">
-Es gibt schon ein Konto mit E-Mail und Passwort und derselben E-Mail wie in deiner Cevi.DB. Gib das Passwort ein, dann werden beide zu einem Konto. Passwort vergessen? Tippe auf **Neues Passwort setzen**, wähle per E-Mail-Link ein neues und melde dich danach nochmals mit Cevi.DB an.
+Du hast bereits ein Konto mit dieser E-Mail und einem Passwort. Gib das Passwort ein, danach sind beide Anmeldearten mit demselben Konto verknüpft.
 </FaqItem>
 
 <FaqItem q="Kann ich mein Konto löschen?">
-Ja, wenn es ein Cevi.DB- oder Passwort-Konto ist: im Konto-Fenster oder auf der Profilseite. [Konto und Profil](/helfen/konto/)
+Ja, unter **Konto** ganz unten. Deine Schichten werden freigegeben und deine Angaben gelöscht. Bei reinen Cevi-Name-Profilen schreib an den Kontakt. [Konto löschen](/helfen/konto/)
 </FaqItem>
 
-## Eintragen
-
 <FaqItem q="Kann ich mich für zwei Arbeiten in derselben Schicht eintragen?">
-Nein, pro Schicht bist du einmal dabei. Für mehr Einsatz trag dich in eine weitere Schicht ein.
+Nein. Du kannst pro Schicht nur eine Arbeit übernehmen.
+</FaqItem>
+
+<FaqItem q="Kann ich mich für zwei Schichten eintragen, die sich kurz überschneiden?">
+Ja! Wenn das OK eine Übergabezeit (z. B. 15 Minuten) eingestellt hat, kannst du dich für zwei aufeinanderfolgende Schichten eintragen, die sich zur Einweisung kurz überschneiden. Nur bei echten zeitlichen Kollisionen blockiert das System. [In Schicht eintragen](/helfen/eintragen/)
+</FaqItem>
+
+<FaqItem q="Ich bin krank oder kann doch nicht helfen. Was soll ich tun?">
+Trage dich unter **Meine Schichten** so früh wie möglich aus, damit dein Platz im Schichtplan für andere frei wird. Bei kurzfristigen Absagen am Festtag selbst informiere bitte zusätzlich das OK oder deine Schichtleitung per Telefon oder Chat. [Wieder austragen](/helfen/austragen/)
 </FaqItem>
 
 <FaqItem q="Da steht «Für dich nicht freigeschaltet». Was nun?">
-Der Anlass ist nur für bestimmte Abteilungen, Stufen, Leitende oder Cevi.DB-Konten. Oben beim Anlass steht der Grund. [Ich kann mich nicht eintragen](/helfen/nicht-freigeschaltet/)
+Der Anlass ist nur für eine bestimmte Abteilung, Stufe oder für Cevi.DB-Mitglieder. Prüfe deine Abteilung oder frag das OK nach einem Zugangs-Link. [Nicht freigeschaltet](/helfen/nicht-freigeschaltet/)
 </FaqItem>
 
 <FaqItem q="Ich will mit einer Freundin dieselbe Schicht machen.">
-Tragt euch beide in dieselbe Schicht ein, gern auch in dieselbe Arbeit, solange Plätze frei sind. Schick ihr den Link zum Anlass und sag ihr, welche Schicht.
+Schau, dass bei der Arbeit noch mindestens zwei Plätze frei sind, und tragt euch beide ein.
 </FaqItem>
 
 <FaqItem q="Bekomme ich eine Erinnerung vor der Schicht?">
-Ja, etwa 24 Stunden vorher per E-Mail, wenn dein Konto eine bestätigte E-Mail hat (Cevi.DB oder E-Mail und Passwort). Profile nur mit Cevi-Name bekommen keine Mail. Abschalten kannst du die Erinnerung auf deiner [Profilseite](https://cevi-schichtplan.ch/profil) unter **Benachrichtigungen**. Zusätzlich kannst du deine Schichten mit «In Kalender» in deinen Kalender übernehmen. [Meine Schichten](/helfen/meine-schichten/)
+Das OK kann Nachrichten an alle Eingetragenen schicken. Verlass dich nicht darauf und übernimm deine Einsätze mit einem Klick in deinen Google Kalender oder lad die `.ics`-Datei herunter. [Meine Schichten](/helfen/meine-schichten/)
 </FaqItem>
 
 <FaqItem q="Ich bin zu jung für die Bar, obwohl ich schon 16 bin.">
@@ -63,6 +69,14 @@ Prüf dein Geburtsdatum im [Profil](/helfen/konto/). Bei Cevi.DB-Konten kommt es
 </FaqItem>
 
 ## Für das OK
+
+<FaqItem q="Wie erstelle ich Schichten im 2-Stunden-Takt (Schichtserie)?">
+Tippe im OK-Bereich unter **Schichten** auf **Serie erstellen**. Wähle Zeitraum, Schichtdauer (z. B. 2 Stunden) und die Arbeiten. Der Schichtplan generiert alle Schichten mit einem Klick. [Schichten planen](/ok/schichten-planen/#schichtserien-erstellen-raster-planung)
+</FaqItem>
+
+<FaqItem q="Wo sehe ich, wer wie viele Stunden geholfen hat (z. B. für Helfer-Bons)?">
+Tippe unter **Helfende** oder **Export & Drucken** auf **Helferstunden**. Dort siehst du alle geleisteten Stunden und kannst eine CSV-Liste herunterladen, um z. B. Verpflegungs-Gutscheine zu verteilen. [Auswertung](/ok/auswertung/#helferstunden--einsatz-statistik)
+</FaqItem>
 
 <FaqItem q="Wie lade ich Leute ein, die nicht zur Abteilung gehören?">
 Mit einem Zugangs-Link im OK-Bereich unter «Zugang & Antworten». Persönlich für eine Person, Gruppe für einen Chat. [Zugangs-Links](/ok/zugangs-links/)
@@ -73,7 +87,7 @@ Ja, mit **Gast / freier Name** beim Einteilen, optional mit E-Mail und Telefon. 
 </FaqItem>
 
 <FaqItem q="Wie mache ich aus einer Schicht drei gleiche hintereinander?">
-Im OK-Bereich unter **Schichten** bei der Schicht **Kopieren**. Die Kopie beginnt, wo die alte endet. Zweimal duplizieren, fertig. [Schichten planen](/ok/schichten-planen/)
+Im OK-Bereich unter **Schichten** bei der Schicht **Kopieren**. Die Kopie beginnt, wo die alte endet. Zweimal duplizieren, fertig. Für ganze Serien nimm **Serie erstellen**. [Schichten planen](/ok/schichten-planen/)
 </FaqItem>
 
 <FaqItem q="Kann ich die Chilbi vom letzten Jahr wiederverwenden?">
@@ -81,11 +95,11 @@ Ja, mit **Als Vorlage speichern** und nächstes Jahr **Aus Vorlage erstellen**. 
 </FaqItem>
 
 <FaqItem q="Ich will in Ruhe planen, bevor sich alle eintragen.">
-Setz unter **Einstellungen** → **Eintragen & Fristen** eine Zeit bei **Eintragen erst ab**. Oder schalte **Helfende können sich selbst eintragen** aus und zum Start wieder ein. [Zugang regeln](/ok/zugang/)
+Setz unter **Einstellungen** eine Zeit bei **Eintragen erst ab** (mit Live-Countdown). Oder schalte **Helfende können sich selbst eintragen** aus und zum Start wieder ein. [Einen Anlass erstellen](/ok/anlass-erstellen/)
 </FaqItem>
 
 <FaqItem q="Bekommt das OK eine Nachricht, wenn sich jemand austrägt?">
-Nein. Im OK-Bereich siehst du die Belegung immer aktuell, und unter [Nachrichten](/ok/nachrichten/) erreichst du alle Eingetragenen. Bitte deine Helfer\*innen, sich bei kurzfristigen Absagen zu melden.
+Nein. Im OK-Bereich siehst du die Belegung immer aktuell, und im **Aktivitäts-Protokoll** steht jede Austragung minutengenau. Bei kurzfristigen Absagen bitte deine Helfer\*innen, sich telefonisch zu melden. [Auswertung](/ok/auswertung/#aktivitaets-protokoll)
 </FaqItem>
 
 <FaqItem q="Ich kann jemanden nicht ins OK aufnehmen.">
@@ -107,7 +121,7 @@ Nein, sie bleibt fest. Wähl sie deshalb beim Anlegen mit Bedacht. Name, Logo un
 </FaqItem>
 
 <FaqItem q="Jemand aus der Cevi.DB-Abteilungsleitung hat keine Rechte im Schichtplan.">
-Der Schichtplan befördert niemanden automatisch. Gib der Person unter **Personen** die Rolle Abteilungsleitung. [Personen und Rollen](/abteilung/personen/)
+Wer in Cevi.DB als Abteilungsleiter\*in der verknüpften Ortsgruppe eingetragen ist, erhält die Rolle Abteilungsleitung beim nächsten Login mit Cevi.DB automatisch. Bei Problemen melde dich einmal ab und mit Cevi.DB neu an. [Cevi.DB](/abteilung/cevidb/)
 </FaqItem>
 
 <FaqItem q="Eltern sehen unsere Anlässe nicht.">

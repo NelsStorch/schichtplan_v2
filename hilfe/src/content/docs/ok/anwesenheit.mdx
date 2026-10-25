@@ -6,6 +6,7 @@ audience: [ok]
 
 import Btn from '../../../components/Btn.astro';
 import Path from '../../../components/Path.astro';
+import QrCheckinMock from '../../../components/QrCheckinMock.astro';
 
 <Path steps={['Anlass', 'OK-Bereich', 'Anwesenheit']} />
 
@@ -40,6 +41,8 @@ Ist der QR-Check-in eingeschaltet, zeigt der Tab einen QR-Code im Cevi-Stil (ers
 1. Tippe auf <Btn>A4-Plakat (PDF)</Btn>, druck es aus und häng es am Eingang oder beim Posten auf.
 2. Helfer\*innen scannen den Code mit dem Handy und melden sich an, falls sie es nicht schon sind.
 3. Der Schichtplan hakt automatisch alle Schichten der Person ab, die gerade laufen: **ab 30 Minuten vor Beginn bis zum Schichtende**.
+
+<QrCheckinMock />
 
 Wer noch zu früh ist, sieht, wann die nächste eigene Schicht beginnt. Wer nicht eingetragen ist, wird nicht abgehakt und soll sich beim OK melden. Spontane Helfer\*innen trägst du zuerst ein und hakst sie dann ab.
 
