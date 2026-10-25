@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, CalendarPlus, Clock, Download, ExternalLink, LogIn, Shield, Ticket, UserMinus } from 'lucide-react';
+import { cancelDeadlineAt, cancelDeadlineText } from '@schichtplan/shared';
 import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
@@ -12,6 +13,7 @@ import {
   fmtDuration,
   fmtRelativeDay,
   fmtTime,
+  fmtTimeRange,
   fmtWeekday,
   groupByBusinessDay,
   hoursBetween,
@@ -75,21 +77,9 @@ export default function MyShiftsPage() {
       shift.cancelDeadlineDays !== null &&
       shift.cancelDeadlineDays !== undefined
     ) {
-      const deadline = new Date(
-        new Date(shift.eventStartDate).getTime() - shift.cancelDeadlineDays * 24 * 60 * 60 * 1000
-      );
+      const deadline = cancelDeadlineAt(shift.eventStartDate, shift.cancelDeadlineDays);
       if (new Date() >= deadline) {
-        const deadlineStr = deadline.toLocaleDateString('de-CH', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        const daysText =
-          shift.cancelDeadlineDays === 0
-            ? 'seit Anlassbeginn'
-            : `seit dem ${deadlineStr} Uhr (${shift.cancelDeadlineDays} Tag(e) vor Anlassbeginn)`;
+        const daysText = cancelDeadlineText(deadline, shift.cancelDeadlineDays);
         await confirm({
           title: 'Austragen nicht mehr selbst möglich',
           description: `Das selbständige Austragen für «${shift.eventTitle}» ist ${daysText} gesperrt. Bitte wende dich direkt an das Event-OK.`,
@@ -215,8 +205,7 @@ export default function MyShiftsPage() {
                     </Link>
                     <p className="tabular mt-3 inline-flex items-center gap-2 font-mono text-[13px] text-fg-muted">
                       <Clock className="size-4" />
-                      {fmtWeekday(next.startTime)}, {fmtDayMonth(next.startTime)} · {fmtTime(next.startTime)} bis{' '}
-                      {fmtTime(next.endTime)}
+                      {fmtWeekday(next.startTime)}, {fmtDayMonth(next.startTime)} · {fmtTimeRange(next.startTime, next.endTime)}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">

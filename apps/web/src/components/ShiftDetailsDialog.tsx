@@ -28,7 +28,7 @@ import {
   cn,
   slotStatus,
 } from '@schichtplan/ui';
-import { fmtDuration, fmtTime, fmtWeekday, fmtDayMonth, isPast, businessDayKey } from '@/lib/format';
+import { fmtDuration, fmtWeekday, fmtDayMonth, isPast, businessDayKey, fmtTimeRange } from '@/lib/format';
 import { loginUrl } from '@/lib/api';
 import { SignupCountdown } from './SignupCountdown';
 import type { EventDetails } from '@/lib/types';
@@ -199,7 +199,7 @@ export function ShiftDetailsDialog({
                   {fmtWeekday(shift.startTime)}, {fmtDayMonth(shift.startTime)}
                 </p>
                 <p className="font-mono text-xs text-fg-muted sm:text-sm">
-                  {fmtTime(shift.startTime)} – {fmtTime(shift.endTime)} Uhr{' '}
+                  {fmtTimeRange(shift.startTime, shift.endTime)}{' '}
                   <span className="text-fg-subtle">({fmtDuration(shift.startTime, shift.endTime)})</span>
                 </p>
               </div>
@@ -478,7 +478,7 @@ export function ShiftDetailsDialog({
                         <div className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning-ink">
                           <AlertCircle className="size-3.5 shrink-0 text-warning" />
                           <span>
-                            Zeitkollision mit «{conflictingShift.title}» ({fmtTime(conflictingShift.startTime)} – {fmtTime(conflictingShift.endTime)} Uhr)
+                            Zeitkollision mit «{conflictingShift.title}» ({fmtTimeRange(conflictingShift.startTime, conflictingShift.endTime)})
                           </span>
                         </div>
                       ) : taskFull ? (

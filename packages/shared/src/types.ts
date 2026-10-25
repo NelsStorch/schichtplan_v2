@@ -418,6 +418,7 @@ export interface EventRosterItemDto {
   lastName: string;
   displayName: string;
   birthDate: string | null;
+  /** Alter am Anlass (erste Schicht), passend zu den Altersgrenzen */
   age: number | null;
   departmentId: string | null;
   departmentName: string | null;

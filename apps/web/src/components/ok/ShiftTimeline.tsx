@@ -2,7 +2,7 @@
 
 import type { ShiftDto } from '@schichtplan/shared';
 import { Card, cn } from '@schichtplan/ui';
-import { fmtTime } from '@/lib/format';
+import { fmtTime, fmtTimeRange } from '@/lib/format';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -73,7 +73,7 @@ export function ShiftTimeline({
                     selected && 'bg-accent/10'
                   )}
                   aria-pressed={selecting ? selected : undefined}
-                  title={`${shift.title}: ${fmtTime(shift.startTime)}–${fmtTime(shift.endTime)}, ${filled}/${shift.requiredSlots} besetzt`}
+                  title={`${shift.title}: ${fmtTimeRange(shift.startTime, shift.endTime)}, ${filled}/${shift.requiredSlots} besetzt`}
                 >
                   <span className="flex min-w-0 items-center gap-2 px-3 py-2">
                     {selecting && (
@@ -82,7 +82,7 @@ export function ShiftTimeline({
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-fg">{shift.title}</span>
                       <span className="block font-mono text-2xs text-fg-muted">
-                        {fmtTime(shift.startTime)}–{fmtTime(shift.endTime)}
+                        {fmtTimeRange(shift.startTime, shift.endTime)}
                       </span>
                     </span>
                   </span>

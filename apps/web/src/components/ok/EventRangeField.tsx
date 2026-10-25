@@ -2,25 +2,13 @@
 
 import { useState } from 'react';
 import { CalendarClock, CalendarDays } from 'lucide-react';
-import { addZurichDays, toZurichInput } from '@schichtplan/shared';
+import { addZurichDays, dayKeyDiff, formatDays, zurichDayKey as zurichDay } from '@schichtplan/shared';
 import { Button, Callout, Dialog, Field, Input, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { fmtDateRange } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 
-/** Kalendertag (YYYY-MM-DD) eines Zeitpunkts in Schweizer Zeit */
-const zurichDay = (iso: string) => toZurichInput(iso).slice(0, 10);
-
-/** Abstand zweier YYYY-MM-DD in ganzen Tagen */
-function dayDiff(from: string, to: string) {
-  const ms = (day: string) => {
-    const [y, m, d] = day.split('-').map(Number);
-    return Date.UTC(y, m - 1, d);
-  };
-  return Math.round((ms(to) - ms(from)) / 86_400_000);
-}
-
-const daysLabel = (n: number) => `${Math.abs(n)} ${Math.abs(n) === 1 ? 'Tag' : 'Tage'}`;
+const daysLabel = (n: number) => formatDays(Math.abs(n));
 
 /**
  * Zeitraum eines Anlasses in den Einstellungen: ergibt sich aus der ersten und letzten Schicht.
@@ -35,10 +23,10 @@ export function EventRangeField({ event, onMoved }: { event: EventDetails; onMov
 
   const shifts = event.shifts ?? [];
   const signupCount = shifts.reduce((sum, s) => sum + (s.signups?.length ?? 0), 0);
-  const days = day ? dayDiff(zurichDay(event.startDate), day) : 0;
+  const days = day ? dayKeyDiff(zurichDay(event.startDate), day) : 0;
   const preview =
     days !== 0
-      ? fmtDateRange(addZurichDays(event.startDate, days).toISOString(), addZurichDays(event.endDate, days).toISOString())
+      ? fmtDateRange(addZurichDays(event.startDate, days).toISOString(), addZurichDays(event.endDate, days).toISOString(), event.dayCutoffTime)
       : null;
 
   const close = () => {
@@ -68,7 +56,7 @@ export function EventRangeField({ event, onMoved }: { event: EventDetails; onMov
       <div className="flex flex-col gap-3 rounded-field border border-line bg-surface-2/60 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-semibold text-fg">
-            <CalendarDays className="size-4 text-accent-ink" aria-hidden /> {fmtDateRange(event.startDate, event.endDate)}
+            <CalendarDays className="size-4 text-accent-ink" aria-hidden /> {fmtDateRange(event.startDate, event.endDate, event.dayCutoffTime)}
           </p>
           <p className="mt-0.5 text-xs text-fg-muted">
             {shifts.length > 0

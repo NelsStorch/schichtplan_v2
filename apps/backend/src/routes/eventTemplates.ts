@@ -1,5 +1,12 @@
 import { FastifyPluginAsync } from 'fastify';
-import { InstantiateTemplateSchema, toEventAccessType, toZurichInput, type EventTemplateData } from '@schichtplan/shared';
+import {
+  InstantiateTemplateSchema,
+  addDaysToDayKey,
+  toEventAccessType,
+  zurichDateTime,
+  zurichDayKey,
+  type EventTemplateData,
+} from '@schichtplan/shared';
 import { cleanRequiredFields } from '../services/profile.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedTo, isDepartmentManager } from '../services/departmentVisibility.js';
 import { generateCheckinToken } from '../services/attendance.js';
@@ -168,9 +175,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
       const templateShifts = templateData?.shifts || [];
       const instantiateAttendanceMode = parse.data.attendanceMode ?? templateData?.attendanceMode ?? 'OFF';
 
-      // Basisdatum = Kalendertag in Schweizer Zeit (das Formular schickt den Tag um 12:00 Schweizer Zeit;
-      // getDate() auf dem Server in UTC würde bei frühen Uhrzeiten den Vortag liefern)
-      const [baseYear, baseMonth, baseDate] = toZurichInput(startDate).slice(0, 10).split('-').map(Number);
+      // Erster Tag und Uhrzeiten der Vorlage gelten in Schweizer Zeit (der Server läuft in UTC)
+      const baseDay = zurichDayKey(startDate);
 
       const tenantId = request.tenant.id;
 
@@ -215,17 +221,13 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         await syncQuestions(tx, ev.id, questions);
 
         for (const s of templateShifts) {
-          const shiftDay = new Date(baseYear, baseMonth - 1, baseDate + (s.dayOffset || 0));
-
-          const [startH, startM] = (s.startTimeStr || '12:00').split(':').map(Number);
-          const [endH, endM] = (s.endTimeStr || '14:00').split(':').map(Number);
-
-          const shiftStart = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate(), startH, startM);
-          let shiftEnd = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate(), endH, endM);
+          const shiftDay = addDaysToDayKey(baseDay, s.dayOffset || 0);
+          const shiftStart = zurichDateTime(shiftDay, s.startTimeStr || '12:00');
+          let shiftEnd = zurichDateTime(shiftDay, s.endTimeStr || '14:00');
 
           // Falls Schicht über Mitternacht geht: Ende auf Folgetag
           if (shiftEnd <= shiftStart) {
-            shiftEnd = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate() + 1, endH, endM);
+            shiftEnd = zurichDateTime(addDaysToDayKey(shiftDay, 1), s.endTimeStr || '14:00');
           }
 
           const tasks = s.tasks || [];

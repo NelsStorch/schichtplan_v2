@@ -2,7 +2,7 @@
 
 import type { ShiftDto } from '@schichtplan/shared';
 import { cn, slotStatus } from '@schichtplan/ui';
-import { fmtTime } from '@/lib/format';
+import { fmtTime, fmtTimeRange } from '@/lib/format';
 import { STATUS_STYLES, shiftStats, shiftTasks } from './shift-utils';
 
 /**
@@ -56,7 +56,7 @@ export function ShiftGrid({
                   className="block w-full rounded-md text-left hover:text-accent-ink"
                 >
                   <span className="tabular block text-[13px] font-bold text-fg">
-                    {fmtTime(shift.startTime)}–{fmtTime(shift.endTime)}
+                    {fmtTimeRange(shift.startTime, shift.endTime)}
                   </span>
                   {showShiftTitles && (
                     <span className="block max-w-[9rem] truncate text-2xs text-fg-subtle">{shift.title}</span>

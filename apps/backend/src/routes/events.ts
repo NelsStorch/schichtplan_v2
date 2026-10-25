@@ -10,6 +10,10 @@ import {
   UnregisterHelperSchema,
   UpdateEventSchema,
   MoveEventSchema,
+  ageAt,
+  dayKeyDiff,
+  zurichDayKey,
+  zurichTimeKey,
   ConfirmDeleteSchema,
   type EventQuestionInput,
   type EventQuestionDto,
@@ -39,13 +43,6 @@ import { generateCheckinToken } from '../services/attendance.js';
 import { moveEventByDays } from '../services/eventRange.js';
 
 type Tx = Prisma.TransactionClient;
-
-function calculateAge(birthDate: Date, targetDate: Date): number {
-  let age = targetDate.getFullYear() - birthDate.getFullYear();
-  const m = targetDate.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && targetDate.getDate() < birthDate.getDate())) age--;
-  return age;
-}
 
 export function toQuestionDto(q: {
   id: string;
@@ -415,7 +412,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                 'Helfer*in'
               : 'Belegt';
             const userAge =
-              access.isManager && su.user?.birthDate ? calculateAge(su.user.birthDate, s.startTime) : null;
+              access.isManager && su.user?.birthDate ? ageAt(su.user.birthDate, s.startTime) : null;
 
             return {
               id: su.id,
@@ -1286,20 +1283,11 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       const templateTitle = parse.data.title || `${event.title} (Vorlage)`;
       const templateDescription = parse.data.description || event.description || null;
 
-      // Berechne relative Tage und Zeiten ausgehend vom Startdatum des Events
-      const eventStart = new Date(event.startDate);
-      const baseMidnight = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
-
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const formatTimeStr = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      // Tag und Uhrzeit relativ zum ersten Tag, alles in Schweizer Zeit (der Server läuft in UTC)
+      const baseDay = zurichDayKey(event.startDate);
 
       const shiftTemplates = event.shifts.map((s) => {
-        const sStart = new Date(s.startTime);
-        const sEnd = new Date(s.endTime);
-
-        const sDayMidnight = new Date(sStart.getFullYear(), sStart.getMonth(), sStart.getDate());
-        const diffMs = sDayMidnight.getTime() - baseMidnight.getTime();
-        const dayOffset = Math.max(0, Math.round(diffMs / (24 * 60 * 60 * 1000)));
+        const dayOffset = Math.max(0, dayKeyDiff(baseDay, zurichDayKey(s.startTime)));
 
         return {
           title: s.title,
@@ -1308,8 +1296,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           description: s.description,
           minAge: s.minAge,
           dayOffset,
-          startTimeStr: formatTimeStr(sStart),
-          endTimeStr: formatTimeStr(sEnd),
+          startTimeStr: zurichTimeKey(s.startTime),
+          endTimeStr: zurichTimeKey(s.endTime),
           tasks: s.tasks.map((t) => ({
             title: t.title,
             description: t.description,

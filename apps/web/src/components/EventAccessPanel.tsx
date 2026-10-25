@@ -7,6 +7,7 @@ import {
   REQUIRED_PROFILE_FIELDS,
   type EventAccessLinkDto,
   type EventParticipantDto,
+  zurichInputToIso,
 } from '@schichtplan/shared';
 import {
   Badge,
@@ -235,7 +236,8 @@ function CreateLinkDialog({
         json: {
           label: label.trim(),
           kind,
-          expiresAt: expires ? new Date(`${expires}T23:59:59`).toISOString() : null,
+          // Gültig bis Ende des gewählten Tages in Schweizer Zeit
+          expiresAt: expires ? zurichInputToIso(`${expires}T23:59`) : null,
         },
       });
       onCreated(res.token, label.trim());

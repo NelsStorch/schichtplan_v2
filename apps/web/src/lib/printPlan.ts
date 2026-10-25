@@ -1,5 +1,5 @@
 import type { DepartmentDto, ShiftDto, ShiftSignupDto } from '@schichtplan/shared';
-import { dayKeyToIso, fmtDateRange, fmtDayMonth, fmtShortDate, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay } from './format';
+import { dayKeyToIso, fmtDateRange, fmtDayMonth, fmtShortDate, fmtShortWeekday, fmtWeekday, groupByBusinessDay, fmtTimeRange } from './format';
 import type { EventDetails } from './types';
 
 export type PrintLayout = 'plan' | 'aushang' | 'personen';
@@ -131,7 +131,7 @@ function buildDays(event: EventDetails, options: PrintPlanOptions): PlanDay[] {
             : [];
           return {
             id: shift.id,
-            time: `${fmtTime(shift.startTime)}–${fmtTime(shift.endTime)}`,
+            time: `${fmtTimeRange(shift.startTime, shift.endTime)}`,
             duration: duration(shift),
             title: shift.title,
             category: options.showDetails ? (shift.category ?? null) : null,
@@ -165,7 +165,7 @@ function buildPeople(event: EventDetails, options: PrintPlanOptions): PersonEntr
           const entry = byPerson.get(key) ?? { name: su.displayName, items: [] };
           entry.items.push({
             day: `${fmtShortWeekday(dayKeyToIso(d.key))} ${fmtShortDate(dayKeyToIso(d.key))}`,
-            time: `${fmtTime(shift.startTime)}–${fmtTime(shift.endTime)}`,
+            time: `${fmtTimeRange(shift.startTime, shift.endTime)}`,
             shift: shift.title,
             task: task.title === shift.title ? null : task.title,
           });
@@ -224,7 +224,7 @@ export async function buildPlanDocument(
     pageBreakPerDay: options.pageBreakPerDay,
     title: event.title,
     subtitle,
-    dateRange: fmtDateRange(event.startDate, event.endDate),
+    dateRange: fmtDateRange(event.startDate, event.endDate, event.dayCutoffTime),
     stand: new Intl.DateTimeFormat('de-CH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Zurich' }).format(new Date()),
     department: department?.name ?? null,
     accent: /^#[0-9a-f]{6}$/i.test(department?.primaryColor ?? '') ? department!.primaryColor! : DEFAULT_ACCENT,

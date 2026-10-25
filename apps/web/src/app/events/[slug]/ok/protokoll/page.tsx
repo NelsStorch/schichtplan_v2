@@ -8,7 +8,7 @@ import { Badge, Button, Card, Chip, EmptyState, Input, Skeleton, cn, useToast } 
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { api, errorMessage } from '@/lib/api';
-import { fmtTime, fmtWeekday } from '@/lib/format';
+import { fmtWeekday, fmtTimeRange } from '@/lib/format';
 
 type Action = 'ALL' | 'SIGNUP' | 'SIGNOFF' | 'ATTENDANCE';
 
@@ -164,7 +164,7 @@ export default function LogPage() {
                     <p className="mt-0.5 text-xs text-fg-muted">
                       «{item.shiftTitle}»{item.taskTitle && item.taskTitle !== item.shiftTitle ? ` · ${item.taskTitle}` : ''}
                       {item.shiftStartTime && item.shiftEndTime
-                        ? ` · ${fmtWeekday(item.shiftStartTime)}, ${fmtTime(item.shiftStartTime)}–${fmtTime(item.shiftEndTime)}`
+                        ? ` · ${fmtWeekday(item.shiftStartTime)}, ${fmtTimeRange(item.shiftStartTime, item.shiftEndTime)}`
                         : ''}
                     </p>
                   </div>

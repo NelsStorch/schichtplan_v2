@@ -3,7 +3,7 @@
 import { AlertTriangle, CheckCircle2, Clock, Copy, Edit, Hammer, Trash2, UserPlus, X } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import { Avatar, Badge, Button, Card, cn } from '@schichtplan/ui';
-import { fmtDuration, fmtTime } from '@/lib/format';
+import { fmtDuration, fmtTimeRange } from '@/lib/format';
 import { taskHasAdult } from './shiftChecks';
 
 export function ShiftCard({
@@ -72,7 +72,7 @@ export function ShiftCard({
             <h3 className="text-lg font-bold text-fg">{shift.title}</h3>
             <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-fg-muted">
               <Clock className="size-3.5" />
-              {fmtTime(shift.startTime)} – {fmtTime(shift.endTime)} ({fmtDuration(shift.startTime, shift.endTime)})
+              {fmtTimeRange(shift.startTime, shift.endTime)} ({fmtDuration(shift.startTime, shift.endTime)})
             </p>
             {shift.responsibles && shift.responsibles.length > 0 && (
               <p className="mt-1 text-xs text-fg-muted">

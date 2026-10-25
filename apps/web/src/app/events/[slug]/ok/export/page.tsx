@@ -81,7 +81,7 @@ export default function ExportPage() {
       const roster = await api<EventRosterResponseDto>(`/api/events/${event.slug}/roster`);
       const min = roster.minShiftsPerPerson;
       const rows: (string | number)[][] = [
-        ['Cevi-Name', 'Vorname', 'Nachname', 'Abteilung', 'Stufe', 'Alter', 'Schichten', ...(min ? ['Soll erfüllt'] : []), 'Abgemeldet', 'Grund'],
+        ['Cevi-Name', 'Vorname', 'Nachname', 'Abteilung', 'Stufe', 'Alter am Anlass', 'Schichten', ...(min ? ['Soll erfüllt'] : []), 'Abgemeldet', 'Grund'],
       ];
       for (const i of roster.items) {
         rows.push([

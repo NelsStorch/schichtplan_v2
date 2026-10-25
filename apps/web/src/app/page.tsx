@@ -11,7 +11,7 @@ import { DepartmentSettingsDialog } from '@/components/DepartmentSettingsDialog'
 import { EventFormDialog } from '@/components/EventFormDialog';
 import { EventTile, eventStatus } from '@/components/EventTile';
 import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
-import { fmtDayMonth, fmtRelativeDay, fmtShortDate, fmtTime, fmtWeekday } from '@/lib/format';
+import { fmtDayMonth, fmtRelativeDay, fmtShortDate, fmtTimeRange, fmtWeekday } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
 import type { MyShift } from '@/lib/types';
 
@@ -194,8 +194,7 @@ function NextShiftCard({ shift }: { shift: MyShift }) {
       <p className="text-sm text-fg-muted">{shift.eventTitle}</p>
       <p className="mt-3 inline-flex items-center gap-2 font-mono text-[13px] text-fg-muted">
         <Clock className="size-4" />
-        {fmtWeekday(shift.startTime)}, {fmtDayMonth(shift.startTime)} · {fmtTime(shift.startTime)} bis{' '}
-        {fmtTime(shift.endTime)}
+        {fmtWeekday(shift.startTime)}, {fmtDayMonth(shift.startTime)} · {fmtTimeRange(shift.startTime, shift.endTime)}
       </p>
       <Link href="/meine-schichten" className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'mt-5' })}>
         Alle meine Schichten <ArrowRight />

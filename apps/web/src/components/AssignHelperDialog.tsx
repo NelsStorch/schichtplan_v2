@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AlertTriangle, ArrowDownUp, Ban, Clock, Filter, Search, UserCheck } from 'lucide-react';
+import { ageAt } from '@schichtplan/shared';
 import type {
   EventRosterItemDto,
   EventRosterResponseDto,
@@ -11,7 +12,7 @@ import type {
 } from '@schichtplan/shared';
 import { Avatar, Badge, Button, Callout, Chip, Dialog, Field, Input, Select, Skeleton, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage, ApiError } from '@/lib/api';
-import { fmtShortWeekday, fmtTime, fmtWeekday } from '@/lib/format';
+import { fmtShortWeekday, fmtTime, fmtWeekday, fmtTimeRange } from '@/lib/format';
 import { shiftTasks } from '@/components/event/shift-utils';
 
 /* ---------------------------------------------------- Helfer durch OK einteilen */
@@ -27,14 +28,6 @@ interface Candidate extends EventRosterItemDto {
   tooYoung: boolean;
 }
 
-function ageAt(birthDate: string | null, at: Date): number | null {
-  if (!birthDate) return null;
-  const b = new Date(`${birthDate}T00:00:00`);
-  let age = at.getFullYear() - b.getFullYear();
-  const m = at.getMonth() - b.getMonth();
-  if (m < 0 || (m === 0 && at.getDate() < b.getDate())) age--;
-  return age;
-}
 
 export function AssignHelperDialog({
   open,
@@ -57,7 +50,7 @@ export function AssignHelperDialog({
       onClose={onClose}
       icon={<UserCheck />}
       title="Person einteilen"
-      description={shift ? `${shift.title} · ${fmtWeekday(shift.startTime)}, ${fmtTime(shift.startTime)} – ${fmtTime(shift.endTime)} Uhr` : ''}
+      description={shift ? `${shift.title} · ${fmtWeekday(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}` : ''}
       size="lg"
     >
       {shift && (
@@ -489,8 +482,7 @@ function AssignHelperForm({
                     <span className="size-1.5 shrink-0 rounded-full bg-warning" />
                     <span>
                       <strong>{c.shiftTitle}</strong>
-                      {c.taskTitle ? ` (${c.taskTitle})` : ''}: {fmtWeekday(c.startTime)}, {fmtTime(c.startTime)} –{' '}
-                      {fmtTime(c.endTime)} Uhr
+                      {c.taskTitle ? ` (${c.taskTitle})` : ''}: {fmtWeekday(c.startTime)}, {fmtTimeRange(c.startTime, c.endTime)}
                     </span>
                   </li>
                 ))}

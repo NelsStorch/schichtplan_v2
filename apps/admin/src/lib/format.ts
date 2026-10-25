@@ -1,12 +1,15 @@
-import type { AdminUserListItemDto, LoginMethod } from '@schichtplan/shared';
+import { ageAt, type AdminUserListItemDto, type LoginMethod } from '@schichtplan/shared';
 
-const dateFmt = new Intl.DateTimeFormat('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+// Immer Schweizer Zeit, auch wenn jemand aus dem Ausland schaut
+const TZ = 'Europe/Zurich';
+const dateFmt = new Intl.DateTimeFormat('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: TZ });
 const dateTimeFmt = new Intl.DateTimeFormat('de-CH', {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
+  timeZone: TZ,
 });
 const shiftFmt = new Intl.DateTimeFormat('de-CH', {
   weekday: 'short',
@@ -14,23 +17,22 @@ const shiftFmt = new Intl.DateTimeFormat('de-CH', {
   month: '2-digit',
   hour: '2-digit',
   minute: '2-digit',
+  timeZone: TZ,
 });
 
 export const formatDate = (iso: string) => dateFmt.format(new Date(iso));
 export const formatDateTime = (iso: string) => dateTimeFmt.format(new Date(iso));
 export const formatShiftStart = (iso: string) => shiftFmt.format(new Date(iso));
 
-/** "YYYY-MM-DD" als lokales Datum anzeigen, ohne Zeitzonen-Verschiebung. */
+/** "YYYY-MM-DD" als Datum anzeigen, ohne Zeitzonen-Verschiebung */
 export function formatBirthDate(value: string) {
-  const [y, m, d] = value.split('-').map(Number);
-  return dateFmt.format(new Date(y, m - 1, d));
+  const [y, m, d] = value.split('-');
+  return `${d}.${m}.${y}`;
 }
 
+/** Heutiges Alter (Schweizer Kalendertag) */
 export function ageFromBirthDate(value: string, today = new Date()) {
-  const [y, m, d] = value.split('-').map(Number);
-  let age = today.getFullYear() - y;
-  if (today.getMonth() + 1 < m || (today.getMonth() + 1 === m && today.getDate() < d)) age -= 1;
-  return age;
+  return ageAt(value, today) ?? 0;
 }
 
 /** Name ohne den Platzhalter "(Helfer)", den der Cevi-Name-Schnelllogin als Nachnamen setzt. */

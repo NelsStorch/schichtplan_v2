@@ -226,7 +226,7 @@ function OkFrame({ children }: { children: ReactNode }) {
             {event.title}
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
-            <CalendarDays className="size-4" /> {fmtDateRange(event.startDate, event.endDate)}
+            <CalendarDays className="size-4" /> {fmtDateRange(event.startDate, event.endDate, event.dayCutoffTime)}
             <Badge tone="accent" size="sm">
               <Shield className="size-3" /> OK-Bereich
             </Badge>

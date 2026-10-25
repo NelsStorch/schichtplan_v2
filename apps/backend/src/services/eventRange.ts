@@ -1,4 +1,4 @@
-import { addZurichDays } from '@schichtplan/shared';
+import { addDaysToDayKey, addZurichDays } from '@schichtplan/shared';
 import type { PrismaClient } from '../generated/prisma/client.js';
 
 type Db = Pick<PrismaClient, 'shift' | 'event' | 'shiftSignup' | 'eventDayResponsible'>;
@@ -38,7 +38,7 @@ export async function moveEventByDays(db: Db, event: { id: string; startDate: Da
   const dayResponsibles = await db.eventDayResponsible.findMany({ where: { eventId: event.id } });
   dayResponsibles.sort((a, b) => (days > 0 ? b.dayDate.localeCompare(a.dayDate) : a.dayDate.localeCompare(b.dayDate)));
   for (const r of dayResponsibles) {
-    await db.eventDayResponsible.update({ where: { id: r.id }, data: { dayDate: shiftDayKey(r.dayDate, days) } });
+    await db.eventDayResponsible.update({ where: { id: r.id }, data: { dayDate: addDaysToDayKey(r.dayDate, days) } });
   }
   await db.shiftSignup.updateMany({
     where: { shift: { eventId: event.id }, reminderSentAt: { not: null } },
@@ -54,10 +54,4 @@ export async function moveEventByDays(db: Db, event: { id: string; startDate: Da
   });
   await syncEventRange(db, event.id);
   return shifts.length;
-}
-
-/** YYYY-MM-DD um ganze Kalendertage verschieben */
-export function shiftDayKey(dayKey: string, days: number) {
-  const [y, m, d] = dayKey.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }

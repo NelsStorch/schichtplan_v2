@@ -146,3 +146,94 @@ export function isSignupTimeOpen(
   if (isNaN(target)) return true;
   return Date.now() + graceMs >= target;
 }
+
+/** Kalendertag in Schweizer Zeit als YYYY-MM-DD */
+export function zurichDayKey(date: Date | string): string {
+  return toZurichInput(date).slice(0, 10);
+}
+
+/** Uhrzeit in Schweizer Zeit als HH:mm (24 h, für Vorlagen) */
+export function zurichTimeKey(date: Date | string): string {
+  return toZurichInput(date).slice(11, 16);
+}
+
+/** YYYY-MM-DD um ganze Kalendertage verschieben */
+export function addDaysToDayKey(dayKey: string, days: number): string {
+  const [y, m, d] = dayKey.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** Abstand zweier YYYY-MM-DD in ganzen Tagen (to - from) */
+export function dayKeyDiff(from: string, to: string): number {
+  const ms = (key: string) => {
+    const [y, m, d] = key.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((ms(to) - ms(from)) / 86_400_000);
+}
+
+/** Tag (YYYY-MM-DD) und Uhrzeit (HH:mm) als Schweizer Wanduhrzeit in einen Zeitpunkt umwandeln */
+export function zurichDateTime(dayKey: string, time: string): Date {
+  return new Date(zurichInputToIso(`${dayKey}T${time}`)!);
+}
+
+/**
+ * Alter an einem Zeitpunkt, gerechnet mit dem Kalendertag in Schweizer Zeit (eine Schicht um 00:30
+ * am 18. Geburtstag zählt also schon). Das Geburtsdatum ist ein reines Datum (YYYY-MM-DD bzw.
+ * UTC-Mitternacht, so speichert es das Backend).
+ */
+export function ageAt(birthDate: Date | string | null | undefined, at: Date | string): number | null {
+  if (!birthDate) return null;
+  const birthKey = typeof birthDate === 'string' ? birthDate.slice(0, 10) : birthDate.toISOString().slice(0, 10);
+  const [by, bm, bd] = birthKey.split('-').map(Number);
+  const [ay, am, ad] = zurichDayKey(at).split('-').map(Number);
+  if ([by, bm, bd, ay, am, ad].some((n) => Number.isNaN(n))) return null;
+  let age = ay - by;
+  if (am < bm || (am === bm && ad < bd)) age--;
+  return age;
+}
+
+/**
+ * Austrage-Sperre: ab diesem Zeitpunkt können sich Helfende nicht mehr selbst austragen.
+ * N Kalendertage vor dem Beginn in Schweizer Zeit (gleiche Uhrzeit, auch über die Zeitumstellung).
+ */
+export function cancelDeadlineAt(eventStart: Date | string, cancelDeadlineDays: number): Date {
+  return addZurichDays(eventStart, -cancelDeadlineDays);
+}
+
+/** «1 Tag» / «3 Tage» */
+export function formatDays(n: number): string {
+  return `${n} ${Math.abs(n) === 1 ? 'Tag' : 'Tage'}`;
+}
+
+/** Zeitspanne in Schweizer Zeit, einheitlich «18:00–22:00» */
+export function formatZurichTimeRange(start: Date | string, end: Date | string): string {
+  return `${formatZurichTime(start)}–${formatZurichTime(end)}`;
+}
+
+/**
+ * Tageswechsel-Uhrzeit (HH:MM, z. B. 04:00) in Minuten seit Mitternacht. Ungültig oder leer ➜ 04:00.
+ */
+export function parseDayCutoffMinutes(cutoff: string | null | undefined = '04:00'): number {
+  const match = (cutoff ?? '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return 4 * 60;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * Geschäftstag eines Zeitpunkts (YYYY-MM-DD, Schweizer Zeit): Was vor der Tageswechsel-Uhrzeit
+ * beginnt, gehört zum Vortag (die Barschicht bis 03:00 ist noch «Samstag»).
+ */
+export function businessDayKey(date: Date | string, cutoff: string | null | undefined = '04:00'): string {
+  const local = toZurichInput(date);
+  const minutes = Number(local.slice(11, 13)) * 60 + Number(local.slice(14, 16));
+  const day = local.slice(0, 10);
+  return minutes < parseDayCutoffMinutes(cutoff) ? addDaysToDayKey(day, -1) : day;
+}
+
+/** «seit Anlassbeginn» bzw. «seit dem 12.06.2026 um 18:00 Uhr (2 Tage vor Anlassbeginn)» */
+export function cancelDeadlineText(deadline: Date, cancelDeadlineDays: number): string {
+  return cancelDeadlineDays === 0
+    ? 'seit Anlassbeginn'
+    : `seit dem ${formatZurichDateTime(deadline)} (${formatDays(cancelDeadlineDays)} vor Anlassbeginn)`;
+}

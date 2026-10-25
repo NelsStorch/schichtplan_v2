@@ -223,4 +223,54 @@ describe.skipIf(!hasTestDb)('Rechte bei Anlässen', () => {
     const responsible = await app.prisma.eventDayResponsible.findFirstOrThrow({ where: { eventId: event.id } });
     expect(responsible.dayDate).toBe('2030-11-02');
   });
+
+  it('speichert Vorlagen in Schweizer Zeit und legt sie zur gleichen Wanduhrzeit wieder an', async () => {
+    const department = await createDepartment(app);
+    const admin = await createUser(app);
+    await addMember(app, department.id, admin.id, 'ADMIN');
+    const cookie = authCookie(app, admin);
+    const event = await createEvent(app, department.id);
+    // Sommer: Sa 18:00–22:00 MESZ und eine Nachtschicht So 00:30–03:00 MESZ
+    await createShift(app, event.id, {
+      title: 'Bar',
+      startTime: new Date('2030-06-01T16:00:00.000Z'),
+      endTime: new Date('2030-06-01T20:00:00.000Z'),
+    });
+    await createShift(app, event.id, {
+      title: 'Nacht',
+      startTime: new Date('2030-06-01T22:30:00.000Z'),
+      endTime: new Date('2030-06-02T01:00:00.000Z'),
+    });
+
+    const saved = await inject(app, {
+      method: 'POST',
+      url: `/api/events/${event.slug}/save-as-template`,
+      tenant: department.slug,
+      cookie,
+      payload: { title: 'Chilbi-Vorlage' },
+    });
+    expect(saved.statusCode).toBe(200);
+    const template = await app.prisma.eventTemplate.findFirstOrThrow({ where: { departmentId: department.id } });
+    const shifts = (template.data as { shifts: { title: string; dayOffset: number; startTimeStr: string; endTimeStr: string }[] }).shifts;
+    expect(shifts.find((s) => s.title === 'Bar')).toMatchObject({ dayOffset: 0, startTimeStr: '18:00', endTimeStr: '22:00' });
+    expect(shifts.find((s) => s.title === 'Nacht')).toMatchObject({ dayOffset: 1, startTimeStr: '00:30', endTimeStr: '03:00' });
+
+    // Im Winter anlegen (erster Tag Sa 07.12.2030): gleiche Wanduhrzeit, jetzt MEZ
+    const created = await inject(app, {
+      method: 'POST',
+      url: `/api/event-templates/${template.id}/instantiate`,
+      tenant: department.slug,
+      cookie,
+      payload: { title: 'Chilbi Winter', slug: 'chilbi-winter', startDate: '2030-12-07T11:00:00.000Z', accessType: 'PUBLIC' },
+    });
+    expect(created.statusCode).toBe(200);
+    const newShifts = await app.prisma.shift.findMany({ where: { event: { slug: 'chilbi-winter' } }, orderBy: { startTime: 'asc' } });
+    expect(newShifts.map((s) => [s.title, s.startTime.toISOString(), s.endTime.toISOString()])).toEqual([
+      ['Bar', '2030-12-07T17:00:00.000Z', '2030-12-07T21:00:00.000Z'],
+      ['Nacht', '2030-12-07T23:30:00.000Z', '2030-12-08T02:00:00.000Z'],
+    ]);
+    // Zeitraum = erste bis letzte Schicht
+    expect(created.json().startDate).toBe('2030-12-07T17:00:00.000Z');
+    expect(created.json().endDate).toBe('2030-12-08T02:00:00.000Z');
+  });
 });

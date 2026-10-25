@@ -8,7 +8,7 @@ import { Badge, Button, Callout, Card, EmptyState, Field, Input, Skeleton, Texta
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { api, errorMessage } from '@/lib/api';
-import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, groupByBusinessDay } from '@/lib/format';
+import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, groupByBusinessDay, fmtTimeRange } from '@/lib/format';
 
 const MAX_BODY = 5000;
 
@@ -203,7 +203,7 @@ export default function MessagesPage() {
                       <input type="checkbox" className="size-4 accent-accent" checked={shiftIds.has(s.id)} onChange={() => toggleShift(s.id)} />
                       <span className="min-w-0 flex-1 truncate text-fg">{s.title}</span>
                       <span className="shrink-0 font-mono text-2xs text-fg-muted">
-                        {fmtTime(s.startTime)}–{fmtTime(s.endTime)} · {s.signups?.length ?? 0}
+                        {fmtTimeRange(s.startTime, s.endTime)} · {s.signups?.length ?? 0}
                       </span>
                     </label>
                   ))}

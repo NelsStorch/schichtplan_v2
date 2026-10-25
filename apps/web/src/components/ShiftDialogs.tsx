@@ -40,7 +40,7 @@ import {
   useConfirm,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
-import { fmtDayMonth, fmtTime, fmtWeekday } from '@/lib/format';
+import { fmtDayMonth, fmtWeekday } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 
 /** ISO -> Wert für <input type="datetime-local"> in Schweizer Zeit */

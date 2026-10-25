@@ -6,6 +6,7 @@ import {
   EventParticipationSchema,
   RedeemAccessLinkSchema,
   accessTypeConfig,
+  ageAt,
   type EventAccessLinkDto,
   type EventParticipantDto,
   type EventRosterItemDto,
@@ -20,17 +21,6 @@ import {
 } from '../services/eventAccess.js';
 import { personLabel } from '../services/profile.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
-
-function calculateAge(birthDate: Date | null): number | null {
-  if (!birthDate) return null;
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
 
 /** Fehlermeldung bei ungültiger Antwort (Auswahl nicht in den Optionen, Ja/Nein falsch), sonst null */
 export function validateAnswers(
@@ -511,7 +501,8 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           lastName: u.lastName,
           displayName: personLabel(u),
           birthDate: u.birthDate ? u.birthDate.toISOString().slice(0, 10) : null,
-          age: calculateAge(u.birthDate),
+          // Alter am Anlass (erste Schicht), nicht heute: so passt es zu den Altersgrenzen der Schichten
+          age: ageAt(u.birthDate, event.startDate),
           departmentId: deptId,
           departmentName: deptName,
           stufen: personStufen,

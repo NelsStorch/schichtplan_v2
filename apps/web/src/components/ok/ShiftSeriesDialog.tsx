@@ -31,7 +31,7 @@ import {
   useToast,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
-import { fmtShortWeekday, fmtTime } from '@/lib/format';
+import { fmtShortWeekday, fmtTimeRange } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 
 const DURATION_PRESETS = [
@@ -478,8 +478,7 @@ export function ShiftSeriesDialog({
                       <span className="font-mono font-semibold text-fg-muted w-5">#{idx + 1}</span>
                       <div>
                         <span className="font-medium text-fg">
-                          {fmtShortWeekday(shift.startTime.toISOString())} {fmtTime(shift.startTime.toISOString())} –{' '}
-                          {fmtTime(shift.endTime.toISOString())}
+                          {fmtShortWeekday(shift.startTime.toISOString())} {fmtTimeRange(shift.startTime.toISOString(), shift.endTime.toISOString())}
                         </span>
                         <span className="text-[11px] text-fg-muted ml-2">({title})</span>
                       </div>

@@ -274,7 +274,7 @@ const tabFromHash = (): AdminTab => {
   return TABS.some((t) => t.id === hash) ? (hash as AdminTab) : 'uebersicht';
 };
 
-const timeFmt = new Intl.DateTimeFormat('de-CH', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+const timeFmt = new Intl.DateTimeFormat('de-CH', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' });
 
 function AdminHome({
   user,

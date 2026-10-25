@@ -25,7 +25,7 @@ import {
 } from '@schichtplan/shared';
 import { Badge, Button, Callout, Card, Chip, EmptyState, Input, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
-import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay } from '@/lib/format';
+import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay, fmtTimeRange } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 
 type AttendanceFields = Pick<ShiftSignupDto, 'attendance' | 'attendanceAt' | 'attendanceSource' | 'attendanceByName'>;
@@ -192,7 +192,7 @@ export function EventAttendancePanel({
     shifts.flatMap((s) =>
       s.signups.map((su) => ({
         date: fmtWeekday(s.startTime),
-        time: `${fmtTime(s.startTime)}–${fmtTime(s.endTime)}`,
+        time: `${fmtTimeRange(s.startTime, s.endTime)}`,
         shift: s.title,
         task: su.taskTitle ?? '',
         name: su.displayName,
@@ -225,7 +225,7 @@ export function EventAttendancePanel({
     const body = shifts
       .map(
         (s) => `
-        <h2>${escapeHtml(s.title)} <small>${escapeHtml(fmtWeekday(s.startTime))}, ${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</small></h2>
+        <h2>${escapeHtml(s.title)} <small>${escapeHtml(fmtWeekday(s.startTime))}, ${fmtTimeRange(s.startTime, s.endTime)}</small></h2>
         <table>
           <thead><tr><th class="box">Da</th><th>Name</th><th>Arbeit</th><th>Status</th><th>Erfasst</th></tr></thead>
           <tbody>${s.signups
@@ -483,7 +483,7 @@ function ShiftAttendanceCard({
             )}
           </p>
           <p className="text-xs text-fg-muted">
-            {fmtTime(shift.startTime)}–{fmtTime(shift.endTime)}
+            {fmtTimeRange(shift.startTime, shift.endTime)}
           </p>
         </div>
         <Badge tone={present === allSignups.length ? 'success' : 'neutral'}>

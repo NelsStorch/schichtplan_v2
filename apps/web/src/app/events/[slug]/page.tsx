@@ -21,6 +21,8 @@ import {
   X,
 } from 'lucide-react';
 import {
+  cancelDeadlineAt,
+  cancelDeadlineText,
   isSignupTimeOpen,
   type RequiredProfileField,
   type ShiftDto,
@@ -60,6 +62,7 @@ import {
   fmtTime,
   fmtWeekday,
   groupByBusinessDay,
+  fmtTimeRange,
 } from '@/lib/format';
 import { usePortal } from '@/lib/portal';
 import { useDynamicFavicon } from '@/lib/favicon';
@@ -366,7 +369,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     if (conflict) {
       toast({
         title: 'Zeitkollision',
-        description: `Du bist zur gleichen Zeit bereits für die Schicht «${conflict.title}» (${fmtTime(conflict.startTime)} – ${fmtTime(conflict.endTime)} Uhr) eingetragen.`,
+        description: `Du bist zur gleichen Zeit bereits für die Schicht «${conflict.title}» (${fmtTimeRange(conflict.startTime, conflict.endTime)}) eingetragen.`,
         tone: 'error',
       });
       return;
@@ -403,19 +406,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       event.cancelDeadlineDays !== null &&
       event.cancelDeadlineDays !== undefined
     ) {
-      const deadline = new Date(new Date(event.startDate).getTime() - event.cancelDeadlineDays * 24 * 60 * 60 * 1000);
+      const deadline = cancelDeadlineAt(event.startDate, event.cancelDeadlineDays);
       if (new Date() >= deadline) {
-        const deadlineStr = deadline.toLocaleDateString('de-CH', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        const daysText =
-          event.cancelDeadlineDays === 0
-            ? 'seit Anlassbeginn'
-            : `seit dem ${deadlineStr} Uhr (${event.cancelDeadlineDays} Tag(e) vor Anlassbeginn)`;
+        const daysText = cancelDeadlineText(deadline, event.cancelDeadlineDays);
         const contactInfo = event.contactUser
           ? `Bitte melde dich bei ${event.contactUser.displayName}${event.contactUser.phone ? ` (${event.contactUser.phone})` : ''}${event.contactUser.email ? ` oder per Mail an ${event.contactUser.email}` : ''}.`
           : 'Bitte wende dich direkt an das Event-OK.';
@@ -548,7 +541,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
               <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-white/85">
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarDays className="size-4" />
-                  {fmtDateRange(event.startDate, event.endDate)}
+                  {fmtDateRange(event.startDate, event.endDate, event.dayCutoffTime)}
                 </span>
                 <span className="inline-flex items-center gap-1.5 text-white/70">
                   <Users className="size-4" />

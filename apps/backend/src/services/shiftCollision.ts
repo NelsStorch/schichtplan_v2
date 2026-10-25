@@ -62,17 +62,8 @@ export function hasShiftCollision(
   return overlapMinutes > toleranceMinutes;
 }
 
-/**
- * Schweizer Zeitformatierung HH:MM in der Zeitzone Europe/Zurich
- */
-export function formatZurichTime(d: Date | string): string {
-  const date = typeof d === 'string' ? new Date(d) : d;
-  return date.toLocaleTimeString('de-CH', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Zurich',
-  });
-}
+/** HH:MM in Schweizer Zeit (gemeinsame Hilfe aus @schichtplan/shared) */
+export { formatZurichTime } from '@schichtplan/shared';
 
 /**
  * Findet alle aktiven Eintragungen einer Person (oder eines Gastes im selben Event),

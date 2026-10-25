@@ -1,3 +1,7 @@
+import { businessDayKey, formatZurichTimeRange } from '@schichtplan/shared';
+
+export { businessDayKey };
+
 // Anlässe finden in der Schweiz statt: Zeiten immer in Schweizer Zeit anzeigen,
 // auch wenn jemand aus dem Ausland schaut.
 const TZ = 'Europe/Zurich';
@@ -9,16 +13,10 @@ const shortWeekdayFmt = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', time
 const dayMonthFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', timeZone: TZ });
 const shortDateFmt = new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: '2-digit', timeZone: TZ });
 const fullDateFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ });
-const partsFmt = new Intl.DateTimeFormat('en-CA', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  hourCycle: 'h23',
-  timeZone: TZ,
-});
 
 export const fmtTime = (iso: string) => timeFmt.format(new Date(iso));
+/** Zeitspanne einheitlich «18:00–22:00» */
+export const fmtTimeRange = (startIso: string, endIso: string) => formatZurichTimeRange(startIso, endIso);
 export const fmtWeekday = (iso: string) => weekdayFmt.format(new Date(iso));
 export const fmtShortWeekday = (iso: string) => shortWeekdayFmt.format(new Date(iso)).replace('.', '');
 export const fmtDayMonth = (iso: string) => dayMonthFmt.format(new Date(iso));
@@ -26,10 +24,10 @@ export const fmtShortDate = (iso: string) => shortDateFmt.format(new Date(iso));
 export const fmtFullDate = (iso: string) => fullDateFmt.format(new Date(iso));
 
 /** "16.10. bis 18. Oktober 2026" bzw. "16. Oktober 2026" */
-export function fmtDateRange(startIso: string, endIso: string) {
-  // Über Geschäftstage, damit ein Ende um 00:30 nicht als Folgetag erscheint
-  const start = dayKeyToIso(businessDayKey(startIso));
-  const end = dayKeyToIso(businessDayKey(endIso));
+export function fmtDateRange(startIso: string, endIso: string, cutoff?: string | null) {
+  // Über Geschäftstage mit der Tageswechsel-Uhrzeit des Anlasses, damit ein Ende um 00:30 nicht als Folgetag erscheint
+  const start = dayKeyToIso(businessDayKey(startIso, cutoff));
+  const end = dayKeyToIso(businessDayKey(endIso, cutoff));
   if (start === end) return fmtFullDate(start);
   return `${fmtShortDate(start)} bis ${fmtFullDate(end)}`;
 }
@@ -46,29 +44,10 @@ export function fmtDuration(startIso: string, endIso: string) {
 export const hoursBetween = (startIso: string, endIso: string) =>
   Math.max(0, (+new Date(endIso) - +new Date(startIso)) / 3_600_000);
 
-export function parseCutoffHour(cutoff: string = '04:00'): number {
-  if (!cutoff) return 4;
-  const match = cutoff.trim().match(/^(\d{1,2}):(\d{2})$/);
-  return match ? parseInt(match[1], 10) : 4;
-}
-
-/**
- * Geschäftstag einer Schicht (YYYY-MM-DD, Schweizer Zeit).
- * Regel aus der Legacy-App: Schichten, die vor der Tageswechsel-Uhrzeit (Standard 04:00) beginnen,
- * gehören zum Vortag (z. B. die Barschicht bis 03:00 ist noch "Samstag").
- */
-export function businessDayKey(iso: string, cutoff: string = '04:00') {
-  const cutoffHour = parseCutoffHour(cutoff);
-  const parts = Object.fromEntries(partsFmt.formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
-  const date = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day));
-  if (+parts.hour < cutoffHour) date.setUTCDate(date.getUTCDate() - 1);
-  return date.toISOString().slice(0, 10);
-}
-
 /** ISO-Zeitpunkt mittags am Geschäftstag – für Wochentag-/Datumslabels. */
 export const dayKeyToIso = (key: string) => `${key}T12:00:00Z`;
 
-export function groupByBusinessDay<T extends { startTime: string }>(items: T[], cutoff: string = '04:00') {
+export function groupByBusinessDay<T extends { startTime: string }>(items: T[], cutoff?: string | null) {
   const groups = new Map<string, T[]>();
   for (const item of [...items].sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime))) {
     const key = businessDayKey(item.startTime, cutoff);

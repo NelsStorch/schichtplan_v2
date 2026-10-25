@@ -7,7 +7,7 @@ import type { CheckinResultDto } from '@schichtplan/shared';
 import { Card, EmptyState, Skeleton, buttonClasses } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { api, errorMessage, loginUrl } from '@/lib/api';
-import { fmtTime, fmtWeekday } from '@/lib/format';
+import { fmtTime, fmtWeekday, fmtTimeRange } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
 
 type State =
@@ -122,7 +122,7 @@ function CheckinResult({ slug, result, name }: { slug: string; result: CheckinRe
             <div className="min-w-0">
               <p className="font-bold text-fg">{c.shiftTitle}</p>
               <p className="text-xs text-fg-muted">
-                {[c.taskTitle, `${fmtWeekday(c.startTime)}, ${fmtTime(c.startTime)}–${fmtTime(c.endTime)}`]
+                {[c.taskTitle, `${fmtWeekday(c.startTime)}, ${fmtTimeRange(c.startTime, c.endTime)}`]
                   .filter(Boolean)
                   .join(' · ')}
               </p>

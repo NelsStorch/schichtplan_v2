@@ -1,6 +1,10 @@
 import { FastifyPluginAsync } from 'fastify';
 import {
   addZurichDays,
+  ageAt,
+  cancelDeadlineAt,
+  cancelDeadlineText,
+  formatZurichTimeRange,
   toZurichInput,
   BulkShiftsSchema,
   CreateShiftSchema,
@@ -20,18 +24,9 @@ import {
 } from '../services/eventAccess.js';
 import { missingProfileFields } from '../services/profile.js';
 import { validateAnswers } from './eventParticipation.js';
-import { findShiftCollisions, formatZurichTime } from '../services/shiftCollision.js';
+import { findShiftCollisions } from '../services/shiftCollision.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
 import { syncEventRange } from '../services/eventRange.js';
-
-function calculateAge(birthDate: Date, targetDate: Date): number {
-  let age = targetDate.getFullYear() - birthDate.getFullYear();
-  const m = targetDate.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && targetDate.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
 
 function toResponsiblePersonDto(
   r: {
@@ -714,7 +709,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         if (first.sameShift) {
           message = `Bereits in dieser Schicht eingetragen${first.taskTitle ? ` (${first.taskTitle})` : ''}.`;
         } else {
-          message = `Bereits eingetragen für «${first.shiftTitle}»${first.taskTitle ? ` (${first.taskTitle})` : ''} (${formatZurichTime(first.startTime)} – ${formatZurichTime(first.endTime)} Uhr).`;
+          message = `Bereits eingetragen für «${first.shiftTitle}»${first.taskTitle ? ` (${first.taskTitle})` : ''} (${formatZurichTimeRange(first.startTime, first.endTime)}).`;
         }
       }
 
@@ -899,7 +894,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               : 'Diese Person ist für diese Schicht bereits eingetragen.';
           }
         } else {
-          const timeStr = `${formatZurichTime(first.startTime)} – ${formatZurichTime(first.endTime)} Uhr`;
+          const timeStr = formatZurichTimeRange(first.startTime, first.endTime);
           if (isSelf) {
             error = first.taskTitle
               ? `Du bist zur gleichen Zeit bereits für die Schicht «${first.shiftTitle}» (${first.taskTitle}, ${timeStr}) eingetragen.`
@@ -951,7 +946,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       // Altersprüfungen
       const shiftDate = new Date(shift.startTime);
       const userBirthDate = targetUser?.birthDate ? new Date(targetUser.birthDate) : null;
-      const userAge = userBirthDate ? calculateAge(userBirthDate, shiftDate) : null;
+      const userAge = userBirthDate ? ageAt(userBirthDate, shiftDate) : null;
 
       // Wer sich selbst einträgt, muss bei einer Altersgrenze das Geburtsdatum angeben
       // (sonst liesse sich «Bar ab 18» mit einem Konto ohne Geburtsdatum umgehen)
@@ -987,8 +982,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           // Prüfen, ob bereits jemand in der Schicht das Mindestalter erfüllt
           const alreadyHasAdult = shift.signups.some((s) => {
             if (s.user?.birthDate) {
-              const age = calculateAge(new Date(s.user.birthDate), shiftDate);
-              return age >= chosenTask!.minAge!;
+              const age = ageAt(s.user.birthDate, shiftDate);
+              return age !== null && age >= chosenTask!.minAge!;
             }
             return false;
           });
@@ -1207,19 +1202,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Austrag-Sperre prüfen: Helfer können sich ab X Tagen vor Event-Beginn nicht mehr selbst austragen
       if (!isManager && event.cancelDeadlineDays !== null && event.cancelDeadlineDays !== undefined) {
-        const deadline = new Date(event.startDate.getTime() - event.cancelDeadlineDays * 24 * 60 * 60 * 1000);
+        const deadline = cancelDeadlineAt(event.startDate, event.cancelDeadlineDays);
         if (new Date() >= deadline) {
-          const deadlineStr = deadline.toLocaleDateString('de-CH', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          const daysText =
-            event.cancelDeadlineDays === 0
-              ? 'seit Anlassbeginn'
-              : `seit ${event.cancelDeadlineDays} Tag(en) vor dem Anlass (${deadlineStr} Uhr)`;
+          const daysText = cancelDeadlineText(deadline, event.cancelDeadlineDays);
           return reply.status(403).send({
             error: `Austragen ist ${daysText} nicht mehr selbst möglich. Bitte wende dich direkt an das Event-OK.`,
           });
