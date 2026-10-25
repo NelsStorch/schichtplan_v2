@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpRight, Bell, Building2, CalendarDays, Database, LogOut, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Bell, Building2, CalendarDays, CalendarSync, Check, Copy, Database, LogOut, Trash2 } from 'lucide-react';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   PLACEHOLDER_LAST_NAME,
@@ -28,6 +28,12 @@ import {
 import { CeviLogo } from '@/components/CeviLogo';
 
 /** Antwort von GET /api/shifts/my (Schichten über alle Abteilungen) */
+interface CalendarTokenData {
+  token: string;
+  webcalUrl: string;
+  httpsUrl: string;
+}
+
 interface MyShift {
   signupId: string;
   title: string;
@@ -58,6 +64,8 @@ export default function ProfilePage() {
   const toast = useToast();
   const [user, setUser] = useState<UserDto | null>(null);
   const [shifts, setShifts] = useState<MyShift[] | null>(null);
+  const [calData, setCalData] = useState<CalendarTokenData | null>(null);
+  const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', birthDate: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -140,6 +148,21 @@ export default function ProfilePage() {
       setMessage({ tone: 'danger', text: err instanceof Error ? err.message : 'Fehler beim Senden.' });
     } finally {
       setResendingVerification(false);
+    }
+  };
+
+  const handleCopyCalUrl = async () => {
+    if (!calData?.httpsUrl) return;
+    try {
+      await navigator.clipboard.writeText(calData.httpsUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+      toast({
+        title: 'Abo-Link kopiert',
+        description: 'Füge den Link in Google Kalender oder deiner Kalender-App ein.',
+      });
+    } catch {
+      toast({ title: 'Kopieren fehlgeschlagen', description: 'Bitte kopiere den Link manuell.', tone: 'error' });
     }
   };
 
@@ -358,9 +381,30 @@ export default function ProfilePage() {
             </section>
 
             <section className="rounded-card border border-line bg-surface p-5">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">
-                <CalendarDays className="size-4" /> Deine nächsten Schichten
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">
+                  <CalendarDays className="size-4" /> Deine nächsten Schichten
+                </h2>
+                {calData && (
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href={calData.webcalUrl}
+                      className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+                      title="In Kalender-App abonnieren (Live-Sync)"
+                    >
+                      <CalendarSync className="size-3.5" /> Kalender abonnieren
+                    </a>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={handleCopyCalUrl}
+                      title="Abo-Link kopieren für Google Kalender"
+                    >
+                      {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
               {shifts === null ? (
                 <div className="mt-3 h-16 animate-pulse rounded-field bg-surface-2" />
               ) : upcoming.length === 0 ? (

@@ -122,6 +122,8 @@ model User {
   passwordChangedAt   DateTime?          @map("password_changed_at")
   /// Erinnerungs-Mail vor eigenen Schichten (im Profil abschaltbar)
   shiftRemindersEnabled Boolean          @default(true) @map("shift_reminders_enabled")
+  /// Geheimer Token für den persönlichen Webcal/iCal-Kalenderfeed
+  calendarToken       String?            @unique @map("calendar_token")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)

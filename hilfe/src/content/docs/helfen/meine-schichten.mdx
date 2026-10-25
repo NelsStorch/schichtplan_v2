@@ -1,6 +1,6 @@
 ---
 title: Meine Schichten und Kalender
-description: Alle deine Einsätze über alle Abteilungen auf einer Seite, mit Google Kalender und .ics-Export.
+description: Alle deine Einsätze über alle Abteilungen auf einer Seite, mit automatischem Webcal-Live-Abo und .ics-Export.
 audience: [helfer]
 ---
 
@@ -20,16 +20,28 @@ Ein Tipp auf den Namen des Anlasses führt direkt zum Plan.
 
 Auf der Startseite deiner Abteilung zeigt die Karte **Dein nächster Einsatz** dasselbe in kurz.
 
-## In den Kalender übernehmen
+## Live-Kalender-Abo (Automatischer Sync)
 
-- <Btn>Google Kalender</Btn>: Öffnet direkt Google Kalender im Browser oder in der App. Titel, Schichtzeiten (in Schweizer Zeit), Ort und Hinweise sind bereits eingetragen – du musst nur noch auf «Speichern» tippen.
-- <Btn variant="ghost">.ics</Btn>: Lädt eine Kalenderdatei (`.ics`) für Apple Kalender, Outlook oder dein Smartphone herunter.
+Mit dem Live-Kalender-Abo hast du deine Einsätze immer aktuell in deinem Smartphone- oder Computer-Kalender, ohne jede Schicht einzeln eintragen zu müssen.
+
+- <Btn>1-Klick Abonnieren</Btn>: Richtet das Abonnement auf Apple-Geräten (iPhone, iPad, Mac) oder in Microsoft Outlook mit einem Klick ein.
+- <Btn variant="ghost">Link kopieren</Btn>: Kopiert deine persönliche Kalender-URL in die Zwischenablage.
+  - **Google Kalender**: Im Web unter *«Weitere Kalender (+)"* ➜ *«Per URL hinzufügen»* einfügen.
+- **Automatische Aktualisierung**: Wenn du dich für eine neue Schicht einträgst, eine Schicht verschoben wird oder du dich austrägst, aktualisiert dein Kalenderprogramm die Termine automatisch im Hintergrund.
+- **Abo-Link erneuern**: Möchtest du einem Gerät oder Kalender den Zugriff entziehen, kannst du mit *«Abo-Link erneuern»* einen neuen geheimen Link erstellen. Bestehende Abos müssen anschliessend aktualisiert werden.
+
+## Einmaliger Kalender-Export (Momentaufnahme)
+
+Möchtest du kein laufendes Abo, sondern die Termine als feste Einträge speichern:
+
+- <Btn>Google Kalender</Btn>: Öffnet direkt Google Kalender im Browser oder in der App mit den vorausgefüllten Schichtdaten zum Speichern.
+- <Btn variant="ghost">.ics</Btn>: Lädt eine einzelne Kalenderdatei (`.ics`) für die jeweilige Schicht herunter.
 - <Btn variant="ghost">Alle als .ics exportieren</Btn> bei «Anstehend»: Lädt alle deine kommenden Schichten in einer einzigen Kalenderdatei herunter.
 
-:::caution[Der Kalender aktualisiert sich nicht selbst]
-Der Kalender-Eintrag ist eine Momentaufnahme. Verschiebt das OK eine Schicht oder trägst du dich aus, ändert sich der Termin in deinem privaten Kalender nicht automatisch. Lösch oder pass ihn dann von Hand an.
+:::note[Manuelle Einträge aktualisieren sich nicht]
+Wählst du den einmaligen Download (`.ics` oder Google Kalender-Button), handelt es sich um eine Momentaufnahme. Änderungen oder Austragungen werden in diesem Fall nicht automatisch nachgeführt. Nutze für automatischen Abgleich das Live-Kalender-Abo.
 :::
 
 ## Auch auf dem Hauptportal
 
-Auf `cevi-schichtplan.ch/profil` stehen unter **Deine nächsten Schichten** dieselben Einsätze, mit Link zur jeweiligen Abteilung.
+Auf `cevi-schichtplan.ch/profil` stehen unter **Deine nächsten Schichten** dieselben Einsätze, ebenfalls mit Option zum Abonnieren des Kalenders.

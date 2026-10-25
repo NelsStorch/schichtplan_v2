@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, CalendarPlus, Clock, Download, ExternalLink, LogIn, Shield, Ticket, UserMinus } from 'lucide-react';
+import { ArrowRight, CalendarPlus, CalendarSync, Check, Clock, Copy, Download, ExternalLink, LogIn, RefreshCw, Shield, Ticket, UserMinus } from 'lucide-react';
 import { cancelDeadlineAt, cancelDeadlineText } from '@schichtplan/shared';
 import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
@@ -21,6 +21,12 @@ import {
 import { downloadIcs, googleCalendarUrl, type CalendarEntry } from '@/lib/ics';
 import { usePortal } from '@/lib/portal';
 import type { MyShift } from '@/lib/types';
+
+interface CalendarTokenData {
+  token: string;
+  webcalUrl: string;
+  httpsUrl: string;
+}
 
 const toCalendar = (s: MyShift): CalendarEntry => {
   const rolePrefix = s.isResponsible ? `[${s.responsibleRole || 'Leitung'}] ` : '';
@@ -49,6 +55,57 @@ export default function MyShiftsPage() {
   const [shifts, setShifts] = useState<MyShift[] | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [calData, setCalData] = useState<CalendarTokenData | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [resettingToken, setResettingToken] = useState(false);
+
+  const loadCalToken = useCallback(async () => {
+    try {
+      const data = await api<CalendarTokenData>('/api/calendar/token');
+      setCalData(data);
+    } catch {
+      // Kalender-Token optional ignorieren falls nicht geladen
+    }
+  }, []);
+
+  const handleCopyUrl = async () => {
+    if (!calData?.httpsUrl) return;
+    try {
+      await navigator.clipboard.writeText(calData.httpsUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+      toast({
+        title: 'Abo-Link kopiert',
+        description: 'Füge den Link in Google Kalender oder deiner Kalender-App ein.',
+      });
+    } catch {
+      toast({ title: 'Kopieren fehlgeschlagen', description: 'Bitte kopiere den Link manuell.', tone: 'error' });
+    }
+  };
+
+  const handleResetToken = async () => {
+    const ok = await confirm({
+      title: 'Abo-Link wirklich erneuern?',
+      description:
+        'Bestehende Kalender-Abonnements (z. B. auf deinem Smartphone oder in Outlook) verlieren den Zugriff und müssen mit dem neuen Link aktualisiert werden.',
+      confirmLabel: 'Neuen Link generieren',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setResettingToken(true);
+    try {
+      const data = await api<CalendarTokenData>('/api/calendar/token/reset', { method: 'POST' });
+      setCalData(data);
+      toast({
+        title: 'Neuer Kalender-Link generiert',
+        description: 'Bestehende Abos müssen mit dem neuen Link aktualisiert werden.',
+      });
+    } catch (err) {
+      toast({ title: 'Fehler beim Erneuern', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setResettingToken(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -157,6 +214,58 @@ export default function MyShiftsPage() {
             </dl>
           )}
         </header>
+
+        {/* Live-Sync Kalender-Abo */}
+        {calData && (
+          <Card className="mt-8 border border-line bg-surface p-5 sm:p-6 animate-fade-up [animation-delay:50ms]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 max-w-xl">
+                <div className="flex items-center gap-2">
+                  <CalendarSync className="size-5 text-accent-ink shrink-0" />
+                  <h2 className="font-display text-lg font-bold text-fg">Live-Kalender-Abo</h2>
+                  <Badge tone="accent">Neu</Badge>
+                </div>
+                <p className="mt-1.5 text-sm text-fg-muted">
+                  Abonniere alle deine Schichten direkt in deiner Kalender-App (Apple Kalender, Outlook oder Google Kalender).
+                  Zukünftige Einsätze, Verschiebungen und Abmeldungen werden vollautomatisch synchronisiert.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <a
+                  href={calData.webcalUrl}
+                  className={buttonClasses()}
+                  title="Direkt in Apple Kalender oder Outlook abonnieren"
+                >
+                  <CalendarSync className="size-4" /> 1-Klick Abonnieren
+                </a>
+                <Button
+                  variant="secondary"
+                  onClick={handleCopyUrl}
+                  title="Kalender-URL kopieren für Google Kalender oder andere Kalender-Apps"
+                >
+                  {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+                  {copied ? 'Kopiert' : 'Link kopieren'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-line/60 flex flex-col gap-2 text-xs text-fg-subtle sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span><strong>Apple & Outlook:</strong> Klick auf «1-Klick Abonnieren».</span>
+                <span><strong>Google Kalender:</strong> Link kopieren ➜ «Weitere Kalender (+)" ➜ «Per URL hinzufügen».</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleResetToken}
+                disabled={resettingToken}
+                className="inline-flex items-center gap-1.5 text-fg-subtle hover:text-fg underline underline-offset-2 transition"
+              >
+                <RefreshCw className={cn("size-3", resettingToken && "animate-spin")} />
+                Abo-Link erneuern
+              </button>
+            </div>
+          </Card>
+        )}
 
         {shifts === null ? (
           <div className="mt-10 grid gap-3">
