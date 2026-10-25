@@ -20,7 +20,7 @@ import {
   type AdminEventListItemDto,
   normalizePermissions,
 } from '@schichtplan/shared';
-import { autoCreateCeviDbDepartmentStufen } from '../services/homeDepartment.js';
+import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen } from '../services/homeDepartment.js';
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
 import { personLabel } from '../services/profile.js';
 import { notifyAdminChange, recordAdminAction } from '../services/adminAudit.js';
@@ -325,6 +325,8 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
       homeDepartmentId: true,
       homeDepartmentSource: true,
     } satisfies Prisma.UserSelect;
+
+    await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, departmentId);
 
     const [[item], members, homeUsers, stufen, eventRows, auditRows] = await Promise.all([
       toDepartmentItems(fastify.prisma, [row]),

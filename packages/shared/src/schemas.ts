@@ -99,7 +99,7 @@ export const RegisterHelperSchema = z.object({
     .min(8, 'Passwort muss mindestens 8 Zeichen lang sein')
     .max(200, 'Passwort darf höchstens 200 Zeichen lang sein'),
   firstName: z.string().trim().min(2, 'Vorname erforderlich').max(80),
-  lastName: z.string().trim().min(2, 'Nachname erforderlich').max(80),
+  lastName: z.string().trim().max(80).optional().or(z.literal('')),
   ceviName: z.string().trim().max(60).optional(),
   phone: z.string().trim().max(30).optional(),
 });

@@ -55,12 +55,21 @@ export async function storeCeviDbFields(prisma: Db, userId: string, derived: Cev
  * Stufen aus Cevi.DB für die Abteilung der Person automatisch in department_stufen anlegen,
  * falls sie noch nicht existieren oder noch nicht mit der Cevi.DB-Gruppe verknüpft sind.
  */
-export async function autoCreateCeviDbDepartmentStufen(
+export async function autoCreateAllCeviDbDepartmentStufen(
   prisma: Db,
-  departmentId: string,
-  userId: string
+  departmentId: string
 ) {
-  const fromCeviDb = await prisma.userCeviDbStufe.findMany({ where: { userId } });
+  const fromCeviDb = await prisma.userCeviDbStufe.findMany({
+    where: {
+      user: {
+        OR: [
+          { homeDepartmentId: departmentId },
+          { memberships: { some: { departmentId } } },
+        ],
+      },
+    },
+    select: { groupId: true, groupName: true },
+  });
   if (!fromCeviDb.length) return;
 
   const existingStufen = await prisma.departmentStufe.findMany({
@@ -76,28 +85,33 @@ export async function autoCreateCeviDbDepartmentStufen(
 
   let createdOrLinkedAny = false;
 
+  const uniqueGroups = new Map<number, string>();
   for (const stufe of fromCeviDb) {
-    // 1. Bereits mit dieser Cevi.DB-Gruppe in dieser Abteilung verknüpft -> nichts nötig
-    if (byCeviDbGroupId.has(stufe.groupId)) {
+    if (!uniqueGroups.has(stufe.groupId)) {
+      uniqueGroups.set(stufe.groupId, stufe.groupName);
+    }
+  }
+
+  for (const [groupId, rawName] of uniqueGroups.entries()) {
+    if (byCeviDbGroupId.has(groupId)) {
       continue;
     }
 
-    // 2. Existiert bereits eine Stufe mit demselben Namen in dieser Abteilung, aber ohne Cevi.DB-Gruppen-ID?
-    const matchByName = byName.get(stufe.groupName.trim().toLowerCase());
+    const groupName = rawName.trim();
+    const matchByName = byName.get(groupName.toLowerCase());
     if (matchByName && matchByName.ceviDbGroupId === null) {
       await prisma.departmentStufe.update({
         where: { id: matchByName.id },
-        data: { ceviDbGroupId: stufe.groupId },
+        data: { ceviDbGroupId: groupId },
       });
-      byCeviDbGroupId.set(stufe.groupId, { ...matchByName, ceviDbGroupId: stufe.groupId });
+      byCeviDbGroupId.set(groupId, { ...matchByName, ceviDbGroupId: groupId });
       createdOrLinkedAny = true;
       continue;
     }
 
-    // 3. Name existiert bereits, aber mit einer anderen Cevi.DB-Gruppe -> Name disambiguieren
-    let nameToUse = stufe.groupName.trim();
+    let nameToUse = groupName;
     if (byName.has(nameToUse.toLowerCase())) {
-      nameToUse = `${nameToUse} (${stufe.groupId})`;
+      nameToUse = `${nameToUse} (${groupId})`;
     }
 
     maxSortOrder++;
@@ -106,11 +120,11 @@ export async function autoCreateCeviDbDepartmentStufen(
         data: {
           departmentId,
           name: nameToUse,
-          ceviDbGroupId: stufe.groupId,
+          ceviDbGroupId: groupId,
           sortOrder: maxSortOrder,
         },
       });
-      byCeviDbGroupId.set(stufe.groupId, created);
+      byCeviDbGroupId.set(groupId, created);
       byName.set(nameToUse.toLowerCase(), created);
       createdOrLinkedAny = true;
     } catch {
@@ -118,11 +132,17 @@ export async function autoCreateCeviDbDepartmentStufen(
     }
   }
 
-  // Falls neue Stufen angelegt oder verknüpft wurden: auch alle anderen bereits registrierten Cevi.DB-Personen
-  // dieser Abteilung aktualisieren
   if (createdOrLinkedAny) {
     await backfillCeviDbStufen(prisma, departmentId);
   }
+}
+
+export async function autoCreateCeviDbDepartmentStufen(
+  prisma: Db,
+  departmentId: string,
+  _userId?: string
+) {
+  return autoCreateAllCeviDbDepartmentStufen(prisma, departmentId);
 }
 
 /** Stufen aus Cevi.DB abgleichen: nur Stufen, die eine Abteilung mit ihrer Cevi.DB-Gruppe verknüpft hat. */
@@ -199,7 +219,13 @@ export async function syncCeviDbHomeDepartment(
 /** Neu mit Cevi.DB verknüpfte Stufe: bereits angemeldete Cevi.DB-Personen der Abteilung gleich zuordnen. */
 export async function backfillCeviDbStufen(prisma: Db, departmentId: string) {
   const users = await prisma.user.findMany({
-    where: { homeDepartmentId: departmentId, ceviDbId: { not: null } },
+    where: {
+      OR: [
+        { homeDepartmentId: departmentId },
+        { memberships: { some: { departmentId } } },
+      ],
+      ceviDbId: { not: null },
+    },
     select: { id: true },
   });
   for (const user of users) {

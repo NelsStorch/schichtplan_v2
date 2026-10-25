@@ -68,7 +68,6 @@ function LoginContent() {
   const [quickBirthDate, setQuickBirthDate] = useState('');
   const [quickFirstName, setQuickFirstName] = useState('');
   const [quickLastName, setQuickLastName] = useState('');
-  const [quickPhone, setQuickPhone] = useState('');
   const [quickStufen, setQuickStufen] = useState<Record<string, StufeRole>>({});
   // Hinweis mit passendem Knopf, wenn das Konto einen anderen Login braucht
   const [errorAction, setErrorAction] = useState<'cevidb' | 'password' | null>(null);
@@ -89,7 +88,6 @@ function LoginContent() {
   const [regFirstName, setRegFirstName] = useState('');
   const [regLastName, setRegLastName] = useState('');
   const [regCeviName, setRegCeviName] = useState('');
-  const [regPhone, setRegPhone] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(
@@ -209,7 +207,6 @@ function LoginContent() {
           birthDate: quickBirthDate,
           firstName: quickFirstName.trim() || undefined,
           lastName: quickLastName.trim() || undefined,
-          phone: quickPhone.trim() || undefined,
           stufen: Object.entries(quickStufen).map(([stufeId, role]) => ({ stufeId, role })),
           returnTo: returnTo ?? undefined,
         }),
@@ -237,9 +234,8 @@ function LoginContent() {
               email,
               password,
               firstName: regFirstName,
-              lastName: regLastName,
-              ceviName: regCeviName || undefined,
-              phone: regPhone || undefined,
+              lastName: regLastName.trim() || undefined,
+              ceviName: regCeviName.trim() || undefined,
             };
 
       const res = await fetch(endpoint, {
@@ -558,7 +554,7 @@ function LoginContent() {
                     maxLength={80}
                   />
                 </Field>
-                <Field label="Nachname">
+                <Field label="Nachname (freiwillig)" hint="Freiwillig">
                   <Input
                     type="text"
                     value={quickLastName}
@@ -568,15 +564,6 @@ function LoginContent() {
                   />
                 </Field>
               </div>
-              <Field label="Handynummer" hint="Freiwillig. Damit dich das OK im Notfall erreicht.">
-                <Input
-                  type="tel"
-                  value={quickPhone}
-                  onChange={(e) => setQuickPhone(e.target.value)}
-                  autoComplete="tel"
-                  placeholder="+41 79 000 00 00"
-                />
-              </Field>
 
               {department.stufen.length > 0 && (
                 <section aria-labelledby="stufen-titel">
@@ -669,13 +656,12 @@ function LoginContent() {
                       minLength={2}
                     />
                   </Field>
-                  <Field label="Nachname" required>
+                  <Field label="Nachname (freiwillig)" hint="Freiwillig">
                     <Input
                       type="text"
                       value={regLastName}
                       onChange={(e) => setRegLastName(e.target.value)}
                       autoComplete="family-name"
-                      minLength={2}
                     />
                   </Field>
                 </div>
@@ -720,25 +706,14 @@ function LoginContent() {
               )}
 
               {authMode === 'register' && (
-                <>
-                  <Field label="Cevi-Name">
-                    <Input
-                      type="text"
-                      value={regCeviName}
-                      onChange={(e) => setRegCeviName(e.target.value)}
-                      autoComplete="nickname"
-                    />
-                  </Field>
-                  <Field label="Handynummer">
-                    <Input
-                      type="tel"
-                      value={regPhone}
-                      onChange={(e) => setRegPhone(e.target.value)}
-                      autoComplete="tel"
-                      placeholder="+41 79 000 00 00"
-                    />
-                  </Field>
-                </>
+                <Field label="Cevi-Name">
+                  <Input
+                    type="text"
+                    value={regCeviName}
+                    onChange={(e) => setRegCeviName(e.target.value)}
+                    autoComplete="nickname"
+                  />
+                </Field>
               )}
 
               <Button

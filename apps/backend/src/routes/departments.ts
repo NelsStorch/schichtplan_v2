@@ -15,7 +15,7 @@ import {
   type DepartmentStufeDto,
   type StufeSuggestionDto,
 } from '@schichtplan/shared';
-import { autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen } from '../services/homeDepartment.js';
+import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
 import { UNRELATED_PERSON_ERROR, isDepartmentInsider, isDepartmentManager } from '../services/departmentVisibility.js';
 import { canGrantPermissions, departmentAccess, type DepartmentAccess } from '../services/permissions.js';
@@ -173,6 +173,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Stufen der aktuellen Abteilung
   fastify.get('/api/departments/current/stufen', async (request, reply) => {
     if (!request.tenant) return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+    await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, request.tenant.id);
     const stufen = await fastify.prisma.departmentStufe.findMany({
       where: { departmentId: request.tenant.id },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -260,7 +261,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Vorschläge: Stufen-Gruppen aus Cevi.DB, die bei Personen dieser Abteilung vorkommen und noch fehlen
+  // Vorschläge: Cevi.DB-Stufen werden automatisch angelegt
   fastify.get(
     '/api/departments/current/stufen/suggestions',
     { preHandler: [fastify.authenticate] },
@@ -268,27 +269,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       const ctx = await requirePermission(request, reply, 'STUFEN_MANAGE');
       if (!ctx) return;
       const { tenant } = ctx;
-      const [roles, existing] = await Promise.all([
-        fastify.prisma.userCeviDbStufe.findMany({
-          where: { user: { homeDepartmentId: tenant.id, homeDepartmentSource: 'CEVIDB' } },
-          select: { groupId: true, groupName: true },
-        }),
-        fastify.prisma.departmentStufe.findMany({
-          where: { departmentId: tenant.id, ceviDbGroupId: { not: null } },
-          select: { ceviDbGroupId: true },
-        }),
-      ]);
-      const linked = new Set(existing.map((s) => s.ceviDbGroupId));
-      const byGroup = new Map<number, StufeSuggestionDto>();
-      for (const stufe of roles) {
-        if (linked.has(stufe.groupId)) continue;
-        const entry = byGroup.get(stufe.groupId);
-        if (entry) entry.personCount++;
-        else byGroup.set(stufe.groupId, { ceviDbGroupId: stufe.groupId, name: stufe.groupName, personCount: 1 });
-      }
-      return [...byGroup.values()].sort(
-        (a, b) => b.personCount - a.personCount || a.name.localeCompare(b.name, 'de')
-      );
+      await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, tenant.id);
+      return [];
     }
   );
 

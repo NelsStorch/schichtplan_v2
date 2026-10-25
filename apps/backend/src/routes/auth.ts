@@ -904,7 +904,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         email: cleanEmail,
         passwordHash,
         firstName,
-        lastName,
+        lastName: lastName?.trim() || PLACEHOLDER_LAST_NAME,
         ceviName: ceviName || null,
         phone: phone || null,
         emailVerified: false,

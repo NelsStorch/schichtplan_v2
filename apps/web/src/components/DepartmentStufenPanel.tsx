@@ -170,7 +170,7 @@ export function DepartmentStufenPanel() {
         </Button>
       </form>
       <p className="-mt-3 text-xs text-fg-subtle">
-        Cevi.DB-ID optional: die Nummer der Stufen-Gruppe in db.cevi.ch. Dann bekommen Cevi.DB-Personen die Stufe automatisch.
+        Cevi.DB-ID optional: die Nummer der Stufen-Gruppe in db.cevi.ch. Stufen aus Cevi.DB werden automatisch angelegt und verknüpft.
       </p>
     </div>
   );
