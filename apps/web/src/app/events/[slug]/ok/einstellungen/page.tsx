@@ -16,6 +16,7 @@ import {
   useToast,
 } from '@schichtplan/ui';
 import { EventForm, eventFormInitial } from '@/components/EventFormDialog';
+import { EventRangeField } from '@/components/ok/EventRangeField';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { OrganizerDialog } from '@/components/ShiftDialogs';
@@ -253,6 +254,7 @@ export default function SettingsPage() {
         layout="page"
         eventSlug={event.slug}
         initial={eventFormInitial(event)}
+        dateRange={<EventRangeField key={`${event.startDate}-${event.endDate}`} event={event} onMoved={reload} />}
         onCancel={() => setFormKey((k) => k + 1)}
         onSaved={async (slug) => {
           if (slug !== event.slug) {

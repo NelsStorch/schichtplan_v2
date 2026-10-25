@@ -9,6 +9,7 @@ import {
   SetDayResponsiblesSchema,
   UnregisterHelperSchema,
   UpdateEventSchema,
+  MoveEventSchema,
   ConfirmDeleteSchema,
   type EventQuestionInput,
   type EventQuestionDto,
@@ -35,6 +36,7 @@ import {
 } from '../services/departmentVisibility.js';
 import { cleanRequiredFields, missingProfileFields } from '../services/profile.js';
 import { generateCheckinToken } from '../services/attendance.js';
+import { moveEventByDays } from '../services/eventRange.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -521,7 +523,6 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         logoUrl,
         bannerUrl,
         startDate,
-        endDate,
         allowPublicSignup,
         accessType,
         leadersOnly,
@@ -540,9 +541,6 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         questions,
         organizers: requestedOrganizers,
       } = parse.data;
-      if (new Date(endDate) < new Date(startDate)) {
-        return reply.status(400).send({ error: 'Das Ende des Anlasses darf nicht vor dem Beginn liegen' });
-      }
 
       const existing = await fastify.prisma.event.findUnique({
         where: {
@@ -646,8 +644,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             description: description || null,
             logoUrl: logoUrl || null,
             bannerUrl: bannerUrl || null,
+            // Bis es Schichten gibt, ist der Anlass ein Zeitpunkt; danach führt syncEventRange nach
             startDate: new Date(startDate),
-            endDate: new Date(endDate),
+            endDate: new Date(startDate),
             allowPublicSignup,
             accessType,
             leadersOnly,
@@ -730,33 +729,6 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
-      const newStartDate = body.startDate ? new Date(body.startDate) : event.startDate;
-      const newEndDate = body.endDate ? new Date(body.endDate) : event.endDate;
-
-      if (newEndDate < newStartDate) {
-        return reply.status(400).send({ error: 'Das Ende des Anlasses darf nicht vor dem Beginn liegen' });
-      }
-
-      // Prüfen, ob nach der Änderung alle existierenden Schichten innerhalb dieser Zeit-Range liegen
-      if (body.startDate || body.endDate) {
-        const outOfBoundsShift = await fastify.prisma.shift.findFirst({
-          where: {
-            eventId: event.id,
-            OR: [
-              { startTime: { lt: newStartDate } },
-              { endTime: { gt: newEndDate } },
-            ],
-          },
-          select: { title: true, startTime: true, endTime: true },
-        });
-
-        if (outOfBoundsShift) {
-          return reply.status(400).send({
-            error: `Zeitraum kann nicht geändert werden: Die Schicht «${outOfBoundsShift.title}» liegt ausserhalb des neuen Zeitraums. Bitte passe zuerst die Schichten an.`,
-          });
-        }
-      }
-
       // Prüfen, ob der neue Slug bereits von einem anderen Event der Abteilung genutzt wird
       let newSlug: string | undefined = undefined;
       if (body.slug && body.slug !== event.slug) {
@@ -796,8 +768,6 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             description: body.description,
             logoUrl: body.logoUrl,
             bannerUrl: body.bannerUrl,
-            startDate: body.startDate ? new Date(body.startDate) : undefined,
-            endDate: body.endDate ? new Date(body.endDate) : undefined,
             allowPublicSignup: body.allowPublicSignup,
             accessType: body.accessType,
             leadersOnly: body.leadersOnly,
@@ -835,6 +805,44 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         cancelDeadlineDays: updated.cancelDeadlineDays,
         overlapToleranceMinutes: updated.overlapToleranceMinutes,
         attendanceMode: updated.attendanceMode,
+      };
+    }
+  );
+
+  // Anlass verschieben: alle Schichten wandern um dieselbe Anzahl Tage mit (Rechte wie Einstellungen)
+  fastify.post<{ Params: { slug: string } }>(
+    '/api/events/:slug/move',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      const event = await fastify.prisma.event.findUnique({
+        where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
+        include: { organizers: true },
+      });
+      if (!event) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.isDeptAdmin && !flags.isOkLead) {
+        return reply
+          .status(403)
+          .send({ error: 'Nur die Abteilungsleitung oder die OK-Leitung dürfen diesen Anlass verschieben' });
+      }
+      const parse = MoveEventSchema.safeParse(request.body);
+      if (!parse.success) {
+        return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      const movedShifts = await fastify.prisma.$transaction((tx) => moveEventByDays(tx, event, parse.data.days));
+      const updated = await fastify.prisma.event.findUniqueOrThrow({ where: { id: event.id } });
+      request.log.info({ eventId: event.id, days: parse.data.days, movedShifts }, 'Anlass verschoben');
+
+      return {
+        movedShifts,
+        startDate: updated.startDate.toISOString(),
+        endDate: updated.endDate.toISOString(),
       };
     }
   );

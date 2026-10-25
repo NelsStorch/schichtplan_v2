@@ -157,14 +157,70 @@ describe.skipIf(!hasTestDb)('Rechte bei Anlässen', () => {
       payload: { endTime: '2030-06-01T17:00:00.000Z' },
     });
     expect(patched.statusCode).toBe(400);
+  });
 
-    const eventPatch = await inject(app, {
-      method: 'PATCH',
-      url: `/api/events/${event.slug}`,
+  it('berechnet den Zeitraum aus der ersten und letzten Schicht', async () => {
+    const department = await createDepartment(app);
+    const admin = await createUser(app);
+    await addMember(app, department.id, admin.id, 'ADMIN');
+    const event = await createEvent(app, department.id);
+    const cookie = authCookie(app, admin);
+    const range = async () => {
+      const e = await app.prisma.event.findUniqueOrThrow({ where: { id: event.id } });
+      return [e.startDate.toISOString(), e.endDate.toISOString()];
+    };
+
+    const create = (startTime: string, endTime: string) =>
+      inject(app, {
+        method: 'POST',
+        url: '/api/shifts',
+        tenant: department.slug,
+        cookie,
+        payload: { eventId: event.id, title: 'Bar', startTime, endTime },
+      });
+    const early = await create('2030-05-30T08:00:00.000Z', '2030-05-30T10:00:00.000Z');
+    await create('2030-06-03T18:00:00.000Z', '2030-06-03T23:00:00.000Z');
+    expect(await range()).toEqual(['2030-05-30T08:00:00.000Z', '2030-06-03T23:00:00.000Z']);
+
+    const deleted = await inject(app, {
+      method: 'DELETE',
+      url: `/api/shifts/${early.json().id}`,
       tenant: department.slug,
       cookie,
-      payload: { endDate: '2030-05-01T00:00:00.000Z' },
     });
-    expect(eventPatch.statusCode).toBe(400);
+    expect(deleted.statusCode).toBe(200);
+    expect(await range()).toEqual(['2030-06-03T18:00:00.000Z', '2030-06-03T23:00:00.000Z']);
+  });
+
+  it('verschiebt den Anlass mit allen Schichten (nur Abteilungsleitung und OK-Leitung)', async () => {
+    const department = await createDepartment(app);
+    const lead = await createUser(app);
+    const event = await createEvent(app, department.id, { organizerId: lead.id });
+    const member = await createUser(app);
+    await app.prisma.eventOrganizer.create({ data: { eventId: event.id, userId: member.id, role: 'OK_MEMBER' } });
+    // 18:00 Schweizer Sommerzeit am Samstag vor der Umstellung auf Winterzeit
+    const shift = await createShift(app, event.id, {
+      startTime: new Date('2030-10-26T16:00:00.000Z'),
+      endTime: new Date('2030-10-26T20:00:00.000Z'),
+    });
+    await app.prisma.eventDayResponsible.create({ data: { eventId: event.id, dayDate: '2030-10-26', userId: lead.id } });
+
+    const move = (cookie: string, days: number) =>
+      inject(app, { method: 'POST', url: `/api/events/${event.slug}/move`, tenant: department.slug, cookie, payload: { days } });
+
+    expect((await move(authCookie(app, member), 7)).statusCode).toBe(403);
+    expect((await move(authCookie(app, lead), 0)).statusCode).toBe(400);
+    const res = await move(authCookie(app, lead), 7);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().movedShifts).toBe(1);
+
+    // Nach der Umstellung bleibt es 18:00 Schweizer Zeit (= 17:00 UTC)
+    const moved = await app.prisma.shift.findUniqueOrThrow({ where: { id: shift.id } });
+    expect(moved.startTime.toISOString()).toBe('2030-11-02T17:00:00.000Z');
+    const updated = await app.prisma.event.findUniqueOrThrow({ where: { id: event.id } });
+    expect(updated.startDate.toISOString()).toBe('2030-11-02T17:00:00.000Z');
+    expect(updated.endDate.toISOString()).toBe('2030-11-02T21:00:00.000Z');
+    const responsible = await app.prisma.eventDayResponsible.findFirstOrThrow({ where: { eventId: event.id } });
+    expect(responsible.dayDate).toBe('2030-11-02');
   });
 });

@@ -24,8 +24,8 @@ export interface EventFormValues {
   description: string;
   logoUrl: string;
   bannerUrl: string;
+  /** Nur beim Anlegen: Tag des Anlasses (YYYY-MM-DD). Danach ergibt sich der Zeitraum aus den Schichten. */
   startDate: string;
-  endDate: string;
   /** false = Eintragen geschlossen (nur noch das OK teilt ein) */
   allowPublicSignup: boolean;
   minShiftsPerPerson: number | null;
@@ -45,8 +45,6 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
   return {
     title: event.title,
     slug: event.slug,
-    startDate: toZurichInput(event.startDate),
-    endDate: toZurichInput(event.endDate),
     description: event.description ?? '',
     logoUrl: event.logoUrl ?? '',
     bannerUrl: event.bannerUrl ?? '',
@@ -107,7 +105,6 @@ const EMPTY: EventFormValues = {
   logoUrl: '',
   bannerUrl: BANNER_PRESETS[0].url,
   startDate: '',
-  endDate: '',
   allowPublicSignup: true,
   minShiftsPerPerson: null,
   cancelDeadlineDays: null,
@@ -120,6 +117,9 @@ const EMPTY: EventFormValues = {
   attendanceMode: 'OFF',
   access: EMPTY_ACCESS,
 };
+
+/** Tag aus <input type="date"> als Zeitpunkt: 12:00 Schweizer Zeit, damit er nie als Vortag erscheint */
+const dayToIso = (day: string) => zurichInputToIso(`${day}T12:00`)!;
 
 const slugify = (value: string) =>
   value
@@ -206,6 +206,7 @@ export function EventForm({
   onCancel,
   onSaved,
   layout = 'dialog',
+  dateRange,
 }: {
   mode: 'create' | 'edit';
   initial?: Partial<EventFormValues>;
@@ -213,6 +214,8 @@ export function EventForm({
   onCancel: () => void;
   onSaved: (slug: string) => void;
   layout?: 'dialog' | 'page';
+  /** Bearbeiten: Anzeige des Zeitraums (aus den Schichten) mit «Verschieben» */
+  dateRange?: ReactNode;
 }) {
   const toast = useToast();
   const { user } = usePortal();
@@ -239,11 +242,6 @@ export function EventForm({
 
     // Validierung: Mindestens Titel muss vorhanden sein
     if (!form.title.trim()) return;
-
-    // Falls Start- und Enddatum gesetzt sind, muss Enddatum nach Startdatum liegen
-    if (form.startDate && form.endDate && new Date(form.endDate) <= new Date(form.startDate)) {
-      return;
-    }
 
     const timer = setTimeout(async () => {
       setAutoSaveStatus('saving');
@@ -275,8 +273,6 @@ export function EventForm({
           method: 'PATCH',
           json: {
             ...shared,
-            startDate: form.startDate ? zurichInputToIso(form.startDate)! : undefined,
-            endDate: form.endDate ? zurichInputToIso(form.endDate)! : undefined,
             description: form.description.trim() || null,
             allowPublicSignup: form.allowPublicSignup,
           },
@@ -447,8 +443,7 @@ export function EventForm({
               slug: form.slug,
               logoUrl: shared.logoUrl ?? undefined,
               bannerUrl: shared.bannerUrl ?? undefined,
-              startDate: zurichInputToIso(form.startDate)!,
-              endDate: zurichInputToIso(form.endDate)!,
+              startDate: dayToIso(form.startDate),
               allowPublicSignup: true,
             },
           });
@@ -464,8 +459,7 @@ export function EventForm({
               slug: form.slug,
               logoUrl: shared.logoUrl ?? undefined,
               bannerUrl: shared.bannerUrl ?? undefined,
-              startDate: zurichInputToIso(form.startDate)!,
-              endDate: zurichInputToIso(form.endDate)!,
+              startDate: dayToIso(form.startDate),
               allowPublicSignup: true,
               organizers: organizers.map((o) => ({
                 userId: o.userId,
@@ -486,8 +480,6 @@ export function EventForm({
           json: {
             ...shared,
             slug: targetSlug !== initialSlug ? targetSlug : undefined,
-            startDate: form.startDate ? zurichInputToIso(form.startDate)! : undefined,
-            endDate: form.endDate ? zurichInputToIso(form.endDate)! : undefined,
             description: form.description.trim() || null,
             allowPublicSignup: form.allowPublicSignup,
           },
@@ -646,37 +638,21 @@ export function EventForm({
             />
           </Field>
 
-          <Field
-            label={
-              <span>
-                Beginn <span className="text-accent-ink" aria-hidden>*</span>
-              </span>
-            }
-            hint={mode === 'edit' ? 'Muss vor allen bestehenden Schichten liegen' : undefined}
-          >
-            <Input
-              type="datetime-local"
-              value={form.startDate}
-              required
-              onChange={(e) => set('startDate', e.target.value)}
-            />
-          </Field>
-          <Field
-            label={
-              <span>
-                Ende <span className="text-accent-ink" aria-hidden>*</span>
-              </span>
-            }
-            hint={mode === 'edit' ? 'Muss nach allen bestehenden Schichten liegen' : undefined}
-          >
-            <Input
-              type="datetime-local"
-              value={form.endDate}
-              min={form.startDate || undefined}
-              required
-              onChange={(e) => set('endDate', e.target.value)}
-            />
-          </Field>
+          {mode === 'create' ? (
+            <Field
+              label={
+                <span>
+                  Datum <span className="text-accent-ink" aria-hidden>*</span>
+                </span>
+              }
+              hint="Erster Tag des Anlasses. Sobald es Schichten gibt, ergibt sich der Zeitraum aus der ersten und letzten Schicht."
+              className="sm:col-span-2"
+            >
+              <Input type="date" value={form.startDate} required onChange={(e) => set('startDate', e.target.value)} />
+            </Field>
+          ) : (
+            dateRange && <div className="sm:col-span-2">{dateRange}</div>
+          )}
           <Field label="Beschreibung" className="sm:col-span-2">
             <Textarea
               rows={3}

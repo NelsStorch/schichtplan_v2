@@ -1,8 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
-import { InstantiateTemplateSchema, toEventAccessType, type EventTemplateData } from '@schichtplan/shared';
+import { InstantiateTemplateSchema, toEventAccessType, toZurichInput, type EventTemplateData } from '@schichtplan/shared';
 import { cleanRequiredFields } from '../services/profile.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedTo, isDepartmentManager } from '../services/departmentVisibility.js';
 import { generateCheckinToken } from '../services/attendance.js';
+import { syncEventRange } from '../services/eventRange.js';
 import { replaceAccessLists, resolveAccessLists, syncQuestions } from './events.js';
 
 const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
@@ -128,7 +129,6 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         logoUrl,
         bannerUrl,
         startDate,
-        endDate,
         accessType,
         leadersOnly,
         requiredFields,
@@ -137,9 +137,6 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         questions,
         allowPublicSignup,
       } = parse.data;
-      if (new Date(endDate) < new Date(startDate)) {
-        return reply.status(400).send({ error: 'Das Ende des Anlasses darf nicht vor dem Beginn liegen' });
-      }
 
       const existing = await fastify.prisma.event.findUnique({
         where: {
@@ -171,11 +168,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
       const templateShifts = templateData?.shifts || [];
       const instantiateAttendanceMode = parse.data.attendanceMode ?? templateData?.attendanceMode ?? 'OFF';
 
-      // Basisdatum ermitteln
-      const startBase = new Date(startDate);
-      const baseYear = startBase.getFullYear();
-      const baseMonth = startBase.getMonth();
-      const baseDate = startBase.getDate();
+      // Basisdatum = Kalendertag in Schweizer Zeit (das Formular schickt den Tag um 12:00 Schweizer Zeit;
+      // getDate() auf dem Server in UTC würde bei frühen Uhrzeiten den Vortag liefern)
+      const [baseYear, baseMonth, baseDate] = toZurichInput(startDate).slice(0, 10).split('-').map(Number);
 
       const tenantId = request.tenant.id;
 
@@ -190,7 +185,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             logoUrl: logoUrl || null,
             bannerUrl: bannerUrl || null,
             startDate: new Date(startDate),
-            endDate: new Date(endDate),
+            endDate: new Date(startDate),
             accessType,
             leadersOnly,
             requiredFields,
@@ -220,7 +215,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         await syncQuestions(tx, ev.id, questions);
 
         for (const s of templateShifts) {
-          const shiftDay = new Date(baseYear, baseMonth, baseDate + (s.dayOffset || 0));
+          const shiftDay = new Date(baseYear, baseMonth - 1, baseDate + (s.dayOffset || 0));
 
           const [startH, startM] = (s.startTimeStr || '12:00').split(':').map(Number);
           const [endH, endM] = (s.endTimeStr || '14:00').split(':').map(Number);
@@ -270,8 +265,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             },
           });
         }
+        await syncEventRange(tx, ev.id);
 
-        return ev;
+        return tx.event.findUniqueOrThrow({ where: { id: ev.id } });
       });
 
       return {

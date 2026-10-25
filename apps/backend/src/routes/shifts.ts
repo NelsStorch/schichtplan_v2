@@ -22,6 +22,7 @@ import { missingProfileFields } from '../services/profile.js';
 import { validateAnswers } from './eventParticipation.js';
 import { findShiftCollisions, formatZurichTime } from '../services/shiftCollision.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
+import { syncEventRange } from '../services/eventRange.js';
 
 function calculateAge(birthDate: Date, targetDate: Date): number {
   let age = targetDate.getFullYear() - birthDate.getFullYear();
@@ -179,6 +180,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           },
         },
       });
+      await syncEventRange(fastify.prisma, eventId);
 
       return {
         ...shift,
@@ -330,6 +332,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           })
         )
       );
+      await syncEventRange(fastify.prisma, eventId);
 
       return {
         count: createdShifts.length,
@@ -468,6 +471,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      if (startTime || endTime) {
+        await syncEventRange(fastify.prisma, shift.eventId);
+      }
+
       if (responsibleUserIds !== undefined) {
         await fastify.prisma.shiftResponsible.deleteMany({ where: { shiftId } });
         if (responsibleUserIds.length > 0) {
@@ -545,6 +552,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       await fastify.prisma.shift.delete({
         where: { id: shiftId },
       });
+      await syncEventRange(fastify.prisma, shift.eventId);
 
       return { message: 'Schicht erfolgreich gelöscht' };
     }
@@ -630,6 +638,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           },
         },
       });
+      await syncEventRange(fastify.prisma, shift.eventId);
 
       return {
         ...duplicated,
@@ -1531,6 +1540,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           updated = (
             await tx.shift.updateMany({ where: { id: { in: shiftIds } }, data: { category: action.category || null } })
           ).count;
+        }
+        if (action.type === 'DELETE' || action.type === 'MOVE') {
+          await syncEventRange(tx, event.id);
         }
       });
 

@@ -152,8 +152,10 @@ export const CreateEventSchema = z.object({
   description: z.string().max(5000).optional(),
   logoUrl: ImageUrlSchema.optional().nullable(),
   bannerUrl: ImageUrlSchema.optional().nullable(),
+  /** Datum des Anlasses, bis es Schichten gibt; danach gilt erste bis letzte Schicht */
   startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
+  /** Veraltet, wird ignoriert: Das Ende ergibt sich aus den Schichten */
+  endDate: z.string().datetime().optional(),
   ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
   minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
@@ -182,8 +184,6 @@ export const UpdateEventSchema = z.object({
   description: z.string().max(5000).optional().nullable(),
   logoUrl: ImageUrlSchema.optional().nullable(),
   bannerUrl: ImageUrlSchema.optional().nullable(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
   allowPublicSignup: z.boolean().optional(),
   minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
   contactUserId: z.string().uuid().optional().nullable(),
@@ -203,6 +203,18 @@ export const UpdateEventSchema = z.object({
 });
 
 export type UpdateEventInput = z.infer<typeof UpdateEventSchema>;
+
+/** Anlass um ganze Tage verschieben: alle Schichten wandern mit (Zeitraum ergibt sich aus den Schichten) */
+export const MoveEventSchema = z.object({
+  days: z
+    .number()
+    .int()
+    .min(-3650)
+    .max(3650)
+    .refine((d) => d !== 0, { message: 'Bitte ein anderes Datum wählen' }),
+});
+
+export type MoveEventInput = z.infer<typeof MoveEventSchema>;
 
 /** Profilangaben, die eine Person für einen Anlass nachträgt (nur gesetzte Felder werden geändert) */
 export const UpdateProfileSchema = z.object({
@@ -398,8 +410,10 @@ export const InstantiateTemplateSchema = z.object({
   description: z.string().max(5000).optional().nullable(),
   logoUrl: ImageUrlSchema.optional().nullable(),
   bannerUrl: ImageUrlSchema.optional().nullable(),
+  /** Datum des Anlasses, bis es Schichten gibt; danach gilt erste bis letzte Schicht */
   startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
+  /** Veraltet, wird ignoriert: Das Ende ergibt sich aus den Schichten */
+  endDate: z.string().datetime().optional(),
   ...EventAccessFields,
   allowPublicSignup: z.boolean().default(true),
   minShiftsPerPerson: z.number().int().min(1).max(100).nullable().optional(),
