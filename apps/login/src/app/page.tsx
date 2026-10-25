@@ -531,6 +531,23 @@ function LoginContent() {
             <div className="mt-8 space-y-5">
               {feedback}
 
+              <Callout tone="warning" title="Wichtiger Sicherheitshinweis: Kein Passwort-Schutz">
+                <p className="mt-1 text-[13px] leading-relaxed text-fg">
+                  Dieses Profil hat <strong>kein Passwort</strong>. Jede Person, die deinen Cevi-Namen und dein Geburtsdatum kennt, kann sich in deinen Account einloggen.
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+                  Wenn du dein Profil mit einem Passwort schützen möchtest oder Aufgaben im OK übernimmst, nutze stattdessen die Anmeldung mit{' '}
+                  <button
+                    type="button"
+                    onClick={() => goTo('start')}
+                    className="font-medium text-accent-ink underline-offset-4 hover:underline"
+                  >
+                    Cevi.DB oder E-Mail
+                  </button>
+                  .
+                </p>
+              </Callout>
+
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Vorname">
                   <Input
