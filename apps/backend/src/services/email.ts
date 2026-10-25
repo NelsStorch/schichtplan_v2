@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { sendServerAlert } from './serverAlert.js';
 
 const host = process.env.SMTP_HOST || 'mail.infomaniak.com';
 const port = Number(process.env.SMTP_PORT || 587);

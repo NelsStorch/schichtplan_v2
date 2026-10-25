@@ -48,6 +48,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-Cevi Schichtplan <admin@cevi-schichtplan.ch>}
       SHIFT_REMINDERS_ENABLED: ${SHIFT_REMINDERS_ENABLED:-false}
+      ADMIN_ALERT_WEBHOOK_URL: ${ADMIN_ALERT_WEBHOOK_URL:-}
+      ADMIN_ALERT_EMAIL: ${ADMIN_ALERT_EMAIL:-}
     depends_on:
       db:
         condition: service_healthy

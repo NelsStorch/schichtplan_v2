@@ -24,6 +24,7 @@ import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen }
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
 import { personLabel } from '../services/profile.js';
 import { notifyAdminChange, recordAdminAction } from '../services/adminAudit.js';
+import { sendServerAlert } from '../services/serverAlert.js';
 import { recordDepartmentAction, toDepartmentAuditDto } from '../services/departmentAudit.js';
 import { contactCandidateWhere } from './departments.js';
 import { loginMethods, toListItem, userSelect } from './admin.js';
@@ -226,6 +227,24 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     issuedAt: request.adminSession?.issuedAt.toISOString() ?? null,
     expiresAt: request.adminSession?.expiresAt.toISOString() ?? null,
   }));
+
+  // Server-Alert-Webhook manuell testen (Server-Leitung)
+  fastify.post('/api/admin/alert-test', guard, async (request) => {
+    const result = await sendServerAlert(
+      {
+        category: 'TEST',
+        level: 'INFO',
+        title: 'Server-Leitung Webhook-Test',
+        message: 'Dies ist eine Test-Benachrichtigung aus dem Admin-Portal des Cevi Schichtplans.',
+        context: {
+          adminUserId: request.user.id,
+          triggeredAt: new Date().toISOString(),
+        },
+      },
+      { force: true }
+    );
+    return { ok: true, result };
+  });
 
   // ---------------------------------------------------------------------------
   // Startseite

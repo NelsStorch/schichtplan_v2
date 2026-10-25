@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
@@ -21,6 +21,7 @@ import adminRoutes from './routes/admin.js';
 import adminManageRoutes from './routes/adminManage.js';
 import uploadRoutes from './routes/uploads.js';
 import calendarRoutes from './routes/calendar.js';
+import { isDatabaseOverloadError, sendServerAlert } from './services/serverAlert.js';
 import eventTemplateRoutes from './routes/eventTemplates.js';
 import taskDefinitionRoutes from './routes/taskDefinitions.js';
 
@@ -105,6 +106,51 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminManageRoutes);
   await app.register(uploadRoutes);
   await app.register(calendarRoutes);
+
+
+  // Zentraler Fehler-Handler für Server-Fehler & Admin-Webhook-Alarme
+  app.setErrorHandler(async (error: FastifyError, request, reply) => {
+    const statusCode = error.statusCode || 500;
+
+    if (isDatabaseOverloadError(error)) {
+      void sendServerAlert({
+        category: 'DB_OVERLOAD',
+        level: 'CRITICAL',
+        title: 'Datenbank kurzzeitig überlastet / nicht erreichbar',
+        message: `Die Datenbank antwortet nicht oder der Connection-Pool ist erschöpft bei ${request.method} ${request.url}.`,
+        error,
+        context: {
+          method: request.method,
+          url: request.url,
+          host: request.headers.host,
+        },
+      }).catch(() => {});
+    } else if (statusCode >= 500) {
+      void sendServerAlert({
+        category: 'SERVER_ERROR',
+        level: 'CRITICAL',
+        title: `Serverfehler 500 bei ${request.method} ${request.url}`,
+        message: error.message || 'Unerwarteter interner Serverfehler',
+        error,
+        context: {
+          method: request.method,
+          url: request.url,
+          host: request.headers.host,
+        },
+      }).catch(() => {});
+    }
+
+    if (statusCode >= 500) {
+      request.log.error(error);
+      return reply.status(statusCode).send({
+        statusCode,
+        error: 'Internal Server Error',
+        message: process.env.NODE_ENV === 'production' ? 'Ein interner Serverfehler ist aufgetreten' : error.message,
+      });
+    }
+
+    return reply.status(statusCode).send(error);
+  });
 
   return app;
 }
