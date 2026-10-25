@@ -127,18 +127,34 @@ export async function resolveOrganizerUser(
 /* Bremse im Speicher gegen das Durchprobieren von Geburtsdaten (siehe rateLimit.ts) */
 const ipLimiter = createRateLimiter(10 * 60 * 1000, 30);
 const missLimiter = createRateLimiter(15 * 60 * 1000, 8);
+/** Über den Tag: sonst reichen 8 pro Viertelstunde, um in einer Woche jedes Geburtsdatum durchzuprobieren */
+const dailyMissLimiter = createRateLimiter(24 * 60 * 60 * 1000, 20);
 
 /** Alle Anfragen pro IP: 30 in 10 Minuten. true = zu viele */
 export function tooManyRequests(ip: string): boolean {
   return ipLimiter.hit(ip);
 }
 
+const nameKey = (departmentId: string, ceviName: string) => `${departmentId}:${ceviName.trim().toLowerCase()}`;
+
 /**
- * Fehlversuche pro Cevi-Name und Abteilung (unabhängig von der IP): 8 in 15 Minuten.
- * Zählt nur, wenn das Geburtsdatum nicht zu einem Profil passt.
+ * Gesperrt nach zu vielen Fehlversuchen für diesen Cevi-Namen und diese Abteilung (unabhängig von der IP):
+ * 8 in 15 Minuten oder 20 am Tag. Muss VOR der Suche geprüft werden: Sonst käme ein richtiges Geburtsdatum
+ * trotz Sperre durch, und die Sperre verriete nur, welche Daten falsch sind.
  */
-export function tooManyMisses(departmentId: string, ceviName: string): boolean {
-  return missLimiter.hit(`${departmentId}:${ceviName.trim().toLowerCase()}`);
+export function ceviNameAttemptsBlocked(departmentId: string, ceviName: string): boolean {
+  const key = nameKey(departmentId, ceviName);
+  return missLimiter.isBlocked(key) || dailyMissLimiter.isBlocked(key);
+}
+
+/**
+ * Fehlversuch zählen: kein Profil, oder ein geschütztes Konto (Cevi.DB/Passwort). Auch Letzteres zählt,
+ * weil die Antwort verrät, dass Name und Geburtsdatum zu einem Konto passen.
+ */
+export function recordCeviNameMiss(departmentId: string, ceviName: string): void {
+  const key = nameKey(departmentId, ceviName);
+  missLimiter.hit(key);
+  dailyMissLimiter.hit(key);
 }
 
 export const RATE_LIMIT_ERROR = 'Zu viele Versuche. Bitte warte ein paar Minuten und versuch es dann nochmals.';

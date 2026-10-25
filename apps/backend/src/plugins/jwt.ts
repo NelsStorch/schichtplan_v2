@@ -2,6 +2,7 @@ import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import fastifyJwt from '@fastify/jwt';
 import fastifyCookie from '@fastify/cookie';
+import { randomUUID } from 'node:crypto';
 import {
   adminRequestProblem,
   adminSecurityConfig,
@@ -24,18 +25,26 @@ declare module 'fastify' {
      * Änderungen gebremst. Siehe services/adminSecurity.ts.
      */
     requireGlobalAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    /** Login-Token ausstellen (mit eigener ID `jti`, damit es sich beim Abmelden widerrufen lässt) */
+    signAuthToken: (payload: Omit<AuthTokenPayload, 'jti'>) => string;
+    /** Token aus dem Cookie widerrufen (Abmelden). Ungültige oder alte Tokens ohne jti: nichts zu tun. */
+    revokeAuthToken: (request: FastifyRequest) => Promise<void>;
   }
+}
+
+interface AuthTokenPayload {
+  id: string;
+  email: string;
+  isGlobalAdmin: boolean;
+  /** Anmeldeart, für die Admin-Schnittstelle (ältere Tokens haben keine) */
+  amr?: LoginMethodClaim;
+  /** Token-ID für den Widerruf beim Abmelden (Tokens vor 2026-10-25 haben keine) */
+  jti?: string;
 }
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: {
-      id: string;
-      email: string;
-      isGlobalAdmin: boolean;
-      /** Anmeldeart, für die Admin-Schnittstelle (ältere Tokens haben keine) */
-      amr?: LoginMethodClaim;
-    };
+    payload: AuthTokenPayload;
     user: {
       id: string;
       email: string;
@@ -96,11 +105,16 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     } catch {
       return false;
     }
-    const user = await fastify.prisma.user.findUnique({
-      where: { id: request.user.id },
-      select: { id: true, email: true, isGlobalAdmin: true, passwordChangedAt: true },
-    });
-    if (!user) return false;
+    const jti = (request.user as { jti?: string }).jti;
+    const [user, revoked] = await Promise.all([
+      fastify.prisma.user.findUnique({
+        where: { id: request.user.id },
+        select: { id: true, email: true, isGlobalAdmin: true, passwordChangedAt: true },
+      }),
+      jti ? fastify.prisma.revokedToken.findUnique({ where: { jti }, select: { jti: true } }) : null,
+    ]);
+    // Abgemeldete Tokens gelten nicht mehr, auch wenn jemand das Cookie kopiert hat
+    if (!user || revoked) return false;
     // Nach einem neuen Passwort gelten ältere Tokens nicht mehr (iat ist in Sekunden)
     const issuedAt = (request.user as { iat?: number }).iat;
     tokenClaims.set(request, { iat: issuedAt, amr: (request.user as { amr?: string }).amr });
@@ -114,6 +128,28 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     };
     return true;
   }
+
+  fastify.decorate('signAuthToken', (payload: Omit<AuthTokenPayload, 'jti'>) =>
+    fastify.jwt.sign({ ...payload, jti: randomUUID() })
+  );
+
+  fastify.decorate('revokeAuthToken', async (request: FastifyRequest) => {
+    let claims: { jti?: string; exp?: number };
+    try {
+      claims = await request.jwtVerify<{ jti?: string; exp?: number }>();
+    } catch {
+      return;
+    }
+    const now = new Date();
+    await fastify.prisma.revokedToken.deleteMany({ where: { expiresAt: { lt: now } } });
+    if (!claims.jti) return;
+    const expiresAt = new Date((claims.exp ?? now.getTime() / 1000 + AUTH_TOKEN_TTL_SECONDS) * 1000);
+    await fastify.prisma.revokedToken.upsert({
+      where: { jti: claims.jti },
+      update: {},
+      create: { jti: claims.jti, expiresAt },
+    });
+  });
 
   fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
     if (!(await verifyAndLoad(request))) {

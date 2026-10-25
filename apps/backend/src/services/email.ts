@@ -462,6 +462,49 @@ export async function sendPasswordResetEmail({
 }
 
 /**
+ * Registrierung mit einer E-Mail, zu der es schon ein Konto gibt. Die Antwort im Browser ist dieselbe wie
+ * bei einem neuen Konto (sonst liesse sich prüfen, wer ein Konto hat); Bescheid bekommt nur die Adresse.
+ */
+export async function sendAccountExistsEmail({
+  to,
+  name,
+  loginUrl,
+  resetUrl,
+}: {
+  to: string;
+  name?: string | null;
+  loginUrl: string;
+  resetUrl: string;
+}): Promise<boolean> {
+  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
+  const subject = 'Du hast schon ein Konto – Cevi Schichtplan';
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hallo <strong>${escapeHtml(displayName)}</strong>,</p>
+    <p style="margin: 0 0 16px 0;">jemand wollte mit dieser E-Mail-Adresse ein neues Konto beim Cevi Schichtplan anlegen. Zu dieser Adresse gibt es aber schon ein Konto.</p>
+    <p style="margin: 0 0 16px 0;">Melde dich einfach an. Falls du dein Passwort nicht mehr weisst, kannst du es <a href="${escapeHtml(resetUrl)}">hier zurücksetzen</a>.</p>
+  `;
+
+  const html = renderEmailTemplate({
+    preheader: 'Zu deiner E-Mail-Adresse gibt es schon ein Konto.',
+    eyebrow: 'Konto',
+    title: 'Du hast schon ein Konto',
+    contentHtml,
+    calloutBox: {
+      title: 'Warst das nicht du?',
+      text: 'Dann kannst du diese E-Mail ignorieren. An deinem Konto hat sich nichts geändert.',
+      tone: 'info' as const,
+    },
+    ctaText: 'Anmelden',
+    ctaUrl: loginUrl,
+  });
+
+  const text = `Hallo ${displayName},\n\njemand wollte mit dieser E-Mail-Adresse ein neues Konto anlegen. Du hast aber schon eines.\n\nAnmelden: ${loginUrl}\nPasswort vergessen: ${resetUrl}\n\nWarst das nicht du? Dann ignoriere diese E-Mail.\n\nDein Cevi Schichtplan Team`;
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/**
  * 3. Schicht-Erinnerung (für zukünftige Erweiterung)
  */
 export async function sendShiftReminderEmail({

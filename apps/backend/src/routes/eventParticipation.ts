@@ -63,7 +63,8 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
       include: { organizers: { select: { userId: true, role: true } } },
     });
-    if (!event) {
+    // Entwürfe gibt es nur für die Abteilungsleitung und das OK
+    if (!event || (!event.isPublished && !(await managerFlags(fastify.prisma, event, request.user ?? null)).isManager)) {
       reply.status(404).send({ error: 'Event nicht gefunden' });
       return null;
     }

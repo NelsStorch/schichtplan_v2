@@ -25,13 +25,14 @@ import {
 } from '../services/homeDepartment.js';
 import { ceviDbProfileFields } from '../services/profile.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
-import { sendVerificationEmail } from '../services/email.js';
+import { sendAccountExistsEmail, sendVerificationEmail } from '../services/email.js';
 import {
   RATE_LIMIT_ERROR,
   findCeviNameMatches,
   isCeviNameProfile,
   pickCeviNameMatch,
-  tooManyMisses,
+  ceviNameAttemptsBlocked,
+  recordCeviNameMiss,
   tooManyRequests,
 } from '../services/ceviNameLogin.js';
 import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
@@ -42,6 +43,8 @@ const loginFailuresByIp = createRateLimiter(10 * 60 * 1000, 30);
 const loginFailuresByEmail = createRateLimiter(15 * 60 * 1000, 10);
 /** Registrieren / Bestätigungsmail anfordern: höchstens 10 pro IP und Stunde (gegen Mail-Bomben) */
 const mailRequestsByIp = createRateLimiter(60 * 60 * 1000, 10);
+/** Hinweis «Du hast schon ein Konto»: höchstens einer pro Adresse und Stunde */
+const accountExistsMailsByEmail = createRateLimiter(60 * 60 * 1000, 1);
 /** Falsche Passwörter beim Verknüpfen: nach 5 ist die Verknüpfung weg */
 const MAX_LINK_ATTEMPTS = 5;
 
@@ -245,6 +248,16 @@ function clearAuthCookie(reply: FastifyReply) {
     path: '/',
     domain,
   });
+}
+
+/** Antwort auf eine Registrierung, gleich ob das Konto neu ist oder die E-Mail schon eines hat */
+function registrationAccepted(email: string) {
+  return {
+    success: true,
+    requiresVerification: true,
+    email,
+    message: 'Bitte überprüfe dein Postfach: Wir haben dir eine E-Mail geschickt, um dich anzumelden.',
+  };
 }
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -599,7 +612,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.log.error({ err, userId: user.id }, 'Cevi-Name-Profile konnten nicht übernommen werden');
     }
 
-    const token = fastify.jwt.sign({
+    const token = fastify.signAuthToken({
       id: user.id,
       email: user.email || `${user.id}@cevi-schichtplan.ch`,
       isGlobalAdmin: user.isGlobalAdmin,
@@ -694,12 +707,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: 'Diese Abteilung gibt es nicht.' });
     }
 
-    const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
-    const result = pickCeviNameMatch(matches);
-
-    if (result.kind !== 'LOGIN' && tooManyMisses(department.id, ceviName)) {
+    // Sperre vor der Suche: Auch ein richtiges Geburtsdatum kommt während der Sperre nicht durch
+    if (ceviNameAttemptsBlocked(department.id, ceviName)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
+    const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
+    const result = pickCeviNameMatch(matches);
+    if (result.kind !== 'LOGIN') recordCeviNameMiss(department.id, ceviName);
     if (result.kind === 'USE_CEVIDB') {
       return reply.status(403).send({
         code: 'USE_CEVIDB',
@@ -743,9 +757,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: 'Diese Abteilung gibt es nicht.' });
     }
 
-    // Gleicher Cevi-Name und gleiches Geburtsdatum in derselben Abteilung gibt es nur einmal
+    // Gleicher Cevi-Name und gleiches Geburtsdatum in derselben Abteilung gibt es nur einmal.
+    // Die Antwort verrät, ob Name und Geburtsdatum passen: gleiche Bremse wie beim Login.
+    if (ceviNameAttemptsBlocked(department.id, ceviName)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
     const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
     if (matches.length > 0) {
+      recordCeviNameMiss(department.id, ceviName);
       const result = pickCeviNameMatch(matches);
       return reply.status(409).send({
         code: result.kind === 'USE_CEVIDB' ? 'USE_CEVIDB' : result.kind === 'USE_PASSWORD' ? 'USE_PASSWORD' : 'EXISTS',
@@ -802,7 +821,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     user: { id: string; email: string | null; ceviName: string | null; isGlobalAdmin: boolean },
     returnTo: string | undefined
   ) {
-    const token = fastify.jwt.sign({
+    const token = fastify.signAuthToken({
       id: user.id,
       email:
         user.email ||
@@ -851,7 +870,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    const token = fastify.jwt.sign({
+    const token = fastify.signAuthToken({
       id: user.id,
       email: user.email || `${user.id}@cevi-schichtplan.ch`,
       isGlobalAdmin: user.isGlobalAdmin,
@@ -884,8 +903,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Auch ohne Passwort nicht übernehmen: Ein bestehendes Konto (z. B. Cevi-Name-Profil mit selbst
     // eingetragener E-Mail) bekäme sonst von irgendwem ein Passwort und fremde Namen.
+    // Die Antwort ist dieselbe wie bei einem neuen Konto: sonst liesse sich durchprobieren, wer ein Konto
+    // hat. Die Person mit dieser Adresse bekommt stattdessen einen Hinweis per Mail.
     if (existing) {
-      return reply.status(409).send({ error: 'Diese E-Mail ist bereits registriert' });
+      const loginPortalUrl = getLoginPortalBaseUrl(request.headers.host);
+      if (!accountExistsMailsByEmail.hit(cleanEmail)) await sendAccountExistsEmail({
+        to: cleanEmail,
+        name: existing.ceviName || existing.firstName,
+        loginUrl: `${loginPortalUrl}/`,
+        resetUrl: `${loginPortalUrl}/passwort-vergessen`,
+      });
+      return registrationAccepted(cleanEmail);
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -930,13 +958,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // Absichtlich KEIN Auth-Cookie setzen, damit die E-Mail zuerst verifiziert werden muss
-    return {
-      success: true,
-      requiresVerification: true,
-      email: cleanEmail,
-      message:
-        'Konto erfolgreich erstellt! Bitte überprüfe dein Postfach und bestätige deine E-Mail-Adresse, um dich anzumelden.',
-    };
+    return registrationAccepted(cleanEmail);
   });
 
   // 5a. Bestätigungs-E-Mail erneut anfordern
@@ -954,18 +976,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       where: { email: cleanEmail },
     });
 
-    if (!user) {
-      return {
-        success: true,
-        message: 'Falls ein Konto mit dieser E-Mail existiert, wurde ein neuer Bestätigungslink versendet.',
-      };
-    }
-
-    if (user.emailVerified) {
-      return reply.status(400).send({
-        error: 'Deine E-Mail-Adresse ist bereits bestätigt. Du kannst dich direkt anmelden.',
-      });
-    }
+    // Immer dieselbe Antwort: Ob es ein Konto gibt, ob es schon bestätigt ist oder eben ein Link ging,
+    // soll sich hier nicht abfragen lassen
+    const genericAnswer = {
+      success: true,
+      message: 'Falls es zu dieser E-Mail ein unbestätigtes Konto gibt, haben wir einen neuen Bestätigungslink gesendet.',
+    };
+    if (!user || user.emailVerified) return genericAnswer;
 
     const recentToken = await fastify.prisma.emailVerificationToken.findFirst({
       where: {
@@ -973,11 +990,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         createdAt: { gt: new Date(Date.now() - 60 * 1000) },
       },
     });
-    if (recentToken) {
-      return reply.status(429).send({
-        error: 'Bitte warte eine Minute, bevor du einen neuen Link anforderst.',
-      });
-    }
+    if (recentToken) return genericAnswer;
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     await fastify.prisma.emailVerificationToken.deleteMany({
@@ -1000,10 +1013,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       verificationUrl,
     });
 
-    return {
-      success: true,
-      message: 'Ein neuer Bestätigungslink wurde an deine E-Mail-Adresse gesendet.',
-    };
+    return genericAnswer;
   });
 
   // 5b. E-Mail-Adresse mit Token bestätigen (POST für UI & API)
@@ -1326,7 +1336,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // 7. Logout
-  fastify.post('/api/auth/logout', async (_request, reply) => {
+  fastify.post('/api/auth/logout', async (request, reply) => {
+    // Token serverseitig sperren: ein kopiertes Cookie hilft nach dem Abmelden nichts mehr
+    await fastify.revokeAuthToken(request);
     clearAuthCookie(reply);
     return { ok: true };
   });

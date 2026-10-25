@@ -167,7 +167,8 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
       startTime: new Date('2030-06-01T12:00:00Z'),
       endTime: new Date('2030-06-01T16:00:00Z'),
     });
-    const helper = await createUser(app);
+    // Einteilen geht nur für Personen der Abteilung oder des Anlasses
+    const helper = await createUser(app, { homeDepartmentId: department.id });
     const okCookie = authCookie(app, okLead);
 
     // OK teilt Helfer für Schicht 1 ein -> OK

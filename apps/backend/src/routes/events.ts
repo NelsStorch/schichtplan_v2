@@ -27,7 +27,12 @@ import {
   managerFlags,
 } from '../services/eventAccess.js';
 import { resolveOrganizerUser } from '../services/ceviNameLogin.js';
-import { isDepartmentInsider } from '../services/departmentVisibility.js';
+import {
+  UNRELATED_PERSON_ERROR,
+  allUsersRelatedTo,
+  allUsersRelatedToEvent,
+  isDepartmentInsider,
+} from '../services/departmentVisibility.js';
 import { cleanRequiredFields, missingProfileFields } from '../services/profile.js';
 import { generateCheckinToken } from '../services/attendance.js';
 
@@ -296,6 +301,10 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         : null;
 
       const flags = await managerFlags(fastify.prisma, event, viewer);
+      // Entwürfe (nicht veröffentlicht) sehen nur Abteilungsleitung, Planung und OK, auch nicht über den Link
+      if (!event.isPublished && !flags.isManager) {
+        return reply.status(404).send({ error: 'Event nicht gefunden' });
+      }
       const hasGrant = viewer ? await hasValidGrant(fastify.prisma, event.id, viewer.id) : false;
       const access = evaluateEventAccess(event, request.tenant.name, viewer, flags, hasGrant);
 
@@ -550,6 +559,11 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: 'Ein Event mit diesem Slug existiert bereits in dieser Abteilung' });
       }
 
+      // Kontaktperson nur aus der eigenen Abteilung (der Anlass gibt es noch nicht)
+      if (!(await allUsersRelatedTo(fastify.prisma, { departmentIds: [request.tenant.id] }, [contactUserId]))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
+      }
+
       const lists = await resolveAccessLists(
         fastify.prisma,
         request.tenant.id,
@@ -712,6 +726,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
       const body = parse.data;
+      if (body.contactUserId && !(await allUsersRelatedToEvent(fastify.prisma, event.id, [body.contactUserId]))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
+      }
 
       const newStartDate = body.startDate ? new Date(body.startDate) : event.startDate;
       const newEndDate = body.endDate ? new Date(body.endDate) : event.endDate;
@@ -858,6 +875,10 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       const parse = SetDayResponsiblesSchema.safeParse(request.body);
       if (!parse.success) {
         return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+
+      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, parse.data.userIds))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
       await fastify.prisma.$transaction(async (tx) => {

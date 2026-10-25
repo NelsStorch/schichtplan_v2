@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { InstantiateTemplateSchema, toEventAccessType, type EventTemplateData } from '@schichtplan/shared';
 import { cleanRequiredFields } from '../services/profile.js';
-import { isDepartmentManager } from '../services/departmentVisibility.js';
+import { UNRELATED_PERSON_ERROR, allUsersRelatedTo, isDepartmentManager } from '../services/departmentVisibility.js';
 import { generateCheckinToken } from '../services/attendance.js';
 import { replaceAccessLists, resolveAccessLists, syncQuestions } from './events.js';
 
@@ -116,6 +116,9 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
       const parse = InstantiateTemplateSchema.safeParse(request.body);
       if (!parse.success) {
         return reply.status(400).send({ error: parse.error.issues[0].message });
+      }
+      if (!(await allUsersRelatedTo(fastify.prisma, { departmentIds: [request.tenant.id] }, [parse.data.contactUserId]))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
       const {

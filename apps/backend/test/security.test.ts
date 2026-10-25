@@ -103,7 +103,9 @@ describe.skipIf(!hasTestDb)('Sicherheit der API', () => {
         url: '/api/auth/register-helper',
         payload: { email: 'opfer@example.com', password: 'geheim12345', firstName: 'Fremd', lastName: 'Person' },
       });
-      expect(res.statusCode).toBe(409);
+      // Gleiche Antwort wie bei einem neuen Konto (verrät nicht, dass es die E-Mail schon gibt)
+      expect(res.statusCode).toBe(200);
+      expect(res.json().requiresVerification).toBe(true);
       const after = await app.prisma.user.findUniqueOrThrow({ where: { id: profile.id } });
       expect(after.passwordHash).toBeNull();
       expect(after.firstName).toBe('Test');

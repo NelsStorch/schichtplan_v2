@@ -21,6 +21,7 @@ import {
 import { missingProfileFields } from '../services/profile.js';
 import { validateAnswers } from './eventParticipation.js';
 import { findShiftCollisions, formatZurichTime } from '../services/shiftCollision.js';
+import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
 
 function calculateAge(birthDate: Date, targetDate: Date): number {
   let age = targetDate.getFullYear() - birthDate.getFullYear();
@@ -114,6 +115,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply
           .status(403)
           .send({ error: 'Keine Berechtigung zum Erstellen von Schichten für dieses Event' });
+      }
+
+      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, responsibleUserIds ?? []))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
       const resolvedTasks =
@@ -241,6 +246,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply
           .status(403)
           .send({ error: 'Keine Berechtigung zum Erstellen von Schichten für dieses Event' });
+      }
+
+      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, responsibleUserIds ?? []))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
       const intervals = calculateShiftSeriesIntervals({
@@ -375,6 +384,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { title, category, isSetupTeardown, startTime, endTime, description, minAge, tasks, responsibleUserIds } = parse.data;
+      if (!(await allUsersRelatedToEvent(fastify.prisma, shift.eventId, responsibleUserIds ?? []))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
+      }
       if (new Date(endTime ?? shift.endTime) <= new Date(startTime ?? shift.startTime)) {
         return reply.status(400).send({ error: 'Das Ende der Schicht muss nach dem Beginn liegen' });
       }
@@ -751,6 +763,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       const flags = await managerFlags(fastify.prisma, event, request.user);
       const isOkOrAdmin = flags.isManager;
+      if (!event.isPublished && !isOkOrAdmin) {
+        return reply.status(404).send({ error: 'Schicht nicht gefunden' });
+      }
 
       // Body parsen
       const parse = SignupShiftSchema.safeParse({ ...(request.body as object), shiftId });
@@ -779,6 +794,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Fall 1: OK teilt eine andere Person ein
       if (isOkOrAdmin && requestedUserId) {
+        // Nur Personen der Abteilung oder des Anlasses: sonst sähe das OK danach fremde Kontaktdaten
+        if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, [requestedUserId]))) {
+          return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
+        }
         targetUserId = requestedUserId;
         targetUser = await fastify.prisma.user.findUnique({ where: { id: targetUserId } });
         if (!targetUser) {
