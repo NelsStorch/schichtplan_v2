@@ -1,0 +1,86 @@
+---
+title: Rechte in der Abteilung
+description: Welche Rechte es gibt, die Vorlagen dazu und wer welche Rechte vergeben darf.
+audience: [abteilung]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+<Path steps={['Startseite der Abteilung', 'Abteilung', 'Personen', 'Bearbeiten']} />
+
+Wer in der Abteilung mehr darf als sich eintragen, bekommt einzelne **Rechte**. Du kannst sie einzeln ankreuzen oder eine **Vorlage** wählen, die passende Rechte auf einmal setzt. Die Rechte gelten für die ganze Abteilung, also für alle Anlässe.
+
+Wer nur einen bestimmten Anlass mitplant, braucht keine Abteilungsrechte. Nimm die Person ins [OK des Anlasses](/ok/rollen/) auf.
+
+## Abteilungsleitung
+
+Die **Abteilungsleitung** hat immer alle Rechte. Sie kommt aus der Cevi.DB: Wer dort Abteilungsleiter\*in ist, wird beim Anmelden mit Cevi.DB automatisch Abteilungsleitung der eigenen Abteilung. Fällt die Rolle in der Cevi.DB weg, nimmt der Schichtplan sie beim nächsten Login wieder weg, ausser es ist die letzte Abteilungsleitung der Abteilung.
+
+In der Abteilung selbst lässt sich die Abteilungsleitung weder vergeben noch entziehen. Braucht eine Abteilung ohne Cevi.DB-Ortsgruppe eine Abteilungsleitung, setzen die [Plattform-Admins](/wissen/kontakt/) sie.
+
+## Die Rechte
+
+**Abteilung**
+
+| Recht | Darf |
+| --- | --- |
+| Abteilung bearbeiten | Name, Logo, Farbe, Kontaktperson und «Startseite nur für Mitglieder» |
+| Stufen verwalten | Stufen anlegen, umbenennen, mit der Cevi.DB verknüpfen und löschen |
+| Personen sehen | die Liste der Personen mit Stufen und Rechten |
+| Personen und Rechte verwalten | Stufen von Personen setzen, Personen entfernen, Rechte vergeben (siehe unten), das Protokoll sehen |
+| Vorlagen verwalten | Anlässe als Vorlage speichern und Vorlagen löschen |
+
+**Anlässe** (gilt für alle Anlässe der Abteilung)
+
+| Recht | Darf |
+| --- | --- |
+| Alle Anlässe sehen | auch Entwürfe und den OK-Bereich aller Anlässe, mit den Kontaktangaben der Helfenden |
+| Anlässe erstellen | neue Anlässe anlegen, auch aus Vorlagen |
+| Anlässe bearbeiten | Einstellungen aller Anlässe ändern wie die OK-Leitung, Anlässe verschieben |
+| Schichten planen | Schichten, Arbeiten und Tagesverantwortliche |
+| Helfende einteilen | Helfende ein- und austragen, Abmeldungen, Zugangs-Links |
+| Nachrichten senden | E-Mails an die Helfenden |
+| Anwesenheit erfassen | Anwesenheitsliste und QR-Code für den Check-in |
+| Exportieren | Listen, Schichtplan-PDF und Helferstunden |
+| OK ernennen | OK-Leitung und OK-Mitglieder ernennen und entfernen |
+| Anlässe löschen | Anlässe mit allen Schichten und Eintragungen endgültig löschen |
+
+Jedes Anlass-Recht setzt **Alle Anlässe sehen** voraus, «Personen und Rechte verwalten» setzt «Personen sehen» voraus. Der Schichtplan setzt das automatisch mit.
+
+:::note[Wer erstellt, ist nicht automatisch im OK]
+Mit «Anlässe erstellen» legst du einen Anlass an und siehst ihn danach. Die Einstellungen ändert das OK. Willst du selbst die OK-Leitung sein, tippe beim Erstellen auf <Btn>Mich als OK-Leitung eintragen</Btn>.
+:::
+
+## Die Vorlagen
+
+| Vorlage | Rechte |
+| --- | --- |
+| Administration | alle Rechte. Fast wie die Abteilungsleitung, vergibt Rechte aber nur eingeschränkt |
+| Anlass-Koordination | Anlässe erstellen und in allen Anlässen planen, einteilen, Nachrichten, Anwesenheit, Export, Vorlagen. Die frühere Rolle «Planung» |
+| Anlässe bearbeiten | alle bestehenden Anlässe bearbeiten wie die OK-Leitung, inkl. OK ernennen, aber keine neuen erstellen |
+| Anlässe erstellen | nur neue Anlässe anlegen |
+
+Passt keine Vorlage, kreuz die Rechte einzeln an. Die Person heisst dann «Eigene Rechte».
+
+## Wer darf Rechte vergeben?
+
+- Die **Abteilungsleitung** vergibt und entzieht alle Rechte.
+- Wer **Personen und Rechte verwalten** hat, vergibt nur Rechte, die er oder sie selbst hat, und insgesamt **weniger**, als er oder sie selbst hat. Personen mit gleich vielen oder mehr Rechten, die Abteilungsleitung und sich selbst kann er oder sie nicht ändern.
+- Personen mit einem reinen Cevi-Name-Profil (ohne Cevi.DB und Passwort) bekommen keine Rechte.
+
+So kann eine Administration zum Beispiel jemandem «Anlässe erstellen» geben, aber niemanden zu einer zweiten Administration machen.
+
+## Wie heissen die Personen?
+
+| Bezeichnung | Bedeutet |
+| --- | --- |
+| Abteilungsleitung | alle Rechte, aus der Cevi.DB |
+| Name einer Vorlage | hat genau die Rechte dieser Vorlage |
+| Eigene Rechte | hat Rechte, die zu keiner Vorlage passen |
+| Mitglied | Heimabteilung ist eure Abteilung, keine besonderen Rechte |
+| Gast | hat sich über eure Subdomain angemeldet, hat aber eine andere oder keine Heimabteilung |
+
+## Protokoll
+
+Unter <Btn>Protokoll</Btn> steht, wer wem wann welche Rechte gegeben oder genommen hat, wann jemand Abteilungsleitung wurde oder nicht mehr ist (auch automatisch über die Cevi.DB) und wer Stufen geändert hat. Das Protokoll sehen die Abteilungsleitung und wer «Personen und Rechte verwalten» hat.

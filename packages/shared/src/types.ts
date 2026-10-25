@@ -1,6 +1,8 @@
 import type {
   AttendanceMode,
   AttendanceStatus,
+  DepartmentPermission,
+  EventCapability,
   EventAccessType,
   EventQuestionScope,
   EventQuestionType,
@@ -16,7 +18,10 @@ export interface DepartmentDto {
   slug: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
-  contactEmail?: string | null;
+  /** Kontaktperson (Abteilungsleitung oder mit «Personen und Rechte verwalten») */
+  contactUserId?: string | null;
+  /** Name immer, E-Mail nur für angemeldete Personen */
+  contactPerson?: { displayName: string; email: string | null } | null;
   /** Cevi.DB-Ortsgruppe; ohne sie funktionieren die Cevi.DB-Zugangstypen nicht */
   ceviDbGroupId?: number | null;
   /** Startseite nur für Mitglieder (öffentliche Anlässe bleiben per Link erreichbar) */
@@ -226,7 +231,10 @@ export interface UserDto {
   phone?: string | null;
   birthDate?: string | null;
   isGlobalAdmin: boolean;
+  /** Rolle in der Abteilung der Subdomain (ADMIN = Abteilungsleitung) */
   departmentRole?: UserRole | null;
+  /** Wirksame Rechte in der Abteilung der Subdomain (Abteilungsleitung und globale Admins: alle) */
+  departmentPermissions?: DepartmentPermission[];
   ceviDbId?: number | null;
   ceviDbSyncedAt?: string | null;
   hasCeviDb?: boolean;
@@ -301,8 +309,14 @@ export interface DepartmentPersonDto {
   /** Heimabteilung ist diese Abteilung (sonst nur wegen einer Rolle in der Liste) */
   isHomeDepartment: boolean;
   source: 'SELF' | 'CEVIDB' | null;
-  /** Rolle im Schichtplan dieser Abteilung */
-  departmentRole: 'ADMIN' | 'PLANNER' | 'HELPER' | null;
+  /** Rolle im Schichtplan dieser Abteilung (ADMIN = Abteilungsleitung) */
+  departmentRole: 'ADMIN' | 'HELPER' | null;
+  /** Gespeicherte Rechte (bei der Abteilungsleitung ohne Bedeutung) */
+  permissions: DepartmentPermission[];
+  /** Woher die Abteilungsleitung kommt */
+  leaderSource: 'CEVIDB' | 'MANUAL' | null;
+  /** Darf die angemeldete Person Rechte und Stufen dieser Person ändern? */
+  canEdit: boolean;
   /** Hat in Cevi.DB eine Abteilungsleitungs-Rolle (CEVIDB_DEPARTMENT_LEADER_ROLES) */
   isCeviDbDepartmentLeader: boolean;
   /** Nur Cevi-Name-Profil (ohne Cevi.DB und Passwort): kann keine Rollen bekommen */
@@ -344,8 +358,24 @@ export interface EventAccessDto {
   message: string | null;
   /** Namen der Helfer*innen sichtbar */
   canSeeNames: boolean;
-  /** Kontaktangaben und Antworten sichtbar (nur Abteilungsleitung / OK) */
+  /** Kontaktangaben und Antworten sichtbar, OK-Bereich offen (Abteilungsleitung, OK, «Alle Anlässe sehen») */
   isManager: boolean;
+  /** Was die Person in diesem Anlass darf */
+  capabilities: EventCapability[];
+}
+
+/** Eintrag im Protokoll einer Abteilung (Rechte, Abteilungsleitung, Stufen, Zugehörigkeit) */
+export interface DepartmentAuditEntryDto {
+  id: string;
+  /** null = automatisch über den Cevi.DB-Login */
+  actorId: string | null;
+  actorName: string;
+  /** PERMISSIONS_SET, LEADER_GRANT, LEADER_REVOKE, STUFEN_SET, MEMBER_REMOVE */
+  action: string;
+  targetUserId: string | null;
+  targetLabel: string;
+  details: Record<string, unknown> | null;
+  createdAt: string;
 }
 
 export interface EventQuestionDto {
@@ -532,6 +562,7 @@ export interface AdminUserMembershipDto {
   departmentName: string;
   departmentSlug: string;
   role: string;
+  permissions: DepartmentPermission[];
 }
 
 export interface AdminUserListItemDto {
@@ -631,7 +662,8 @@ export interface AdminDepartmentListItemDto {
   slug: string;
   logoUrl: string | null;
   primaryColor: string | null;
-  contactEmail: string | null;
+  contactUserId: string | null;
+  contactName: string | null;
   ceviDbGroupId: number | null;
   membersOnly: boolean;
   /** Personen mit Abteilungsrolle (department_members) */
@@ -657,6 +689,8 @@ export interface AdminDepartmentPersonDto {
   loginMethods: LoginMethod[];
   /** Rolle in der Abteilung, null = nur Heimabteilung */
   role: string | null;
+  permissions: DepartmentPermission[];
+  leaderSource: string | null;
   isHome: boolean;
   /** CEVIDB oder SELF, nur bei Heimabteilung */
   homeSource: string | null;
@@ -672,6 +706,8 @@ export interface AdminDepartmentStufeDto {
 export interface AdminDepartmentDetailDto extends AdminDepartmentListItemDto {
   people: AdminDepartmentPersonDto[];
   stufen: AdminDepartmentStufeDto[];
+  /** Die neusten Einträge im Protokoll der Abteilung */
+  audit: DepartmentAuditEntryDto[];
   events: AdminEventListItemDto[];
 }
 

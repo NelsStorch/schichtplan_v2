@@ -11,7 +11,7 @@ export function isCeviNameProfile(user: { passwordHash: string | null; ceviDbId:
 }
 
 export const CEVINAME_ROLE_ERROR =
-  'Diese Person hat nur ein Cevi-Name-Profil. Für Rollen im OK oder in der Abteilung braucht sie ein Konto mit Cevi.DB oder mit E-Mail und Passwort.';
+  'Diese Person hat nur ein Cevi-Name-Profil. Für Rechte im OK oder in der Abteilung braucht sie ein Konto mit Cevi.DB oder mit E-Mail und Passwort.';
 
 /** Geburtsdatum JJJJ-MM-TT als Tagesbereich (UTC), damit auch anders gespeicherte Uhrzeiten passen */
 function dayRange(birthDate: string) {
@@ -41,7 +41,7 @@ export async function findCeviNameMatches(
       passwordHash: true,
       ceviDbId: true,
       isGlobalAdmin: true,
-      memberships: { select: { role: true } },
+      memberships: { select: { role: true, permissions: true } },
       organizedEvents: { select: { id: true }, take: 1 },
     },
     orderBy: { createdAt: 'asc' },
@@ -54,7 +54,7 @@ type Match = Awaited<ReturnType<typeof findCeviNameMatches>>[number];
 export function hasRights(user: Match): boolean {
   return (
     user.isGlobalAdmin ||
-    user.memberships.some((m) => m.role === 'ADMIN' || m.role === 'PLANNER') ||
+    user.memberships.some((m) => m.role === 'ADMIN' || m.permissions.length > 0) ||
     user.organizedEvents.length > 0
   );
 }

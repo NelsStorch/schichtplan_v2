@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  COORDINATION,
   addMember,
   authCookie,
   createDepartment,
@@ -108,7 +109,7 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
   it('lässt nur die eigene Eintragung oder das OK austragen', async () => {
     const department = await createDepartment(app);
     const planner = await createUser(app);
-    await addMember(app, department.id, planner.id, 'PLANNER');
+    await addMember(app, department.id, planner.id, 'HELPER', COORDINATION);
     const event = await createEvent(app, department.id);
     const shift = await createShift(app, event.id);
     const owner = await createUser(app);

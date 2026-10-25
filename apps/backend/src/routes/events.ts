@@ -33,6 +33,7 @@ import {
   managerFlags,
 } from '../services/eventAccess.js';
 import { resolveOrganizerUser } from '../services/ceviNameLogin.js';
+import { departmentAccess, hasDepartmentPermission } from '../services/permissions.js';
 import {
   UNRELATED_PERSON_ERROR,
   allUsersRelatedTo,
@@ -187,10 +188,22 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         .send({ error: 'Diese Abteilung zeigt ihre Anlässe nur Mitgliedern.', code: 'MEMBERS_ONLY' });
     }
 
+    // Entwürfe nur für «Alle Anlässe sehen» (inkl. Abteilungsleitung) und das OK des jeweiligen Anlasses
+    const viewerId = request.user?.id;
+    const seesAllDrafts = (await departmentAccess(fastify.prisma, request.tenant.id, viewerId)).permissions.has(
+      'EVENTS_VIEW_ALL'
+    );
     const events = await fastify.prisma.event.findMany({
       where: {
         departmentId: request.tenant.id,
-        isPublished: true,
+        ...(seesAllDrafts
+          ? {}
+          : {
+              OR: [
+                { isPublished: true },
+                ...(viewerId ? [{ organizers: { some: { userId: viewerId } } }] : []),
+              ],
+            }),
       },
       include: {
         shifts: { select: { requiredSlots: true, _count: { select: { signups: true } } } },
@@ -495,19 +508,10 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      if (!request.user.isGlobalAdmin && (!member || (member.role !== 'ADMIN' && member.role !== 'PLANNER'))) {
+      if (!(await hasDepartmentPermission(fastify.prisma, request.tenant.id, request.user.id, 'EVENTS_CREATE'))) {
         return reply.status(403).send({
           error:
-            'Anlässe können nur von der Abteilungsleitung oder Personen mit der Rolle «Planung» erstellt werden. Bitte wende dich an deine Abteilungsleitung: Sie kann dir die Rolle «Planung» geben oder den Anlass für dich erstellen.',
+            'Anlässe erstellen kann die Abteilungsleitung oder wer das Recht «Anlässe erstellen» hat. Bitte wende dich an deine Abteilungsleitung: Sie kann dir das Recht geben oder den Anlass für dich erstellen.',
         });
       }
 
@@ -625,14 +629,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      // Falls der Ersteller noch nicht im OK ist, als OK-Leitung hinzufügen
-      if (!userIdsSeen.has(request.user.id)) {
-        organizersToCreate.unshift({
-          userId: request.user.id,
-          role: 'OK_LEAD',
-          roleTitle: 'Event-Leitung',
-        });
-      }
+      // Wer erstellt, kommt nicht automatisch ins OK (Entscheid 2026-10-25): Das OK wählt man im Formular.
+      // Mit «Anlässe erstellen» allein sieht man den Anlass danach, ändert ihn aber nur über das OK.
 
       const departmentId = request.tenant.id;
       const event = await fastify.prisma.$transaction(async (tx) => {
@@ -714,7 +712,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       // Einstellungen (Zugang, Design, Fragen) nur Abteilungsleitung und OK-Leitung, wie im Frontend.
       // OK-Mitglieder planen Schichten, ändern aber nicht, wer sich eintragen darf.
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isDeptAdmin && !flags.isOkLead) {
+      if (!flags.can.SETTINGS) {
         return reply
           .status(403)
           .send({ error: 'Nur die Abteilungsleitung oder die OK-Leitung dürfen diesen Anlass bearbeiten' });
@@ -825,7 +823,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isDeptAdmin && !flags.isOkLead) {
+      if (!flags.can.SETTINGS) {
         return reply
           .status(403)
           .send({ error: 'Nur die Abteilungsleitung oder die OK-Leitung dürfen diesen Anlass verschieben' });
@@ -876,7 +874,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isManager) {
+      if (!flags.can.SHIFTS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Verwalten der Tagesverantwortlichen' });
       }
 
@@ -954,7 +952,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Nur Abteilungsleitung oder OK_LEAD darf OK-Mitglieder verwalten
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isDeptAdmin && !flags.isOkLead) {
+      if (!flags.can.ORGANIZERS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zur OK-Verwaltung' });
       }
 
@@ -1025,8 +1023,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isDeptAdmin) {
-        return reply.status(403).send({ error: 'Nur die Abteilungsleitung darf einen Anlass löschen' });
+      if (!flags.can.DELETE) {
+        return reply.status(403).send({ error: 'Anlässe löschen darf nur die Abteilungsleitung oder wer das Recht «Anlässe löschen» hat' });
       }
 
       const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
@@ -1062,7 +1060,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const flags = await managerFlags(fastify.prisma, existing.event, request.user);
-      if (!flags.isDeptAdmin && !flags.isOkLead) {
+      if (!flags.can.ORGANIZERS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zur OK-Verwaltung' });
       }
 
@@ -1098,7 +1096,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isManager) {
+      if (!flags.can.HELPERS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Abmelden von Helfenden' });
       }
 
@@ -1274,7 +1272,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isManager) {
+      if (!flags.can.TEMPLATES) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Vorlagen' });
       }
 

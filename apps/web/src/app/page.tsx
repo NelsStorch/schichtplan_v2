@@ -17,7 +17,10 @@ import type { MyShift } from '@/lib/types';
 
 export default function DepartmentHomePage() {
   const router = useRouter();
-  const { department, user, loading, error, isDeptAdmin, isPlanner } = usePortal();
+  const { department, user, loading, error, can } = usePortal();
+  const canCreate = can('EVENTS_CREATE');
+  // «Abteilung»-Dialog: Einstellungen, Stufen oder Personen (je nach Recht nur einzelne Reiter)
+  const canOpenDepartment = can('DEPARTMENT_SETTINGS') || can('STUFEN_MANAGE') || can('PEOPLE_VIEW');
   const [events, setEvents] = useState<EventDto[] | null>(null);
   const [nextShift, setNextShift] = useState<MyShift | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
@@ -25,11 +28,11 @@ export default function DepartmentHomePage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('createEvent=1')) {
-      if (isPlanner) {
+      if (canCreate) {
         setShowEventForm(true);
       }
     }
-  }, [isPlanner]);
+  }, [canCreate]);
 
   const lockedOut = Boolean(department?.membersOnly && !department.viewerIsMember);
 
@@ -64,7 +67,7 @@ export default function DepartmentHomePage() {
   return (
     <AppShell
       actions={
-        isPlanner && (
+        canCreate && (
           <Button size="sm" onClick={() => setShowEventForm(true)} aria-label="Neuer Anlass">
             <Plus /> <span className="hidden sm:inline">Neuer Anlass</span>
           </Button>
@@ -91,9 +94,9 @@ export default function DepartmentHomePage() {
               <p className="mt-5 max-w-xl text-base leading-relaxed text-fg-muted sm:text-lg">
                 Such dir einen Anlass aus und trag dich in eine Schicht ein. Jede helfende Hand zählt.
               </p>
-              {isDeptAdmin && (
+              {canOpenDepartment && (
                 <Button variant="secondary" size="sm" className="mt-6" onClick={() => setShowDeptForm(true)}>
-                  <Settings2 /> Abteilung bearbeiten
+                  <Settings2 /> Abteilung
                 </Button>
               )}
             </>
@@ -124,12 +127,12 @@ export default function DepartmentHomePage() {
             icon={<CalendarX2 />}
             title="Gerade keine Anlässe"
             description={
-              isPlanner
+              canCreate
                 ? 'Lege den ersten Anlass an. Danach planst du die Schichten und teilst den Link mit deinen Helfer*innen.'
-                : 'Für diese Abteilung sind momentan keine Schichtpläne offen. Wenn du einen Anlass planen möchtest, wende dich an deine Abteilungsleitung: Sie kann dir die Rolle «Planung» geben oder den Anlass für dich anlegen.'
+                : 'Für diese Abteilung sind momentan keine Schichtpläne offen. Wenn du einen Anlass planen möchtest, wende dich an deine Abteilungsleitung: Sie kann dir das Recht «Anlässe erstellen» geben oder den Anlass für dich anlegen.'
             }
             action={
-              isPlanner && (
+              canCreate && (
                 <Button onClick={() => setShowEventForm(true)}>
                   <CalendarPlus /> Anlass erstellen
                 </Button>
@@ -177,7 +180,7 @@ export default function DepartmentHomePage() {
         onClose={() => setShowEventForm(false)}
         onSaved={(slug) => router.push(`/events/${slug}`)}
       />
-      <DepartmentSettingsDialog open={showDeptForm} onClose={() => setShowDeptForm(false)} />
+      {canOpenDepartment && <DepartmentSettingsDialog open={showDeptForm} onClose={() => setShowDeptForm(false)} />}
     </AppShell>
   );
 }
@@ -250,6 +253,19 @@ function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
             )
           }
         />
+        {department?.contactPerson && (
+          <p className="mt-6 text-center text-sm text-fg-muted">
+            Fragen? Kontakt: <span className="font-semibold text-fg">{department.contactPerson.displayName}</span>
+            {department.contactPerson.email && (
+              <>
+                {' · '}
+                <a href={`mailto:${department.contactPerson.email}`} className="font-semibold text-accent-ink hover:underline">
+                  {department.contactPerson.email}
+                </a>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </AppShell>
   );

@@ -54,7 +54,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isManager) {
+      if (!flags.can.ATTENDANCE) {
         return reply.status(403).send({ error: 'Nur das OK darf die Anwesenheit erfassen' });
       }
       if (event.attendanceMode === 'OFF') {
@@ -230,7 +230,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isDeptAdmin && !flags.isOkLead) {
+      if (!flags.can.SETTINGS) {
         return reply
           .status(403)
           .send({ error: 'Nur die Abteilungsleitung oder die OK-Leitung dürfen den QR-Code erneuern' });
@@ -259,7 +259,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isManager) {
+      if (!flags.can.ATTENDANCE) {
         return reply.status(403).send({ error: 'Nur das OK sieht den Check-in-QR-Code' });
       }
       if (event.attendanceMode !== 'OK_AND_QR' || !event.checkinToken) {

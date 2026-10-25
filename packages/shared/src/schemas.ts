@@ -3,8 +3,10 @@ import {
   ATTENDANCE_MODE_KEYS,
   ATTENDANCE_STATUS_KEYS,
   DEFAULT_QUESTION_RETENTION_DAYS,
+  DEPARTMENT_PERMISSION_KEYS,
   EVENT_ACCESS_TYPE_KEYS,
   QUESTION_RETENTION_DAYS,
+  type DepartmentPermission,
   REQUIRED_PROFILE_FIELD_KEYS,
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_REGEX,
@@ -292,7 +294,7 @@ export const UpdateDepartmentSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   logoUrl: ImageUrlSchema.optional().nullable(),
   primaryColor: HexColorSchema.optional().nullable(),
-  contactEmail: z.string().email().max(254).optional().nullable(),
+  contactUserId: z.string().uuid().optional().nullable(),
   membersOnly: z.boolean().optional(),
 });
 
@@ -521,13 +523,18 @@ export const EventDeregistrationSchema = z.object({
 export type EventDeregistrationInput = z.infer<typeof EventDeregistrationSchema>;
 
 
-/** Abteilungsleitung bearbeitet eine Person: Stufen (selbst angegebene) und Rolle im Schichtplan */
+/** Einzelne Rechte in einer Abteilung; unbekannte Werte sind ein Fehler, Vorausgesetzte ergänzt das Backend */
+export const DepartmentPermissionsSchema = z
+  .array(z.enum(DEPARTMENT_PERMISSION_KEYS as [DepartmentPermission, ...DepartmentPermission[]]))
+  .max(DEPARTMENT_PERMISSION_KEYS.length * 2);
+
+/** Person bearbeiten (Abteilungsleitung oder «Personen und Rechte verwalten»): Stufen und Rechte */
 export const UpdateDepartmentPersonSchema = z.object({
   stufen: z
     .array(z.object({ stufeId: z.string().uuid(), role: z.enum(['LEITUNG', 'TEILNEHMER']) }))
     .max(20)
     .optional(),
-  departmentRole: z.enum(['ADMIN', 'PLANNER', 'HELPER']).optional(),
+  permissions: DepartmentPermissionsSchema.optional(),
 });
 
 export type UpdateDepartmentPersonInput = z.infer<typeof UpdateDepartmentPersonSchema>;
@@ -573,7 +580,6 @@ export const AdminCreateDepartmentSchema = z.object({
   name: z.string().trim().min(2, 'Name muss mindestens 2 Zeichen lang sein').max(80),
   slug: DepartmentSlugSchema,
   ceviDbGroupId: CeviDbGroupIdSchema.optional().nullable(),
-  contactEmail: z.string().trim().email('Ungültige E-Mail-Adresse').max(254).optional().nullable(),
   membersOnly: z.boolean().default(true),
   leaderUserId: z.string().uuid().optional().nullable(),
 });
@@ -592,8 +598,10 @@ export const ConfirmDeleteSchema = z.object({
   confirm: z.string().trim().min(1, 'Bestätigung fehlt').max(100),
 });
 
+/** Admin-Portal: Abteilungsleitung (ADMIN) oder Rechte setzen (HELPER) */
 export const AdminSetMemberRoleSchema = z.object({
-  role: z.enum(['ADMIN', 'PLANNER', 'HELPER']),
+  role: z.enum(['ADMIN', 'HELPER']),
+  permissions: DepartmentPermissionsSchema.optional(),
 });
 
 export const AdminUpdateUserSchema = z.object({

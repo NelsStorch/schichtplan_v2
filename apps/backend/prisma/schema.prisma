@@ -18,7 +18,9 @@ model Department {
   slug         String             @unique
   logoUrl      String?
   primaryColor String?            @default("#e11d48")
-  contactEmail String?
+  // Kontaktperson der Abteilung: Abteilungsleitung oder jemand mit dem Recht «Personen und Rechte verwalten»
+  contactUserId String?           @map("contact_user_id")
+  contactUser   User?             @relation("DepartmentContactUser", fields: [contactUserId], references: [id], onDelete: SetNull)
   // Cevi.DB-Gruppen-ID der Ortsgruppe (Feld `ortsgruppe_id` im Cevi.DB-Profil).
   // Wer sich mit Cevi.DB anmeldet und zu dieser Ortsgruppe gehört, wird automatisch Mitglied.
   ceviDbGroupId Int?              @unique
@@ -35,6 +37,7 @@ model Department {
   homeUsers    User[]             @relation("UserHomeDepartment")
   // Anlässe anderer Abteilungen, die diese Abteilung freigeschaltet haben (Whitelist)
   allowedInEvents EventAllowedDepartment[]
+  auditLogs    DepartmentAuditLog[]
 
   @@map("departments")
 }
@@ -133,6 +136,7 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   contactForEvents        Event[]            @relation("EventContactUser")
+  contactForDepartments   Department[]       @relation("DepartmentContactUser")
   shiftResponsibles       ShiftResponsible[]
   eventDayResponsibles    EventDayResponsible[]
   helperSignupLogs        ShiftSignupLog[]   @relation("HelperUser")
@@ -141,11 +145,17 @@ model User {
   @@map("users")
 }
 
+// Zugehörigkeit zu einer Abteilung im Schichtplan.
+// role: ADMIN = Abteilungsleitung (alle Rechte, nur über Cevi.DB oder das Admin-Portal), HELPER = alle anderen.
+// permissions: einzelne Rechte (DEPARTMENT_PERMISSIONS in packages/shared/src/constants.ts), bei ADMIN ohne Bedeutung.
 model DepartmentMember {
   id           String     @id @default(uuid())
   departmentId String
   userId       String
-  role         String     @default("HELPER") // ADMIN, PLANNER, HELPER
+  role         String     @default("HELPER")
+  permissions  String[]   @default([])
+  // Woher die Abteilungsleitung kommt: CEVIDB (Login entzieht sie wieder) oder MANUAL (Admin-Portal)
+  leaderSource String?    @map("leader_source")
   createdAt    DateTime   @default(now())
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -570,6 +580,26 @@ model AdminAuditLog {
   @@index([createdAt])
   @@index([targetType, targetId])
   @@map("admin_audit_logs")
+}
+
+/// Protokoll der Abteilung: Rechte, Abteilungsleitung, Stufen und Zugehörigkeit von Personen.
+/// Ohne Fremdschlüssel auf Personen (Namen werden mitgespeichert), damit Einträge Löschungen überleben.
+model DepartmentAuditLog {
+  id           String     @id @default(uuid())
+  departmentId String     @map("department_id")
+  // null = automatisch (Cevi.DB-Login)
+  actorId      String?    @map("actor_id")
+  actorName    String     @map("actor_name")
+  // PERMISSIONS_SET, LEADER_GRANT, LEADER_REVOKE, STUFEN_SET, MEMBER_REMOVE
+  action       String
+  targetUserId String?    @map("target_user_id")
+  targetLabel  String     @map("target_label")
+  details      Json?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@index([departmentId, createdAt])
+  @@map("department_audit_logs")
 }
 
 /// Abgemeldete Login-Tokens (jti): gelten bis zu ihrem Ablauf nicht mehr. Abgelaufene werden beim Abmelden gelöscht.

@@ -26,9 +26,9 @@ describe('isCeviNameProfile', () => {
 describe('hasRights', () => {
   it('erkennt Admin, Leitung, Planung und OK', () => {
     expect(hasRights(match())).toBe(false);
-    expect(hasRights(match({ memberships: [{ role: 'HELPER' }] }))).toBe(false);
+    expect(hasRights(match({ memberships: [{ role: 'HELPER', permissions: [] }] }))).toBe(false);
     expect(hasRights(match({ isGlobalAdmin: true }))).toBe(true);
-    expect(hasRights(match({ memberships: [{ role: 'PLANNER' }] }))).toBe(true);
+    expect(hasRights(match({ memberships: [{ role: 'HELPER', permissions: ['EVENTS_VIEW_ALL'] }] }))).toBe(true);
     expect(hasRights(match({ organizedEvents: [{ id: 'e' }] }))).toBe(true);
   });
 });
@@ -44,7 +44,7 @@ describe('pickCeviNameMatch', () => {
   });
 
   it('meldet Cevi-Name-Profile mit Rechten nicht an', () => {
-    expect(pickCeviNameMatch([match({ memberships: [{ role: 'ADMIN' }] })])).toEqual({ kind: 'USE_PASSWORD' });
+    expect(pickCeviNameMatch([match({ memberships: [{ role: 'ADMIN', permissions: [] }] })])).toEqual({ kind: 'USE_PASSWORD' });
   });
 
   it('bevorzugt ein offenes Profil vor geschützten Konten', () => {

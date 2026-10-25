@@ -79,6 +79,7 @@ export default defineConfig({
             'abteilung/einstellungen',
             'abteilung/stufen',
             'abteilung/personen',
+            'abteilung/rechte',
             'abteilung/cevidb',
           ],
         },

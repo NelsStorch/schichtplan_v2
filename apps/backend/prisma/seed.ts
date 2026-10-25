@@ -55,8 +55,11 @@ async function main() {
       departmentId: department.id,
       userId: admin.id,
       role: 'ADMIN',
+      leaderSource: 'MANUAL',
     },
   });
+  // Abteilungsleitung ist auch Kontaktperson
+  await prisma.department.update({ where: { id: department.id }, data: { contactUserId: admin.id } });
 
   console.log(`Demo-Admin: ${admin.email}`);
   if (!process.env.SEED_PASSWORD) console.log(`Passwort für neu angelegte Demo-Konten: ${password}`);

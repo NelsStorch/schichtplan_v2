@@ -145,7 +145,7 @@ describe.skipIf(!hasTestDb)('Admin-Portal: Abteilungen, Anlässe, Rollen', () =>
       method: 'PUT',
       url: `/api/admin/departments/${department.id}/members/${profile.id}`,
       cookie,
-      payload: { role: 'PLANNER' },
+      payload: { role: 'HELPER', permissions: ['EVENTS_CREATE'] },
     });
     expect(denied.statusCode).toBe(400);
 
@@ -153,7 +153,7 @@ describe.skipIf(!hasTestDb)('Admin-Portal: Abteilungen, Anlässe, Rollen', () =>
       method: 'PUT',
       url: `/api/admin/departments/${department.id}/members/${account.id}`,
       cookie,
-      payload: { role: 'PLANNER' },
+      payload: { role: 'HELPER', permissions: ['EVENTS_CREATE'] },
     });
     expect(granted.statusCode).toBe(200);
 

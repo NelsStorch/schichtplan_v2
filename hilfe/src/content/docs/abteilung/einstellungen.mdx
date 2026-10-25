@@ -1,15 +1,15 @@
 ---
 title: Abteilung einstellen
-description: Name, Logo, Kontakt, Farbe und wer die Startseite sieht. Gilt für alle Anlässe der Abteilung.
+description: Name, Logo, Kontaktperson, Farbe und wer die Startseite sieht. Gilt für alle Anlässe der Abteilung.
 audience: [abteilung]
 ---
 
 import Btn from '../../../components/Btn.astro';
 import Path from '../../../components/Path.astro';
 
-<Path steps={['Startseite der Abteilung', 'Abteilung bearbeiten', 'Allgemein']} />
+<Path steps={['Startseite der Abteilung', 'Abteilung', 'Allgemein']} />
 
-Den Knopf <Btn>Abteilung bearbeiten</Btn> sieht nur die Abteilungsleitung. Das Fenster hat drei Bereiche: **Allgemein**, [Stufen](/abteilung/stufen/) und [Personen](/abteilung/personen/).
+Den Knopf <Btn>Abteilung</Btn> sieht die Abteilungsleitung und wer eines der Rechte «Abteilung bearbeiten», «Stufen verwalten» oder «Personen sehen» hat. Im Fenster erscheinen nur die Bereiche, für die du ein Recht hast: **Allgemein**, [Stufen](/abteilung/stufen/), [Personen](/abteilung/personen/) und [Protokoll](/abteilung/rechte/#protokoll).
 
 ## Allgemein
 
@@ -17,7 +17,7 @@ Den Knopf <Btn>Abteilung bearbeiten</Btn> sieht nur die Abteilungsleitung. Das F
 | --- | --- |
 | Name der Abteilung | steht gross auf der Startseite und oben links |
 | Logo der Abteilung | Wappen oder Logo. Leer bleibt das Cevi-Logo |
-| Kontakt-E-Mail | allgemeine Adresse der Abteilung |
+| Kontaktperson | wer bei Fragen hilft. Wählbar sind die Abteilungsleitung und wer «Personen und Rechte verwalten» hat. Der Name steht im Hinweis «nur für Mitglieder», die E-Mail sehen nur Angemeldete |
 | Startseite nur für Mitglieder | wer die Liste der Anlässe sieht, siehe unten |
 | Abteilungsfarbe | Akzent für Knöpfe und Hervorhebungen |
 
@@ -37,7 +37,7 @@ Bei neuen Abteilungen ist dieser Schalter **an**. Dann gilt:
 - **Öffentliche** Anlässe bleiben über ihren direkten Link für alle erreichbar.
 - **Interne** Anlässe öffnen Aussenstehende nur mit einem [Zugangs-Link](/ok/zugangs-links/).
 
-Als **Mitglied** zählt, wer die Abteilung als Heimabteilung hat, Abteilungsleitung oder Planung ist, im OK eines Anlasses ist oder Plattform-Admin ist.
+Als **Mitglied** zählt, wer die Abteilung als Heimabteilung hat, Abteilungsleitung ist oder Rechte in der Abteilung hat, im OK eines Anlasses ist oder Plattform-Admin ist. Gäste (über die Subdomain angemeldet, andere Heimabteilung) zählen nicht.
 
 :::note[Warum an?]
 Viele Abteilungen wollen nicht, dass jede\*r sieht, wann Lager und Hüttenwochenenden sind. Schalt den Schalter aus, wenn eure Anlässe sowieso öffentlich sind und die Startseite als Übersicht dienen soll.

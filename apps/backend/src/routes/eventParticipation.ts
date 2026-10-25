@@ -61,11 +61,16 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
     return event;
   }
 
-  async function loadManagedEvent(request: FastifyRequest<{ Params: { slug: string } }>, reply: FastifyReply) {
+  /** Anlass laden und Fähigkeit prüfen: VIEW zum Ansehen, HELPERS zum Ändern */
+  async function loadManagedEvent(
+    request: FastifyRequest<{ Params: { slug: string } }>,
+    reply: FastifyReply,
+    capability: 'VIEW' | 'HELPERS' = 'VIEW'
+  ) {
     const event = await loadEvent(request, reply);
     if (!event) return null;
     const flags = await managerFlags(fastify.prisma, event, request.user);
-    if (!flags.isManager) {
+    if (!flags.can[capability]) {
       reply.status(403).send({ error: 'Nur die Abteilungsleitung oder das Event-OK' });
       return null;
     }
@@ -116,7 +121,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/access-links',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
-      const event = await loadManagedEvent(request, reply);
+      const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
 
       const parse = CreateAccessLinkSchema.safeParse(request.body);
@@ -144,7 +149,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/access-links/:linkId',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
-      const event = await loadManagedEvent(request, reply);
+      const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
 
       const deleted = await fastify.prisma.eventAccessLink.deleteMany({
@@ -392,7 +397,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           homeDepartment: { select: { id: true, name: true } },
           memberships: {
             where: { departmentId: { in: targetDeptIds } },
-            select: { departmentId: true, role: true },
+            select: { departmentId: true, role: true, permissions: true },
           },
           stufen: {
             where: { stufe: { departmentId: { in: targetDeptIds } } },
@@ -431,7 +436,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           u.isGlobalAdmin ||
           u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');
         const isPlanner = u.memberships.some(
-          (m) => m.departmentId === event.departmentId && m.role === 'PLANNER'
+          (m) => m.departmentId === event.departmentId && m.permissions.includes('EVENTS_VIEW_ALL')
         );
         const isOrganizer = event.organizers.some((o) => o.userId === u.id);
         const isMgr = isDeptAdmin || isPlanner || isOrganizer;
@@ -540,7 +545,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/deregistrations',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
-      const event = await loadManagedEvent(request, reply);
+      const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
 
       const parse = EventDeregistrationSchema.safeParse(request.body);
@@ -584,7 +589,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/deregistrations/:userId',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
-      const event = await loadManagedEvent(request, reply);
+      const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
 
       const deleted = await fastify.prisma.eventDeregistration.deleteMany({

@@ -3,6 +3,7 @@
  * mit `npx prisma migrate deploy`). Alle Tabellen werden vor jedem Test geleert.
  */
 import type { FastifyInstance, InjectOptions } from 'fastify';
+import { DEPARTMENT_PERMISSION_PRESETS } from '@schichtplan/shared';
 import { buildApp } from '../src/app.js';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -76,13 +77,17 @@ export async function createUser(
   });
 }
 
+/** Bisherige Rolle «Planung» = Vorlage «Anlass-Koordination» */
+export const COORDINATION = [...DEPARTMENT_PERMISSION_PRESETS.EVENT_COORDINATION.permissions];
+
 export async function addMember(
   app: FastifyInstance,
   departmentId: string,
   userId: string,
-  role: 'ADMIN' | 'PLANNER' | 'HELPER'
+  role: 'ADMIN' | 'HELPER',
+  permissions: string[] = []
 ) {
-  return app.prisma.departmentMember.create({ data: { departmentId, userId, role } });
+  return app.prisma.departmentMember.create({ data: { departmentId, userId, role, permissions } });
 }
 
 export async function createEvent(

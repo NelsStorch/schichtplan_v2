@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { DepartmentDto, UserDto } from '@schichtplan/shared';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { DepartmentDto, DepartmentPermission, UserDto } from '@schichtplan/shared';
 import { applyAccent } from '@schichtplan/ui';
 import { api, errorMessage } from './api';
 import { updateFavicon } from './favicon';
@@ -13,10 +13,11 @@ interface PortalState {
   error: string | null;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
-  /** Abteilungsleitung (oder globaler Admin) */
+  /** Abteilungsleitung (oder globaler Admin): hat alle Rechte */
   isDeptAdmin: boolean;
-  /** Abteilungsleitung oder Schichtplaner*in */
-  isPlanner: boolean;
+  /** Wirksame Rechte in dieser Abteilung (vom Backend berechnet) */
+  permissions: ReadonlySet<DepartmentPermission>;
+  can: (permission: DepartmentPermission) => boolean;
 }
 
 const PortalContext = createContext<PortalState | null>(null);
@@ -64,13 +65,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     window.location.href = '/';
   }, []);
 
-  const role = user?.departmentRole;
-  const isDeptAdmin = Boolean(user && (role === 'ADMIN' || user.isGlobalAdmin));
-  const isPlanner = Boolean(isDeptAdmin || role === 'PLANNER');
+  const isDeptAdmin = Boolean(user && (user.departmentRole === 'ADMIN' || user.isGlobalAdmin));
+  const permissions = useMemo(() => new Set(user?.departmentPermissions ?? []), [user]);
+  const can = useCallback((permission: DepartmentPermission) => permissions.has(permission), [permissions]);
 
   return (
     <PortalContext.Provider
-      value={{ department, user, loading, error, refresh, logout, isDeptAdmin, isPlanner }}
+      value={{ department, user, loading, error, refresh, logout, isDeptAdmin, permissions, can }}
     >
       {children}
     </PortalContext.Provider>

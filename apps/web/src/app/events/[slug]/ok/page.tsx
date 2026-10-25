@@ -193,12 +193,16 @@ export default function OkOverviewPage() {
         help="/ok/ok-bereich/"
         actions={
           <>
-            <Link href={`${base}/schichten?neu=1`} className={buttonClasses({ size: 'sm' })}>
-              <Plus className="size-4" /> Neue Schicht
-            </Link>
-            <Link href={`${base}/nachrichten`} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
-              <Mail className="size-4" /> Nachricht
-            </Link>
+            {permissions.can.SHIFTS && (
+              <Link href={`${base}/schichten?neu=1`} className={buttonClasses({ size: 'sm' })}>
+                <Plus className="size-4" /> Neue Schicht
+              </Link>
+            )}
+            {permissions.can.MESSAGES && (
+              <Link href={`${base}/nachrichten`} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
+                <Mail className="size-4" /> Nachricht
+              </Link>
+            )}
             <button type="button" onClick={copyLink} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
               <Copy className="size-4" /> Link kopieren
             </button>

@@ -1,63 +1,55 @@
 /**
  * Sichtbarkeit einer Abteilung mit «Startseite nur für Mitglieder» (departments.members_only).
  *
- * Mitglied ist, wer die Abteilung als Heimabteilung hat, dort Abteilungsleitung oder Planung ist,
- * im OK eines ihrer Anlässe sitzt oder globaler Admin ist. Die Helfer-Mitgliedschaft (department_members
- * HELPER) zählt bewusst nicht: Sie entsteht schon durch ein Login von der Subdomain aus.
+ * Mitglied ist, wer die Abteilung als Heimabteilung hat, dort Abteilungsleitung ist oder Rechte hat,
+ * im OK eines ihrer Anlässe sitzt oder globaler Admin ist. Die Mitgliedschaft ohne Rechte (department_members
+ * HELPER, «Gast») zählt bewusst nicht: Sie entsteht schon durch ein Login von der Subdomain aus.
  * Dazu Prüfungen, wer in einer Abteilung planen bzw. Bilder hochladen darf.
  */
 import type { PrismaClient } from '../db.js';
-import { accessTypeConfig } from '@schichtplan/shared';
+import { accessTypeConfig, type DepartmentPermission } from '@schichtplan/shared';
+import { accessFrom } from './permissions.js';
 
-export async function isDepartmentInsider(
-  prisma: Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer'>,
-  departmentId: string,
-  userId: string | null | undefined
-): Promise<boolean> {
-  if (!userId) return false;
+type Db = Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer'>;
+
+async function loadMembership(prisma: Db, departmentId: string, userId: string) {
   const [user, member, organizer] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { homeDepartmentId: true, isGlobalAdmin: true } }),
     prisma.departmentMember.findUnique({
       where: { departmentId_userId: { departmentId, userId } },
-      select: { role: true },
+      select: { role: true, permissions: true },
     }),
     prisma.eventOrganizer.findFirst({ where: { userId, event: { departmentId } }, select: { id: true } }),
   ]);
-  if (!user) return false;
-  return (
-    user.isGlobalAdmin ||
-    user.homeDepartmentId === departmentId ||
-    member?.role === 'ADMIN' ||
-    member?.role === 'PLANNER' ||
-    Boolean(organizer)
-  );
+  if (!user) return null;
+  return { user, access: accessFrom(member, user.isGlobalAdmin), isOrganizer: Boolean(organizer) };
+}
+
+export async function isDepartmentInsider(prisma: Db, departmentId: string, userId: string | null | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const m = await loadMembership(prisma, departmentId, userId);
+  if (!m) return false;
+  return m.user.homeDepartmentId === departmentId || m.access.permissions.size > 0 || m.isOrganizer;
 }
 
 /**
- * Darf die Person in dieser Abteilung planen (Mitgliederliste mit E-Mails, Vorlagen)?
- * Abteilungsleitung, Planung, OK eines ihrer Anlässe oder globaler Admin (laut DB).
+ * Darf die Person die Personen der Abteilung mit E-Mails sehen und Vorlagen lesen (Auswahl von OK,
+ * Verantwortlichen, Kontaktperson)? Abteilungsleitung, «Personen sehen», «Alle Anlässe sehen»
+ * (jedes Anlass-Recht setzt es voraus), OK eines ihrer Anlässe oder globaler Admin.
  */
-export async function isDepartmentManager(
-  prisma: Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer'>,
-  departmentId: string,
-  userId: string | null | undefined
-): Promise<boolean> {
+export async function isDepartmentManager(prisma: Db, departmentId: string, userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
-  const [user, member, organizer] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { isGlobalAdmin: true } }),
-    prisma.departmentMember.findUnique({
-      where: { departmentId_userId: { departmentId, userId } },
-      select: { role: true },
-    }),
-    prisma.eventOrganizer.findFirst({ where: { userId, event: { departmentId } }, select: { id: true } }),
-  ]);
-  if (!user) return false;
-  return (
-    user.isGlobalAdmin ||
-    member?.role === 'ADMIN' ||
-    member?.role === 'PLANNER' ||
-    Boolean(organizer)
-  );
+  const m = await loadMembership(prisma, departmentId, userId);
+  if (!m) return false;
+  return m.access.permissions.has('PEOPLE_VIEW') || m.access.permissions.has('EVENTS_VIEW_ALL') || m.isOrganizer;
+}
+
+/** Darf die Person die Arbeiten der Abteilung pflegen? Abteilungsleitung, «Schichten planen» oder OK eines Anlasses. */
+export async function canPlanInDepartment(prisma: Db, departmentId: string, userId: string | null | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const m = await loadMembership(prisma, departmentId, userId);
+  if (!m) return false;
+  return m.access.permissions.has('SHIFTS_MANAGE') || m.isOrganizer;
 }
 
 export const UNRELATED_PERSON_ERROR = 'Diese Person gehört nicht zu dieser Abteilung oder zu diesem Anlass.';
@@ -122,14 +114,23 @@ export async function allUsersRelatedToEvent(
   return allUsersRelatedTo(prisma, { departmentIds: await eventDepartmentIds(prisma, eventId), eventId }, userIds);
 }
 
-/** Darf die Person Bilder hochladen? Wer irgendwo plant (Abteilungsleitung, Planung, OK) oder globaler Admin ist. */
-export async function canUploadImages(
-  prisma: Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer'>,
-  userId: string
-): Promise<boolean> {
+/** Rechte, mit denen man Bilder (Logos, Banner) braucht */
+const UPLOAD_PERMISSIONS: DepartmentPermission[] = [
+  'DEPARTMENT_SETTINGS',
+  'EVENTS_CREATE',
+  'EVENTS_EDIT_SETTINGS',
+  'SHIFTS_MANAGE',
+  'TEMPLATES_MANAGE',
+];
+
+/** Darf die Person Bilder hochladen? Wer irgendwo Abteilung oder Anlässe gestaltet (Abteilungsleitung, Rechte, OK) oder globaler Admin ist. */
+export async function canUploadImages(prisma: Db, userId: string): Promise<boolean> {
   const [user, member, organizer] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { isGlobalAdmin: true } }),
-    prisma.departmentMember.findFirst({ where: { userId, role: { in: ['ADMIN', 'PLANNER'] } }, select: { id: true } }),
+    prisma.departmentMember.findFirst({
+      where: { userId, OR: [{ role: 'ADMIN' }, { permissions: { hasSome: UPLOAD_PERMISSIONS } }] },
+      select: { id: true },
+    }),
     prisma.eventOrganizer.findFirst({ where: { userId }, select: { id: true } }),
   ]);
   return Boolean(user?.isGlobalAdmin || member || organizer);

@@ -212,7 +212,7 @@ function CreateDepartment() {
                     Einen neuen Schichtplan für eine Abteilung kann nur die Abteilungsleitung anlegen (offizielle Rolle «Abteilungsleiter*in» in Cevi.DB).
                   </p>
                   <p className="mt-2 text-[14px] leading-relaxed">
-                    <strong>Was du tun kannst:</strong> Bitte eure Abteilungsleitung, den Schichtplan einmalig anzulegen. Danach kann sie dir unter <em>Abteilung → Personen</em> die Rolle <strong>Planung</strong> geben, damit du selbstständig Events erstellen kannst – oder sie erstellt den Anlass direkt für dich.
+                    <strong>Was du tun kannst:</strong> Bitte eure Abteilungsleitung, den Schichtplan einmalig anzulegen. Danach kann sie dir unter <em>Abteilung → Personen</em> das Recht <strong>Anlässe erstellen</strong> geben, damit du selbstständig Anlässe erstellen kannst – oder sie erstellt den Anlass direkt für dich.
                   </p>
                 </Callout>
               </div>

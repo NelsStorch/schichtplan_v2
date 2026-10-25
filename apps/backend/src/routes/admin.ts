@@ -8,6 +8,7 @@ import type {
   AdminUserListItemDto,
   LoginMethod,
 } from '@schichtplan/shared';
+import { normalizePermissions } from '@schichtplan/shared';
 import { toCeviDbStufeDto } from '../services/homeDepartment.js';
 import { recordAdminAction } from '../services/adminAudit.js';
 
@@ -42,6 +43,7 @@ export const userSelect = {
   memberships: {
     select: {
       role: true,
+      permissions: true,
       department: { select: { id: true, name: true, slug: true } },
     },
     orderBy: { department: { name: 'asc' } },
@@ -77,6 +79,7 @@ export function toListItem(user: UserRow): AdminUserListItemDto {
       departmentName: m.department.name,
       departmentSlug: m.department.slug,
       role: m.role,
+      permissions: m.role === 'ADMIN' ? [] : normalizePermissions(m.permissions),
     })),
     ceviDbOrtsgruppeId: user.ceviDbOrtsgruppeId,
     ceviDbOrtsgruppeName: user.ceviDbOrtsgruppeName,

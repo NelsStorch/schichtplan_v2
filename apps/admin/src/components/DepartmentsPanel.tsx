@@ -53,7 +53,6 @@ function CreateDepartmentDialog({
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
   const [ceviDbGroupId, setCeviDbGroupId] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
   const [membersOnly, setMembersOnly] = useState(true);
   const [leader, setLeader] = useState<AdminUserListItemDto | null>(null);
   const [saving, setSaving] = useState(false);
@@ -72,7 +71,6 @@ function CreateDepartmentDialog({
     setSlug('');
     setSlugTouched(false);
     setCeviDbGroupId('');
-    setContactEmail('');
     setMembersOnly(true);
     setLeader(null);
     setError(null);
@@ -100,7 +98,6 @@ function CreateDepartmentDialog({
           name: name.trim(),
           slug,
           ceviDbGroupId: ceviDbGroupId ? Number(ceviDbGroupId) : null,
-          contactEmail: contactEmail.trim() || null,
           membersOnly,
           leaderUserId: leader?.id ?? null,
         }
@@ -181,12 +178,9 @@ function CreateDepartmentDialog({
           >
             <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
           </Field>
-          <Field label="Kontakt-E-Mail">
-            <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} maxLength={254} />
-          </Field>
         </div>
         <div className="space-y-2">
-          <span className="text-[13px] font-semibold text-fg">Abteilungsleitung</span>
+          <span className="text-[13px] font-semibold text-fg">Abteilungsleitung (wird auch Kontaktperson)</span>
           <PersonPicker value={leader} onChange={setLeader} placeholder="Optional: Person suchen" />
           {leaderInvalid && (
             <p className="text-xs text-danger-ink">

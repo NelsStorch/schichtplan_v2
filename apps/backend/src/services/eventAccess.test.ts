@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { audienceLabel, checkRules, evaluateEventAccess, type AccessEvent, type AccessUser } from './eventAccess.js';
+import { EVENT_CAPABILITIES, type EventCapability } from '@schichtplan/shared';
 
 const HOME = 'dep-home';
 const OTHER = 'dep-other';
@@ -34,7 +35,8 @@ function user(overrides: Partial<AccessUser> = {}): AccessUser {
   };
 }
 
-const noFlags = { isManager: false, isDeptAdmin: false, isOkLead: false };
+const noCan = Object.fromEntries(EVENT_CAPABILITIES.map((c) => [c, false])) as Record<EventCapability, boolean>;
+const noFlags = { isManager: false, isDeptAdmin: false, isOkLead: false, can: noCan };
 
 describe('checkRules', () => {
   it('lässt bei PUBLIC alle mit Konto zu', () => {

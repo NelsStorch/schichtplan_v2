@@ -1,11 +1,233 @@
+/**
+ * Rolle in einer Abteilung (department_members.role). ADMIN = Abteilungsleitung (alle Rechte, nur über Cevi.DB
+ * oder das Admin-Portal), HELPER = alle anderen. Was jemand ohne Abteilungsleitung darf, steht in den einzelnen
+ * Rechten (DEPARTMENT_PERMISSIONS).
+ */
 export const ROLES = {
-  SUPERADMIN: 'SUPERADMIN',
-  ADMIN: 'ADMIN',       // Abteilungsleiter / Hauptverantwortlicher
-  PLANNER: 'PLANNER',   // Schichtplaner / OK-Mitglied
-  HELPER: 'HELPER',     // Normaler Helfer
+  ADMIN: 'ADMIN',
+  HELPER: 'HELPER',
 } as const;
 
 export type UserRole = (typeof ROLES)[keyof typeof ROLES];
+
+/**
+ * Einzelne Rechte in einer Abteilung. Die Abteilungsleitung hat immer alle.
+ * `requires`: wird beim Speichern automatisch mitgesetzt (z. B. braucht jedes Anlass-Recht «Alle Anlässe sehen»).
+ * Neues Recht: hier ergänzen, im Backend prüfen (`services/permissions.ts`) und die Hilfeseite
+ * `abteilung/rechte` nachführen. Bestehende Personen bekommen es nicht automatisch.
+ */
+export interface DepartmentPermissionConfig {
+  label: string;
+  description: string;
+  group: 'DEPARTMENT' | 'EVENTS';
+  requires: readonly string[];
+}
+
+export const DEPARTMENT_PERMISSIONS = {
+  DEPARTMENT_SETTINGS: {
+    label: 'Abteilung bearbeiten',
+    description: 'Name, Logo, Farbe, Kontaktperson und «Startseite nur für Mitglieder».',
+    group: 'DEPARTMENT',
+    requires: [],
+  },
+  STUFEN_MANAGE: {
+    label: 'Stufen verwalten',
+    description: 'Stufen anlegen, umbenennen, mit Cevi.DB verknüpfen und löschen.',
+    group: 'DEPARTMENT',
+    requires: [],
+  },
+  PEOPLE_VIEW: {
+    label: 'Personen sehen',
+    description: 'Liste der Personen der Abteilung mit Stufen und Rechten.',
+    group: 'DEPARTMENT',
+    requires: [],
+  },
+  PEOPLE_MANAGE: {
+    label: 'Personen und Rechte verwalten',
+    description:
+      'Stufen von Personen setzen, Personen aus der Abteilung entfernen und Rechte vergeben, aber nur weniger, als man selbst hat. Sieht das Protokoll.',
+    group: 'DEPARTMENT',
+    requires: ['PEOPLE_VIEW'],
+  },
+  TEMPLATES_MANAGE: {
+    label: 'Vorlagen verwalten',
+    description: 'Anlässe als Vorlage speichern und Vorlagen löschen.',
+    group: 'DEPARTMENT',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  EVENTS_VIEW_ALL: {
+    label: 'Alle Anlässe sehen',
+    description: 'Auch Entwürfe und den OK-Bereich aller Anlässe, inkl. Kontaktangaben der Helfenden.',
+    group: 'EVENTS',
+    requires: [],
+  },
+  EVENTS_CREATE: {
+    label: 'Anlässe erstellen',
+    description: 'Neue Anlässe anlegen, auch aus Vorlagen. Die Einstellungen danach ändert die OK-Leitung.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  EVENTS_EDIT_SETTINGS: {
+    label: 'Anlässe bearbeiten',
+    description: 'Einstellungen aller Anlässe ändern (wie die OK-Leitung), Anlässe verschieben.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  SHIFTS_MANAGE: {
+    label: 'Schichten planen',
+    description: 'Schichten, Arbeiten und Tagesverantwortliche in allen Anlässen.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  HELPERS_MANAGE: {
+    label: 'Helfende einteilen',
+    description: 'Helfende ein- und austragen, Abmeldungen und Zugangs-Links in allen Anlässen.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  MESSAGES_SEND: {
+    label: 'Nachrichten senden',
+    description: 'E-Mails an Helfende aller Anlässe.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  ATTENDANCE_MANAGE: {
+    label: 'Anwesenheit erfassen',
+    description: 'Anwesenheitsliste führen und den QR-Code für den Check-in herunterladen.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  EXPORT: {
+    label: 'Exportieren',
+    description: 'Listen, Schichtplan-PDF und Helferstunden herunterladen.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  ORGANIZERS_MANAGE: {
+    label: 'OK ernennen',
+    description: 'OK-Leitung und OK-Mitglieder aller Anlässe ernennen und entfernen.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+  EVENTS_DELETE: {
+    label: 'Anlässe löschen',
+    description: 'Anlässe mit allen Schichten und Eintragungen endgültig löschen.',
+    group: 'EVENTS',
+    requires: ['EVENTS_VIEW_ALL'],
+  },
+} as const satisfies Record<string, DepartmentPermissionConfig>;
+
+export type DepartmentPermission = keyof typeof DEPARTMENT_PERMISSIONS;
+
+export const DEPARTMENT_PERMISSION_KEYS = Object.keys(DEPARTMENT_PERMISSIONS) as DepartmentPermission[];
+
+export const isDepartmentPermission = (value: unknown): value is DepartmentPermission =>
+  typeof value === 'string' && Object.prototype.hasOwnProperty.call(DEPARTMENT_PERMISSIONS, value);
+
+/** Gültige Rechte inkl. der vorausgesetzten, in der Reihenfolge des Katalogs (ohne Doppelte) */
+export function normalizePermissions(values: readonly unknown[]): DepartmentPermission[] {
+  const set = new Set<DepartmentPermission>();
+  const add = (p: DepartmentPermission) => {
+    if (set.has(p)) return;
+    set.add(p);
+    for (const r of DEPARTMENT_PERMISSIONS[p].requires) if (isDepartmentPermission(r)) add(r);
+  };
+  for (const v of values) if (isDepartmentPermission(v)) add(v);
+  return DEPARTMENT_PERMISSION_KEYS.filter((p) => set.has(p));
+}
+
+/**
+ * Feste Vorlagen zum Vergeben von Rechten. Gespeichert werden nur die einzelnen Rechte,
+ * die Vorlage füllt nur die Häkchen vor.
+ */
+export const DEPARTMENT_PERMISSION_PRESETS = {
+  ADMINISTRATION: {
+    label: 'Administration',
+    description: 'Fast alles wie die Abteilungsleitung. Vergibt Rechte, aber nur weniger, als sie selbst hat.',
+    permissions: DEPARTMENT_PERMISSION_KEYS,
+  },
+  EVENT_COORDINATION: {
+    label: 'Anlass-Koordination',
+    description: 'Erstellt Anlässe und plant in allen Anlässen mit. Die frühere Rolle «Planung».',
+    permissions: [
+      'EVENTS_VIEW_ALL',
+      'EVENTS_CREATE',
+      'SHIFTS_MANAGE',
+      'HELPERS_MANAGE',
+      'MESSAGES_SEND',
+      'ATTENDANCE_MANAGE',
+      'EXPORT',
+      'TEMPLATES_MANAGE',
+    ],
+  },
+  EVENT_EDITING: {
+    label: 'Anlässe bearbeiten',
+    description: 'Bearbeitet alle bestehenden Anlässe wie die OK-Leitung, erstellt aber keine neuen.',
+    permissions: [
+      'EVENTS_VIEW_ALL',
+      'EVENTS_EDIT_SETTINGS',
+      'SHIFTS_MANAGE',
+      'HELPERS_MANAGE',
+      'MESSAGES_SEND',
+      'ATTENDANCE_MANAGE',
+      'EXPORT',
+      'ORGANIZERS_MANAGE',
+    ],
+  },
+  EVENT_CREATION: {
+    label: 'Anlässe erstellen',
+    description: 'Legt neue Anlässe an. Planen und Einstellungen danach über das OK.',
+    permissions: ['EVENTS_VIEW_ALL', 'EVENTS_CREATE'],
+  },
+} as const satisfies Record<
+  string,
+  { label: string; description: string; permissions: readonly DepartmentPermission[] }
+>;
+
+export type DepartmentPermissionPreset = keyof typeof DEPARTMENT_PERMISSION_PRESETS;
+
+/** Vorlage, die genau diesen Rechten entspricht (sonst null = eigene Auswahl) */
+export function permissionPresetOf(permissions: readonly string[]): DepartmentPermissionPreset | null {
+  const own = normalizePermissions(permissions);
+  for (const [key, preset] of Object.entries(DEPARTMENT_PERMISSION_PRESETS)) {
+    const p = normalizePermissions(preset.permissions);
+    if (p.length === own.length && p.every((x) => own.includes(x))) return key as DepartmentPermissionPreset;
+  }
+  return null;
+}
+
+/**
+ * Bezeichnung einer Person in der Abteilung: Abteilungsleitung, Name der Vorlage, «Eigene Rechte»,
+ * «Mitglied» (Heimabteilung) oder «Gast» (nur über die Subdomain angemeldet).
+ */
+export function departmentRoleLabel(person: {
+  isLeader: boolean;
+  permissions: readonly string[];
+  isHomeDepartment: boolean;
+}): string {
+  if (person.isLeader) return 'Abteilungsleitung';
+  if (normalizePermissions(person.permissions).length > 0) {
+    const preset = permissionPresetOf(person.permissions);
+    return preset ? DEPARTMENT_PERMISSION_PRESETS[preset].label : 'Eigene Rechte';
+  }
+  return person.isHomeDepartment ? 'Mitglied' : 'Gast';
+}
+
+/** Was jemand in einem Anlass darf (aus OK-Rolle, Abteilungsrechten oder Abteilungsleitung) */
+export const EVENT_CAPABILITIES = [
+  'VIEW',
+  'SETTINGS',
+  'SHIFTS',
+  'HELPERS',
+  'MESSAGES',
+  'ATTENDANCE',
+  'EXPORT',
+  'ORGANIZERS',
+  'TEMPLATES',
+  'DELETE',
+] as const;
+
+export type EventCapability = (typeof EVENT_CAPABILITIES)[number];
 
 /**
  * Wer darf sich bei einem Anlass eintragen? Eintragen braucht immer ein Konto

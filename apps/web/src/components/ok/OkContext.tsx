@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { ApiError, api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 import type { EventDetails } from '@/lib/types';
+import { EVENT_CAPABILITIES, departmentRoleLabel, type EventCapability } from '@schichtplan/shared';
 
 /** Auswahl, die von «Helfende» oder «Schichten» an «Nachrichten» übergeben wird */
 export type MessageDraft =
@@ -11,12 +12,14 @@ export type MessageDraft =
   | { target: 'SHIFTS'; shiftIds: string[]; label: string };
 
 export interface OkPermissions {
-  /** Sieht den OK-Bereich: Abteilungsleitung, Planung, OK, globale Admins */
+  /** Sieht den OK-Bereich: Abteilungsleitung, OK, «Alle Anlässe sehen», globale Admins */
   canManage: boolean;
-  /** Anlass-Einstellungen und OK-Team: Abteilungsleitung (inkl. globale Admins) und OK-Leitung */
+  /** Anlass-Einstellungen: Abteilungsleitung, OK-Leitung, «Anlässe bearbeiten» */
   canEditSettings: boolean;
-  /** Anlass löschen: nur Abteilungsleitung (inkl. globale Admins), nicht die OK-Leitung */
+  /** Anlass löschen: Abteilungsleitung oder «Anlässe löschen», nicht die OK-Leitung */
   canDeleteEvent: boolean;
+  /** Alle Fähigkeiten im Anlass, so wie das Backend sie prüft */
+  can: Record<EventCapability, boolean>;
   roleLabel: string;
 }
 
@@ -62,7 +65,7 @@ export function computeStats(event: EventDetails | null): OkStats {
 
 /** Lädt den Anlass einmal für alle Seiten des OK-Bereichs */
 export function OkProvider({ slug, children }: { slug: string; children: ReactNode }) {
-  const { user, isDeptAdmin, isPlanner, loading: portalLoading } = usePortal();
+  const { user, isDeptAdmin, permissions: departmentPermissions, loading: portalLoading } = usePortal();
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,22 +88,30 @@ export function OkProvider({ slug, children }: { slug: string; children: ReactNo
   }, [reload]);
 
   const permissions = useMemo<OkPermissions>(() => {
+    const caps = new Set(event?.viewer.access.capabilities ?? []);
+    const can = Object.fromEntries(EVENT_CAPABILITIES.map((c) => [c, caps.has(c)])) as Record<EventCapability, boolean>;
     const organizer = user ? event?.organizers?.find((o) => o.userId === user.id) : undefined;
-    const isGlobalAdmin = Boolean(user?.isGlobalAdmin);
-    const canEditSettings = Boolean(isDeptAdmin || isGlobalAdmin || organizer?.role === 'OK_LEAD');
-    const canManage = Boolean(isDeptAdmin || isPlanner || isGlobalAdmin || organizer);
     const roleLabel = organizer
       ? organizer.role === 'OK_LEAD'
         ? 'OK-Leitung'
         : 'OK-Mitglied'
-      : isDeptAdmin || isGlobalAdmin
-        ? 'Abteilungsleitung'
-        : isPlanner
-          ? 'Planung'
+      : user?.isGlobalAdmin && user.departmentRole !== 'ADMIN'
+        ? 'Plattform-Admin'
+        : user
+          ? departmentRoleLabel({
+              isLeader: isDeptAdmin,
+              permissions: [...departmentPermissions],
+              isHomeDepartment: true,
+            })
           : '';
-    const canDeleteEvent = Boolean(isDeptAdmin || isGlobalAdmin);
-    return { canManage, canEditSettings, canDeleteEvent, roleLabel };
-  }, [user, event, isDeptAdmin, isPlanner]);
+    return {
+      canManage: can.VIEW,
+      canEditSettings: can.SETTINGS,
+      canDeleteEvent: can.DELETE,
+      can,
+      roleLabel,
+    };
+  }, [user, event, isDeptAdmin, departmentPermissions]);
 
   const stats = useMemo(() => computeStats(event), [event]);
 

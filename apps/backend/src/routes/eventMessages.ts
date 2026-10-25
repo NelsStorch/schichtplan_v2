@@ -72,9 +72,9 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         department: { select: { slug: true, name: true } },
       },
     });
-    if (!event) return { event: null, allowed: false };
+    if (!event) return { event: null, canView: false, canSend: false };
     const flags = await managerFlags(fastify.prisma, event, user);
-    return { event, allowed: flags.isManager };
+    return { event, canView: flags.isManager, canSend: flags.can.MESSAGES };
   }
 
   // Verlauf der verschickten Nachrichten
@@ -83,7 +83,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
       if (!request.tenant) return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
-      const { event, allowed } = await loadManagedEvent(request.tenant.id, request.params.slug, request.user);
+      const { event, canView: allowed } = await loadManagedEvent(request.tenant.id, request.params.slug, request.user);
       if (!event) return reply.status(404).send({ error: 'Event nicht gefunden' });
       if (!allowed) return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder das Event-OK' });
       reply.header('Cache-Control', 'no-store');
@@ -103,7 +103,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
       if (!request.tenant) return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
-      const { event, allowed } = await loadManagedEvent(request.tenant.id, request.params.slug, request.user);
+      const { event, canSend: allowed } = await loadManagedEvent(request.tenant.id, request.params.slug, request.user);
       if (!event) return reply.status(404).send({ error: 'Event nicht gefunden' });
       if (!allowed) return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder das Event-OK' });
 

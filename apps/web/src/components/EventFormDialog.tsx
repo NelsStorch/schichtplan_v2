@@ -328,20 +328,6 @@ export function EventForm({
   const [templates, setTemplates] = useState<EventTemplateDto[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
-  // Ersteller initial als OK-Leitung eintragen
-  useEffect(() => {
-    if (mode === 'create' && user && organizers.length === 0) {
-      setOrganizers([
-        {
-          userId: user.id,
-          displayName: displayName(user),
-          role: 'OK_LEAD',
-          roleTitle: 'Leitung',
-        },
-      ]);
-    }
-  }, [mode, user, organizers.length]);
-
   // Abteilungsmitglieder & Vorlagen laden
   useEffect(() => {
     api<DeptMemberItem[]>('/api/departments/current/members')
@@ -702,6 +688,23 @@ export function EventForm({
               <div className="p-3 text-xs text-fg-subtle text-center">Noch niemand im OK eingetragen.</div>
             )}
           </div>
+          {/* Wer erstellt, kommt nicht automatisch ins OK: hier mit einem Klick, wenn gewünscht */}
+          {user && !organizers.some((o) => o.userId === user.id) && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mb-4"
+              onClick={() =>
+                setOrganizers((prev) => [
+                  ...prev,
+                  { userId: user.id, displayName: displayName(user), role: 'OK_LEAD', roleTitle: 'Leitung' },
+                ])
+              }
+            >
+              <Crown /> Mich als OK-Leitung eintragen
+            </Button>
+          )}
 
           {/* Weitere Person hinzufügen */}
           <div className="space-y-3 rounded-field border border-line/70 bg-surface-2 p-3 text-xs">

@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { CreateTaskDefinitionSchema, UpdateTaskDefinitionSchema } from '@schichtplan/shared';
-import { isDepartmentManager } from '../services/departmentVisibility.js';
+import { canPlanInDepartment } from '../services/departmentVisibility.js';
 
 const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Arbeiten (Task-Definitionen) der aktuellen Abteilung
@@ -37,7 +37,7 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
-      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+      if (!(await canPlanInDepartment(fastify.prisma, request.tenant.id, request.user.id))) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Arbeiten' });
       }
 
@@ -92,7 +92,7 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
-      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+      if (!(await canPlanInDepartment(fastify.prisma, request.tenant.id, request.user.id))) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten von Arbeiten' });
       }
 
@@ -143,7 +143,7 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
-      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+      if (!(await canPlanInDepartment(fastify.prisma, request.tenant.id, request.user.id))) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Arbeit' });
       }
 

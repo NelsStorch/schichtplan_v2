@@ -6,17 +6,17 @@ audience: [ok, abteilung]
 
 import Btn from '../../../components/Btn.astro';
 
-Im Schichtplan gibt es zwei Ebenen. Die **Abteilungsrolle** gilt für alle Anlässe einer Abteilung. Das **OK** gilt nur für einen bestimmten Anlass. So kann jemand die Chilbi planen, ohne gleich die ganze Abteilung verwalten zu können.
+Im Schichtplan gibt es zwei Ebenen. Die **Rechte in der Abteilung** gelten für alle Anlässe einer Abteilung. Das **OK** gilt nur für einen bestimmten Anlass. So kann jemand die Chilbi planen, ohne gleich die ganze Abteilung verwalten zu können.
 
-## Rollen in der Abteilung
+## In der Abteilung
 
-| Rolle | Darf |
+| Wer | Darf |
 | --- | --- |
-| Abteilungsleitung | Alles in der Abteilung: Name, Logo, Farbe, Stufen, Personen und Rollen, alle Anlässe und deren OK, Anlässe löschen |
-| Planung | Neue Anlässe erstellen, in allen Anlässen der Abteilung Schichten planen und einteilen |
-| Helfer\*in | Sich eintragen. Planungsrechte gibt es pro Anlass über das OK |
+| Abteilungsleitung | Alles in der Abteilung. Kommt aus der Cevi.DB |
+| Personen mit Rechten | Was ihnen gegeben wurde, zum Beispiel «Anlässe erstellen» oder alles als «Administration» |
+| Mitglied | Sich eintragen. Planen gibt es pro Anlass über das OK |
 
-Die Abteilungsleitung vergibt diese Rollen unter [Personen](/abteilung/personen/).
+Alle Rechte und Vorlagen stehen unter [Rechte in der Abteilung](/abteilung/rechte/), vergeben werden sie unter [Personen](/abteilung/personen/).
 
 ## Rollen im OK eines Anlasses
 
@@ -27,7 +27,7 @@ Die Abteilungsleitung vergibt diese Rollen unter [Personen](/abteilung/personen/
 
 Zu jeder OK-Rolle passt ein **Ressort**, zum Beispiel «Bau & Technik», «Kasse» oder «Grill». Das Ressort steht beim Namen oben im Anlass, damit Helfende wissen, wen sie fragen.
 
-Wer einen Anlass erstellt, ist automatisch **OK-Leitung** mit dem Ressort «Event-Leitung».
+Wer einen Anlass erstellt, kommt **nicht automatisch** ins OK. Beim Erstellen trägst du das OK ein, dich selbst mit <Btn>Mich als OK-Leitung eintragen</Btn>.
 
 ## Jemanden ins OK aufnehmen
 
@@ -39,7 +39,7 @@ Wer einen Anlass erstellt, ist automatisch **OK-Leitung** mit dem Ressort «Even
 Entfernen geht mit dem kleinen Kreuz beim Namen im Anlass. Die Person verliert nur die Planungsrechte, ihre eigenen Eintragungen bleiben.
 
 :::caution[Nicht mit einem Cevi-Name-Profil]
-Wer sich nur mit Cevi-Name und Geburtsdatum anmeldet, kann nicht ins OK und nicht Planung oder Abteilungsleitung werden. Geburtsdaten kennen viele, das wäre für Rechte zu unsicher. Die Person meldet sich dafür einmal mit Cevi.DB an oder erstellt ein Konto mit E-Mail und Passwort.
+Wer sich nur mit Cevi-Name und Geburtsdatum anmeldet, kann nicht ins OK und bekommt keine Rechte in der Abteilung. Geburtsdaten kennen viele, das wäre für Rechte zu unsicher. Die Person meldet sich dafür einmal mit Cevi.DB an oder erstellt ein Konto mit E-Mail und Passwort.
 :::
 
 :::tip[Gleich beim Erstellen]
@@ -52,4 +52,4 @@ Plattform-Admins betreiben den Schichtplan. Sie gelten in jeder Abteilung wie di
 
 ## Wer sieht den OK-Bereich?
 
-Den OK-Bereich (<Btn>OK-Bereich</Btn> oben beim Anlass) sehen OK-Leitung, OK-Mitglieder, Planung und Abteilungsleitung. Alle anderen bekommen «Keine Berechtigung». **Einstellungen** und das OK-Team sehen nur OK-Leitung und Abteilungsleitung. Aufbau: [Der OK-Bereich](/ok/ok-bereich/).
+Den OK-Bereich (<Btn>OK-Bereich</Btn> oben beim Anlass) sehen OK-Leitung, OK-Mitglieder, die Abteilungsleitung und wer das Recht «Alle Anlässe sehen» hat. Alle anderen bekommen «Keine Berechtigung». Im OK-Bereich erscheinen nur die Teile, für die du ein Recht hast: **Einstellungen** zum Beispiel nur für OK-Leitung, Abteilungsleitung und «Anlässe bearbeiten». Aufbau: [Der OK-Bereich](/ok/ok-bereich/).

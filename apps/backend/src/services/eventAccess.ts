@@ -1,7 +1,7 @@
 /**
  * Wer darf sich bei einem Anlass eintragen?
  *
- * Reihenfolge: Abteilungsleitung/Planer*in/Event-OK/globale Admins dürfen immer. Sonst braucht es ein Konto;
+ * Reihenfolge: wer den Anlass verwalten darf (Abteilungsleitung, OK, «Alle Anlässe sehen», globale Admins) darf immer. Sonst braucht es ein Konto;
  * danach zählt ein eingelöster Zugangs-Link, sonst die Regeln des Zugangs-Typs (EVENT_ACCESS_TYPES):
  * Cevi.DB-Pflicht, Abteilung (eigene plus Whitelist), Stufen-Filter und «nur Leitende».
  */
@@ -10,9 +10,12 @@ import {
   accessTypeConfig,
   formatZurichDateTime,
   isSignupTimeOpen,
+  EVENT_CAPABILITIES,
   type EventAccessDto,
   type EventAccessReason,
+  type EventCapability,
 } from '@schichtplan/shared';
+import { accessFrom, eventCapabilities } from './permissions.js';
 
 /** Was die Prüfung vom Anlass braucht */
 export interface AccessEvent {
@@ -59,33 +62,45 @@ export const accessUserSelect = {
 } as const;
 
 export interface ManagerFlags {
-  /** Abteilungsleitung, Planer*in, Event-OK oder globaler Admin */
+  /** Darf den OK-Bereich sehen (Kontaktangaben, Entwürfe): irgendeine Fähigkeit im Anlass */
   isManager: boolean;
   /** Abteilungsleitung oder globaler Admin */
   isDeptAdmin: boolean;
   isOkLead: boolean;
+  /** Einzelne Fähigkeiten im Anlass (aus OK-Rolle und Abteilungsrechten) */
+  can: Record<EventCapability, boolean>;
 }
 
-/** Rollen der Person für diesen Anlass (Mitgliedschaft wird aus der DB gelesen) */
+const noCapabilities = () =>
+  Object.fromEntries(EVENT_CAPABILITIES.map((c) => [c, false])) as Record<EventCapability, boolean>;
+
+/** Rechte der Person für diesen Anlass (Mitgliedschaft wird aus der DB gelesen) */
 export async function managerFlags(
   prisma: Pick<PrismaClient, 'departmentMember'>,
   event: Pick<AccessEvent, 'departmentId' | 'organizers'>,
   user: { id: string; isGlobalAdmin: boolean } | null
 ): Promise<ManagerFlags> {
-  if (!user) return { isManager: false, isDeptAdmin: false, isOkLead: false };
+  if (!user) return { isManager: false, isDeptAdmin: false, isOkLead: false, can: noCapabilities() };
   const member = await prisma.departmentMember.findUnique({
     where: { departmentId_userId: { departmentId: event.departmentId, userId: user.id } },
-    select: { role: true },
+    select: { role: true, permissions: true },
   });
-  const isDeptAdmin = user.isGlobalAdmin || member?.role === 'ADMIN';
-  const isPlanner = member?.role === 'PLANNER';
+  const access = accessFrom(member, user.isGlobalAdmin);
   const organizer = event.organizers.find((o) => o.userId === user.id);
+  const caps = eventCapabilities(access, organizer?.role);
+  const can = noCapabilities();
+  for (const c of caps) can[c] = true;
   return {
-    isManager: isDeptAdmin || isPlanner || Boolean(organizer),
-    isDeptAdmin,
+    isManager: can.VIEW,
+    isDeptAdmin: access.hasFullAccess,
     isOkLead: organizer?.role === 'OK_LEAD',
+    can,
   };
 }
+
+/** Fähigkeiten als Liste für das Frontend */
+export const capabilityList = (flags: ManagerFlags): EventCapability[] =>
+  EVENT_CAPABILITIES.filter((c) => flags.can[c]);
 
 /** Kurzbeschreibung, wer sich eintragen darf, z. B. «Cevi Illnau (Hiskia), nur Leitende» */
 export function audienceLabel(event: AccessEvent, departmentName: string): string {
@@ -190,7 +205,15 @@ export function evaluateEventAccess(
     reason: EventAccessReason | null,
     message: string | null,
     canSeeNames: boolean
-  ): EventAccessDto => ({ canSignup, via, reason, message, canSeeNames, isManager: flags.isManager });
+  ): EventAccessDto => ({
+    canSignup,
+    via,
+    reason,
+    message,
+    canSeeNames,
+    isManager: flags.isManager,
+    capabilities: capabilityList(flags),
+  });
 
   if (flags.isManager) return result(true, 'MANAGER', null, null, true);
 

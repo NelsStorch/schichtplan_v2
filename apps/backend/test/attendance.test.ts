@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  COORDINATION,
   addMember,
   authCookie,
   createDepartment,
@@ -159,7 +160,7 @@ describe.skipIf(!hasTestDb)('Anwesenheitsliste', () => {
   it('erzeugt beim Einschalten einen Code, das OK kann ihn erneuern, Helfer:innen sehen ihn nie', async () => {
     const { department, lead, event, helper } = await setup('OFF');
     const planner = await createUser(app);
-    await addMember(app, department.id, planner.id, 'PLANNER');
+    await addMember(app, department.id, planner.id, 'HELPER', COORDINATION);
 
     const patch = await inject(app, {
       method: 'PATCH',

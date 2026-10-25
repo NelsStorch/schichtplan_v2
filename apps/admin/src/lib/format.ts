@@ -47,10 +47,11 @@ export const methodLabels: Record<LoginMethod, string> = {
   CEVINAME: 'Nur Cevi-Name',
 };
 
+/** Rolle in einer Abteilung (Protokoll-Einträge von vor den einzelnen Rechten können noch PLANNER enthalten) */
 export const departmentRoleLabels: Record<string, string> = {
   ADMIN: 'Abteilungsleitung',
-  PLANNER: 'Schichtplaner*in',
-  HELPER: 'Helfer*in',
+  PLANNER: 'Planung (alt)',
+  HELPER: 'Mitglied',
 };
 
 export const organizerRoleLabels: Record<string, string> = {

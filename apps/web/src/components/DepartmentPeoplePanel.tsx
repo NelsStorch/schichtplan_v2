@@ -1,9 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Crown, Database, Pencil, UserMinus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Check, Crown, Database, LayoutList, Pencil, Table2, UserMinus } from 'lucide-react';
 import {
+  DEPARTMENT_PERMISSION_KEYS,
+  DEPARTMENT_PERMISSIONS,
   STUFE_ROLES,
+  departmentRoleLabel,
+  type DepartmentPermission,
   type DepartmentPersonDto,
   type DepartmentStufeDto,
   type StufeRole,
@@ -11,30 +15,27 @@ import {
 import { Badge, Button, Callout, EmptyState, Input, Skeleton, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
+import { PermissionEditor } from './PermissionEditor';
 
-const ROLE_LABELS = { HELPER: 'Helfer*in', PLANNER: 'Planung', ADMIN: 'Abteilungsleitung' } as const;
-type DeptRole = keyof typeof ROLE_LABELS;
+const roleLabel = (p: DepartmentPersonDto) =>
+  departmentRoleLabel({ isLeader: p.departmentRole === 'ADMIN', permissions: p.permissions, isHomeDepartment: p.isHomeDepartment });
 
-const ROLE_DESCRIPTIONS: Record<DeptRole, string> = {
-  ADMIN: 'Volle Administrationsrechte für die Abteilung (Einstellungen, Logo, Stufen, Personen und alle Anlässe).',
-  PLANNER: 'Darf neue Anlässe erstellen und hat in allen Events der Abteilung automatisch Planungs- und OK-Rechte.',
-  HELPER: 'Normales Abteilungsmitglied. Berechtigungen zum Planen von Schichten werden pro Anlass im jeweiligen OK-Team vergeben.',
-};
-
-/** Personen der Abteilung: Stufen und Rolle bearbeiten, Abteilungsleitung erkennen. */
+/** Personen der Abteilung: Rechte und Stufen bearbeiten, Übersicht wer was darf. */
 export function DepartmentPeoplePanel() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { user } = usePortal();
+  const { user, isDeptAdmin, permissions } = usePortal();
   const [people, setPeople] = useState<DepartmentPersonDto[] | null>(null);
   const [stufen, setStufen] = useState<DepartmentStufeDto[]>([]);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
+  const [withGuests, setWithGuests] = useState(false);
+  const [view, setView] = useState<'list' | 'matrix'>('list');
 
   const load = useCallback(async () => {
     try {
       const [list, st] = await Promise.all([
-        api<DepartmentPersonDto[]>('/api/departments/current/people'),
+        api<DepartmentPersonDto[]>(`/api/departments/current/people${withGuests ? '?alle=1' : ''}`),
         api<DepartmentStufeDto[]>('/api/departments/current/stufen'),
       ]);
       setPeople(list);
@@ -43,16 +44,20 @@ export function DepartmentPeoplePanel() {
       toast({ title: 'Personen konnten nicht geladen werden', description: errorMessage(err), tone: 'error' });
       setPeople([]);
     }
-  }, [toast]);
+  }, [toast, withGuests]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  // Was ich vergeben darf: Abteilungsleitung alles (null), sonst nur weniger als die eigenen Rechte
+  const grantable = useMemo(() => (isDeptAdmin ? null : new Set(permissions)), [isDeptAdmin, permissions]);
+
   const remove = async (person: DepartmentPersonDto) => {
     const ok = await confirm({
       title: `${person.ceviName || person.firstName} entfernen?`,
-      description: 'Die Person gehört danach nicht mehr zur Abteilung und wird beim nächsten Login erneut gefragt.',
+      description:
+        'Die Person gehört danach nicht mehr zur Abteilung, verliert ihre Rechte hier und wird beim nächsten Login erneut gefragt.',
       confirmLabel: 'Entfernen',
       tone: 'danger',
     });
@@ -69,32 +74,78 @@ export function DepartmentPeoplePanel() {
   if (people === null) return <Skeleton className="h-40 rounded-card" />;
   const q = query.trim().toLowerCase();
   const visible = q ? people.filter((p) => p.displayName.toLowerCase().includes(q)) : people;
-  const leaders = people.filter((p) => p.departmentRole === 'ADMIN' || p.isCeviDbDepartmentLeader);
+  const leaders = people.filter((p) => p.departmentRole === 'ADMIN');
+  const missingLeaders = people.filter((p) => p.isCeviDbDepartmentLeader && p.departmentRole !== 'ADMIN');
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-fg-muted">
-        {people.length} Personen. Selbst angegebene Zuordnungen gelten sofort, Stufen und Rollen kannst du anpassen.
-        Angaben aus Cevi.DB sind fest.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-fg-muted">
+          {people.length} Personen. Abteilungsleitung kommt aus Cevi.DB, Rechte vergibst du hier.
+        </p>
+        <div role="tablist" aria-label="Ansicht" className="flex rounded-full bg-surface-2 p-0.5">
+          {(
+            [
+              { key: 'list', label: 'Liste', icon: LayoutList },
+              { key: 'matrix', label: 'Wer darf was', icon: Table2 },
+            ] as const
+          ).map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              role="tab"
+              aria-selected={view === v.key}
+              onClick={() => setView(v.key)}
+              className={cn(
+                'flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition',
+                view === v.key ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+              )}
+            >
+              <v.icon className="size-3.5" /> {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {leaders.length > 0 && (
         <p className="flex flex-wrap items-center gap-1.5 text-xs text-fg-muted">
           <Crown className="size-3.5 text-accent-ink" /> Abteilungsleitung:
           <span className="font-semibold text-fg">{leaders.map((p) => p.ceviName || p.firstName).join(', ')}</span>
         </p>
       )}
-      {people.length > 8 && (
-        <Input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Person suchen"
-          aria-label="Person suchen"
-          className="h-10"
-        />
+      {missingLeaders.length > 0 && (
+        <p className="text-xs text-warning-ink">
+          In Cevi.DB Abteilungsleitung, hier noch nicht: {missingLeaders.map((p) => p.ceviName || p.firstName).join(', ')}.
+          Das wird beim nächsten Cevi.DB-Login der Person nachgeführt.
+        </p>
       )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        {people.length > 8 && (
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Person suchen"
+            aria-label="Person suchen"
+            className="h-10 min-w-48 flex-1"
+          />
+        )}
+        <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-fg-muted">
+          <input
+            type="checkbox"
+            checked={withGuests}
+            onChange={(e) => setWithGuests(e.target.checked)}
+            className="size-4 rounded border-line"
+          />
+          Gäste anzeigen (ohne Heimabteilung, z. B. um ihnen Rechte zu geben)
+        </label>
+      </div>
+
       {visible.length === 0 ? (
         <EmptyState title="Noch niemand" description="Personen erscheinen hier, sobald sie beim Login diese Abteilung angeben." />
+      ) : view === 'matrix' ? (
+        <PermissionMatrix people={visible} />
       ) : (
         <ul className="max-h-[28rem] divide-y divide-line overflow-y-auto rounded-card border border-line">
           {visible.map((p) => (
@@ -103,17 +154,9 @@ export function DepartmentPeoplePanel() {
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-fg">
                     <span className="truncate">{p.displayName}</span>
-                    {p.departmentRole === 'ADMIN' && (
-                      <Badge size="sm" tone="accent">
-                        <Crown className="size-3" /> Abteilungsleitung
-                      </Badge>
-                    )}
-                    {p.departmentRole === 'PLANNER' && <Badge size="sm">Planung</Badge>}
-                    {p.isCeviDbDepartmentLeader && p.departmentRole !== 'ADMIN' && (
-                      <Badge size="sm" tone="warning" title="In Cevi.DB Abteilungsleitung, im Schichtplan noch nicht">
-                        <Crown className="size-3" /> AL laut Cevi.DB
-                      </Badge>
-                    )}
+                    <Badge size="sm" tone={p.departmentRole === 'ADMIN' ? 'accent' : 'neutral'}>
+                      {p.departmentRole === 'ADMIN' && <Crown className="size-3" />} {roleLabel(p)}
+                    </Badge>
                     {p.source === 'CEVIDB' && (
                       <Badge size="sm">
                         <Database className="size-3" /> Cevi.DB
@@ -128,20 +171,23 @@ export function DepartmentPeoplePanel() {
                         : 'Keine Stufe'}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant={editing === p.userId ? 'primary' : 'ghost'}
-                  onClick={() => setEditing(editing === p.userId ? null : p.userId)}
-                  aria-expanded={editing === p.userId}
-                  aria-label={`${p.displayName} bearbeiten`}
-                >
-                  <Pencil /> <span className="hidden sm:inline">Bearbeiten</span>
-                </Button>
+                {p.canEdit && (
+                  <Button
+                    size="sm"
+                    variant={editing === p.userId ? 'primary' : 'ghost'}
+                    onClick={() => setEditing(editing === p.userId ? null : p.userId)}
+                    aria-expanded={editing === p.userId}
+                    aria-label={`${p.displayName} bearbeiten`}
+                  >
+                    <Pencil /> <span className="hidden sm:inline">Bearbeiten</span>
+                  </Button>
+                )}
               </div>
               {editing === p.userId && (
                 <PersonEditor
                   person={p}
                   stufen={stufen}
+                  grantable={grantable}
                   isSelf={user?.id === p.userId}
                   onCancel={() => setEditing(null)}
                   onRemove={() => remove(p)}
@@ -160,9 +206,69 @@ export function DepartmentPeoplePanel() {
   );
 }
 
+/** Übersicht: Personen mit Rechten (Zeilen) und Rechte (Spalten) */
+function PermissionMatrix({ people }: { people: DepartmentPersonDto[] }) {
+  const rows = people.filter((p) => p.departmentRole === 'ADMIN' || p.permissions.length > 0);
+  if (rows.length === 0) {
+    return <EmptyState title="Noch niemand mit Rechten" description="Ausser der Abteilungsleitung hat niemand besondere Rechte." />;
+  }
+  return (
+    <div className="max-h-[28rem] overflow-auto rounded-card border border-line">
+      <table className="w-full border-collapse text-xs">
+        <thead className="sticky top-0 z-10 bg-surface">
+          <tr>
+            <th scope="col" className="sticky left-0 z-10 bg-surface px-3 py-2 text-left font-semibold text-fg-subtle">
+              Person
+            </th>
+            {DEPARTMENT_PERMISSION_KEYS.map((perm) => (
+              <th key={perm} scope="col" className="px-1 py-2 align-bottom font-semibold text-fg-subtle">
+                <span
+                  title={DEPARTMENT_PERMISSIONS[perm].description}
+                  className="mx-auto block max-h-52 rotate-180 whitespace-nowrap [writing-mode:vertical-rl]"
+                >
+                  {DEPARTMENT_PERMISSIONS[perm].label}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.map((p) => {
+            const isLeader = p.departmentRole === 'ADMIN';
+            const has = new Set<DepartmentPermission>(p.permissions);
+            return (
+              <tr key={p.userId}>
+                <th scope="row" className="sticky left-0 bg-surface px-3 py-2 text-left font-normal">
+                  <span className="block max-w-40 truncate font-semibold text-fg">{p.ceviName || p.firstName}</span>
+                  <span className="block text-2xs text-fg-subtle">{roleLabel(p)}</span>
+                </th>
+                {DEPARTMENT_PERMISSION_KEYS.map((perm) => (
+                  <td key={perm} className="px-1 py-2 text-center">
+                    {isLeader || has.has(perm) ? (
+                      <Check
+                        className={cn('mx-auto size-4', isLeader ? 'text-fg-subtle' : 'text-accent-ink')}
+                        aria-label={`${DEPARTMENT_PERMISSIONS[perm].label}: ja`}
+                      />
+                    ) : (
+                      <span className="text-fg-subtle/40" aria-label={`${DEPARTMENT_PERMISSIONS[perm].label}: nein`}>
+                        ·
+                      </span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PersonEditor({
   person,
   stufen,
+  grantable,
   isSelf,
   onCancel,
   onRemove,
@@ -170,6 +276,7 @@ function PersonEditor({
 }: {
   person: DepartmentPersonDto;
   stufen: DepartmentStufeDto[];
+  grantable: ReadonlySet<DepartmentPermission> | null;
   isSelf: boolean;
   onCancel: () => void;
   onRemove: () => void;
@@ -178,10 +285,12 @@ function PersonEditor({
   const [roles, setRoles] = useState<Record<string, StufeRole>>(
     Object.fromEntries(person.stufen.map((s) => [s.stufeId, s.role]))
   );
-  const [deptRole, setDeptRole] = useState<DeptRole>(person.departmentRole ?? 'HELPER');
+  const [perms, setPerms] = useState<DepartmentPermission[]>(person.permissions);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const locked = new Set(person.stufen.filter((s) => s.source === 'CEVIDB').map((s) => s.stufeId));
+  const isLeader = person.departmentRole === 'ADMIN';
+  const canHaveRights = !isLeader && !person.isCeviNameProfile;
 
   const save = async () => {
     setSaving(true);
@@ -190,7 +299,7 @@ function PersonEditor({
       await api(`/api/departments/current/people/${person.userId}`, {
         method: 'PATCH',
         json: {
-          departmentRole: deptRole,
+          permissions: canHaveRights ? perms : undefined,
           stufen: person.isHomeDepartment
             ? Object.entries(roles).map(([stufeId, role]) => ({ stufeId, role }))
             : undefined,
@@ -206,46 +315,27 @@ function PersonEditor({
   return (
     <div className="mt-3 space-y-4 rounded-field border border-line bg-surface-2/60 p-3">
       {error && <Callout tone="danger">{error}</Callout>}
-      <div>
-        <div className="mb-1.5 flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold text-fg-subtle">Rolle in der Abteilung</p>
-          <span className="text-2xs text-fg-subtle">Gilt abteilungsweit</span>
-        </div>
-        <div role="radiogroup" aria-label="Rolle in der Abteilung" className="flex flex-wrap gap-1.5">
-          {(Object.keys(ROLE_LABELS) as DeptRole[]).map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="radio"
-              aria-checked={deptRole === r}
-              // Die eigene Abteilungsleitung kann man nicht selbst entziehen; Cevi-Name-Profile bleiben Helfer*in
-              disabled={
-                (isSelf && person.departmentRole === 'ADMIN' && r !== 'ADMIN') ||
-                (person.isCeviNameProfile && r !== 'HELPER')
-              }
-              onClick={() => setDeptRole(r)}
-              className={cn(
-                'h-8 rounded-full border px-3 text-xs font-semibold transition disabled:opacity-40',
-                deptRole === r ? 'border-accent bg-accent/12 text-accent-ink' : 'border-line text-fg-muted hover:text-fg'
-              )}
-            >
-              {ROLE_LABELS[r]}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs leading-relaxed text-fg-muted">
-          {ROLE_DESCRIPTIONS[deptRole]}
+      {isLeader ? (
+        <p className="text-xs leading-relaxed text-fg-muted">
+          <Crown className="mr-1 inline size-3.5 text-accent-ink" />
+          Abteilungsleitung {person.leaderSource === 'CEVIDB' ? 'laut Cevi.DB' : 'vom Admin-Portal'}: hat alle Rechte.
+          Das ändert sich nur über die Rolle in Cevi.DB oder im Admin-Portal.
         </p>
-        {person.isCeviNameProfile && (
-          <p className="mt-2 text-xs leading-relaxed text-warning-ink">
-            Nur Cevi-Name-Profil (ohne Passwort): bleibt Helfer*in. Für Planung oder Abteilungsleitung braucht die
-            Person ein Konto mit Cevi.DB oder mit E-Mail und Passwort.
-          </p>
-        )}
-        <div className="mt-2.5 rounded-card border border-line/60 bg-surface/60 p-2 text-2xs leading-normal text-fg-subtle">
-          💡 <strong>Hinweis:</strong> Wer Schichten für einen bestimmten Anlass (z. B. Chilbi) planen darf, wird unabhängig von dieser Rolle direkt im jeweiligen Event unter <em>Einstellungen → OK-Team</em> festgelegt.
+      ) : person.isCeviNameProfile ? (
+        <p className="text-xs leading-relaxed text-warning-ink">
+          Nur Cevi-Name-Profil (ohne Passwort): bekommt keine Rechte. Dafür braucht die Person ein Konto mit Cevi.DB
+          oder mit E-Mail und Passwort.
+        </p>
+      ) : (
+        <div>
+          <p className="mb-2 text-xs font-semibold text-fg-subtle">Rechte in der Abteilung</p>
+          <PermissionEditor value={perms} onChange={setPerms} grantable={isSelf ? new Set() : grantable} />
+          <div className="mt-3 rounded-card border border-line/60 bg-surface/60 p-2 text-2xs leading-normal text-fg-subtle">
+            💡 Wer nur bei einem einzelnen Anlass mitplant, kommt besser ins OK-Team dieses Anlasses (Anlass →
+            Einstellungen → OK-Team) statt hier Rechte für alle Anlässe zu bekommen.
+          </div>
         </div>
-      </div>
+      )}
 
       {person.isHomeDepartment && stufen.length > 0 && (
         <div>
@@ -293,7 +383,7 @@ function PersonEditor({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-        {person.isHomeDepartment && person.source === 'SELF' ? (
+        {person.isHomeDepartment && person.source === 'SELF' && !isLeader ? (
           <Button size="sm" variant="ghost" onClick={onRemove} className="hover:text-danger-ink">
             <UserMinus /> Aus Abteilung entfernen
           </Button>

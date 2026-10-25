@@ -20,17 +20,25 @@ import {
   cn,
   useToast,
 } from '@schichtplan/ui';
-import type { AdminDepartmentDetailDto, AdminDepartmentPersonDto, AdminUserListItemDto } from '@schichtplan/shared';
+import {
+  DEPARTMENT_PERMISSION_KEYS,
+  DEPARTMENT_PERMISSIONS,
+  isDepartmentPermission,
+  normalizePermissions,
+  type AdminDepartmentDetailDto,
+  type AdminDepartmentPersonDto,
+  type AdminUserListItemDto,
+  type DepartmentPermission,
+} from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
-import { departmentRoleLabels, formatDate, fullName } from '../lib/format';
+import { ACCESS_OPTIONS, CUSTOM_ACCESS, accessLabel, accessPayload, accessValue } from '../lib/access';
+import { formatDate, formatDateTime, fullName } from '../lib/format';
 import { EventRows } from './EventsPanel';
 import { PersonPicker } from './PersonPicker';
 import { TypedConfirmDialog } from './TypedConfirmDialog';
 
-type Tab = 'personen' | 'anlaesse' | 'einstellungen' | 'stufen';
-type PeopleFilter = 'all' | 'ADMIN' | 'PLANNER' | 'HELPER' | 'home';
-
-const ROLES = ['ADMIN', 'PLANNER', 'HELPER'] as const;
+type Tab = 'personen' | 'anlaesse' | 'einstellungen' | 'stufen' | 'protokoll';
+type PeopleFilter = 'all' | 'ADMIN' | 'RIGHTS' | 'HELPER' | 'home';
 
 export function DepartmentLogo({
   name,
@@ -76,57 +84,146 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 function PersonRow({
   person,
-  onRoleChange,
+  onAccessChange,
   busy,
 }: {
   person: AdminDepartmentPersonDto;
-  onRoleChange: (role: string) => void;
+  onAccessChange: (payload: { role: 'ADMIN' | 'HELPER'; permissions: DepartmentPermission[] } | null) => void;
   busy: boolean;
 }) {
   const name = fullName(person);
   const ceviNameOnly = person.loginMethods.includes('CEVINAME');
+  const value = accessValue(person.role, person.permissions);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<DepartmentPermission[]>(person.permissions);
   return (
-    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
-      <span className="flex min-w-0 flex-1 items-center gap-3">
-        <Avatar name={name} size="sm" highlight={person.role === 'ADMIN'} />
-        <span className="min-w-0">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-semibold text-fg">{name}</span>
-            {person.isGlobalAdmin && <ShieldCheck aria-label="Globale Admin" className="size-3.5 shrink-0 text-accent-ink" />}
-          </span>
-          <span className="block truncate text-xs text-fg-subtle">
-            {[person.ceviName !== person.firstName && person.ceviName !== name ? person.ceviName : null, person.email]
-              .filter(Boolean)
-              .join(' · ') ||
-              '–'}
+    <li className="px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <span className="flex min-w-0 flex-1 items-center gap-3">
+          <Avatar name={name} size="sm" highlight={person.role === 'ADMIN'} />
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5">
+              <span className="truncate text-sm font-semibold text-fg">{name}</span>
+              {person.isGlobalAdmin && <ShieldCheck aria-label="Globale Admin" className="size-3.5 shrink-0 text-accent-ink" />}
+            </span>
+            <span className="block truncate text-xs text-fg-subtle">
+              {[person.ceviName !== person.firstName && person.ceviName !== name ? person.ceviName : null, person.email]
+                .filter(Boolean)
+                .join(' · ') ||
+                '–'}
+            </span>
           </span>
         </span>
-      </span>
-      <span className="flex flex-wrap items-center gap-2 pl-10 sm:pl-0">
-        {person.isHome && (
-          <Badge tone="outline" title="Heimabteilung">
-            {person.homeSource === 'CEVIDB' ? 'Heim · Cevi.DB' : 'Heim · selbst'}
-          </Badge>
-        )}
-        {ceviNameOnly && <Badge>Nur Cevi-Name</Badge>}
-        <span className="w-48">
-          <Select
-            value={person.role ?? ''}
-            disabled={busy}
-            onChange={(e) => onRoleChange(e.target.value)}
-            aria-label={`Rolle von ${name}`}
-            className="h-10 text-sm sm:text-sm"
-          >
-            <option value="">Keine Rolle</option>
-            {ROLES.map((role) => (
-              <option key={role} value={role} disabled={ceviNameOnly && role !== 'HELPER'}>
-                {departmentRoleLabels[role]}
-              </option>
-            ))}
-          </Select>
+        <span className="flex flex-wrap items-center gap-2 pl-10 sm:pl-0">
+          {person.isHome && (
+            <Badge tone="outline" title="Heimabteilung">
+              {person.homeSource === 'CEVIDB' ? 'Heim · Cevi.DB' : 'Heim · selbst'}
+            </Badge>
+          )}
+          {person.role === 'ADMIN' && (
+            <Badge tone="outline" title="Woher die Abteilungsleitung kommt">
+              {person.leaderSource === 'CEVIDB' ? 'aus Cevi.DB' : 'von Hand'}
+            </Badge>
+          )}
+          {ceviNameOnly && <Badge>Nur Cevi-Name</Badge>}
+          <span className="w-52">
+            <Select
+              value={value}
+              disabled={busy}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === CUSTOM_ACCESS) return;
+                onAccessChange(v ? accessPayload(v) : null);
+              }}
+              aria-label={`Zugang von ${name}`}
+              className="h-10 text-sm sm:text-sm"
+            >
+              <option value="">Keine Zugehörigkeit</option>
+              {ACCESS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value} disabled={ceviNameOnly && o.needsAccount}>
+                  {o.label}
+                </option>
+              ))}
+              {value === CUSTOM_ACCESS && (
+                <option value={CUSTOM_ACCESS} disabled>
+                  Eigene Rechte
+                </option>
+              )}
+            </Select>
+          </span>
+          {person.role === 'HELPER' && !ceviNameOnly && (
+            <Button
+              size="sm"
+              variant={editing ? 'primary' : 'ghost'}
+              onClick={() => {
+                setDraft(person.permissions);
+                setEditing(!editing);
+              }}
+              aria-expanded={editing}
+            >
+              Rechte
+            </Button>
+          )}
         </span>
-      </span>
+      </div>
+      {editing && (
+        <div className="mt-3 space-y-3 rounded-field border border-line bg-surface-2/50 p-3">
+          <AdminPermissionChecks value={draft} onChange={setDraft} />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                onAccessChange({ role: 'HELPER', permissions: normalizePermissions(draft) });
+                setEditing(false);
+              }}
+            >
+              Rechte speichern
+            </Button>
+          </div>
+        </div>
+      )}
     </li>
+  );
+}
+
+/** Einzelne Rechte ankreuzen (globale Admins dürfen alles vergeben) */
+function AdminPermissionChecks({
+  value,
+  onChange,
+}: {
+  value: DepartmentPermission[];
+  onChange: (next: DepartmentPermission[]) => void;
+}) {
+  const current = normalizePermissions(value);
+  const dependentsOf = (p: DepartmentPermission) =>
+    DEPARTMENT_PERMISSION_KEYS.filter((k) => k !== p && normalizePermissions([k]).includes(p));
+  return (
+    <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+      {DEPARTMENT_PERMISSION_KEYS.map((p) => (
+        <label key={p} className="flex cursor-pointer items-start gap-2 rounded-field px-1.5 py-1 hover:bg-surface">
+          <input
+            type="checkbox"
+            checked={current.includes(p)}
+            onChange={(e) =>
+              onChange(
+                normalizePermissions(
+                  e.target.checked ? [...current, p] : current.filter((x) => x !== p && !dependentsOf(p).includes(x))
+                )
+              )
+            }
+            className="mt-0.5 size-4 shrink-0 rounded border-line"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-fg">{DEPARTMENT_PERMISSIONS[p].label}</span>
+            <span className="block text-xs leading-snug text-fg-subtle">{DEPARTMENT_PERMISSIONS[p].description}</span>
+          </span>
+        </label>
+      ))}
+    </div>
   );
 }
 
@@ -137,32 +234,48 @@ function PeopleTab({ detail, onChanged }: { detail: AdminDepartmentDetailDto; on
   const [busyId, setBusyId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newPerson, setNewPerson] = useState<AdminUserListItemDto | null>(null);
-  const [newRole, setNewRole] = useState<(typeof ROLES)[number]>('ADMIN');
+  const [newAccess, setNewAccess] = useState('ADMIN');
 
   const counts = useMemo(
     () => ({
       all: detail.people.length,
       ADMIN: detail.people.filter((p) => p.role === 'ADMIN').length,
-      PLANNER: detail.people.filter((p) => p.role === 'PLANNER').length,
-      HELPER: detail.people.filter((p) => p.role === 'HELPER').length,
+      RIGHTS: detail.people.filter((p) => p.role === 'HELPER' && p.permissions.length > 0).length,
+      HELPER: detail.people.filter((p) => p.role === 'HELPER' && p.permissions.length === 0).length,
       home: detail.people.filter((p) => p.isHome).length,
     }),
     [detail.people]
   );
 
   const visible = detail.people.filter((p) => {
-    if (filter === 'home' ? !p.isHome : filter !== 'all' && p.role !== filter) return false;
+    const match =
+      filter === 'all'
+        ? true
+        : filter === 'home'
+          ? p.isHome
+          : filter === 'ADMIN'
+            ? p.role === 'ADMIN'
+            : filter === 'RIGHTS'
+              ? p.role === 'HELPER' && p.permissions.length > 0
+              : p.role === 'HELPER' && p.permissions.length === 0;
+    if (!match) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return [p.firstName, p.lastName, p.ceviName, p.email].some((v) => v?.toLowerCase().includes(q));
   });
 
-  const setRole = async (userId: string, role: string) => {
+  const setAccess = async (
+    userId: string,
+    payload: { role: 'ADMIN' | 'HELPER'; permissions: DepartmentPermission[] } | null
+  ) => {
     setBusyId(userId);
     try {
-      if (role) await send(`/api/admin/departments/${detail.id}/members/${userId}`, 'PUT', { role });
+      if (payload) await send(`/api/admin/departments/${detail.id}/members/${userId}`, 'PUT', payload);
       else await send(`/api/admin/departments/${detail.id}/members/${userId}`, 'DELETE');
-      toast({ title: role ? `Rolle: ${departmentRoleLabels[role]}` : 'Rolle entfernt', tone: 'success' });
+      toast({
+        title: payload ? `Zugang: ${accessLabel(payload.role, payload.permissions)}` : 'Zugehörigkeit entfernt',
+        tone: 'success',
+      });
       onChanged();
     } catch (err) {
       toast({ title: 'Nicht gespeichert', description: errorMessage(err), tone: 'error' });
@@ -173,10 +286,12 @@ function PeopleTab({ detail, onChanged }: { detail: AdminDepartmentDetailDto; on
 
   const add = async () => {
     if (!newPerson) return;
-    await setRole(newPerson.id, newRole);
+    await setAccess(newPerson.id, accessPayload(newAccess));
     setNewPerson(null);
     setAdding(false);
   };
+
+  const newNeedsAccount = ACCESS_OPTIONS.find((o) => o.value === newAccess)?.needsAccount ?? false;
 
   return (
     <div className="space-y-4">
@@ -203,22 +318,22 @@ function PeopleTab({ detail, onChanged }: { detail: AdminDepartmentDetailDto; on
           <PersonPicker value={newPerson} onChange={setNewPerson} />
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1">
-              <Select value={newRole} onChange={(e) => setNewRole(e.target.value as typeof newRole)} aria-label="Rolle">
-                {ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {departmentRoleLabels[role]}
+              <Select value={newAccess} onChange={(e) => setNewAccess(e.target.value)} aria-label="Zugang">
+                {ACCESS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
                   </option>
                 ))}
               </Select>
             </div>
             <Button onClick={add} disabled={!newPerson || busyId !== null}>
               <Plus aria-hidden />
-              Rolle vergeben
+              Hinzufügen
             </Button>
           </div>
-          {newPerson?.loginMethods.includes('CEVINAME') && newRole !== 'HELPER' && (
+          {newPerson?.loginMethods.includes('CEVINAME') && newNeedsAccount && (
             <p className="text-xs text-danger-ink">
-              Cevi-Name-Profile können nur Helfer*in sein. Für Leitung oder Planung braucht es Cevi.DB oder ein Passwort.
+              Cevi-Name-Profile bekommen keine Rechte. Für Leitung oder Rechte braucht es Cevi.DB oder ein Passwort.
             </p>
           )}
         </div>
@@ -249,8 +364,8 @@ function PeopleTab({ detail, onChanged }: { detail: AdminDepartmentDetailDto; on
           [
             ['all', 'Alle'],
             ['ADMIN', 'Leitung'],
-            ['PLANNER', 'Planung'],
-            ['HELPER', 'Helfende'],
+            ['RIGHTS', 'Mit Rechten'],
+            ['HELPER', 'Ohne Rechte'],
             ['home', 'Heimabteilung'],
           ] as const
         ).map(([id, label]) => (
@@ -266,19 +381,61 @@ function PeopleTab({ detail, onChanged }: { detail: AdminDepartmentDetailDto; on
         <ul className="divide-y divide-line overflow-hidden rounded-card border border-line">
           {visible.map((person) => (
             <PersonRow
-              key={person.userId}
+              key={`${person.userId}-${person.role}-${person.permissions.join()}`}
               person={person}
               busy={busyId === person.userId}
-              onRoleChange={(role) => setRole(person.userId, role)}
+              onAccessChange={(payload) => setAccess(person.userId, payload)}
             />
           ))}
         </ul>
       )}
       <p className="text-xs leading-relaxed text-fg-subtle">
-        «Keine Rolle» entfernt nur die Abteilungsrolle. Die Heimabteilung kommt aus Cevi.DB oder wurde von der Person
-        selbst gewählt und bleibt.
+        Von Hand gesetzte Abteilungsleitung bleibt, auch wenn Cevi.DB nichts davon weiss. Die aus Cevi.DB entzieht der
+        nächste Login wieder, wenn die Rolle dort fehlt (nie die letzte). «Keine Zugehörigkeit» entfernt Rolle und Rechte,
+        die Heimabteilung bleibt.
       </p>
     </div>
+  );
+}
+
+const AUDIT_LABELS: Record<string, string> = {
+  PERMISSIONS_SET: 'Rechte geändert',
+  LEADER_GRANT: 'Abteilungsleitung erhalten',
+  LEADER_REVOKE: 'Abteilungsleitung entzogen',
+  STUFEN_SET: 'Stufen geändert',
+  MEMBER_REMOVE: 'Aus der Abteilung entfernt',
+};
+
+/** Protokoll der Abteilung (Rechte, Abteilungsleitung, Stufen), auch was die Abteilung selbst geändert hat */
+function DepartmentAuditTab({ detail }: { detail: AdminDepartmentDetailDto }) {
+  if (detail.audit.length === 0) {
+    return <EmptyState title="Noch keine Einträge" description="Hier erscheint, wer wem welche Rechte gegeben hat." className="py-8" />;
+  }
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const label = (p: string) => (isDepartmentPermission(p) ? DEPARTMENT_PERMISSIONS[p].label : p);
+  return (
+    <ul className="divide-y divide-line overflow-hidden rounded-card border border-line">
+      {detail.audit.map((entry) => {
+        const before = list(entry.details?.before);
+        const after = list(entry.details?.after);
+        const fmt = entry.action === 'PERMISSIONS_SET' ? label : (s: string) => s;
+        const change = [
+          ...after.filter((x) => !before.includes(x)).map((x) => `+ ${fmt(x)}`),
+          ...before.filter((x) => !after.includes(x)).map((x) => `− ${fmt(x)}`),
+        ].join(' · ');
+        return (
+          <li key={entry.id} className="px-4 py-3">
+            <p className="text-sm text-fg">
+              <span className="font-semibold">{entry.targetLabel}</span>: {AUDIT_LABELS[entry.action] ?? entry.action}
+            </p>
+            {change && <p className="mt-0.5 text-xs text-fg-muted">{change}</p>}
+            <p className="mt-0.5 text-2xs text-fg-subtle">
+              {formatDateTime(entry.createdAt)} · {entry.actorName}
+            </p>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -295,7 +452,9 @@ function SettingsTab({
   const [name, setName] = useState(detail.name);
   const [slug, setSlug] = useState(detail.slug);
   const [ceviDbGroupId, setCeviDbGroupId] = useState(detail.ceviDbGroupId?.toString() ?? '');
-  const [contactEmail, setContactEmail] = useState(detail.contactEmail ?? '');
+  const [contactUserId, setContactUserId] = useState(detail.contactUserId ?? '');
+  // Kontaktperson: Abteilungsleitung oder «Personen und Rechte verwalten»
+  const contactCandidates = detail.people.filter((p) => p.role === 'ADMIN' || p.permissions.includes('PEOPLE_MANAGE'));
   const [logoUrl, setLogoUrl] = useState(detail.logoUrl ?? '');
   const [primaryColor, setPrimaryColor] = useState(detail.primaryColor ?? '#e11d48');
   const [membersOnly, setMembersOnly] = useState(detail.membersOnly);
@@ -315,7 +474,7 @@ function SettingsTab({
         name: name.trim(),
         slug: slug.trim() !== detail.slug ? slug.trim() : undefined,
         ceviDbGroupId: ceviDbGroupId ? Number(ceviDbGroupId) : null,
-        contactEmail: contactEmail.trim() || null,
+        contactUserId: contactUserId || null,
         logoUrl: logoUrl.trim() || null,
         primaryColor,
         membersOnly,
@@ -360,8 +519,19 @@ function SettingsTab({
           >
             <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
           </Field>
-          <Field label="Kontakt-E-Mail">
-            <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} maxLength={254} />
+          <Field label="Kontaktperson" hint="Abteilungsleitung oder wer «Personen und Rechte verwalten» darf.">
+            <Select value={contactUserId} onChange={(e) => setContactUserId(e.target.value)}>
+              <option value="">Keine Kontaktperson</option>
+              {contactCandidates.map((p) => (
+                <option key={p.userId} value={p.userId}>
+                  {fullName(p)}
+                  {p.role === 'ADMIN' ? ' (Abteilungsleitung)' : ''}
+                </option>
+              ))}
+              {contactUserId && !contactCandidates.some((p) => p.userId === contactUserId) && (
+                <option value={contactUserId}>{detail.contactName ?? 'Bisherige Kontaktperson'}</option>
+              )}
+            </Select>
           </Field>
           <Field label="Logo-Adresse" hint="Pfad (/api/uploads/…) oder https-Adresse. Leer = Farbfläche.">
             <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} maxLength={500} />
@@ -478,6 +648,7 @@ export function DepartmentDialog({
     { id: 'anlaesse', label: 'Anlässe', count: loaded?.eventCount },
     { id: 'stufen', label: 'Stufen', count: loaded?.stufen.length },
     { id: 'einstellungen', label: 'Einstellungen' },
+    { id: 'protokoll', label: 'Protokoll', count: loaded?.audit.length },
   ];
 
   return (
@@ -590,6 +761,7 @@ export function DepartmentDialog({
                   ))}
                 </ul>
               ))}
+            {tab === 'protokoll' && <DepartmentAuditTab detail={loaded} />}
             {tab === 'einstellungen' && (
               <SettingsTab
                 key={`${loaded.id}-${reload}`}

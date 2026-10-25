@@ -36,6 +36,8 @@ import {
 } from '../services/ceviNameLogin.js';
 import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
 import { withoutCeviDbAddress } from '../services/profile.js';
+import { syncCeviDbLeadership } from '../services/departmentLeaders.js';
+import { accessFrom } from '../services/permissions.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 
 /** Passwort-Login: höchstens 30 Fehlversuche pro IP in 10 Minuten, 10 pro E-Mail in 15 Minuten */
@@ -197,7 +199,8 @@ async function loadUserDto(
     phone: user.phone,
     birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
     isGlobalAdmin: user.isGlobalAdmin,
-    departmentRole: (user.memberships[0]?.role as UserDto['departmentRole']) ?? null,
+    departmentRole: user.memberships[0] ? (user.memberships[0].role === 'ADMIN' ? 'ADMIN' : 'HELPER') : null,
+    departmentPermissions: tenantId ? [...accessFrom(user.memberships[0], user.isGlobalAdmin).permissions] : [],
     ceviDbId: user.ceviDbId,
     ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
     hasCeviDb: Boolean(user.ceviDbId),
@@ -225,19 +228,6 @@ async function ensureHelperMembership(
     where: { departmentId_userId: { departmentId, userId } },
     update: {},
     create: { departmentId, userId, role: 'HELPER' },
-  });
-}
-
-/** Trägt die Person als Abteilungsleitung (ADMIN) ein bzw. befördert sie dazu. */
-async function ensureLeaderMembership(
-  prisma: FastifyInstance['prisma'],
-  departmentId: string,
-  userId: string
-) {
-  await prisma.departmentMember.upsert({
-    where: { departmentId_userId: { departmentId, userId } },
-    update: { role: 'ADMIN' },
-    create: { departmentId, userId, role: 'ADMIN' },
   });
 }
 
@@ -566,15 +556,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const derived = deriveCeviDbFields(profile);
     await storeCeviDbFields(fastify.prisma, user.id, derived);
     const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, derived.ortsgruppeId);
-    if (homeDepartment) {
-      if (derived.isDepartmentLeader) {
-        await ensureLeaderMembership(fastify.prisma, homeDepartment.id, user.id);
-      } else {
-        await ensureHelperMembership(fastify.prisma, homeDepartment.id, user.id);
-      }
-    }
+    // Abteilungsleitung der Heimabteilung vergeben bzw. entziehen (nie die letzte einer Abteilung)
+    await syncCeviDbLeadership(
+      fastify.prisma,
+      fastify.log,
+      user.id,
+      homeDepartment?.id ?? null,
+      derived.isDepartmentLeader
+    );
 
-    // Kommt die Person von einer Abteilungs-Subdomain, dort als Helfer eintragen (nur in der eigenen Heimabteilung Leitung)
+    // Kommt die Person von einer Abteilungs-Subdomain, dort ohne Rechte eintragen (Leitung nur in der Heimabteilung)
     let tenantDepartmentId: string | null = null;
     if (tenantSlug) {
       const department = await fastify.prisma.department.findUnique({
@@ -583,11 +574,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
       if (department) {
         tenantDepartmentId = department.id;
-        if (homeDepartment && department.id === homeDepartment.id && derived.isDepartmentLeader) {
-          await ensureLeaderMembership(fastify.prisma, department.id, user.id);
-        } else {
-          await ensureHelperMembership(fastify.prisma, department.id, user.id);
-        }
+        await ensureHelperMembership(fastify.prisma, department.id, user.id);
       }
     }
 

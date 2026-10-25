@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  COORDINATION,
   addMember,
   authCookie,
   createDepartment,
@@ -49,7 +50,7 @@ describe.skipIf(!hasTestDb)('Anlass löschen durch die Abteilungsleitung', () =>
     expect((await del(authCookie(app, okLead), 'chilbi')).statusCode).toBe(403);
 
     const planner = await createUser(app, { passwordHash: 'x' });
-    await addMember(app, department.id, planner.id, 'PLANNER');
+    await addMember(app, department.id, planner.id, 'HELPER', COORDINATION);
     expect((await del(authCookie(app, planner), 'chilbi')).statusCode).toBe(403);
     expect(await app.prisma.event.count()).toBe(1);
   });

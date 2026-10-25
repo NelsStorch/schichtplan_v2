@@ -54,6 +54,8 @@ export function EventTile({ event, featured, index = 0 }: { event: EventDto; fea
             </Badge>
           )}
           <AccessTypeBadge type={event.accessType} leadersOnly={event.leadersOnly} tone="glass" />
+          {/* Entwürfe sehen nur das OK und wer «Alle Anlässe sehen» darf */}
+          {event.isPublished === false && <Badge tone="warning">Entwurf</Badge>}
           {status !== 'past' && event.totalSlots ? (
             <Badge tone="glass">
               {event.totalSlots - (event.filledSlots ?? 0) > 0

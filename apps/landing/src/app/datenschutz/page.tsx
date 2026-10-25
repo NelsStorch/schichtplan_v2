@@ -216,8 +216,10 @@ export default function DatenschutzPage() {
               «verhindert» reicht,
             </li>
             <li>
-              Rollen in Abteilung und OK (Abteilungsleitung, Planung,
-              OK-Leitung, OK-Mitglied),
+              Rollen und Rechte in Abteilung und OK (Abteilungsleitung,
+              einzelne Rechte wie «Anlässe erstellen», OK-Leitung,
+              OK-Mitglied) sowie ein Protokoll, wer wem welche Rechte gegeben
+              hat,
             </li>
             <li>
               Personen, die ein OK von Hand einträgt (Name, allenfalls E-Mail
@@ -294,9 +296,9 @@ export default function DatenschutzPage() {
               Plan ohne Namen.
             </li>
             <li>
-              <strong>OK, Abteilungsleitung und Planung</strong> der
-              betreffenden Abteilung sehen zusätzlich Kontaktdaten (E-Mail und
-              Telefon, soweit vorhanden), das Alter sowie Antworten und
+              <strong>OK, Abteilungsleitung und wer das Recht «Alle Anlässe
+              sehen» hat</strong> in der betreffenden Abteilung sehen zusätzlich
+              Kontaktdaten (E-Mail und Telefon, soweit vorhanden), das Alter sowie Antworten und
               Abmeldungen zu ihren Anlässen.
             </li>
             <li>

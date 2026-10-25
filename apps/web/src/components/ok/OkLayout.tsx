@@ -23,7 +23,7 @@ import {
   Wrench,
   type LucideProps,
 } from 'lucide-react';
-import { helpUrl } from '@schichtplan/shared';
+import { helpUrl, type EventCapability } from '@schichtplan/shared';
 import { Badge, Dialog, EmptyState, Skeleton, buttonClasses, cn } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { fmtDateRange } from '@/lib/format';
@@ -34,8 +34,8 @@ interface NavItem {
   path: string;
   label: string;
   icon: ComponentType<LucideProps>;
-  /** Nur für Abteilungsleitung und OK-Leitung */
-  leadOnly?: boolean;
+  /** Nur sichtbar mit dieser Fähigkeit im Anlass */
+  capability?: EventCapability;
   count?: (ctx: ReturnType<typeof useOk>) => number | null;
 }
 
@@ -51,8 +51,8 @@ const NAV: NavGroup[] = [
     label: 'Planen',
     items: [
       { path: 'schichten', label: 'Schichten', icon: CalendarDays, count: (c) => c.event?.shifts.length ?? null },
-      { path: 'schichten/arbeiten', label: 'Arbeiten-Katalog', icon: Wrench },
-      { path: 'schichten/vorlagen', label: 'Vorlagen', icon: Copy },
+      { path: 'schichten/arbeiten', label: 'Arbeiten-Katalog', icon: Wrench, capability: 'SHIFTS' },
+      { path: 'schichten/vorlagen', label: 'Vorlagen', icon: Copy, capability: 'TEMPLATES' },
     ],
   },
   {
@@ -61,20 +61,20 @@ const NAV: NavGroup[] = [
       { path: 'helfende', label: 'Helfende', icon: Users, count: (c) => c.stats.helperCount },
       { path: 'fragen', label: 'Fragen', icon: MessageSquareText, count: (c) => c.event?.questions.length ?? null },
       { path: 'helfende/zugang', label: 'Zugang & Antworten', icon: KeyRound },
-      { path: 'nachrichten', label: 'Nachrichten', icon: Mail },
+      { path: 'nachrichten', label: 'Nachrichten', icon: Mail, capability: 'MESSAGES' },
     ],
   },
   {
     label: 'Am Anlass',
     items: [
-      { path: 'anwesenheit', label: 'Anwesenheit', icon: ClipboardCheck },
-      { path: 'export', label: 'Export & Drucken', icon: Download },
+      { path: 'anwesenheit', label: 'Anwesenheit', icon: ClipboardCheck, capability: 'ATTENDANCE' },
+      { path: 'export', label: 'Export & Drucken', icon: Download, capability: 'EXPORT' },
     ],
   },
   {
     label: 'Verwaltung',
     items: [
-      { path: 'einstellungen', label: 'Einstellungen', icon: Settings, leadOnly: true },
+      { path: 'einstellungen', label: 'Einstellungen', icon: Settings, capability: 'SETTINGS' },
       { path: 'protokoll', label: 'Protokoll', icon: History },
     ],
   },
@@ -101,7 +101,7 @@ function OkNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav aria-label="OK-Bereich" className="space-y-5">
       {NAV.map((group) => {
-        const items = group.items.filter((i) => !i.leadOnly || permissions.canEditSettings);
+        const items = group.items.filter((i) => !i.capability || permissions.can[i.capability]);
         if (items.length === 0) return null;
         return (
           <div key={group.label ?? 'start'}>
@@ -149,23 +149,23 @@ function OkNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Name des aktuellen Bereichs für die Handy-Leiste */
-function useCurrentLabel() {
+/** Aktueller Bereich (längster passender Pfad) */
+function useCurrentItem() {
   const { base } = useOk();
   const pathname = usePathname();
-  const match = NAV.flatMap((g) => g.items)
+  return NAV.flatMap((g) => g.items)
     .filter((i) => {
       const href = itemHref(base, i.path);
       return i.path === '' ? pathname === base : pathname === href || pathname.startsWith(`${href}/`);
     })
     .sort((a, b) => b.path.length - a.path.length)[0];
-  return match?.label ?? 'Übersicht';
 }
 
 function OkFrame({ children }: { children: ReactNode }) {
   const { event, loading, error, permissions } = useOk();
   const [menuOpen, setMenuOpen] = useState(false);
-  const currentLabel = useCurrentLabel();
+  const currentItem = useCurrentItem();
+  const currentLabel = currentItem?.label ?? 'Übersicht';
 
   if (loading) {
     return (
@@ -196,13 +196,19 @@ function OkFrame({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!permissions.canManage) {
+  // Ganzer OK-Bereich oder ein Teil davon (direkt aufgerufen) ohne das passende Recht
+  const missingCapability = Boolean(currentItem?.capability && !permissions.can[currentItem.capability]);
+  if (!permissions.canManage || missingCapability) {
     return (
       <div className="mx-auto max-w-xl px-4 pt-16">
         <EmptyState
           icon={<Shield className="size-12 text-warning-ink" />}
           title="Keine Berechtigung"
-          description="Der OK-Bereich ist für das OK dieses Anlasses und die Abteilungsleitung."
+          description={
+            missingCapability
+              ? `Für «${currentLabel}» fehlt dir in diesem Anlass das Recht. Frag die OK-Leitung oder die Abteilungsleitung.`
+              : 'Der OK-Bereich ist für das OK dieses Anlasses, die Abteilungsleitung und wer «Alle Anlässe sehen» darf.'
+          }
           action={
             <Link href={`/events/${event.slug}`} className={buttonClasses()}>
               Zum Schichtplan

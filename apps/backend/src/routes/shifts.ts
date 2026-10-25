@@ -95,19 +95,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Prüfe Berechtigung: Abteilungsleitung, Planner oder Event-OK
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: event.departmentId,
-            userId: request.user.id,
-          },
-        },
-      });
+      // Schichten planen: Abteilungsleitung, OK oder Recht «Schichten planen»
+      const flags = await managerFlags(fastify.prisma, event, request.user);
 
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      if (!flags.can.SHIFTS) {
         return reply
           .status(403)
           .send({ error: 'Keine Berechtigung zum Erstellen von Schichten für dieses Event' });
@@ -227,19 +218,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Prüfe Berechtigung: Abteilungsleitung, Planner oder Event-OK
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: event.departmentId,
-            userId: request.user.id,
-          },
-        },
-      });
+      // Schichten planen: Abteilungsleitung, OK oder Recht «Schichten planen»
+      const flags = await managerFlags(fastify.prisma, event, request.user);
 
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      const isEventOk = event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      if (!flags.can.SHIFTS) {
         return reply
           .status(403)
           .send({ error: 'Keine Berechtigung zum Erstellen von Schichten für dieses Event' });
@@ -365,19 +347,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Berechtigung prüfen
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: shift.event.departmentId,
-            userId: request.user.id,
-          },
-        },
-      });
+      // Schichten planen: Abteilungsleitung, OK oder Recht «Schichten planen»
+      const flags = await managerFlags(fastify.prisma, shift.event, request.user);
 
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      const isEventOk = shift.event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      if (!flags.can.SHIFTS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten dieser Schicht' });
       }
 
@@ -528,19 +501,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Schicht nicht gefunden' });
       }
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: shift.event.departmentId,
-            userId: request.user.id,
-          },
-        },
-      });
+      // Schichten planen: Abteilungsleitung, OK oder Recht «Schichten planen»
+      const flags = await managerFlags(fastify.prisma, shift.event, request.user);
 
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      const isEventOk = shift.event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      if (!flags.can.SHIFTS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Schicht' });
       }
 
@@ -573,19 +537,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Schicht nicht gefunden' });
       }
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: shift.event.departmentId,
-            userId: request.user.id,
-          },
-        },
-      });
+      // Schichten planen: Abteilungsleitung, OK oder Recht «Schichten planen»
+      const flags = await managerFlags(fastify.prisma, shift.event, request.user);
 
-      const isDeptAdmin = member && (member.role === 'ADMIN' || member.role === 'PLANNER');
-      const isEventOk = shift.event.organizers.some((o) => o.userId === request.user.id);
-
-      if (!isDeptAdmin && !isEventOk && !request.user.isGlobalAdmin) {
+      if (!flags.can.SHIFTS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Duplizieren dieser Schicht' });
       }
 
@@ -796,8 +751,12 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       let guestEmail: string | null = null;
       let guestPhone: string | null = null;
 
+      // Andere einteilen braucht «Helfende einteilen» (OK oder Recht), Sehen allein reicht nicht.
+      // Ohne das Recht werden userId/guestName ignoriert und die Person trägt sich selbst ein.
+      const canAssign = flags.can.HELPERS;
+
       // Fall 1: OK teilt eine andere Person ein
-      if (isOkOrAdmin && requestedUserId) {
+      if (canAssign && requestedUserId) {
         // Nur Personen der Abteilung oder des Anlasses: sonst sähe das OK danach fremde Kontaktdaten
         if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, [requestedUserId]))) {
           return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
@@ -807,7 +766,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         if (!targetUser) {
           return reply.status(404).send({ error: 'Ausgewählte Person nicht gefunden' });
         }
-      } else if (isOkOrAdmin && reqGuestName) {
+      } else if (canAssign && reqGuestName) {
         // OK trägt manuellen Gast/Helfer ein
         guestName = reqGuestName.trim();
         guestEmail = reqGuestEmail?.trim() || null;
@@ -1192,7 +1151,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       // Prüfe Berechtigung: Eigener Eintrag ODER Abteilungsleitung ODER Event-OK
       const event = existingSignup.shift.event;
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      const isManager = flags.isManager;
+      // Andere austragen und Austrage-Frist übergehen: «Helfende einteilen»
+      const isManager = flags.can.HELPERS;
       const isSelf = Boolean(request.user && existingSignup.userId === request.user.id);
 
       if (!isSelf && !isManager) {
@@ -1463,7 +1423,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
       const flags = await managerFlags(fastify.prisma, event, request.user);
-      if (!flags.isManager) {
+      if (!flags.can.SHIFTS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten der Schichten' });
       }
 

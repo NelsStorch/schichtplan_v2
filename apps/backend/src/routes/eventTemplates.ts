@@ -9,6 +9,7 @@ import {
 } from '@schichtplan/shared';
 import { cleanRequiredFields } from '../services/profile.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedTo, isDepartmentManager } from '../services/departmentVisibility.js';
+import { hasDepartmentPermission } from '../services/permissions.js';
 import { generateCheckinToken } from '../services/attendance.js';
 import { syncEventRange } from '../services/eventRange.js';
 import { replaceAccessLists, resolveAccessLists, syncQuestions } from './events.js';
@@ -100,17 +101,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      if (!request.user.isGlobalAdmin && member?.role !== 'ADMIN' && member?.role !== 'PLANNER') {
-        return reply.status(403).send({ error: 'Nur die Abteilungsleitung darf neue Events aus Vorlagen erstellen' });
+      if (!(await hasDepartmentPermission(fastify.prisma, request.tenant.id, request.user.id, 'EVENTS_CREATE'))) {
+        return reply.status(403).send({ error: 'Anlässe aus Vorlagen erstellen braucht das Recht «Anlässe erstellen»' });
       }
 
       const template = await fastify.prisma.eventTemplate.findUnique({
@@ -206,15 +198,6 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             signupOpensAt: parse.data.signupOpensAt ? new Date(parse.data.signupOpensAt) : null,
             attendanceMode: instantiateAttendanceMode,
             checkinToken: instantiateAttendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
-            organizers: {
-              create: [
-                {
-                  userId: request.user.id,
-                  role: 'OK_LEAD',
-                  roleTitle: 'Event-Leitung',
-                },
-              ],
-            },
           },
         });
         await replaceAccessLists(tx, ev.id, lists.departmentIds, lists.stufeIds);
@@ -292,17 +275,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       }
 
-      const member = await fastify.prisma.departmentMember.findUnique({
-        where: {
-          departmentId_userId: {
-            departmentId: request.tenant.id,
-            userId: request.user.id,
-          },
-        },
-      });
-
-      if (!request.user.isGlobalAdmin && member?.role !== 'ADMIN' && member?.role !== 'PLANNER') {
-        return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen von Vorlagen' });
+      if (!(await hasDepartmentPermission(fastify.prisma, request.tenant.id, request.user.id, 'TEMPLATES_MANAGE'))) {
+        return reply.status(403).send({ error: 'Vorlagen löschen braucht das Recht «Vorlagen verwalten»' });
       }
 
       const template = await fastify.prisma.eventTemplate.findUnique({

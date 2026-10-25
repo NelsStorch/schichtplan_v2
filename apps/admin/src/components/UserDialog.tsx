@@ -22,9 +22,9 @@ import {
   type AdminUserListItemDto,
 } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
+import { ACCESS_OPTIONS, CUSTOM_ACCESS, accessLabel, accessPayload, accessValue } from '../lib/access';
 import {
   ageFromBirthDate,
-  departmentRoleLabels,
   formatBirthDate,
   formatDate,
   formatDateTime,
@@ -147,14 +147,16 @@ export function UserDialog({
     );
   };
 
-  const setMembership = async (departmentId: string, role: string) => {
-    if (!user) return;
+  /** value: Auswahl aus ACCESS_OPTIONS (Abteilungsleitung, Vorlage, ohne Rechte) oder '' = entfernen */
+  const setMembership = async (departmentId: string, value: string) => {
+    if (!user || value === CUSTOM_ACCESS) return;
+    const payload = value ? accessPayload(value) : null;
     await change(
       () =>
-        role
-          ? send(`/api/admin/departments/${departmentId}/members/${user.id}`, 'PUT', { role })
+        payload
+          ? send(`/api/admin/departments/${departmentId}/members/${user.id}`, 'PUT', payload)
           : send(`/api/admin/departments/${departmentId}/members/${user.id}`, 'DELETE'),
-      role ? `Rolle: ${departmentRoleLabels[role]}` : 'Rolle entfernt'
+      payload ? `Zugang: ${accessLabel(payload.role, payload.permissions)}` : 'Zugehörigkeit entfernt'
     );
   };
 
@@ -405,18 +407,23 @@ export function UserDialog({
                       </span>
                       <span className="w-44 shrink-0">
                         <Select
-                          value={m.role}
+                          value={accessValue(m.role, m.permissions)}
                           disabled={saving}
                           onChange={(e) => setMembership(m.departmentId, e.target.value)}
-                          aria-label={`Rolle in ${m.departmentName}`}
+                          aria-label={`Zugang in ${m.departmentName}`}
                           className="h-10 text-sm sm:text-sm"
                         >
-                          {['ADMIN', 'PLANNER', 'HELPER'].map((role) => (
-                            <option key={role} value={role} disabled={ceviNameOnly && role !== 'HELPER'}>
-                              {departmentRoleLabels[role]}
+                          {ACCESS_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value} disabled={ceviNameOnly && o.needsAccount}>
+                              {o.label}
                             </option>
                           ))}
-                          <option value="">Rolle entfernen</option>
+                          {accessValue(m.role, m.permissions) === CUSTOM_ACCESS && (
+                            <option value={CUSTOM_ACCESS} disabled>
+                              Eigene Rechte (in der Abteilung ändern)
+                            </option>
+                          )}
+                          <option value="">Zugehörigkeit entfernen</option>
                         </Select>
                       </span>
                       <a
@@ -458,9 +465,9 @@ export function UserDialog({
                       aria-label="Rolle"
                       className="h-10 text-sm sm:text-sm"
                     >
-                      {['ADMIN', 'PLANNER', 'HELPER'].map((role) => (
-                        <option key={role} value={role} disabled={ceviNameOnly && role !== 'HELPER'}>
-                          {departmentRoleLabels[role]}
+                      {ACCESS_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value} disabled={ceviNameOnly && o.needsAccount}>
+                          {o.label}
                         </option>
                       ))}
                     </Select>

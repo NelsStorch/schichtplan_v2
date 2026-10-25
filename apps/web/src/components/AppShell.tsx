@@ -16,7 +16,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, getLandingUrl, helpUrl } from '@schichtplan/shared';
+import { PRIVACY_URL, departmentRoleLabel, getLandingUrl, helpUrl } from '@schichtplan/shared';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 
@@ -180,20 +180,21 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
   );
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: 'Abteilungsleitung',
-  PLANNER: 'Schichtplanung',
-  HELPER: 'Helfer*in',
-};
-
 function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, logout } = usePortal();
+  const { user, department, logout } = usePortal();
   const confirm = useConfirm();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
   if (!user) return null;
-  const role = user.isGlobalAdmin ? 'Plattform-Admin' : ROLE_LABEL[user.departmentRole ?? ''] ?? 'Helfer*in';
+  const role =
+    user.isGlobalAdmin && user.departmentRole !== 'ADMIN'
+      ? 'Plattform-Admin'
+      : departmentRoleLabel({
+          isLeader: user.departmentRole === 'ADMIN',
+          permissions: user.departmentPermissions ?? [],
+          isHomeDepartment: user.homeDepartment?.id === department?.id,
+        });
 
   const handleDeleteAccount = async () => {
     const confirmed = await confirm({

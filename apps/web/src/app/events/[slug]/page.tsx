@@ -73,7 +73,7 @@ const VIEW_STORAGE_KEY = 'schichtplan.eventView';
 
 export default function EventDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const { user, department, isDeptAdmin, isPlanner, loading: portalLoading } = usePortal();
+  const { user, department, loading: portalLoading } = usePortal();
   const toast = useToast();
   const confirm = useConfirm();
   const loginHref = useLoginHref();
@@ -236,10 +236,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   if (!event) return <EventSkeleton />;
 
   const { access } = event.viewer;
-  const isEventOk = Boolean(user && event.organizers?.some((o) => o.userId === user.id));
-  const isOkLead = Boolean(user && event.organizers?.some((o) => o.userId === user.id && o.role === 'OK_LEAD'));
-  const canManageShifts = isPlanner || isEventOk;
-  const canManageEvent = isDeptAdmin || isOkLead;
+  // Was die Person hier darf, rechnet das Backend aus (OK-Rolle, Abteilungsrechte, Abteilungsleitung)
+  const caps = new Set(access.capabilities ?? []);
+  const canOpenOk = caps.has('VIEW');
+  const canManageShifts = caps.has('SHIFTS');
+  const canManageHelpers = caps.has('HELPERS');
+  const canManageEvent = caps.has('SETTINGS');
+  const canManageOk = caps.has('ORGANIZERS');
   const needsLogin = !user;
   // Eintragen-Knöpfe zeigen, wenn es geht oder nur noch der Login fehlt (und Freischaltzeit erreicht ist)
   const isSignupTimeOpenNow = isSignupTimeOpen(event.signupOpensAt);
@@ -401,7 +404,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     const isSelfCancel = !name;
     if (
       isSelfCancel &&
-      !canManageShifts &&
+      !canManageHelpers &&
       !user?.isGlobalAdmin &&
       event.cancelDeadlineDays !== null &&
       event.cancelDeadlineDays !== undefined
@@ -479,21 +482,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   return (
     <AppShell
       actions={
-        canManageShifts && (
+        canOpenOk && (
           <div className="flex items-center gap-2">
             <Link href={`/events/${slug}/ok`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
               <Shield className="size-4" /> <span className="hidden sm:inline">OK-Bereich</span>
             </Link>
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditingShift(null);
-                setShowShiftForm(true);
-              }}
-              aria-label="Schicht anlegen"
-            >
-              <Plus /> <span className="hidden sm:inline">Schicht</span>
-            </Button>
+            {canManageShifts && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingShift(null);
+                  setShowShiftForm(true);
+                }}
+                aria-label="Schicht anlegen"
+              >
+                <Plus /> <span className="hidden sm:inline">Schicht</span>
+              </Button>
+            )}
           </div>
         )
       }
@@ -612,7 +617,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         </div>
 
         {/* Organisationskomitee */}
-        {(event.organizers?.length || canManageEvent) && (
+        {(event.organizers?.length || canManageEvent || canManageOk) && (
           <section className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center" aria-label="Organisationskomitee">
             <h2 className="shrink-0 text-sm font-semibold text-fg-subtle">OK</h2>
             <ul className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:px-0">
@@ -631,7 +636,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                       </span>
                       <span className="block text-xs text-fg-subtle">{org.roleTitle || (lead ? 'OK-Leitung' : 'OK-Mitglied')}</span>
                     </span>
-                    {canManageEvent && (
+                    {canManageOk && (
                       <button
                         type="button"
                         onClick={() => removeOrganizer(org.id, org.userCeviName || org.displayName)}
@@ -645,14 +650,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                 );
               })}
             </ul>
-            {canManageEvent && (
+            {(canManageEvent || canManageOk) && (
               <div className="flex flex-wrap gap-2 sm:ml-auto">
-                <Button variant="secondary" size="sm" onClick={() => setShowOkForm(true)}>
-                  <UserPlus /> OK ernennen
-                </Button>
-                <Link href={`/events/${event.slug}/ok/einstellungen`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
-                  <Palette className="size-4" /> Einstellungen
-                </Link>
+                {canManageOk && (
+                  <Button variant="secondary" size="sm" onClick={() => setShowOkForm(true)}>
+                    <UserPlus /> OK ernennen
+                  </Button>
+                )}
+                {canManageEvent && (
+                  <Link href={`/events/${event.slug}/ok/einstellungen`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+                    <Palette className="size-4" /> Einstellungen
+                  </Link>
+                )}
               </div>
             )}
           </section>
@@ -844,7 +853,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         currentUser={user}
         needsLogin={needsLogin}
         blockedReason={!access.canSignup ? access.message : null}
-        canManage={canManageShifts}
+        canManage={canManageShifts || canManageHelpers}
         busy={Boolean(selectedShift && busyShift === selectedShift.id)}
         onSignup={(task) => {
           if (selectedShift) signup(selectedShift, task);
