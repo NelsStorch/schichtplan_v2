@@ -448,6 +448,19 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     }).catch(() => null);
     if (!existing) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
 
+    // Vor dem Speichern prüfen (danach fände sich die Abteilung selbst) und nur bei anderen Abteilungen
+    if (data.ceviDbGroupId && data.ceviDbGroupId !== existing.ceviDbGroupId) {
+      const existingWithGroup = await fastify.prisma.department.findUnique({
+        where: { ceviDbGroupId: data.ceviDbGroupId },
+        select: { id: true, name: true, slug: true },
+      });
+      if (existingWithGroup && existingWithGroup.id !== existing.id) {
+        return reply.status(409).send({
+          error: `Für diese Cevi.DB-Ortsgruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
+        });
+      }
+    }
+
     try {
       await fastify.prisma.department.update({
         where: { id: existing.id },
@@ -466,18 +479,6 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(409).send({ error: uniqueConflictMessage(err as Prisma.PrismaClientKnownRequestError) });
       }
       throw err;
-    }
-
-    if (data.ceviDbGroupId && data.ceviDbGroupId !== existing.ceviDbGroupId) {
-      const existingWithGroup = await fastify.prisma.department.findUnique({
-        where: { ceviDbGroupId: data.ceviDbGroupId },
-        select: { id: true, name: true, slug: true },
-      });
-      if (existingWithGroup) {
-        return reply.status(409).send({
-          error: `Für diese Cevi.DB-Ortsgruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
-        });
-      }
     }
 
     const newGroup = data.ceviDbGroupId;
