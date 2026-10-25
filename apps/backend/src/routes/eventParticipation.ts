@@ -44,8 +44,8 @@ export function validateAnswers(
   return null;
 }
 
-const displayNameOf = (u: { ceviName: string | null; firstName: string; lastName: string }) =>
-  u.ceviName || `${u.firstName} ${u.lastName}`.trim();
+const displayNameOf = (u: { ceviName: string | null; firstName: string; lastName: string | null }) =>
+  u.ceviName || `${u.firstName} ${u.lastName ?? ''}`.trim();
 
 /** Zugangs-Links, Pflichtangaben/Fragen und die Teilnehmerliste fürs OK */
 const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {

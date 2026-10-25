@@ -33,7 +33,7 @@ function toResponsiblePersonDto(
     user: {
       id: string;
       firstName: string;
-      lastName: string;
+      lastName: string | null;
       ceviName?: string | null;
       phone?: string | null;
       email?: string | null;
@@ -47,7 +47,7 @@ function toResponsiblePersonDto(
     id: r.user.id,
     displayName: r.user.ceviName
       ? `${r.user.firstName} / ${r.user.ceviName}`
-      : `${r.user.firstName} ${r.user.lastName}`,
+      : `${r.user.firstName} ${r.user.lastName ?? ''}`.trim(),
     firstName: r.user.firstName,
     lastName: r.user.lastName,
     ceviName: r.user.ceviName,

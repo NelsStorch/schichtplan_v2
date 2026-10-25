@@ -12,7 +12,7 @@ import {
 export interface ProfileFieldsSource {
   email: string | null;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   phone: string | null;
   birthDate: Date | null;
 }
@@ -71,8 +71,8 @@ export function withoutCeviDbAddress<T>(profile: T): T {
 }
 
 /** «Falk (Max Muster)», ohne Platzhalter-Nachnamen und ohne Wiederholung des Cevi-Namens */
-export function personLabel(u: { ceviName: string | null; firstName: string; lastName: string }): string {
-  const lastName = u.lastName === PLACEHOLDER_LAST_NAME ? '' : u.lastName;
+export function personLabel(u: { ceviName: string | null; firstName: string; lastName: string | null }): string {
+  const lastName = u.lastName && u.lastName !== PLACEHOLDER_LAST_NAME ? u.lastName : '';
   const fullName = `${u.firstName} ${lastName}`.trim();
   if (!u.ceviName) return fullName;
   return fullName && fullName !== u.ceviName ? `${u.ceviName} (${fullName})` : u.ceviName;

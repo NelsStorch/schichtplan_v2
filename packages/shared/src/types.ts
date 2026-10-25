@@ -36,7 +36,7 @@ export interface EventOrganizerDto {
   eventId: string;
   userId: string;
   userFirstName: string;
-  userLastName: string;
+  userLastName: string | null;
   userCeviName?: string | null;
   displayName: string;
   role: string;
@@ -51,7 +51,7 @@ export interface ResponsiblePersonDto {
   id: string;
   displayName: string;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   ceviName?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -226,7 +226,7 @@ export interface UserDto {
   id: string;
   email?: string | null;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   ceviName?: string | null;
   phone?: string | null;
   birthDate?: string | null;
@@ -305,7 +305,7 @@ export interface DepartmentPersonDto {
   displayName: string;
   ceviName: string | null;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   /** Heimabteilung ist diese Abteilung (sonst nur wegen einer Rolle in der Liste) */
   isHomeDepartment: boolean;
   source: 'SELF' | 'CEVIDB' | null;
@@ -447,7 +447,7 @@ export interface EventRosterItemDto {
   userId: string;
   ceviName: string | null;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   displayName: string;
   birthDate: string | null;
   /** Alter am Anlass (erste Schicht), passend zu den Altersgrenzen */
@@ -520,7 +520,7 @@ export interface CeviDbDebugResponseDto {
 export interface CeviDbUserSummaryDto {
   id: string;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   ceviName: string | null;
   email: string | null;
   ceviDbId: number | null;
@@ -569,7 +569,7 @@ export interface AdminUserListItemDto {
   id: string;
   email: string | null;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   ceviName: string | null;
   phone: string | null;
   birthDate: string | null;
@@ -682,7 +682,7 @@ export interface AdminDepartmentListItemDto {
 export interface AdminDepartmentPersonDto {
   userId: string;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   ceviName: string | null;
   email: string | null;
   isGlobalAdmin: boolean;

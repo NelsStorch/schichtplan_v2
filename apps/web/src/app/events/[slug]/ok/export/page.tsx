@@ -87,7 +87,7 @@ export default function ExportPage() {
         rows.push([
           i.ceviName ?? '',
           i.firstName,
-          i.lastName,
+          i.lastName ?? '',
           i.departmentName ?? '',
           i.stufen.map((s) => s.name).join(', '),
           i.age ?? '',

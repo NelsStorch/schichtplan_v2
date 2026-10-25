@@ -773,7 +773,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           ceviName: cleanCeviName,
           firstName: firstName?.trim() || cleanCeviName,
-          lastName: lastName?.trim() || PLACEHOLDER_LAST_NAME,
+          lastName: lastName?.trim() || null,
           birthDate: new Date(`${birthDate}T00:00:00Z`),
           phone: phone?.trim() || null,
           homeDepartmentId: department.id,
@@ -904,7 +904,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         email: cleanEmail,
         passwordHash,
         firstName,
-        lastName: lastName?.trim() || PLACEHOLDER_LAST_NAME,
+        lastName: lastName?.trim() || null,
         ceviName: ceviName || null,
         phone: phone || null,
         emailVerified: false,

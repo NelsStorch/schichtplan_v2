@@ -98,7 +98,7 @@ model User {
   passwordHash  String?
   ceviDbId      Int?               @unique
   firstName     String
-  lastName      String
+  lastName      String?
   ceviName      String?
   phone         String?
   birthDate     DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
