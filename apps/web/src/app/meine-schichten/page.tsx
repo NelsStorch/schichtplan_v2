@@ -84,6 +84,14 @@ export default function MyShiftsPage() {
   };
 
   const handleResetToken = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: 'Keine Internetverbindung',
+        description: 'Zum Erneuern des Links wird eine Internetverbindung benötigt.',
+        tone: 'error',
+      });
+      return;
+    }
     const ok = await confirm({
       title: 'Abo-Link wirklich erneuern?',
       description:
@@ -127,6 +135,14 @@ export default function MyShiftsPage() {
   }, [sessionLoading, user, load]);
 
   const cancel = async (shift: MyShift) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: 'Keine Internetverbindung',
+        description: 'Im Offline-Modus ist nur die Leseansicht verfügbar. Zum Austragen wird eine Internetverbindung benötigt.',
+        tone: 'error',
+      });
+      return;
+    }
     // Austrag-Sperre prüfen falls vorhanden
     if (
       !user?.isGlobalAdmin &&

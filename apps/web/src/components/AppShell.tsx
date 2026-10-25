@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, CalendarDays, Database, LifeBuoy, LogIn, LogOut, Ticket, Trash2, UserRound } from 'lucide-react';
+import { Building2, CalendarDays, Database, LifeBuoy, LogIn, LogOut, Smartphone, Ticket, Trash2, UserRound } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -19,6 +19,8 @@ import {
 import { PRIVACY_URL, departmentRoleLabel, getLandingUrl, helpUrl } from '@schichtplan/shared';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
+import { useInstallPrompt } from '@/lib/offline';
+import { OfflineBanner } from './OfflineBanner';
 
 const NAV = [
   { href: '/', label: 'Anlässe', icon: CalendarDays, match: (p: string) => p === '/' || p.startsWith('/events') },
@@ -85,6 +87,9 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
           </div>
         </div>
       </header>
+
+      {/* Offline-Hinweis mit Stand-Zeitstempel: wird nur gerendert wenn offline */}
+      <OfflineBanner />
 
       {user?.needsDepartmentSetup && (
         <div className="border-b border-warning/25 bg-warning/10">
@@ -185,6 +190,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const confirm = useConfirm();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
+  const { canInstall, isInstalled, showIosGuide, setShowIosGuide, install } = useInstallPrompt();
 
   if (!user) return null;
   const role =
@@ -232,62 +238,91 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
   };
 
   return (
-    <Dialog open={open} onClose={onClose} size="sm" title="Dein Konto">
-      <div className="flex items-center gap-4 rounded-card bg-surface-2 p-4">
-        <Avatar name={displayName(user)} size="lg" highlight />
-        <div className="min-w-0">
-          <p className="truncate font-display text-lg font-bold text-fg">{displayName(user)}</p>
-          <p className="truncate text-sm text-fg-muted">
-            {user.firstName} {user.lastName}
-          </p>
-          <p className="truncate text-xs text-fg-subtle">
-            {user.homeDepartment ? user.homeDepartment.name : user.needsDepartmentSetup ? 'Abteilung fehlt' : 'Keine Abteilung'}
-            {user.stufen?.length ? ` · ${user.stufen.map((s) => s.name).join(', ')}` : ''}
-          </p>
-          <Badge tone="accent" className="mt-2">
-            {role}
-          </Badge>
+    <>
+      <Dialog open={open} onClose={onClose} size="sm" title="Dein Konto">
+        <div className="flex items-center gap-4 rounded-card bg-surface-2 p-4">
+          <Avatar name={displayName(user)} size="lg" highlight />
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg font-bold text-fg">{displayName(user)}</p>
+            <p className="truncate text-sm text-fg-muted">
+              {user.firstName} {user.lastName}
+            </p>
+            <p className="truncate text-xs text-fg-subtle">
+              {user.homeDepartment ? user.homeDepartment.name : user.needsDepartmentSetup ? 'Abteilung fehlt' : 'Keine Abteilung'}
+              {user.stufen?.length ? ` · ${user.stufen.map((s) => s.name).join(', ')}` : ''}
+            </p>
+            <Badge tone="accent" className="mt-2">
+              {role}
+            </Badge>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-card border border-line px-4 py-2">
-        <span className="text-sm font-semibold text-fg">Farbschema</span>
-        <ThemeToggle />
-      </div>
+        <div className="mt-4 flex items-center justify-between rounded-card border border-line px-4 py-2">
+          <span className="text-sm font-semibold text-fg">Farbschema</span>
+          <ThemeToggle />
+        </div>
 
-      <div className="mt-4 grid gap-2">
-        <Link href="/meine-schichten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
-          <Ticket /> Meine Schichten
-        </Link>
-        <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary' })}>
-          <Building2 /> Abteilung &amp; Stufen
-        </a>
-        <a href={getLandingUrl('/profil')} className={buttonClasses({ variant: 'secondary' })}>
-          <UserRound /> Profil &amp; Angaben
-        </a>
-        <a href={helpUrl()} className={buttonClasses({ variant: 'secondary' })}>
-          <LifeBuoy /> Hilfe &amp; Anleitungen
-        </a>
-        {user.isGlobalAdmin && (
-          <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
-            <Database /> Cevi.DB Daten & Profil
+        <div className="mt-4 grid gap-2">
+          {canInstall && (
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                await install();
+              }}
+            >
+              <Smartphone className="size-4" /> App auf Home-Bildschirm
+            </Button>
+          )}
+          <Link href="/meine-schichten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
+            <Ticket /> Meine Schichten
           </Link>
-        )}
-        <Button variant="ghost" onClick={logout} disabled={deleting}>
-          <LogOut /> Abmelden
-        </Button>
-        {user.canSelfDelete && (
-          <Button
-            variant="ghost"
-            onClick={handleDeleteAccount}
-            disabled={deleting}
-            className="text-danger-ink hover:bg-danger/10 hover:text-danger-ink"
-          >
-            <Trash2 className="size-4" aria-hidden />
-            {deleting ? 'Wird gelöscht …' : 'Konto löschen'}
+          <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary' })}>
+            <Building2 /> Abteilung &amp; Stufen
+          </a>
+          <a href={getLandingUrl('/profil')} className={buttonClasses({ variant: 'secondary' })}>
+            <UserRound /> Profil &amp; Angaben
+          </a>
+          <a href={helpUrl()} className={buttonClasses({ variant: 'secondary' })}>
+            <LifeBuoy /> Hilfe &amp; Anleitungen
+          </a>
+          {user.isGlobalAdmin && (
+            <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
+              <Database /> Cevi.DB Daten & Profil
+            </Link>
+          )}
+          <Button variant="ghost" onClick={logout} disabled={deleting}>
+            <LogOut /> Abmelden
           </Button>
-        )}
-      </div>
-    </Dialog>
+          {user.canSelfDelete && (
+            <Button
+              variant="ghost"
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              className="text-danger-ink hover:bg-danger/10 hover:text-danger-ink"
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {deleting ? 'Wird gelöscht …' : 'Konto löschen'}
+            </Button>
+          )}
+        </div>
+      </Dialog>
+
+      <Dialog open={showIosGuide} onClose={() => setShowIosGuide(false)} size="sm" title="Zum Home-Bildschirm hinzufügen">
+        <div className="space-y-4 text-sm text-fg-muted">
+          <p>So fügst du den Schichtplan als App auf deinem Home-Bildschirm hinzu:</p>
+          <ol className="list-decimal space-y-2 pl-5 text-fg">
+            <li>Tippe in Safari unten in der Leiste auf das <strong>Teilen-Symbol</strong> (Viereck mit Pfeil nach oben).</li>
+            <li>Scrolle im Menü etwas nach unten und wähle <strong>«Zum Home-Bildschirm»</strong>.</li>
+            <li>Tippe oben rechts auf <strong>«Hinzufügen»</strong>.</li>
+          </ol>
+          <p className="text-xs text-fg-subtle">
+            Der Schichtplan ist anschliessend wie eine native App startbar und funktioniert auch im Flugmodus oder Funkloch mit deinen gecachten Schichten.
+          </p>
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setShowIosGuide(false)}>Verstanden</Button>
+          </div>
+        </div>
+      </Dialog>
+    </>
   );
 }

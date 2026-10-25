@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { FeedbackProvider, ThemeScript } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
+import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { getDepartmentPreview } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
 
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-[100dvh]">
         <FeedbackProvider>
           <PortalProvider>{children}</PortalProvider>
+          <ServiceWorkerRegister />
         </FeedbackProvider>
       </body>
     </html>

@@ -327,6 +327,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   };
 
   const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto, answers?: Record<string, string>) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: 'Keine Internetverbindung',
+        description: 'Im Offline-Modus ist nur die Leseansicht verfügbar. Zum Eintragen wird eine Internetverbindung benötigt.',
+        tone: 'error',
+      });
+      return;
+    }
     setBusyShift(shift.id);
     try {
       await api(`/api/shifts/${shift.id}/signup`, {
@@ -400,6 +408,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   };
 
   const cancel = async (shift: ShiftDto, signupId?: string, name?: string) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: 'Keine Internetverbindung',
+        description: 'Im Offline-Modus ist nur die Leseansicht verfügbar. Zum Austragen wird eine Internetverbindung benötigt.',
+        tone: 'error',
+      });
+      return;
+    }
     // Falls Helfer*in sich selbst austragen möchte, Austrag-Sperre prüfen
     const isSelfCancel = !name;
     if (

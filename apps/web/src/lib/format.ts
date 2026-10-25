@@ -67,4 +67,18 @@ export function fmtRelativeDay(iso: string, now = new Date()) {
   return diff > 0 ? `in ${diff} Tagen` : `vor ${-diff} Tagen`;
 }
 
+/** Formatierung für den Stand der Offline-Daten: "Heute, 14:32 Uhr", "Gestern, 09:15 Uhr" oder "25.10., 14:32 Uhr" */
+export function fmtStand(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (isNaN(date.getTime())) return '';
+  const now = new Date();
+  const time = timeFmt.format(date);
+  const diff = Math.round(
+    (Date.parse(businessDayKey(date.toISOString())) - Date.parse(businessDayKey(now.toISOString()))) / 86_400_000
+  );
+  if (diff === 0) return `Heute, ${time} Uhr`;
+  if (diff === -1) return `Gestern, ${time} Uhr`;
+  return `${shortDateFmt.format(date)}, ${time} Uhr`;
+}
+
 export const isPast = (iso: string) => new Date(iso).getTime() < Date.now();

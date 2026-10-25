@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDepartmentSetupUrl, getLoginUrl } from '@schichtplan/shared';
+import { recordLastSyncTime } from './offline';
 
 export class ApiError extends Error {
   constructor(
@@ -23,6 +24,15 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new ApiError(data?.error || data?.message || 'Etwas ist schiefgelaufen', res.status, data ?? {});
+  }
+  // Wenn online und nicht aus dem SW-Cache: Synchronisationszeitpunkt aktualisieren
+  if (
+    typeof window !== 'undefined' &&
+    (!init?.method || init.method.toUpperCase() === 'GET') &&
+    navigator.onLine &&
+    !res.headers.get('x-from-cache')
+  ) {
+    recordLastSyncTime();
   }
   return data as T;
 }
