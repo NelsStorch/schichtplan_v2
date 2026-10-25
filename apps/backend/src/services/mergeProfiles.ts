@@ -44,7 +44,6 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
     where: { id: targetId },
     data: {
       phone: target.phone || source.phone,
-      address: target.address || source.address,
       lastName:
         (!target.lastName || target.lastName === PLACEHOLDER_LAST_NAME) && source.lastName !== PLACEHOLDER_LAST_NAME
           ? source.lastName

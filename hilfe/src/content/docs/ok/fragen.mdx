@@ -1,0 +1,60 @@
+---
+title: Fragen an die Helfenden
+description: Adresse, Allergien, T-Shirt-Grösse oder eigene Fragen stellen und festlegen, wann die Antworten gelöscht werden.
+audience: [ok, abteilung]
+---
+
+import Btn from '../../../components/Btn.astro';
+import Path from '../../../components/Path.astro';
+
+Braucht ihr von den Helfenden mehr als Name und Kontakt, stellt ihr pro Anlass eigene Fragen:
+
+<Path steps={['Anlass', 'OK-Bereich', 'Fragen']} />
+
+Fragen ändern dürfen die Abteilungsleitung und die OK-Leitung. Speichern mit <Btn variant="primary">Speichern</Btn> oben rechts.
+
+:::tip[Nur fragen, was ihr braucht]
+Jede Angabe ist eine Personenangabe, die ihr schützen müsst. Fragt nur, was ihr für den Anlass wirklich braucht, und löscht die Antworten so früh wie möglich.
+:::
+
+## Vorgefertigte Fragen
+
+Mit einem Tipp fügst du eine fertige Frage hinzu:
+
+| Frage | Art |
+| --- | --- |
+| Adresse (Strasse, PLZ, Ort) | Freitext |
+| Allergien / Ernährung | Freitext |
+| T-Shirt-Grösse | Auswahl XS bis XXL |
+| Notfallkontakt (Name und Telefon) | Freitext |
+
+Der Schichtplan speichert keine Adressen im Profil. Braucht ihr sie, zum Beispiel für einen Versand, nehmt die Frage **Adresse**.
+
+## Eigene Fragen
+
+Mit <Btn>Eigene Frage</Btn> stellst du eine Frage selbst zusammen:
+
+| Einstellung | Möglichkeiten |
+| --- | --- |
+| Art der Antwort | Freitext, Ja / Nein, Auswahl (eine Antwort pro Zeile) |
+| Wann wird gefragt? | **Einmal pro Anlass** (z. B. Allergien, T-Shirt-Grösse) oder **Bei jeder Eintragung** (z. B. «Bringe ich ein Auto mit?») |
+| Pflicht | Ohne Antwort kein Eintragen |
+| Antworten löschen | Direkt nach dem Anlass, 10, 30, 90 oder 365 Tage danach, oder Nie löschen |
+
+Mit den Pfeilen änderst du die Reihenfolge. Entfernst du eine Frage, sind beim Speichern auch alle Antworten darauf weg.
+
+## Wann die Antworten gelöscht werden
+
+Pro Frage legst du unter **Antworten löschen** fest, wie lange die Antworten bleiben. Neue Fragen starten mit **30 Tagen**.
+
+- Die Frist zählt ab dem **Ende der letzten Schicht** des Anlasses.
+- «Direkt nach dem Anlass» heisst: spätestens eine Stunde nach dem Ende der letzten Schicht.
+- Gelöscht werden nur die Antworten. Die Frage bleibt stehen, damit ihr seht, was gefragt wurde.
+- Die Helfenden sehen die Frist beim Ausfüllen direkt unter jeder Frage.
+- «Nie löschen» nur wählen, wenn ihr die Angaben wirklich länger braucht. Sie bleiben dann, bis der Anlass oder das Konto gelöscht wird.
+
+Brauchst du die Antworten nach dem Anlass noch, lade sie vorher als [CSV](/ok/auswertung/) herunter.
+
+## Wo die Antworten stehen
+
+Die Antworten sehen nur das OK und die Abteilungsleitung, unter [Zugang & Antworten](/ok/auswertung/). Über jeder Spalte steht, wann die Antworten gelöscht werden.

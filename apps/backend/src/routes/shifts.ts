@@ -824,7 +824,6 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             lastName: true,
             ceviName: true,
             phone: true,
-            address: true,
             birthDate: true,
           },
         });

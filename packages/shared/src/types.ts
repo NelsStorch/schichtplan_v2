@@ -4,6 +4,7 @@ import type {
   EventAccessType,
   EventQuestionScope,
   EventQuestionType,
+  QuestionRetentionDays,
   RequiredProfileField,
   StufeRole,
   UserRole,
@@ -192,7 +193,8 @@ export interface ShiftTemplateItem {
 
 export interface EventTemplateData {
   shifts: ShiftTemplateItem[];
-  questions?: Omit<EventQuestionDto, 'id'>[];
+  /** `retentionDays` fehlt bei Vorlagen von vor 2026-10-25 (dann gilt DEFAULT_QUESTION_RETENTION_DAYS) */
+  questions?: (Omit<EventQuestionDto, 'id' | 'retentionDays'> & { retentionDays?: QuestionRetentionDays })[];
   allowedDepartmentIds?: string[];
   allowedStufeIds?: string[];
   attendanceMode?: AttendanceMode;
@@ -222,7 +224,6 @@ export interface UserDto {
   lastName: string;
   ceviName?: string | null;
   phone?: string | null;
-  address?: string | null;
   birthDate?: string | null;
   isGlobalAdmin: boolean;
   departmentRole?: UserRole | null;
@@ -355,6 +356,8 @@ export interface EventQuestionDto {
   required: boolean;
   /** ONCE = einmal pro Anlass, PER_SIGNUP = bei jeder Eintragung (Antwort pro Schicht) */
   scope: EventQuestionScope;
+  /** Tage nach dem Anlass, bis die Antworten gelöscht werden (null = nie) */
+  retentionDays: QuestionRetentionDays;
 }
 
 /** Was der angemeldeten Person beim Anlass noch fehlt bzw. was sie angegeben hat */
@@ -386,7 +389,6 @@ export interface EventParticipantDto {
   lastName: string | null;
   email: string | null;
   phone: string | null;
-  address: string | null;
   birthDate: string | null;
   homeDepartmentName: string | null;
   viaLink: boolean;

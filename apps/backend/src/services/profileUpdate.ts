@@ -30,7 +30,6 @@ export async function applyProfileUpdate(
   if (input.firstName !== undefined) data.firstName = input.firstName;
   if (input.lastName !== undefined) data.lastName = input.lastName;
   if (input.phone !== undefined) data.phone = input.phone;
-  if (input.address !== undefined) data.address = input.address;
   if (input.shiftReminders !== undefined) data.shiftRemindersEnabled = input.shiftReminders;
   if (input.birthDate !== undefined) {
     const date = new Date(`${input.birthDate}T00:00:00Z`);

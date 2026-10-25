@@ -98,7 +98,6 @@ model User {
   lastName      String
   ceviName      String?
   phone         String?
-  address       String?            // Eine Zeile, z. B. "Dorfstrasse 1, 8307 Effretikon"
   birthDate     DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
   isGlobalAdmin Boolean            @default(false)
   // Rohes Cevi.DB-Profil: nur zum Entwickeln (Debug-Seite), wird später entfernt. Code liest NIE daraus.
@@ -243,6 +242,8 @@ model EventQuestion {
   // ONCE = einmal pro Anlass, PER_SIGNUP = bei jeder Eintragung neu (Antwort pro Schicht)
   scope     String        @default("ONCE")
   sortOrder Int           @default(0) @map("sort_order")
+  // Antworten werden so viele Tage nach dem Anlass-Ende gelöscht (null = nie), siehe services/answerRetention.ts
+  retentionDays Int?      @map("retention_days")
   event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   answers   EventAnswer[]
   signupAnswers ShiftSignupAnswer[]

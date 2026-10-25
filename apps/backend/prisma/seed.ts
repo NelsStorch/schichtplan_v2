@@ -191,9 +191,9 @@ async function main() {
       requiredFields: ['PHONE', 'BIRTH_DATE'],
       questions: {
         create: [
-          { label: 'Allergien oder Unverträglichkeiten', type: 'TEXT', required: false, sortOrder: 0 },
+          { label: 'Allergien oder Unverträglichkeiten', type: 'TEXT', required: false, sortOrder: 0, retentionDays: 0 },
           // Wird bei jeder Eintragung neu gefragt (Antwort pro Schicht)
-          { label: 'Kommst du mit dem Auto?', type: 'YES_NO', required: true, scope: 'PER_SIGNUP', sortOrder: 1 },
+          { label: 'Kommst du mit dem Auto?', type: 'YES_NO', required: true, scope: 'PER_SIGNUP', sortOrder: 1, retentionDays: 30 },
         ],
       },
     },

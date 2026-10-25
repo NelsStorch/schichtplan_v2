@@ -23,7 +23,6 @@ import {
   syncCeviDbStufen,
   toUserStufeDto,
 } from '../services/homeDepartment.js';
-import { ceviDbProfileFields } from '../services/profile.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
 import { sendAccountExistsEmail, sendVerificationEmail } from '../services/email.js';
 import {
@@ -36,6 +35,7 @@ import {
   tooManyRequests,
 } from '../services/ceviNameLogin.js';
 import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
+import { withoutCeviDbAddress } from '../services/profile.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 
 /** Passwort-Login: höchstens 30 Fehlversuche pro IP in 10 Minuten, 10 pro E-Mail in 15 Minuten */
@@ -195,7 +195,6 @@ async function loadUserDto(
     lastName: user.lastName,
     ceviName: user.ceviName,
     phone: user.phone,
-    address: user.address,
     birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
     isGlobalAdmin: user.isGlobalAdmin,
     departmentRole: (user.memberships[0]?.role as UserDto['departmentRole']) ?? null,
@@ -518,11 +517,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       user = byEmail;
     }
 
-    // Adresse aus Cevi.DB. Cevi.DB ist die Quelle: Was dort steht, ersetzt die lokalen Werte bei jedem Login.
-    // Fehlt ein Wert in Cevi.DB, bleibt der selbst erfasste. Die Handynummer liefert Cevi.DB nicht (Scope
-    // `with_roles` hat keine Telefonnummern), sie wird nur im Schichtplan erfasst.
-    const extra = ceviDbProfileFields(profile);
-
+    // Cevi.DB ist die Quelle: Was dort steht, ersetzt die lokalen Werte bei jedem Login. Die Adresse
+    // übernehmen wir bewusst nicht (Datensparsamkeit; wer sie braucht, fragt beim Anlass danach). Die
+    // Handynummer liefert Cevi.DB nicht (Scope `with_roles` hat keine Telefonnummern).
     if (!user) {
       user = await fastify.prisma.user.create({
         data: {
@@ -532,10 +529,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           lastName,
           ceviName,
           birthDate,
-          address: extra.address,
           emailVerified: true,
           emailVerifiedAt: now,
-          ceviDbData: profile,
+          ceviDbData: withoutCeviDbAddress(profile),
           ceviDbSyncedAt: now,
         },
       });
@@ -548,11 +544,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           firstName: firstName || user.firstName,
           lastName: lastName || user.lastName,
           birthDate: birthDate || user.birthDate,
-          address: extra.address || user.address,
           ...(await ceviDbEmailUpdate(user, profile.email)),
           emailVerified: true,
           emailVerifiedAt: user.emailVerifiedAt || now,
-          ceviDbData: profile,
+          ceviDbData: withoutCeviDbAddress(profile),
           ceviDbSyncedAt: now,
         },
       });

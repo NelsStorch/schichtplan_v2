@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 
 import { buildApp } from './app.js';
+import { ANSWER_RETENTION_INTERVAL_MS, purgeExpiredAnswers } from './services/answerRetention.js';
 import { REMINDER_INTERVAL_MS, sendDueShiftReminders } from './services/shiftReminders.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
@@ -46,6 +47,20 @@ async function main() {
     });
     app.log.info('Schicht-Erinnerungen eingeschaltet');
   }
+
+  // Antworten auf eigene Fragen nach der eingestellten Frist löschen (immer an, auch vor listen())
+  const purge = () =>
+    purgeExpiredAnswers(app.prisma)
+      .then((deleted) => deleted > 0 && app.log.info({ deleted }, 'Abgelaufene Antworten gelöscht'))
+      .catch((err) => app.log.error(err, 'Löschen abgelaufener Antworten fehlgeschlagen'));
+  const purgeTimer = setInterval(purge, ANSWER_RETENTION_INTERVAL_MS);
+  purgeTimer.unref();
+  const firstPurge = setTimeout(purge, 2 * 60 * 1000);
+  firstPurge.unref();
+  app.addHook('onClose', async () => {
+    clearInterval(purgeTimer);
+    clearTimeout(firstPurge);
+  });
 
   try {
     await app.listen({ port: PORT, host: HOST });

@@ -58,7 +58,7 @@ export default function ProfilePage() {
   const toast = useToast();
   const [user, setUser] = useState<UserDto | null>(null);
   const [shifts, setShifts] = useState<MyShift[] | null>(null);
-  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', birthDate: '', address: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', birthDate: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
@@ -112,7 +112,6 @@ export default function ProfilePage() {
         phone: me.phone ?? '',
         email: '',
         birthDate: me.birthDate ?? '',
-        address: me.address ?? '',
       });
       const shiftsRes = await fetch('/api/shifts/my', { cache: 'no-store' });
       setShifts(shiftsRes.ok ? await shiftsRes.json() : []);
@@ -153,7 +152,6 @@ export default function ProfilePage() {
     if (form.lastName.trim()) payload.lastName = form.lastName.trim();
     if (form.phone.trim()) payload.phone = form.phone.trim();
     if (form.birthDate && !birthDateFromCeviDb) payload.birthDate = form.birthDate;
-    if (form.address.trim()) payload.address = form.address.trim();
     if (!hasRealEmail && form.email.trim()) payload.email = form.email.trim();
     try {
       const res = await fetch('/api/auth/me', {
@@ -284,8 +282,9 @@ export default function ProfilePage() {
               <div>
                 <h2 className="text-sm font-semibold text-fg-subtle">Deine Angaben</h2>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Manche Anlässe brauchen sie für die Eintragung. Bei Cevi.DB-Konten werden Name, E-Mail, Geburtsdatum
-                  und Adresse bei jedem Login aus Cevi.DB aktualisiert.
+                  Manche Anlässe brauchen sie für die Eintragung. Bei Cevi.DB-Konten werden Name, E-Mail und
+                  Geburtsdatum bei jedem Login aus Cevi.DB aktualisiert. Deine Adresse speichern wir nicht; braucht ein
+                  OK sie, fragt es beim Anlass danach und löscht sie nach der angegebenen Frist.
                 </p>
               </div>
               {message && <Callout tone={message.tone}>{message.text}</Callout>}
@@ -301,9 +300,6 @@ export default function ProfilePage() {
                 </Field>
                 <Field label="Geburtsdatum" hint={birthDateFromCeviDb ? 'Aus Cevi.DB, nur dort änderbar' : undefined}>
                   <Input type="date" value={form.birthDate} disabled={birthDateFromCeviDb} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} autoComplete="bday" />
-                </Field>
-                <Field label="Adresse" className="sm:col-span-2">
-                  <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} autoComplete="street-address" placeholder="Dorfstrasse 1, 8307 Effretikon" />
                 </Field>
                 {hasRealEmail ? (
                   <div className="sm:col-span-2">

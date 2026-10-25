@@ -1,33 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, Plus, Search, Trash2 } from 'lucide-react';
+import { Check, Search } from 'lucide-react';
 import {
-  EVENT_QUESTION_SCOPES,
-  EVENT_QUESTION_TYPES,
   REQUIRED_PROFILE_FIELDS,
   accessTypeConfig,
   helpUrl,
   type DepartmentDirectoryItemDto,
   type EventAccessType,
-  type EventQuestionScope,
-  type EventQuestionType,
   type RequiredProfileField,
 } from '@schichtplan/shared';
-import { Button, Callout, Input, Select, Switch, cn } from '@schichtplan/ui';
+import { Callout, Input, Switch, cn } from '@schichtplan/ui';
 import { api } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 import { ACCESS_TYPE_INFO } from './event-meta';
+import { questionsPayload, type QuestionDraft } from './ok/QuestionsEditor';
 
-export interface QuestionDraft {
-  id?: string;
-  label: string;
-  type: EventQuestionType;
-  /** Antworten bei Auswahl-Fragen, eine pro Zeile */
-  optionsText: string;
-  required: boolean;
-  scope: EventQuestionScope;
-}
+export type { QuestionDraft };
 
 export interface EventAccessValues {
   accessType: EventAccessType;
@@ -47,8 +36,11 @@ export const EMPTY_ACCESS: EventAccessValues = {
   questions: [],
 };
 
-/** Formularwerte -> API (Listen passend zum Typ, Fragen bereinigt) */
-export function accessPayload(values: EventAccessValues) {
+/**
+ * Formularwerte -> API (Listen passend zum Typ). Fragen nur beim Erstellen (aus einer Vorlage):
+ * Danach bearbeitet sie die Seite «Fragen» im OK-Bereich, die Einstellungen dürfen sie nicht überschreiben.
+ */
+export function accessPayload(values: EventAccessValues, includeQuestions = false) {
   const cfg = accessTypeConfig(values.accessType);
   return {
     accessType: values.accessType,
@@ -56,22 +48,7 @@ export function accessPayload(values: EventAccessValues) {
     requiredFields: values.requiredFields,
     allowedDepartmentIds: cfg.whitelist ? values.allowedDepartmentIds : [],
     allowedStufeIds: cfg.scope === 'DEPARTMENT' ? values.allowedStufeIds : [],
-    questions: values.questions
-      .filter((q) => q.label.trim())
-      .map((q) => ({
-        id: q.id,
-        label: q.label.trim(),
-        type: q.type,
-        options:
-          q.type === 'CHOICE'
-            ? q.optionsText
-                .split('\n')
-                .map((o) => o.trim())
-                .filter(Boolean)
-            : [],
-        required: q.required,
-        scope: q.scope,
-      })),
+    questions: includeQuestions ? questionsPayload(values.questions) : undefined,
   };
 }
 
@@ -117,18 +94,6 @@ export function EventAccessFields({
   ].filter((d): d is DepartmentDirectoryItemDto => Boolean(d));
 
   const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
-
-  const updateQuestion = (index: number, patch: Partial<QuestionDraft>) =>
-    set(
-      'questions',
-      values.questions.map((q, i) => (i === index ? { ...q, ...patch } : q))
-    );
-  const moveQuestion = (index: number, delta: number) => {
-    const next = [...values.questions];
-    const [item] = next.splice(index, 1);
-    next.splice(index + delta, 0, item);
-    set('questions', next);
-  };
 
   return (
     <div className="space-y-7">
@@ -290,7 +255,7 @@ export function EventAccessFields({
         <legend className="mb-1 text-[13px] font-semibold text-fg">Pflichtangaben</legend>
         <p className="mb-3 text-xs text-fg-muted">
           Wer etwas davon noch nicht im Profil hat, wird beim ersten Eintragen danach gefragt. Bei Cevi.DB-Konten kommen
-          Name, E-Mail, Geburtsdatum und Adresse aus Cevi.DB.
+          Name, E-Mail und Geburtsdatum aus Cevi.DB.
         </p>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(REQUIRED_PROFILE_FIELDS) as RequiredProfileField[]).map((field) => {
@@ -316,118 +281,10 @@ export function EventAccessFields({
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend className="mb-1 text-[13px] font-semibold text-fg">Eigene Fragen</legend>
-        <p className="mb-3 text-xs text-fg-muted">
-          «Einmal pro Anlass» z. B. für Allergien oder T-Shirt-Grösse, «Bei jeder Eintragung» für Angaben pro Schicht
-          (z. B. «Bringe ich ein Auto mit?»). Die Antworten sieht nur das OK.
-        </p>
-        <div className="space-y-3">
-          {values.questions.map((q, index) => (
-            <div key={q.id ?? `new-${index}`} className="space-y-3 rounded-field border border-line bg-surface-2/60 p-3">
-              <div className="flex gap-2">
-                <Input
-                  value={q.label}
-                  onChange={(e) => updateQuestion(index, { label: e.target.value })}
-                  placeholder="Frage, z. B. T-Shirt-Grösse"
-                  aria-label={`Frage ${index + 1}`}
-                  className="h-10"
-                />
-                <div className="flex shrink-0 items-center">
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={index === 0}
-                    onClick={() => moveQuestion(index, -1)}
-                    aria-label="Nach oben"
-                  >
-                    <ArrowUp />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={index === values.questions.length - 1}
-                    onClick={() => moveQuestion(index, 1)}
-                    aria-label="Nach unten"
-                  >
-                    <ArrowDown />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => set('questions', values.questions.filter((_, i) => i !== index))}
-                    aria-label="Frage entfernen"
-                    className="hover:text-danger-ink"
-                  >
-                    <Trash2 />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Select
-                  value={q.type}
-                  onChange={(e) => updateQuestion(index, { type: e.target.value as EventQuestionType })}
-                  aria-label="Art der Antwort"
-                  className="h-10 w-40"
-                >
-                  {(Object.keys(EVENT_QUESTION_TYPES) as EventQuestionType[]).map((type) => (
-                    <option key={type} value={type}>
-                      {EVENT_QUESTION_TYPES[type]}
-                    </option>
-                  ))}
-                </Select>
-                <Select
-                  value={q.scope}
-                  onChange={(e) => updateQuestion(index, { scope: e.target.value as EventQuestionScope })}
-                  aria-label="Wann wird gefragt?"
-                  className="h-10 w-52"
-                >
-                  {(Object.keys(EVENT_QUESTION_SCOPES) as EventQuestionScope[]).map((scope) => (
-                    <option key={scope} value={scope}>
-                      {EVENT_QUESTION_SCOPES[scope]}
-                    </option>
-                  ))}
-                </Select>
-                <label className="inline-flex items-center gap-2 text-sm text-fg">
-                  <input
-                    type="checkbox"
-                    checked={q.required}
-                    onChange={(e) => updateQuestion(index, { required: e.target.checked })}
-                    className="size-4 accent-[rgb(var(--accent))]"
-                  />
-                  Pflicht
-                </label>
-              </div>
-              {q.type === 'CHOICE' && (
-                <textarea
-                  value={q.optionsText}
-                  onChange={(e) => updateQuestion(index, { optionsText: e.target.value })}
-                  rows={3}
-                  placeholder={'Eine Antwort pro Zeile, z. B.\nS\nM\nL'}
-                  aria-label="Antwortmöglichkeiten"
-                  className="w-full rounded-field border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
-                />
-              )}
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              set('questions', [
-                ...values.questions,
-                { label: '', type: 'TEXT', optionsText: '', required: false, scope: 'ONCE' },
-              ])
-            }
-          >
-            <Plus /> Frage hinzufügen
-          </Button>
-        </div>
-      </fieldset>
+      <p className="text-xs text-fg-muted">
+        Eigene Fragen (z. B. Adresse, Allergien, T-Shirt-Grösse) stellt ihr im OK-Bereich unter «Fragen», mit
+        Aufbewahrungsdauer für die Antworten.
+      </p>
     </div>
   );
 }

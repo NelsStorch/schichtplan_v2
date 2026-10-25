@@ -5,6 +5,7 @@ import { Check, Copy, Download, Link2, Plus, Share2, Trash2, User, Users } from 
 import {
   PLACEHOLDER_LAST_NAME,
   REQUIRED_PROFILE_FIELDS,
+  retentionNotice,
   type EventAccessLinkDto,
   type EventParticipantDto,
   zurichInputToIso,
@@ -49,8 +50,8 @@ export function EventAccessPanel({ event }: { event: EventDetails }) {
           {event.requiredFields.length
             ? event.requiredFields.map((f) => REQUIRED_PROFILE_FIELDS[f].label).join(', ')
             : 'keine'}
-          {event.questions.length > 0 && ` · ${event.questions.length} eigene Frage(n)`}. Ändern unter
-          «Einstellungen».
+          {event.questions.length > 0 && ` · ${event.questions.length} eigene Frage(n)`}. Pflichtangaben ändern unter
+          «Einstellungen», Fragen unter «Fragen».
         </p>
       </Card>
 
@@ -350,7 +351,6 @@ function Participants({ event }: { event: EventDetails }) {
       'Nachname',
       'E-Mail',
       'Handy',
-      'Adresse',
       'Geburtsdatum',
       'Abteilung',
       'Schichten',
@@ -362,7 +362,6 @@ function Participants({ event }: { event: EventDetails }) {
       p.lastName === PLACEHOLDER_LAST_NAME ? '' : p.lastName,
       p.email,
       p.phone,
-      p.address,
       p.birthDate,
       p.homeDepartmentName,
       p.shiftCount,
@@ -414,6 +413,7 @@ function Participants({ event }: { event: EventDetails }) {
                 {event.questions.map((q) => (
                   <th key={q.id} className="px-4 py-2.5">
                     {q.label}
+                    <span className="block font-normal text-fg-subtle">{retentionNotice(q.retentionDays)}</span>
                   </th>
                 ))}
               </tr>
@@ -450,7 +450,6 @@ function Participants({ event }: { event: EventDetails }) {
                         {p.email}
                       </a>
                     )}
-                    {p.address && <span className="block">{p.address}</span>}
                     {p.birthDate && <span className="block">geb. {p.birthDate.split('-').reverse().join('.')}</span>}
                   </td>
                   <td className="tabular px-4 py-3 text-fg">{p.shiftCount}</td>

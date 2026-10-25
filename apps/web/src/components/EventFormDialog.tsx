@@ -17,6 +17,7 @@ import type { EventDetails } from '@/lib/types';
 import { BANNER_PRESETS } from './event-meta';
 import { EMPTY_ACCESS, EventAccessFields, accessPayload, type EventAccessValues } from './EventAccessFields';
 import { ImageUpload } from './ImageUpload';
+import { questionDraft } from './ok/QuestionsEditor';
 
 export interface EventFormValues {
   title: string;
@@ -64,14 +65,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
       requiredFields: event.requiredFields,
       allowedDepartmentIds: event.allowedDepartments.map((d) => d.id),
       allowedStufeIds: event.allowedStufen.map((s) => s.id),
-      questions: event.questions.map((q) => ({
-        id: q.id,
-        label: q.label,
-        type: q.type,
-        optionsText: q.options.join('\n'),
-        required: q.required,
-        scope: q.scope,
-      })),
+      questions: event.questions.map(questionDraft),
     },
   };
 }
@@ -431,7 +425,7 @@ export function EventForm({
         contactVisibility: form.contactVisibility,
         signupOpensAt: form.signupOpensAt ? zurichInputToIso(form.signupOpensAt) : null,
         attendanceMode: form.attendanceMode,
-        ...accessPayload(form.access),
+        ...accessPayload(form.access, mode === 'create'),
       };
 
       if (mode === 'create') {
@@ -548,13 +542,7 @@ export function EventForm({
                           requiredFields: found.requiredFields,
                           allowedDepartmentIds: found.data.allowedDepartmentIds ?? [],
                           allowedStufeIds: found.data.allowedStufeIds ?? [],
-                          questions: (found.data.questions ?? []).map((q) => ({
-                            label: q.label,
-                            type: q.type,
-                            optionsText: q.options.join('\n'),
-                            required: q.required,
-                            scope: q.scope ?? 'ONCE',
-                          })),
+                          questions: (found.data.questions ?? []).map(questionDraft),
                         },
                       }));
                     }

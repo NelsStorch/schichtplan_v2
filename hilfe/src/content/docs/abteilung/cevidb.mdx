@@ -13,7 +13,6 @@ Die Cevi.DB (`db.cevi.ch`, Hitobito) ist die Mitgliederdatenbank des Cevi. Der S
 | Übername (Cevi-Name), Vor- und Nachname | Name auf dem Plan |
 | Geburtsdatum | Altersprüfung bei Schichten, im Schichtplan nicht änderbar |
 | E-Mail | Konto, Kontakt fürs OK |
-| Adresse | ersetzt die Angabe im Schichtplan, wenn in der Cevi.DB erfasst |
 | Ortsgruppe | Heimabteilung (fest) |
 | Rollen in Stufen-Gruppen | [Stufen](/abteilung/stufen/) mit Leitung oder Teilnehmer\*in |
 | Rolle Abteilungsleiter\*in | darf eine [Abteilung anlegen](/abteilung/anlegen/), zählt bei «Nur Leitende» |
@@ -22,7 +21,9 @@ Der Schichtplan liest nur. Er schreibt nie etwas in die Cevi.DB zurück.
 
 ## Wann aktualisiert wird
 
-Bei **jedem Login mit Cevi.DB**. Ändert sich etwas in der Cevi.DB, zum Beispiel ein Stufenwechsel oder eine abgegebene Leitung, gilt das im Schichtplan erst nach dem nächsten Login der Person. Was in der Cevi.DB steht, gewinnt: Name, E-Mail, Geburtsdatum und Adresse werden dabei überschrieben. Fehlt etwas in der Cevi.DB, bleibt die im Schichtplan erfasste Angabe.
+Bei **jedem Login mit Cevi.DB**. Ändert sich etwas in der Cevi.DB, zum Beispiel ein Stufenwechsel oder eine abgegebene Leitung, gilt das im Schichtplan erst nach dem nächsten Login der Person. Was in der Cevi.DB steht, gewinnt: Name, E-Mail und Geburtsdatum werden dabei überschrieben. Fehlt etwas in der Cevi.DB, bleibt die im Schichtplan erfasste Angabe.
+
+Die **Adresse** übernimmt der Schichtplan bewusst nicht (Datensparsamkeit). Braucht ein OK sie, stellt es beim Anlass die [Frage «Adresse»](/ok/fragen/).
 
 Die Handynummer kommt nicht aus der Cevi.DB, die gibt sie dem Schichtplan nicht heraus. Jede Person erfasst sie selbst im Profil oder beim Eintragen.
 

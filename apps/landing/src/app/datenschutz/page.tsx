@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 // Rechtliche Stammdaten: Platzhalter in eckigen Klammern vor dem Livegang ausfüllen
-const STAND = "20. Oktober 2026";
+const STAND = "25. Oktober 2026";
 
 function Section({
   id,
@@ -175,7 +175,8 @@ export default function DatenschutzPage() {
               <strong>Cevi.DB:</strong> Cevi.DB-Personen-ID, Vor- und Nachname,
               Cevi-Name, E-Mail, Geburtsdatum, Ortsgruppe sowie deine Rollen in
               der Cevi.DB, soweit wir daraus Abteilung, Stufen und eine
-              allfällige Abteilungsleitung ableiten.
+              allfällige Abteilungsleitung ableiten. Deine Postadresse aus der
+              Cevi.DB übernehmen und speichern wir nicht.
             </li>
             <li>
               <strong>Cevi-Name (ohne Passwort):</strong> Cevi-Name und
@@ -185,9 +186,16 @@ export default function DatenschutzPage() {
           </List>
           <p>
             Freiwillig oder auf Verlangen eines Anlasses kommen dazu:
-            Handynummer, Postadresse, Geburtsdatum, Heimabteilung und Stufen
-            (mit Rolle Leitung oder Teilnehmer*in) sowie die Einstellung, ob du
+            Handynummer, Geburtsdatum, Heimabteilung und Stufen (mit Rolle
+            Leitung oder Teilnehmer*in) sowie die Einstellung, ob du
             Schicht-Erinnerungen erhalten möchtest.
+          </p>
+          <p>
+            Nach dem Grundsatz der Datensparsamkeit speichern wir in deinem
+            Profil <strong>keine Postadresse</strong>. Braucht ein OK sie für
+            einen Anlass (z.&nbsp;B. für einen Versand), fragt es beim Anlass
+            danach; die Antwort gehört nur zu diesem Anlass und wird nach der
+            angegebenen Frist gelöscht (siehe Abschnitt 8).
           </p>
 
           <h3 className="pt-2 font-semibold text-fg">Schichtplanung</h3>
@@ -198,7 +206,9 @@ export default function DatenschutzPage() {
             </li>
             <li>
               Antworten auf Fragen, die ein OK zu seinem Anlass stellt
-              (z.&nbsp;B. T-Shirt-Grösse),
+              (z.&nbsp;B. Adresse, Allergien, Notfallkontakt oder
+              T-Shirt-Grösse). Beim Ausfüllen steht bei jeder Frage, wann die
+              Antwort gelöscht wird,
             </li>
             <li>
               Abmeldungen von einem Anlass mit freiwilligem Grund. Bitte gib
@@ -285,8 +295,8 @@ export default function DatenschutzPage() {
             </li>
             <li>
               <strong>OK, Abteilungsleitung und Planung</strong> der
-              betreffenden Abteilung sehen zusätzlich Kontaktdaten (E-Mail,
-              Telefon, Adresse, soweit vorhanden), das Alter sowie Antworten und
+              betreffenden Abteilung sehen zusätzlich Kontaktdaten (E-Mail und
+              Telefon, soweit vorhanden), das Alter sowie Antworten und
               Abmeldungen zu ihren Anlässen.
             </li>
             <li>
@@ -415,6 +425,15 @@ export default function DatenschutzPage() {
             <li>
               Anlässe mit ihren Eintragungen bleiben bestehen, bis die Abteilung
               sie löscht.
+            </li>
+            <li>
+              Antworten auf die Fragen eines Anlasses löschen wir automatisch
+              nach der Frist, die das OK pro Frage festlegt: direkt nach dem
+              Anlass oder 10, 30, 90 bzw. 365 Tage danach (gezählt ab dem Ende
+              der letzten Schicht). Die Frist steht beim Ausfüllen neben der
+              Frage. Nur wenn das OK ausdrücklich «Nie löschen» wählt, bleiben
+              die Antworten bis zur Löschung des Anlasses oder deines Kontos
+              bestehen.
             </li>
             <li>
               Links zum Bestätigen der E-Mail und zum Zurücksetzen des Passworts

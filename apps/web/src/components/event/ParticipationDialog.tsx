@@ -5,6 +5,7 @@ import { ClipboardList } from 'lucide-react';
 import {
   PLACEHOLDER_LAST_NAME,
   REQUIRED_PROFILE_FIELDS,
+  retentionNotice,
   type EventQuestionDto,
   type RequiredProfileField,
 } from '@schichtplan/shared';
@@ -93,7 +94,6 @@ function ParticipationForm({
     phone: user?.phone ?? '',
     email: '',
     birthDate: user?.birthDate ?? '',
-    address: user?.address ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +112,6 @@ function ParticipationForm({
     if (missing.has('PHONE')) profilePayload.phone = profile.phone.trim();
     if (missing.has('EMAIL')) profilePayload.email = profile.email.trim();
     if (missing.has('BIRTH_DATE')) profilePayload.birthDate = profile.birthDate;
-    if (missing.has('ADDRESS')) profilePayload.address = profile.address.trim();
 
     try {
       if (Object.keys(profilePayload).length || onceQuestions.length) {
@@ -140,7 +139,7 @@ function ParticipationForm({
     const value = answers[q.id] ?? '';
     const set = (v: string) => setAnswers((a) => ({ ...a, [q.id]: v }));
     return (
-      <Field key={q.id} label={q.label} required={q.required}>
+      <Field key={q.id} label={q.label} required={q.required} hint={retentionNotice(q.retentionDays)}>
         {q.type === 'YES_NO' ? (
           <div role="radiogroup" aria-label={q.label} className="flex gap-2">
             {[
@@ -235,18 +234,6 @@ function ParticipationForm({
             onChange={(e) => setField('birthDate', e.target.value)}
             autoComplete="bday"
             required
-          />
-        </Field>
-      )}
-      {missing.has('ADDRESS') && (
-        <Field label={REQUIRED_PROFILE_FIELDS.ADDRESS.label} required hint="Strasse, PLZ und Ort">
-          <Input
-            value={profile.address}
-            onChange={(e) => setField('address', e.target.value)}
-            autoComplete="street-address"
-            placeholder="Dorfstrasse 1, 8307 Effretikon"
-            required
-            minLength={5}
           />
         </Field>
       )}

@@ -60,6 +60,7 @@ export default defineConfig({
             'ok/schichten-planen',
             'ok/arbeiten-katalog',
             'ok/zugang',
+            'ok/fragen',
             'ok/zugangs-links',
             'ok/einteilen',
             'ok/helfer-pool',

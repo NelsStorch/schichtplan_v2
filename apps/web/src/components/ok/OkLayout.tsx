@@ -16,6 +16,7 @@ import {
   LifeBuoy,
   Mail,
   Menu,
+  MessageSquareText,
   Settings,
   Shield,
   Users,
@@ -58,6 +59,7 @@ const NAV: NavGroup[] = [
     label: 'Helfende',
     items: [
       { path: 'helfende', label: 'Helfende', icon: Users, count: (c) => c.stats.helperCount },
+      { path: 'fragen', label: 'Fragen', icon: MessageSquareText, count: (c) => c.event?.questions.length ?? null },
       { path: 'helfende/zugang', label: 'Zugang & Antworten', icon: KeyRound },
       { path: 'nachrichten', label: 'Nachrichten', icon: Mail },
     ],

@@ -2,7 +2,9 @@ import { z } from 'zod';
 import {
   ATTENDANCE_MODE_KEYS,
   ATTENDANCE_STATUS_KEYS,
+  DEFAULT_QUESTION_RETENTION_DAYS,
   EVENT_ACCESS_TYPE_KEYS,
+  QUESTION_RETENTION_DAYS,
   REQUIRED_PROFILE_FIELD_KEYS,
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_REGEX,
@@ -16,6 +18,15 @@ const EventQuestionInputSchema = z
     options: z.array(z.string().trim().min(1).max(100)).max(30).default([]),
     required: z.boolean().default(false),
     scope: z.enum(['ONCE', 'PER_SIGNUP']).default('ONCE'),
+    /** Tage nach dem Anlass, bis die Antworten gelöscht werden (null = nie) */
+    retentionDays: z
+      .number()
+      .int()
+      .refine((d) => (QUESTION_RETENTION_DAYS as readonly (number | null)[]).includes(d), {
+        message: 'Ungültige Aufbewahrungsdauer',
+      })
+      .nullable()
+      .default(DEFAULT_QUESTION_RETENTION_DAYS),
   })
   .refine((q) => q.type !== 'CHOICE' || q.options.length >= 2, {
     message: 'Eine Auswahl-Frage braucht mindestens zwei Antworten',
@@ -23,11 +34,17 @@ const EventQuestionInputSchema = z
 
 export type EventQuestionInput = z.infer<typeof EventQuestionInputSchema>;
 
+/** Pflichtangaben; nicht mehr bekannte Schlüssel (z. B. das frühere ADDRESS) fallen still weg */
+const RequiredFieldsSchema = z
+  .array(z.string().max(40))
+  .max(20)
+  .transform((values) => REQUIRED_PROFILE_FIELD_KEYS.filter((key) => values.includes(key)));
+
 /** Zugang & Pflichtangaben eines Anlasses (gleich beim Erstellen, Bearbeiten und für Vorlagen) */
 const EventAccessFields = {
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).default('PUBLIC'),
   leadersOnly: z.boolean().default(false),
-  requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).default([]),
+  requiredFields: RequiredFieldsSchema.default([]),
   allowedDepartmentIds: z.array(z.string().uuid()).max(100).default([]),
   allowedStufeIds: z.array(z.string().uuid()).max(100).default([]),
   questions: z.array(EventQuestionInputSchema).max(30).default([]),
@@ -196,7 +213,7 @@ export const UpdateEventSchema = z.object({
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
-  requiredFields: z.array(z.enum(REQUIRED_PROFILE_FIELD_KEYS)).optional(),
+  requiredFields: RequiredFieldsSchema.optional(),
   allowedDepartmentIds: z.array(z.string().uuid()).max(100).optional(),
   allowedStufeIds: z.array(z.string().uuid()).max(100).optional(),
   questions: z.array(EventQuestionInputSchema).max(30).optional(),
@@ -227,7 +244,6 @@ export const UpdateProfileSchema = z.object({
     .optional(),
   email: z.string().trim().email('Ungültige E-Mail-Adresse').max(254).optional(),
   birthDate: BirthDateSchema.optional(),
-  address: z.string().trim().min(5, 'Bitte Strasse, PLZ und Ort angeben').max(200).optional(),
   /** Erinnerungs-Mail vor eigenen Schichten */
   shiftReminders: z.boolean().optional(),
 });

@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from '../db.js';
 import {
   accessTypeConfig,
   toEventAccessType,
+  toRetentionDays,
   AddEventOrganizerSchema,
   CreateEventSchema,
   SaveAsTemplateSchema,
@@ -51,6 +52,7 @@ export function toQuestionDto(q: {
   options: string[];
   required: boolean;
   scope: string;
+  retentionDays: number | null;
 }): EventQuestionDto {
   return {
     id: q.id,
@@ -59,6 +61,7 @@ export function toQuestionDto(q: {
     options: q.options,
     required: q.required,
     scope: q.scope === 'PER_SIGNUP' ? 'PER_SIGNUP' : 'ONCE',
+    retentionDays: toRetentionDays(q.retentionDays),
   };
 }
 
@@ -136,6 +139,7 @@ async function syncQuestions(tx: Tx, eventId: string, questions: EventQuestionIn
       options: q.type === 'CHOICE' ? q.options : [],
       required: q.required,
       scope: q.scope,
+      retentionDays: q.retentionDays,
       sortOrder: index,
     };
     if (q.id && existingIds.has(q.id)) {
@@ -292,7 +296,6 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
               firstName: true,
               lastName: true,
               phone: true,
-              address: true,
               birthDate: true,
               eventAnswers: { where: { eventId: event.id }, select: { questionId: true, value: true } },
             },

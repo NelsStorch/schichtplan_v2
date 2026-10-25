@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveCeviDbFields, isDepartmentLeaderRole, parseCeviDbGroupId } from './cevidb.js';
-import { ceviDbProfileFields, missingProfileFields, personLabel } from './profile.js';
+import { missingProfileFields, personLabel, withoutCeviDbAddress } from './profile.js';
 
 const profile = {
   id: 12211,
@@ -57,25 +57,25 @@ describe('deriveCeviDbFields', () => {
   });
 });
 
-describe('ceviDbProfileFields', () => {
-  it('setzt die Adresse zusammen und bevorzugt die Mobilnummer', () => {
+describe('withoutCeviDbAddress', () => {
+  it('entfernt Adressfelder, auch in _userInfo', () => {
     expect(
-      ceviDbProfileFields({
+      withoutCeviDbAddress({
+        id: 1,
+        nickname: 'Falk',
         address: 'Hauptstrasse 1',
         zip_code: '8307',
         town: 'Effretikon',
-        phone_numbers: [
-          { label: 'Privat', number: '052 000 00 00' },
-          { label: 'Mobil', number: '079 000 00 00' },
-        ],
+        country: 'CH',
+        _userInfo: { sub: '1', address: 'Hauptstrasse 1', postal_code: '8307' },
       })
-    ).toEqual({ address: 'Hauptstrasse 1, 8307 Effretikon', phone: '079 000 00 00' });
-    expect(ceviDbProfileFields('x')).toEqual({ address: null, phone: null });
+    ).toEqual({ id: 1, nickname: 'Falk', _userInfo: { sub: '1' } });
+    expect(withoutCeviDbAddress('x')).toBe('x');
   });
 });
 
 describe('Profilangaben', () => {
-  const base = { email: null, firstName: 'Max', lastName: 'Muster', phone: null, address: null, birthDate: null };
+  const base = { email: null, firstName: 'Max', lastName: 'Muster', phone: null, birthDate: null };
 
   it('meldet fehlende Pflichtangaben und ignoriert unbekannte', () => {
     expect(missingProfileFields(base, ['PHONE', 'BIRTH_DATE', 'UNBEKANNT'])).toEqual(['PHONE', 'BIRTH_DATE']);

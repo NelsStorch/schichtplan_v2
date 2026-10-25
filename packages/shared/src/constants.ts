@@ -96,7 +96,6 @@ export const REQUIRED_PROFILE_FIELDS = {
   EMAIL: { label: 'E-Mail' },
   BIRTH_DATE: { label: 'Geburtsdatum' },
   FULL_NAME: { label: 'Vor- und Nachname' },
-  ADDRESS: { label: 'Adresse' },
 } as const;
 
 export type RequiredProfileField = keyof typeof REQUIRED_PROFILE_FIELDS;
@@ -119,6 +118,52 @@ export const EVENT_QUESTION_SCOPES = {
 } as const;
 
 export type EventQuestionScope = keyof typeof EVENT_QUESTION_SCOPES;
+
+/**
+ * Wie lange die Antworten auf eine Frage nach dem Anlass bleiben: Tage nach dem Ende der letzten
+ * Schicht, null = nie automatisch löschen. Gelöscht wird in `services/answerRetention.ts` (Backend).
+ */
+export const QUESTION_RETENTION_DAYS = [0, 10, 30, 90, 365, null] as const;
+export type QuestionRetentionDays = (typeof QUESTION_RETENTION_DAYS)[number];
+export const DEFAULT_QUESTION_RETENTION_DAYS: QuestionRetentionDays = 30;
+
+/** Gespeicherter Wert als erlaubte Dauer (Unbekanntes gilt als «nie», es wird also nichts gelöscht) */
+export function toRetentionDays(days: number | null | undefined): QuestionRetentionDays {
+  return (QUESTION_RETENTION_DAYS as readonly (number | null)[]).includes(days ?? null)
+    ? ((days ?? null) as QuestionRetentionDays)
+    : null;
+}
+
+/** Auswahl im Fragen-Editor: «Direkt nach dem Anlass», «30 Tage nach dem Anlass», «Nie löschen» */
+export function retentionLabel(days: number | null): string {
+  if (days === null) return 'Nie löschen';
+  if (days === 0) return 'Direkt nach dem Anlass';
+  return `${days} Tage nach dem Anlass`;
+}
+
+/** Hinweis im Formular: «Wird 30 Tage nach dem Anlass gelöscht.» */
+export function retentionNotice(days: number | null): string {
+  if (days === null) return 'Wird nicht automatisch gelöscht.';
+  if (days === 0) return 'Wird direkt nach dem Anlass gelöscht.';
+  return `Wird ${days} Tage nach dem Anlass gelöscht.`;
+}
+
+/** Vorgefertigte Fragen im Fragen-Editor des OK (Aufbewahrung: DEFAULT_QUESTION_RETENTION_DAYS) */
+export interface EventQuestionPreset {
+  key: string;
+  label: string;
+  type: EventQuestionType;
+  options: string[];
+  /** Kurze Erklärung im Auswahlmenü */
+  hint: string;
+}
+
+export const EVENT_QUESTION_PRESETS: EventQuestionPreset[] = [
+  { key: 'ADDRESS', label: 'Adresse (Strasse, PLZ, Ort)', type: 'TEXT', options: [], hint: 'z. B. für Versand oder Versicherung' },
+  { key: 'DIET', label: 'Allergien / Ernährung', type: 'TEXT', options: [], hint: 'z. B. vegetarisch, laktosefrei, Nüsse' },
+  { key: 'TSHIRT', label: 'T-Shirt-Grösse', type: 'CHOICE', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], hint: 'Auswahl XS bis XXL' },
+  { key: 'EMERGENCY', label: 'Notfallkontakt (Name und Telefon)', type: 'TEXT', options: [], hint: 'Wen das OK im Notfall anruft' },
+];
 
 /** Anwesenheit pro Anlass: aus, nur das OK hakt ab, oder zusätzlich Selbst-Check-in per QR-Code */
 export const ATTENDANCE_MODES = {
