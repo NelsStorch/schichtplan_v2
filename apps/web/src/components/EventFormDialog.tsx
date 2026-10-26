@@ -217,6 +217,14 @@ export function EventForm({
   const [form, setForm] = useState<EventFormValues>({ ...EMPTY, ...initial });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  // Nach einem Klick auf Speichern zur Fehlermeldung oben scrollen (nicht beim Auto-Speichern im Hintergrund)
+  const [scrollToError, setScrollToError] = useState(false);
+  useEffect(() => {
+    if (!scrollToError || !error) return;
+    errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setScrollToError(false);
+  }, [scrollToError, error]);
   const [slugTouched, setSlugTouched] = useState(false);
   const initialSlug = initial?.slug || eventSlug || '';
 
@@ -473,6 +481,7 @@ export function EventForm({
       }
     } catch (err) {
       setError(errorMessage(err));
+      setScrollToError(true);
     } finally {
       setSaving(false);
     }
@@ -496,7 +505,11 @@ export function EventForm({
 
   return (
     <form onSubmit={submit} className={layout === 'page' ? 'space-y-6' : 'space-y-7'}>
-      {error && layout === 'dialog' && <Callout tone="danger">{error}</Callout>}
+      {error && (
+        <div ref={errorRef} className="scroll-mt-24">
+          <Callout tone="danger">{error}</Callout>
+        </div>
+      )}
 
       <S id="grunddaten" title="Grunddaten" description="Name, Webadresse und Zeitraum des Anlasses.">
         <div className="grid gap-5 sm:grid-cols-2">
@@ -602,7 +615,8 @@ export function EventForm({
           >
             <Input
               value={form.slug}
-              pattern="[-a-z0-9]+"
+              pattern="[a-z0-9\-]+"
+              maxLength={50}
               required
               placeholder="chilbi-2026"
               onChange={(e) => {

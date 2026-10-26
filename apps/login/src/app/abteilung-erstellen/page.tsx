@@ -145,7 +145,7 @@ function CreateDepartment() {
                     setSlugTouched(true);
                     setSlug(slugify(e.target.value));
                   }}
-                  pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?"
+                  pattern="[a-z0-9]([a-z0-9\-]*[a-z0-9])?"
                   minLength={3}
                   maxLength={30}
                   className="font-mono"
