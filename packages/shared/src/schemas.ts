@@ -470,8 +470,8 @@ export const SendEventMessageSchema = z
   .object({
     subject: z.string().trim().min(3, 'Betreff ist zu kurz').max(150, 'Betreff ist zu lang'),
     body: z.string().trim().min(1, 'Nachricht fehlt').max(5000, 'Nachricht ist zu lang (max. 5000 Zeichen)'),
-    /** ALL = alle Eingetragenen, SHIFTS = Eingetragene bestimmter Schichten, PEOPLE = ausgewählte Personen, OK = das OK */
-    target: z.enum(['ALL', 'SHIFTS', 'PEOPLE', 'OK']),
+    /** ALL = alle Eingetragenen, SHIFTS = Eingetragene bestimmter Schichten, PEOPLE = ausgewählte Personen, OK = das OK, OPEN = ohne Schicht / unter dem Soll */
+    target: z.enum(['ALL', 'SHIFTS', 'PEOPLE', 'OK', 'OPEN']),
     shiftIds: z.array(z.string().uuid()).max(500).optional(),
     userIds: z.array(z.string().uuid()).max(1000).optional(),
     /** true = nur Empfänger zählen, nichts verschicken */

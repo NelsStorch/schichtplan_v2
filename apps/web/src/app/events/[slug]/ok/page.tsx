@@ -98,7 +98,7 @@ export default function OkOverviewPage() {
           .slice(0, 3)
           .map((w) => `${w.shift.title} (${w.task.title}, ab ${w.task.minAge})`)
           .join(' · '),
-        href: `${base}/schichten`,
+        href: `${base}/schichten?warnung=1`,
         action: 'Schichten ansehen',
       });
     }

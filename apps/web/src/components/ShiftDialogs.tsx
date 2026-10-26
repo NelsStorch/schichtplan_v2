@@ -41,7 +41,7 @@ import {
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { fmtDayMonth, fmtWeekday } from '@/lib/format';
-import type { EventDetails } from '@/lib/types';
+import type { EventDetails, EventOrganizer } from '@/lib/types';
 
 /** ISO -> Wert für <input type="datetime-local"> in Schweizer Zeit */
 export const toLocalInput = toZurichInput;
@@ -1050,11 +1050,13 @@ export function SaveTemplateDialog({
 export function OrganizerDialog({
   open,
   eventSlug,
+  organizer,
   onClose,
   onSaved,
 }: {
   open: boolean;
   eventSlug: string;
+  organizer?: EventOrganizer | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1063,25 +1065,40 @@ export function OrganizerDialog({
       open={open}
       onClose={onClose}
       icon={<UserPlus />}
-      title="Ins OK aufnehmen"
+      title={organizer ? `${organizer.userCeviName || organizer.displayName} im OK bearbeiten` : 'Ins OK aufnehmen'}
       description="OK-Mitglieder planen Schichten und teilen Helfende ein, ohne Abteilungsleitung zu sein."
     >
-      <OrganizerForm eventSlug={eventSlug} onCancel={onClose} onSaved={onSaved} />
+      <OrganizerForm
+        key={organizer?.id ?? 'new'}
+        eventSlug={eventSlug}
+        organizer={organizer ?? null}
+        onCancel={onClose}
+        onSaved={onSaved}
+      />
     </Dialog>
   );
 }
 
 function OrganizerForm({
   eventSlug,
+  organizer,
   onCancel,
   onSaved,
 }: {
   eventSlug: string;
+  organizer: EventOrganizer | null;
   onCancel: () => void;
   onSaved: () => void;
 }) {
   const toast = useToast();
-  const [form, setForm] = useState({ who: '', role: 'OK_MEMBER' as 'OK_LEAD' | 'OK_MEMBER', roleTitle: '' });
+  const [form, setForm] = useState({
+    who: organizer ? organizer.userCeviName || organizer.displayName : '',
+    role: (organizer?.role ?? 'OK_MEMBER') as 'OK_LEAD' | 'OK_MEMBER',
+    roleTitle:
+      organizer?.roleTitle && organizer.roleTitle !== 'OK-Mitglied' && organizer.roleTitle !== 'OK-Leitung'
+        ? organizer.roleTitle
+        : '',
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1094,12 +1111,16 @@ function OrganizerForm({
       await api(`/api/events/${eventSlug}/organizers`, {
         method: 'POST',
         json: {
-          ...(who.includes('@') ? { email: who } : { ceviName: who }),
+          ...(organizer
+            ? { userId: organizer.userId }
+            : who.includes('@')
+              ? { email: who }
+              : { ceviName: who }),
           role: form.role,
-          roleTitle: form.roleTitle.trim() || undefined,
+          roleTitle: form.roleTitle.trim(),
         },
       });
-      toast({ title: `${who} ist jetzt im OK` });
+      toast({ title: organizer ? `${who} aktualisiert` : `${who} ist jetzt im OK` });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -1115,18 +1136,24 @@ function OrganizerForm({
   return (
     <form onSubmit={submit} className="space-y-5">
       {error && <Callout tone="danger">{error}</Callout>}
-      <Field
-        label="Cevi-Name oder E-Mail"
-        required
-        hint="Die Person braucht ein Konto mit Cevi.DB oder mit E-Mail und Passwort. Bei gleichen Cevi-Namen die E-Mail angeben."
-      >
-        <Input
-          value={form.who}
-          autoFocus
-          placeholder="Cevi-Name oder E-Mail"
-          onChange={(e) => setForm({ ...form, who: e.target.value })}
-        />
-      </Field>
+      {organizer ? (
+        <Field label="Person">
+          <Input value={form.who} disabled />
+        </Field>
+      ) : (
+        <Field
+          label="Cevi-Name oder E-Mail"
+          required
+          hint="Die Person braucht ein Konto mit Cevi.DB oder mit E-Mail und Passwort. Bei gleichen Cevi-Namen die E-Mail angeben."
+        >
+          <Input
+            value={form.who}
+            autoFocus
+            placeholder="Cevi-Name oder E-Mail"
+            onChange={(e) => setForm({ ...form, who: e.target.value })}
+          />
+        </Field>
+      )}
       <fieldset>
         <legend className="mb-3 text-[13px] font-semibold text-fg">Rolle</legend>
         <div className="grid gap-2.5 sm:grid-cols-2">
@@ -1165,7 +1192,7 @@ function OrganizerForm({
           onChange={(e) => setForm({ ...form, roleTitle: e.target.value })}
         />
       </Field>
-      <FormActions onCancel={onCancel} saving={saving} label="Ins OK aufnehmen" />
+      <FormActions onCancel={onCancel} saving={saving} label={organizer ? 'Speichern' : 'Ins OK aufnehmen'} />
     </form>
   );
 }

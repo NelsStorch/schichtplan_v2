@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { CreateEventSchema, UpdateEventSchema, type EventContactVisibility } from '@schichtplan/shared';
+import {
+  AdminMergeUserSchema,
+  AdminUpdateUserSchema,
+  CreateEventSchema,
+  PLACEHOLDER_EMAIL_REGEX,
+  SendEventMessageSchema,
+  UpdateEventSchema,
+  type EventContactVisibility,
+} from '@schichtplan/shared';
 
 function redactResponsible(
   u: {
@@ -13,7 +21,9 @@ function redactResponsible(
   contactVisibility: EventContactVisibility = 'BOTH'
 ) {
   const allowPhone = contactVisibility === 'BOTH' || contactVisibility === 'PHONE';
-  const allowEmail = contactVisibility === 'BOTH' || contactVisibility === 'EMAIL';
+  const allowEmail =
+    (contactVisibility === 'BOTH' || contactVisibility === 'EMAIL') &&
+    Boolean(u.email && !PLACEHOLDER_EMAIL_REGEX.test(u.email));
   return {
     id: u.id,
     displayName: u.ceviName ? `${u.firstName} / ${u.ceviName}` : `${u.firstName} ${u.lastName}`,
@@ -78,5 +88,33 @@ describe('Event contactVisibility', () => {
   it('validates contactVisibility in UpdateEventSchema', () => {
     expect(UpdateEventSchema.safeParse({ contactVisibility: 'NONE' }).success).toBe(true);
     expect(UpdateEventSchema.safeParse({ contactVisibility: 'INVALID' }).success).toBe(false);
+  });
+
+  it('redacts Cevi.DB placeholder email even when contactVisibility is BOTH or EMAIL', () => {
+    const placeholderPerson = { ...samplePerson, email: 'cevidb_12345@cevi-schichtplan.ch' };
+    expect(redactResponsible(placeholderPerson, 'BOTH').email).toBeNull();
+    expect(redactResponsible(placeholderPerson, 'EMAIL').email).toBeNull();
+    expect(redactResponsible(placeholderPerson, 'BOTH').phone).toBe('079 123 45 67');
+  });
+
+  it('validates SendEventMessageSchema targets including OPEN', () => {
+    const baseMsg = { subject: 'Erinnerung', body: 'Bitte tragt euch in die offenen Schichten ein.' };
+    const sampleId = '00000000-0000-4000-8000-000000000001';
+    expect(SendEventMessageSchema.safeParse({ ...baseMsg, target: 'ALL' }).success).toBe(true);
+    expect(SendEventMessageSchema.safeParse({ ...baseMsg, target: 'OPEN' }).success).toBe(true);
+    expect(SendEventMessageSchema.safeParse({ ...baseMsg, target: 'SHIFTS', shiftIds: [sampleId] }).success).toBe(true);
+    expect(SendEventMessageSchema.safeParse({ ...baseMsg, target: 'SHIFTS', shiftIds: [] }).success).toBe(false);
+    expect(SendEventMessageSchema.safeParse({ ...baseMsg, target: 'PEOPLE', userIds: [sampleId] }).success).toBe(true);
+    expect(SendEventMessageSchema.safeParse({ ...baseMsg, target: 'PEOPLE', userIds: [] }).success).toBe(false);
+  });
+
+  it('validates AdminUpdateUserSchema and AdminMergeUserSchema', () => {
+    expect(AdminUpdateUserSchema.safeParse({ isGlobalAdmin: true }).success).toBe(true);
+    expect(AdminUpdateUserSchema.safeParse({ homeDepartmentId: '00000000-0000-4000-8000-000000000001' }).success).toBe(true);
+    expect(AdminUpdateUserSchema.safeParse({ homeDepartmentId: null }).success).toBe(true);
+    expect(AdminUpdateUserSchema.safeParse({ isGlobalAdmin: 'nope' }).success).toBe(false);
+
+    expect(AdminMergeUserSchema.safeParse({ targetUserId: '00000000-0000-4000-8000-000000000002' }).success).toBe(true);
+    expect(AdminMergeUserSchema.safeParse({ targetUserId: 'not-a-uuid' }).success).toBe(false);
   });
 });

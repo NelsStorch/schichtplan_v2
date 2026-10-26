@@ -1027,13 +1027,13 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         },
         update: {
           role,
-          roleTitle: roleTitle || undefined,
+          roleTitle: roleTitle !== undefined ? roleTitle.trim() || null : undefined,
         },
         create: {
           eventId: event.id,
           userId: targetUser.id,
           role,
-          roleTitle: roleTitle || 'OK-Mitglied',
+          roleTitle: roleTitle?.trim() || 'OK-Mitglied',
         },
         include: {
           user: {

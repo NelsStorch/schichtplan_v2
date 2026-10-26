@@ -149,9 +149,16 @@ export default function TaskCatalogPage() {
                   </div>
                 </div>
                 <div className="mt-5 flex items-center justify-between border-t border-line pt-3 text-xs">
-                  <span className={usedIn > 0 ? 'font-medium text-fg' : 'text-fg-subtle'}>
-                    {usedIn === 0 ? 'In diesem Anlass nicht verwendet' : `In ${usedIn} Schicht${usedIn === 1 ? '' : 'en'}`}
-                  </span>
+                  {usedIn > 0 ? (
+                    <Link
+                      href={`${base}/schichten?arbeit=${encodeURIComponent(td.title)}`}
+                      className="font-semibold text-accent-ink hover:underline"
+                    >
+                      In {usedIn} Schicht{usedIn === 1 ? '' : 'en'} anzeigen
+                    </Link>
+                  ) : (
+                    <span className="text-fg-subtle">In diesem Anlass nicht verwendet</span>
+                  )}
                   <Link href={`${base}/schichten?neu=1`} className="font-bold text-accent-ink hover:underline">
                     + Schicht
                   </Link>

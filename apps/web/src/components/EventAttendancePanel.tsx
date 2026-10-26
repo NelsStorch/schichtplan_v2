@@ -73,6 +73,7 @@ export function EventAttendancePanel({
   // Lokale Änderungen, bis der Anlass neu geladen ist
   const [overrides, setOverrides] = useState<Record<string, AttendanceFields>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [markingShiftId, setMarkingShiftId] = useState<string | null>(null);
   const [day, setDay] = useState('ALL');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -141,6 +142,35 @@ export function EventAttendancePanel({
       toast({ title: 'Anwesenheit nicht gespeichert', description: errorMessage(err), tone: 'error' });
     } finally {
       setSaving(null);
+    }
+  };
+
+  const markAllOpenPresent = async (shiftId: string, openSignups: ShiftSignupDto[]) => {
+    if (openSignups.length === 0) return;
+    setMarkingShiftId(shiftId);
+    try {
+      const updates = await Promise.all(
+        openSignups.map(async (su) => {
+          const res = await api<AttendanceFields>(`/api/events/${event.slug}/signups/${su.id}/attendance`, {
+            method: 'PUT',
+            json: { status: 'PRESENT' },
+          });
+          return [su.id, res] as const;
+        })
+      );
+      setOverrides((prev) => {
+        const next = { ...prev };
+        for (const [id, res] of updates) next[id] = res;
+        return next;
+      });
+      toast({
+        title: `${openSignups.length} Person${openSignups.length === 1 ? '' : 'en'} als anwesend markiert`,
+        tone: 'success',
+      });
+    } catch (err) {
+      toast({ title: 'Anwesenheit nicht gespeichert', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setMarkingShiftId(null);
     }
   };
 
@@ -437,7 +467,9 @@ export function EventAttendancePanel({
                     shift={s}
                     allSignups={shifts.find((x) => x.id === s.id)?.signups ?? s.signups}
                     saving={saving}
+                    markingAll={markingShiftId === s.id}
                     onSet={setStatus}
+                    onMarkAllOpen={(openSignups) => markAllOpenPresent(s.id, openSignups)}
                   />
                 ))}
               </section>
@@ -459,14 +491,19 @@ function ShiftAttendanceCard({
   shift,
   allSignups,
   saving,
+  markingAll,
   onSet,
+  onMarkAllOpen,
 }: {
   shift: ShiftDto & { signups: ShiftSignupDto[] };
   allSignups: ShiftSignupDto[];
   saving: string | null;
+  markingAll: boolean;
   onSet: (signup: ShiftSignupDto, status: AttendanceStatus | null) => void;
+  onMarkAllOpen: (openSignups: ShiftSignupDto[]) => void;
 }) {
   const present = allSignups.filter((su) => su.attendance === 'PRESENT').length;
+  const openSignups = shift.signups.filter((su) => !su.attendance);
   const now = Date.now();
   const running = new Date(shift.startTime).getTime() - 30 * 60_000 <= now && now <= new Date(shift.endTime).getTime();
 
@@ -486,9 +523,22 @@ function ShiftAttendanceCard({
             {fmtTimeRange(shift.startTime, shift.endTime)}
           </p>
         </div>
-        <Badge tone={present === allSignups.length ? 'success' : 'neutral'}>
-          {present} / {allSignups.length} anwesend
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {openSignups.length > 0 && (
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={markingAll}
+              disabled={saving !== null || markingAll}
+              onClick={() => onMarkAllOpen(openSignups)}
+            >
+              <CheckCircle2 className="size-3.5" /> Alle offenen als Da ({openSignups.length})
+            </Button>
+          )}
+          <Badge tone={present === allSignups.length ? 'success' : 'neutral'}>
+            {present} / {allSignups.length} anwesend
+          </Badge>
+        </div>
       </div>
       <ul className="divide-y divide-line">
         {shift.signups.map((su) => {

@@ -100,6 +100,88 @@ describe.skipIf(!hasTestDb)('OK-Werkzeuge: Nachrichten und Massenbearbeitung', (
       });
       expect(good.json().recipientCount).toBe(1);
     });
+
+    it('filtert bei target OPEN Personen ohne Schicht oder unter dem Soll (ohne Abgemeldete)', async () => {
+      const { department, lead, event } = await setup();
+      await app.prisma.event.update({
+        where: { id: event.id },
+        data: { minShiftsPerPerson: 2 },
+      });
+      const shift1 = await createShift(app, event.id, { title: 'Schicht 1' });
+      const shift2 = await createShift(app, event.id, { title: 'Schicht 2' });
+
+      const userZero = await createUser(app, { firstName: 'Zero', lastName: 'Schicht', homeDepartmentId: department.id });
+      const userOne = await createUser(app, { firstName: 'Eins', lastName: 'Schicht', homeDepartmentId: department.id });
+      const userTwo = await createUser(app, { firstName: 'Zwei', lastName: 'Schicht', homeDepartmentId: department.id });
+      const userDereg = await createUser(app, { firstName: 'Ab', lastName: 'Gemeldet', homeDepartmentId: department.id });
+
+      await app.prisma.shiftSignup.create({ data: { shiftId: shift1.id, userId: userOne.id } });
+      await app.prisma.shiftSignup.create({ data: { shiftId: shift1.id, userId: userTwo.id } });
+      await app.prisma.shiftSignup.create({ data: { shiftId: shift2.id, userId: userTwo.id } });
+      await app.prisma.eventDeregistration.create({
+        data: { eventId: event.id, userId: userDereg.id, reason: 'Ferien' },
+      });
+
+      const url = `/api/events/${event.slug}/messages`;
+      const res = await inject(app, {
+        method: 'POST',
+        url,
+        tenant: department.slug,
+        cookie: authCookie(app, lead),
+        payload: { subject: 'Noch Plätze frei', body: 'Bitte eintragen!', target: 'OPEN' },
+      });
+      expect(res.statusCode).toBe(200);
+      // lead (als Organizer im Helfer-Pool mit 0 Schichten), userZero (0) und userOne (1 < 2) -> 3 Empfänger;
+      // userTwo (2 >= 2) und userDereg (abgemeldet) werden ausgelassen.
+      expect(res.json()).toMatchObject({ recipientCount: 3, sent: 3 });
+
+      const history = await inject(app, { method: 'GET', url, tenant: department.slug, cookie: authCookie(app, lead) });
+      expect(history.json()[0]).toMatchObject({
+        subject: 'Noch Plätze frei',
+        target: 'OPEN',
+        targetLabel: 'Unter dem Soll (mind. 2 Schichten)',
+        recipientCount: 3,
+      });
+    });
+  });
+
+  describe('OK-Team verwalten', () => {
+    it('aktualisiert und leert Rolle sowie Funktion/Ressort bestehender OK-Mitglieder', async () => {
+      const { department, lead, event } = await setup();
+      const co = await createUser(app, { firstName: 'Lena', lastName: 'Ressort', ceviName: 'Fuchs' });
+      const url = `/api/events/${event.slug}/organizers`;
+      const cookie = authCookie(app, lead);
+
+      const added = await inject(app, {
+        method: 'POST',
+        url,
+        tenant: department.slug,
+        cookie,
+        payload: { userId: co.id, role: 'HELPER', roleTitle: 'Küche' },
+      });
+      expect(added.statusCode).toBe(200);
+      expect(added.json()).toMatchObject({ userId: co.id, role: 'HELPER', roleTitle: 'Küche' });
+
+      const updated = await inject(app, {
+        method: 'POST',
+        url,
+        tenant: department.slug,
+        cookie,
+        payload: { userId: co.id, role: 'LEAD', roleTitle: 'Co-Leitung & Bau' },
+      });
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json()).toMatchObject({ userId: co.id, role: 'LEAD', roleTitle: 'Co-Leitung & Bau' });
+
+      const clearedTitle = await inject(app, {
+        method: 'POST',
+        url,
+        tenant: department.slug,
+        cookie,
+        payload: { userId: co.id, role: 'LEAD', roleTitle: '   ' },
+      });
+      expect(clearedTitle.statusCode).toBe(200);
+      expect(clearedTitle.json()).toMatchObject({ userId: co.id, role: 'LEAD', roleTitle: null });
+    });
   });
 
   describe('Massenbearbeitung', () => {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, Mail, Send, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Copy, Mail, Send, Users } from 'lucide-react';
 import type { EventMessageDto, EventMessageResultDto, EventMessageTarget } from '@schichtplan/shared';
 import { Badge, Button, Callout, Card, EmptyState, Field, Input, Skeleton, Textarea, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { useOkEvent } from '@/components/ok/OkContext';
@@ -37,6 +37,7 @@ export default function MessagesPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState<EventMessageDto[] | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const days = useMemo(() => groupByBusinessDay(event.shifts, event.dayCutoffTime), [event]);
 
@@ -128,6 +129,14 @@ export default function MessagesPage() {
 
   const options: { key: EventMessageTarget; label: string; text: string; show: boolean }[] = [
     { key: 'ALL', label: 'Alle Eingetragenen', text: 'Alle mit mindestens einer Schicht', show: true },
+    {
+      key: 'OPEN',
+      label: event.minShiftsPerPerson ? 'Unter dem Soll' : 'Noch ohne Schicht',
+      text: event.minShiftsPerPerson
+        ? `Alle im Helfer-Pool mit weniger als ${event.minShiftsPerPerson} Schichten (ohne Abgemeldete)`
+        : 'Alle im Helfer-Pool ohne Schicht (ohne Abgemeldete)',
+      show: true,
+    },
     { key: 'SHIFTS', label: 'Bestimmte Schichten', text: 'Nur wer in den gewählten Schichten ist', show: event.shifts.length > 0 },
     {
       key: 'PEOPLE',
@@ -271,24 +280,69 @@ export default function MessagesPage() {
             <EmptyState icon={<Mail />} title="Noch keine Nachrichten" description="Verschickte Nachrichten erscheinen hier." />
           ) : (
             <div className="space-y-3">
-              {history.map((m) => (
-                <Card key={m.id} className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold text-fg">{m.subject}</p>
-                    {m.failedCount > 0 ? (
-                      <Badge tone="danger" size="sm">
-                        <AlertTriangle className="size-3" /> {m.failedCount} nicht zugestellt
-                      </Badge>
-                    ) : (
-                      <CheckCircle2 className="size-4 shrink-0 text-success-ink" aria-label="verschickt" />
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-2xs text-fg-muted">
-                    {stampFmt.format(new Date(m.createdAt))} · {m.sentByName} · {m.targetLabel} ({m.recipientCount})
-                  </p>
-                  <p className="mt-2 line-clamp-3 whitespace-pre-line text-xs text-fg-muted">{m.body}</p>
-                </Card>
-              ))}
+              {history.map((m) => {
+                const isExpanded = expandedIds.has(m.id);
+                const isLong = m.body.length > 160 || m.body.split('\n').length > 3;
+                return (
+                  <Card key={m.id} className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-fg">{m.subject}</p>
+                      {m.failedCount > 0 ? (
+                        <Badge tone="danger" size="sm">
+                          <AlertTriangle className="size-3" /> {m.failedCount} nicht zugestellt
+                        </Badge>
+                      ) : (
+                        <CheckCircle2 className="size-4 shrink-0 text-success-ink" aria-label="verschickt" />
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-2xs text-fg-muted">
+                      {stampFmt.format(new Date(m.createdAt))} · {m.sentByName} · {m.targetLabel} ({m.recipientCount})
+                    </p>
+                    <p className={cn('mt-2 whitespace-pre-line text-xs text-fg-muted', !isExpanded && 'line-clamp-3')}>
+                      {m.body}
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2 text-xs">
+                      {isLong ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(m.id)) next.delete(m.id);
+                              else next.add(m.id);
+                              return next;
+                            })
+                          }
+                          className="inline-flex items-center gap-1 font-semibold text-fg-muted hover:text-fg"
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="size-3.5" /> Weniger
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="size-3.5" /> Ganz lesen
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSubject(m.subject);
+                          setBody(m.body);
+                          toast({ title: 'Als Vorlage übernommen', description: m.subject });
+                        }}
+                        className="inline-flex items-center gap-1 font-semibold text-accent-ink hover:underline"
+                      >
+                        <Copy className="size-3" /> Als Vorlage übernehmen
+                      </button>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </section>

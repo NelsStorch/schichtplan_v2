@@ -832,7 +832,7 @@ export interface CheckinResultDto {
   nextShift: { shiftTitle: string; startTime: string; endTime: string } | null;
 }
 
-export type EventMessageTarget = 'ALL' | 'SHIFTS' | 'PEOPLE' | 'OK';
+export type EventMessageTarget = 'ALL' | 'SHIFTS' | 'PEOPLE' | 'OK' | 'OPEN';
 
 /** Verlauf: vom OK verschickte Nachricht */
 export interface EventMessageDto {

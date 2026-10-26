@@ -1,9 +1,10 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronDown, ChevronUp, Clock, Filter, Mail, Search, UserCheck, UserMinus, Users, X } from 'lucide-react';
-import type { EventRosterResponseDto } from '@schichtplan/shared';
+import { AlertTriangle, ChevronDown, ChevronUp, Clock, Filter, Mail, Plus, Search, UserCheck, UserMinus, UserPlus, Users, X } from 'lucide-react';
+import type { EventRosterResponseDto, ShiftCollisionCheckResult, ShiftDto } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -24,8 +25,9 @@ import {
 import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
-import { api, errorMessage } from '@/lib/api';
-import { fmtShortWeekday, fmtTime } from '@/lib/format';
+import { shiftTasks } from '@/components/event/shift-utils';
+import { api, ApiError, errorMessage } from '@/lib/api';
+import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtTimeRange, groupByBusinessDay } from '@/lib/format';
 import { formatMinutes } from '@/lib/helperStats';
 
 type Status = 'ALL' | 'WITH' | 'WITHOUT' | 'UNDER' | 'DEREGISTERED';
@@ -56,7 +58,7 @@ interface PersonRow {
 }
 
 function HelpersPage() {
-  const { event, base, reload, setMessageDraft } = useOkEvent();
+  const { event, base, reload, setMessageDraft, permissions } = useOkEvent();
   const router = useRouter();
   const params = useSearchParams();
   const toast = useToast();
@@ -74,6 +76,7 @@ function HelpersPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deregTarget, setDeregTarget] = useState<PersonRow | null>(null);
+  const [assignTarget, setAssignTarget] = useState<PersonRow | null>(null);
   const [showHoursDialog, setShowHoursDialog] = useState(false);
 
   const loadRoster = useCallback(async () => {
@@ -466,14 +469,18 @@ function HelpersPage() {
                           .sort((a, b) => a.startTime.localeCompare(b.startTime))
                           .map((s) => (
                             <li key={s.signupId} className="flex items-center justify-between gap-2 rounded-field bg-surface-2/60 px-3 py-1.5">
-                              <span className="min-w-0 truncate text-fg">
+                              <Link
+                                href={`${base}/schichten?suche=${encodeURIComponent(s.title)}`}
+                                className="min-w-0 truncate text-fg hover:underline"
+                                title="Schicht im Plan öffnen"
+                              >
                                 <strong>{s.title}</strong>
                                 {s.taskTitle && s.taskTitle !== s.title ? ` (${s.taskTitle})` : ''}
                                 <span className="text-fg-muted">
                                   {' '}
                                   · {fmtShortWeekday(s.startTime)} {fmtTime(s.startTime)}
                                 </span>
-                              </span>
+                              </Link>
                               <button
                                 type="button"
                                 onClick={() => removeSignup(row, s)}
@@ -489,6 +496,11 @@ function HelpersPage() {
                       <p className="text-xs italic text-fg-muted">Noch in keiner Schicht.</p>
                     )}
                     <div className="flex flex-wrap gap-2">
+                      {permissions.can.HELPERS && event.shifts.length > 0 && (
+                        <Button size="sm" variant="secondary" onClick={() => setAssignTarget(row)}>
+                          <Plus className="size-3.5" /> In Schicht einteilen
+                        </Button>
+                      )}
                       {row.shifts.length > 1 && (
                         <Button size="sm" variant="ghost" className="text-danger-ink hover:bg-danger/10" onClick={() => removeFromAll(row)}>
                           <X className="size-3.5" /> Aus allen Schichten austragen
@@ -520,6 +532,17 @@ function HelpersPage() {
         onSaved={async () => {
           setDeregTarget(null);
           await loadRoster();
+        }}
+      />
+
+      <AssignPersonToShiftDialog
+        row={assignTarget}
+        shifts={event.shifts}
+        dayCutoffTime={event.dayCutoffTime}
+        onClose={() => setAssignTarget(null)}
+        onAssigned={async () => {
+          setAssignTarget(null);
+          await refresh();
         }}
       />
 
@@ -602,6 +625,274 @@ function DeregisterDialog({
           </Button>
           <Button type="submit" loading={saving}>
             Abmelden
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+function AssignPersonToShiftDialog({
+  row,
+  shifts,
+  dayCutoffTime,
+  onClose,
+  onAssigned,
+}: {
+  row: PersonRow | null;
+  shifts: ShiftDto[];
+  dayCutoffTime?: string | null;
+  onClose: () => void;
+  onAssigned: () => Promise<void>;
+}) {
+  const toast = useToast();
+  const [search, setSearch] = useState('');
+  const [onlyOpen, setOnlyOpen] = useState(true);
+  const [selectedShiftId, setSelectedShiftId] = useState('');
+  const [selectedTaskId, setSelectedTaskId] = useState('');
+  const [collisionWarning, setCollisionWarning] = useState<ShiftCollisionCheckResult | null>(null);
+  const [confirmCollision, setConfirmCollision] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!row) return;
+    setSearch('');
+    setOnlyOpen(true);
+    setSelectedShiftId('');
+    setSelectedTaskId('');
+    setCollisionWarning(null);
+    setConfirmCollision(false);
+    setError(null);
+  }, [row]);
+
+  const selectedShift = useMemo(
+    () => shifts.find((s) => s.id === selectedShiftId) ?? null,
+    [shifts, selectedShiftId]
+  );
+
+  const tasks = useMemo(
+    () => (selectedShift ? shiftTasks(selectedShift).filter((t) => t.id !== 'default') : []),
+    [selectedShift]
+  );
+
+  useEffect(() => {
+    if (!selectedShift) {
+      setSelectedTaskId('');
+      return;
+    }
+    const openTask = tasks.find((t) => t.filled < t.requiredSlots) ?? tasks[0];
+    setSelectedTaskId(openTask?.id ?? '');
+  }, [selectedShift, tasks]);
+
+  useEffect(() => {
+    if (!row || !selectedShiftId) {
+      setCollisionWarning(null);
+      setConfirmCollision(false);
+      return;
+    }
+    let active = true;
+    setConfirmCollision(false);
+    const query = row.userId
+      ? `userId=${encodeURIComponent(row.userId)}`
+      : `guestName=${encodeURIComponent(row.name)}`;
+    api<ShiftCollisionCheckResult>(`/api/shifts/${selectedShiftId}/check-collision?${query}`)
+      .then((res) => active && setCollisionWarning(res.hasCollision ? res : null))
+      .catch(() => active && setCollisionWarning(null));
+    return () => {
+      active = false;
+    };
+  }, [row, selectedShiftId]);
+
+  const days = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return groupByBusinessDay(shifts, dayCutoffTime)
+      .map((d) => ({
+        ...d,
+        items: d.items.filter((s) => {
+          const filled = s.signups?.length ?? 0;
+          if (onlyOpen && filled >= s.requiredSlots) return false;
+          if (
+            q &&
+            !s.title.toLowerCase().includes(q) &&
+            !(s.category?.toLowerCase().includes(q) ?? false) &&
+            !s.tasks?.some((t) => t.title.toLowerCase().includes(q))
+          )
+            return false;
+          return true;
+        }),
+      }))
+      .filter((d) => d.items.length > 0);
+  }, [shifts, dayCutoffTime, onlyOpen, search]);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!row || !selectedShift) return;
+    if (collisionWarning?.hasCollision && !confirmCollision) {
+      setError('Bitte bestätige die Zeitkollision mit dem Kontrollkästchen.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const chosenTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
+      await api(`/api/shifts/${selectedShift.id}/signup`, {
+        method: 'POST',
+        json: {
+          taskId: chosenTask?.id || undefined,
+          userId: row.userId ?? undefined,
+          guestName: row.isGuest ? row.name : undefined,
+          guestEmail: row.isGuest && row.guestEmail ? row.guestEmail : undefined,
+          guestPhone: row.isGuest && row.guestPhone ? row.guestPhone : undefined,
+          confirmCollision: confirmCollision ? true : undefined,
+        },
+      });
+      toast({
+        title: `${row.name} eingeteilt`,
+        description: `${selectedShift.title}${chosenTask ? ` (${chosenTask.title})` : ''}`,
+      });
+      await onAssigned();
+    } catch (err) {
+      if (err instanceof ApiError && err.data.code === 'TIME_COLLISION') {
+        setCollisionWarning({
+          hasCollision: true,
+          conflicts: (err.data.conflicts as ShiftCollisionCheckResult['conflicts']) || [],
+          message: err.message,
+        });
+      }
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={Boolean(row)}
+      onClose={onClose}
+      icon={<UserPlus />}
+      title={row ? `${row.name} in Schicht einteilen` : ''}
+      description={
+        row
+          ? `${row.shifts.length} Schicht${row.shifts.length === 1 ? '' : 'en'} bisher${row.age !== null ? ` · ${row.age} Jahre` : ''}`
+          : ''
+      }
+      size="lg"
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {error && <Callout tone="danger">{error}</Callout>}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[12rem] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
+            <Input
+              className="h-9 pl-9 text-sm"
+              placeholder="Schicht oder Arbeit suchen…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Chip selected={onlyOpen} onClick={() => setOnlyOpen((v) => !v)}>
+            Nur freie Schichten
+          </Chip>
+        </div>
+
+        <div className="max-h-72 space-y-4 overflow-y-auto rounded-field border border-line bg-surface-2/40 p-3">
+          {days.length === 0 ? (
+            <p className="py-6 text-center text-xs text-fg-muted">Keine passenden Schichten gefunden.</p>
+          ) : (
+            days.map((d) => {
+              const iso = dayKeyToIso(d.key);
+              return (
+                <div key={d.key} className="space-y-1.5">
+                  <p className="px-1 text-2xs font-bold uppercase tracking-wider text-fg-subtle">
+                    {fmtShortWeekday(iso)} {fmtDayMonth(iso)}
+                  </p>
+                  {d.items.map((s) => {
+                    const filled = s.signups?.length ?? 0;
+                    const isFull = filled >= s.requiredSlots;
+                    const alreadyIn = Boolean(row?.shifts.some((ps) => ps.shiftId === s.id));
+                    const isSelected = selectedShiftId === s.id;
+                    const disabled = isFull || alreadyIn;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => setSelectedShiftId(s.id)}
+                        className={cn(
+                          'flex w-full items-center justify-between gap-3 rounded-field border px-3 py-2 text-left text-sm transition',
+                          isSelected
+                            ? 'border-accent bg-accent/10'
+                            : 'border-line bg-surface hover:border-line-strong',
+                          disabled && 'cursor-not-allowed opacity-50'
+                        )}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold text-fg">{s.title}</span>
+                          <span className="block font-mono text-2xs text-fg-muted">
+                            {fmtTimeRange(s.startTime, s.endTime)}
+                            {s.tasks && s.tasks.length > 0 ? ` · ${s.tasks.map((t) => t.title).join(', ')}` : ''}
+                          </span>
+                        </span>
+                        <span className="shrink-0">
+                          {alreadyIn ? (
+                            <Badge size="sm" tone="neutral">
+                              Schon drin
+                            </Badge>
+                          ) : (
+                            <Badge size="sm" tone={isFull ? 'neutral' : 'success'}>
+                              {filled}/{s.requiredSlots}
+                            </Badge>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {selectedShift && tasks.length > 1 && (
+          <Field label="Arbeit" required>
+            <Select value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)}>
+              {tasks.map((t) => (
+                <option key={t.id} value={t.id} disabled={t.filled >= t.requiredSlots}>
+                  {t.title} ({t.filled}/{t.requiredSlots} besetzt{t.minAge ? `, ab ${t.minAge} J.` : ''})
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        {collisionWarning?.hasCollision && (
+          <div className="rounded-field border border-warning/40 bg-warning/10 p-3.5 text-xs">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-ink" />
+              <div className="space-y-2">
+                <p className="font-semibold text-warning-ink">{collisionWarning.message}</p>
+                <label className="flex cursor-pointer items-center gap-2 pt-1 font-medium text-fg">
+                  <input
+                    type="checkbox"
+                    checked={confirmCollision}
+                    onChange={(e) => setConfirmCollision(e.target.checked)}
+                    className="size-4 accent-warning"
+                  />
+                  Trotz Zeitkollision einteilen
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Abbrechen
+          </Button>
+          <Button type="submit" loading={saving} disabled={!selectedShift}>
+            <UserCheck className="size-4" /> Einteilen
           </Button>
         </div>
       </form>

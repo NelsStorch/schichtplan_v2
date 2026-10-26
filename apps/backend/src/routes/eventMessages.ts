@@ -2,11 +2,12 @@ import { FastifyPluginAsync } from 'fastify';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   SendEventMessageSchema,
+  accessTypeConfig,
   type EventMessageDto,
   type EventMessageResultDto,
   type EventMessageTarget,
 } from '@schichtplan/shared';
-import { managerFlags } from '../services/eventAccess.js';
+import { accessEventInclude, checkRules, managerFlags, type AccessUser } from '../services/eventAccess.js';
 import { escapeHtml, renderEmailTemplate, sendEmail } from '../services/email.js';
 import { personLabel } from '../services/profile.js';
 import { createRateLimiter } from '../services/rateLimit.js';
@@ -67,8 +68,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
     const event = await fastify.prisma.event.findUnique({
       where: { departmentId_slug: { departmentId: tenantId, slug } },
       include: {
-        organizers: { select: { userId: true, role: true } },
-        allowedDepartments: { select: { departmentId: true } },
+        ...accessEventInclude,
         department: { select: { slug: true, name: true } },
       },
     });
@@ -141,6 +141,80 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         });
         recipients = users.map((u) => ({ id: u.id, label: personLabel(u), email: usableEmail(u) }));
         targetLabel = 'Das OK';
+      } else if (target === 'OPEN') {
+        const cfg = accessTypeConfig(event.accessType);
+        const targetDeptIds = [
+          event.departmentId,
+          ...(cfg.whitelist ? event.allowedDepartments.map((a) => a.departmentId) : []),
+        ];
+        const minRequired = event.minShiftsPerPerson || 1;
+        const now = new Date();
+
+        const candidates = await fastify.prisma.user.findMany({
+          where: {
+            deregistrations: { none: { eventId: event.id } },
+            OR: [
+              { homeDepartmentId: { in: targetDeptIds } },
+              { memberships: { some: { departmentId: { in: targetDeptIds } } } },
+              { stufen: { some: { stufe: { departmentId: { in: targetDeptIds } } } } },
+              { organizedEvents: { some: { eventId: event.id } } },
+              { eventAccessGrants: { some: { eventId: event.id } } },
+              { signups: { some: { shift: { eventId: event.id } } } },
+            ],
+          },
+          select: {
+            ...userSelect,
+            isGlobalAdmin: true,
+            ceviDbId: true,
+            ceviDbDepartmentLeader: true,
+            homeDepartmentId: true,
+            homeDepartmentSource: true,
+            memberships: {
+              where: { departmentId: { in: targetDeptIds } },
+              select: { departmentId: true, role: true, permissions: true },
+            },
+            stufen: {
+              where: { stufe: { departmentId: { in: targetDeptIds } } },
+              select: { stufeId: true, role: true, source: true },
+            },
+            ceviDbStufen: { select: { kind: true } },
+            signups: {
+              where: { shift: { eventId: event.id } },
+              select: { id: true },
+            },
+            eventAccessGrants: {
+              where: { eventId: event.id },
+              select: { id: true, link: { select: { expiresAt: true } } },
+            },
+          },
+        });
+
+        const matching = candidates.filter((u) => {
+          if (u.signups.length >= minRequired) return false;
+          const hasGrant = u.eventAccessGrants.some((g) => !g.link.expiresAt || g.link.expiresAt > now);
+          const isDeptAdmin =
+            u.isGlobalAdmin ||
+            u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');
+          const isPlanner = u.memberships.some(
+            (m) => m.departmentId === event.departmentId && m.permissions.includes('EVENTS_VIEW_ALL')
+          );
+          const isOrganizer = event.organizers.some((o) => o.userId === u.id);
+          if (isDeptAdmin || isPlanner || isOrganizer || hasGrant || u.signups.length > 0) return true;
+          const accessUser: AccessUser = {
+            id: u.id,
+            isGlobalAdmin: u.isGlobalAdmin,
+            ceviDbId: u.ceviDbId,
+            ceviDbDepartmentLeader: u.ceviDbDepartmentLeader,
+            ceviDbStufen: u.ceviDbStufen,
+            homeDepartmentId: u.homeDepartmentId,
+            homeDepartmentSource: u.homeDepartmentSource,
+            stufen: u.stufen,
+          };
+          return checkRules(event, accessUser, event.department.name).ok;
+        });
+
+        recipients = matching.map((u) => ({ id: u.id, label: personLabel(u), email: usableEmail(u) }));
+        targetLabel = event.minShiftsPerPerson ? 'Unter dem Soll' : 'Noch ohne Schicht';
       } else {
         const userIds = [...new Set(parse.data.userIds ?? [])];
         // Nur Personen mit Bezug zum Anlass oder zur Abteilung, nie beliebige Konten

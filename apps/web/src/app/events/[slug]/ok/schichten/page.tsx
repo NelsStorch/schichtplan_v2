@@ -2,13 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CalendarDays, CheckSquare, Filter, LayoutList, Plus, Rows3, Search, Sparkles } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckSquare, Filter, LayoutList, Plus, Rows3, Search, Sparkles } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import { Badge, Button, Chip, EmptyState, Input, Select, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { BulkShiftBar } from '@/components/ok/BulkShiftBar';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { ShiftCard } from '@/components/ok/ShiftCard';
+import { ageWarnings } from '@/components/ok/shiftChecks';
 import { ShiftSeriesDialog } from '@/components/ok/ShiftSeriesDialog';
 import { ShiftTimeline } from '@/components/ok/ShiftTimeline';
 import { AssignHelperDialog, DayResponsiblesDialog, DuplicateShiftDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
@@ -27,10 +28,12 @@ function ShiftsPage() {
 
   const [view, setView] = useState<View>('list');
   const [day, setDay] = useState<string>(params.get('tag') ?? 'ALL');
-  const [taskFilter, setTaskFilter] = useState('ALL');
+  const [taskFilter, setTaskFilter] = useState(params.get('arbeit') ?? 'ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [setupFilter, setSetupFilter] = useState<'ALL' | 'EVENT' | 'SETUP'>('ALL');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(params.get('suche') ?? '');
   const [onlyOpen, setOnlyOpen] = useState(params.get('offen') === '1');
+  const [onlyWarning, setOnlyWarning] = useState(params.get('warnung') === '1');
 
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -71,6 +74,12 @@ function ShiftsPage() {
     for (const s of event.shifts) for (const t of s.tasks ?? []) if (t.title.trim()) titles.add(t.title.trim());
     return [...titles].sort((a, b) => a.localeCompare(b, 'de'));
   }, [event]);
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const s of event.shifts) if (s.category?.trim()) cats.add(s.category.trim());
+    return [...cats].sort((a, b) => a.localeCompare(b, 'de'));
+  }, [event]);
+  const warningShiftIds = useMemo(() => new Set(ageWarnings(event).map((w) => w.shift.id)), [event]);
   const hasSetup = event.shifts.some((s) => s.isSetupTeardown);
 
   const q = search.trim().toLowerCase();
@@ -82,10 +91,13 @@ function ShiftsPage() {
         if (setupFilter === 'SETUP' && !s.isSetupTeardown) return false;
         if (setupFilter === 'EVENT' && s.isSetupTeardown) return false;
         if (taskFilter !== 'ALL' && !s.tasks?.some((t) => t.title.trim() === taskFilter)) return false;
+        if (categoryFilter !== 'ALL' && (s.category?.trim() ?? '') !== categoryFilter) return false;
         if (onlyOpen && (s.signups?.length ?? 0) >= s.requiredSlots) return false;
+        if (onlyWarning && !warningShiftIds.has(s.id)) return false;
         if (
           q &&
           !s.title.toLowerCase().includes(q) &&
+          !(s.category?.toLowerCase().includes(q) ?? false) &&
           !s.tasks?.some((t) => t.title.toLowerCase().includes(q)) &&
           !s.signups?.some((su) => su.displayName.toLowerCase().includes(q))
         )
@@ -95,14 +107,23 @@ function ShiftsPage() {
     }))
     .filter((d) => d.items.length > 0);
   const visibleShifts = filteredDays.flatMap((d) => d.items);
-  const filtersActive = day !== 'ALL' || taskFilter !== 'ALL' || setupFilter !== 'ALL' || Boolean(q) || onlyOpen;
+  const filtersActive =
+    day !== 'ALL' ||
+    taskFilter !== 'ALL' ||
+    categoryFilter !== 'ALL' ||
+    setupFilter !== 'ALL' ||
+    Boolean(q) ||
+    onlyOpen ||
+    onlyWarning;
 
   const resetFilters = () => {
     setDay('ALL');
     setTaskFilter('ALL');
+    setCategoryFilter('ALL');
     setSetupFilter('ALL');
     setSearch('');
     setOnlyOpen(false);
+    setOnlyWarning(false);
   };
 
   const toggle = (id: string) =>
@@ -230,6 +251,21 @@ function ShiftsPage() {
               ))}
             </Select>
           )}
+          {categories.length > 0 && (
+            <Select
+              className="h-10 w-auto text-sm"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              aria-label="Nach Kategorie filtern"
+            >
+              <option value="ALL">Alle Kategorien</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {days.length > 1 && (
@@ -248,6 +284,11 @@ function ShiftsPage() {
           <Chip selected={onlyOpen} onClick={() => setOnlyOpen((v) => !v)}>
             Nur nicht voll
           </Chip>
+          {(warningShiftIds.size > 0 || onlyWarning) && (
+            <Chip selected={onlyWarning} count={warningShiftIds.size} onClick={() => setOnlyWarning((v) => !v)}>
+              <AlertTriangle className="size-3.5 text-warning-ink" /> Jugendschutz-Warnung
+            </Chip>
+          )}
           {hasSetup && (
             <Chip
               selected={setupFilter === 'SETUP'}

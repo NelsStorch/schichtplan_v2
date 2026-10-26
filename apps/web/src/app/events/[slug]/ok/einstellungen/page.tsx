@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Crown, Lock, Shield, Trash2, UserPlus, X } from 'lucide-react';
+import { Crown, Edit, Lock, Shield, Trash2, UserPlus, X } from 'lucide-react';
 import {
   Avatar,
   Button,
@@ -21,6 +21,7 @@ import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { OrganizerDialog } from '@/components/ShiftDialogs';
 import { api, errorMessage } from '@/lib/api';
+import type { EventOrganizer } from '@/lib/types';
 
 const SECTIONS = [
   ['ok-team', 'OK-Team'],
@@ -145,6 +146,7 @@ export default function SettingsPage() {
   const confirm = useConfirm();
   const [formKey, setFormKey] = useState(0);
   const [okDialog, setOkDialog] = useState(false);
+  const [editingOrganizer, setEditingOrganizer] = useState<EventOrganizer | null>(null);
 
   if (!permissions.canEditSettings) {
     return (
@@ -205,7 +207,14 @@ export default function SettingsPage() {
                 OK-Team.
               </p>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => setOkDialog(true)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setEditingOrganizer(null);
+                setOkDialog(true);
+              }}
+            >
               <UserPlus className="size-4" /> Person aufnehmen
             </Button>
           </div>
@@ -228,18 +237,34 @@ export default function SettingsPage() {
                       </span>
                       <span className="block text-xs text-fg-muted">
                         {lead ? 'OK-Leitung' : 'OK-Mitglied'}
-                        {org.roleTitle ? ` · ${org.roleTitle}` : ''}
+                        {org.roleTitle && org.roleTitle !== 'OK-Mitglied' && org.roleTitle !== 'OK-Leitung'
+                          ? ` · ${org.roleTitle}`
+                          : ''}
                       </span>
                     </span>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      onClick={() => removeOrganizer(org.id, name)}
-                      aria-label={`${name} aus dem OK entfernen`}
-                      className="text-fg-subtle hover:text-danger-ink"
-                    >
-                      <X className="size-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingOrganizer(org);
+                          setOkDialog(true);
+                        }}
+                        aria-label={`${name} bearbeiten`}
+                        title="Rolle und Ressort bearbeiten"
+                      >
+                        <Edit className="size-3.5" />
+                      </Button>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={() => removeOrganizer(org.id, name)}
+                        aria-label={`${name} aus dem OK entfernen`}
+                        className="text-fg-subtle hover:text-danger-ink"
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
                   </li>
                 );
               })}
@@ -278,9 +303,14 @@ export default function SettingsPage() {
       <OrganizerDialog
         open={okDialog}
         eventSlug={event.slug}
-        onClose={() => setOkDialog(false)}
+        organizer={editingOrganizer}
+        onClose={() => {
+          setOkDialog(false);
+          setEditingOrganizer(null);
+        }}
         onSaved={async () => {
           setOkDialog(false);
+          setEditingOrganizer(null);
           await reload();
         }}
       />

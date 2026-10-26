@@ -189,4 +189,59 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
     expect(secondWithConfirm.statusCode).toBe(200);
     expect(await app.prisma.shiftSignup.count({ where: { shiftId: shift2.id, userId: helper.id } })).toBe(1);
   });
+
+  it('liefert in /api/shifts/me Einsatz-Briefing-Felder (Mithelfende, Verantwortliche, Belegung) ohne Platzhalter-Mails', async () => {
+    const department = await createDepartment(app);
+    const okLead = await createUser(app, {
+      firstName: 'Klara',
+      lastName: 'Kontakt',
+      ceviName: 'Luchs',
+      phone: '079 111 22 33',
+      email: 'cevidb_999@cevi-schichtplan.ch',
+    });
+    const event = await createEvent(app, department.id, {
+      organizerId: okLead.id,
+      contactVisibility: 'BOTH',
+    });
+    await app.prisma.event.update({
+      where: { id: event.id },
+      data: { contactUserId: okLead.id },
+    });
+    const shift = await createShift(app, event.id, { title: 'Zeltbau', requiredSlots: 3 });
+
+    const helper1 = await createUser(app, { firstName: 'Anna', lastName: 'Eins', ceviName: 'Adler' });
+    const helper2 = await createUser(app, { firstName: 'Beni', lastName: 'Zwei', ceviName: 'Bär' });
+
+    await app.prisma.shiftSignup.create({ data: { shiftId: shift.id, userId: helper1.id } });
+    await app.prisma.shiftSignup.create({ data: { shiftId: shift.id, userId: helper2.id } });
+    await app.prisma.shiftResponsible.create({ data: { shiftId: shift.id, userId: okLead.id } });
+
+    const res = await inject(app, {
+      method: 'GET',
+      url: '/api/shifts/me',
+      tenant: department.slug,
+      cookie: authCookie(app, helper1),
+    });
+    expect(res.statusCode).toBe(200);
+    const items = res.json();
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: shift.id,
+      coHelpers: ['Bär'],
+      filledSlots: 2,
+      requiredSlots: 3,
+      dayCutoffTime: '04:00',
+    });
+    // Platzhalter-E-Mail (cevidb_*@cevi-schichtplan.ch) wird bei Verantwortlichen & Kontakt ausgeblendet
+    expect(items[0].responsibles[0]).toMatchObject({
+      id: okLead.id,
+      phone: '079 111 22 33',
+      email: null,
+    });
+    expect(items[0].contactUser).toMatchObject({
+      id: okLead.id,
+      phone: '079 111 22 33',
+      email: null,
+    });
+  });
 });

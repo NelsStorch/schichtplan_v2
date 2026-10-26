@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Check, Copy, Download, Link2, Plus, Share2, Trash2, User, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Check, Copy, Download, Filter, Link2, Plus, Search, Share2, Trash2, User, Users, X } from 'lucide-react';
 import {
   PLACEHOLDER_LAST_NAME,
   REQUIRED_PROFILE_FIELDS,
@@ -15,6 +15,7 @@ import {
   Button,
   Callout,
   Card,
+  Chip,
   Dialog,
   EmptyState,
   Field,
@@ -324,6 +325,8 @@ function csvCell(value: string | number | null | undefined) {
 function Participants({ event }: { event: EventDetails }) {
   const [people, setPeople] = useState<EventParticipantDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [answerFilter, setAnswerFilter] = useState<{ questionId: string; value: string } | null>(null);
 
   useEffect(() => {
     api<EventParticipantDto[]>(`/api/events/${event.slug}/participants`)
@@ -341,7 +344,77 @@ function Participants({ event }: { event: EventDetails }) {
       .map((sa) => ({
         label: `${sa.shiftTitle} (${fmtShortWeekday(sa.startTime)} ${fmtTime(sa.startTime)})`,
         text: answerText(question, sa.answers[question.id]),
+        raw: sa.answers[question.id]!,
       }));
+
+  const questionSummaries = useMemo(() => {
+    if (!people || people.length === 0) return [];
+    return event.questions
+      .filter((q) => q.type === 'YES_NO' || q.type === 'CHOICE')
+      .map((q) => {
+        const counts = new Map<string, number>();
+        if (q.type === 'YES_NO') {
+          counts.set('JA', 0);
+          counts.set('NEIN', 0);
+        } else {
+          for (const opt of q.options ?? []) counts.set(opt, 0);
+        }
+        for (const p of people) {
+          if (q.scope === 'PER_SIGNUP') {
+            for (const sa of p.signupAnswers) {
+              const v = sa.answers[q.id];
+              if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+            }
+          } else {
+            const v = p.answers[q.id];
+            if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+          }
+        }
+        const entries = [...counts.entries()].map(([value, count]) => ({
+          value,
+          label: q.type === 'YES_NO' ? (value === 'JA' ? 'Ja' : 'Nein') : value,
+          count,
+        }));
+        return { question: q, entries };
+      });
+  }, [people, event.questions]);
+
+  const filteredPeople = useMemo(() => {
+    if (!people) return [];
+    const q = search.trim().toLowerCase();
+    return people.filter((p) => {
+      if (answerFilter) {
+        const targetQ = event.questions.find((x) => x.id === answerFilter.questionId);
+        if (targetQ) {
+          const matchesAnswer =
+            targetQ.scope === 'PER_SIGNUP'
+              ? p.signupAnswers.some((sa) => sa.answers[targetQ.id] === answerFilter.value)
+              : p.answers[targetQ.id] === answerFilter.value;
+          if (!matchesAnswer) return false;
+        }
+      }
+      if (!q) return true;
+      const answerStrings = event.questions.flatMap((question) =>
+        question.scope === 'PER_SIGNUP'
+          ? perSignup(question, p).map((a) => `${a.label} ${a.text}`)
+          : [answerText(question, p.answers[question.id])]
+      );
+      const haystack = [
+        p.displayName,
+        p.firstName,
+        p.lastName === PLACEHOLDER_LAST_NAME ? '' : p.lastName,
+        p.homeDepartmentName,
+        p.email,
+        p.phone,
+        ...answerStrings,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [people, search, answerFilter, event.questions]);
 
   const download = () => {
     if (!people) return;
@@ -403,79 +476,154 @@ function Participants({ event }: { event: EventDetails }) {
       ) : people.length === 0 ? (
         <EmptyState icon={<Users />} title="Noch niemand eingetragen" />
       ) : (
-        <div className="overflow-x-auto rounded-card border border-line bg-surface">
-          <table className="w-full min-w-[40rem] text-left text-sm">
-            <thead className="bg-surface-2 text-xs font-semibold text-fg-subtle">
-              <tr>
-                <th className="px-4 py-2.5">Person</th>
-                <th className="px-4 py-2.5">Kontakt</th>
-                <th className="px-4 py-2.5">Schichten</th>
-                {event.questions.map((q) => (
-                  <th key={q.id} className="px-4 py-2.5">
-                    {q.label}
-                    <span className="block font-normal text-fg-subtle">{retentionNotice(q.retentionDays)}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {people.map((p) => (
-                <tr key={p.userId ?? p.displayName} className="align-top">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-fg">{p.displayName}</p>
-                    <p className="text-xs text-fg-muted">
-                      {[
-                        p.firstName && p.lastName && p.lastName !== PLACEHOLDER_LAST_NAME
-                          ? `${p.firstName} ${p.lastName}`
-                          : null,
-                        p.homeDepartmentName ?? 'ohne Abteilung',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                    {p.viaLink && (
-                      <Badge size="sm" className="mt-1">
-                        <Link2 className="size-3" /> über Link
-                      </Badge>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-fg-muted">
-                    {p.phone && (
-                      <a href={`tel:${p.phone}`} className="block text-fg hover:underline">
-                        {p.phone}
-                      </a>
-                    )}
-                    {p.email && (
-                      <a href={`mailto:${p.email}`} className="block break-all hover:underline">
-                        {p.email}
-                      </a>
-                    )}
-                    {p.birthDate && <span className="block">geb. {p.birthDate.split('-').reverse().join('.')}</span>}
-                  </td>
-                  <td className="tabular px-4 py-3 text-fg">{p.shiftCount}</td>
-                  {event.questions.map((q) => (
-                    <td key={q.id} className="px-4 py-3 text-fg">
-                      {q.scope === 'PER_SIGNUP' ? (
-                        perSignup(q, p).length ? (
-                          <ul className="space-y-0.5">
-                            {perSignup(q, p).map((a, i) => (
-                              <li key={i}>
-                                <span className="text-xs text-fg-subtle">{a.label}:</span> {a.text}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-fg-subtle">–</span>
-                        )
-                      ) : (
-                        answerText(q, p.answers[q.id]) || <span className="text-fg-subtle">–</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
+        <div className="space-y-4">
+          {questionSummaries.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {questionSummaries.map(({ question, entries }) => (
+                <Card key={question.id} className="p-3.5">
+                  <p className="text-xs font-semibold text-fg">{question.label}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {entries.map((entry) => {
+                      const active =
+                        answerFilter?.questionId === question.id && answerFilter?.value === entry.value;
+                      return (
+                        <Chip
+                          key={entry.value}
+                          selected={active}
+                          count={entry.count}
+                          onClick={() =>
+                            setAnswerFilter(
+                              active ? null : { questionId: question.id, value: entry.value }
+                            )
+                          }
+                        >
+                          {entry.label}
+                        </Chip>
+                      );
+                    })}
+                  </div>
+                </Card>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
+              <Input
+                className="h-9 pl-9 pr-8 text-sm"
+                placeholder="Name, Kontakt oder Antwort suchen…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Helfende und Antworten durchsuchen"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg"
+                  aria-label="Suche leeren"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+            {(search || answerFilter) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSearch('');
+                  setAnswerFilter(null);
+                }}
+              >
+                Filter zurücksetzen
+              </Button>
+            )}
+          </div>
+
+          {filteredPeople.length === 0 ? (
+            <EmptyState
+              icon={<Filter />}
+              title="Keine passenden Einträge"
+              description="Passe die Suche oder den Antwort-Filter an."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-card border border-line bg-surface">
+              <table className="w-full min-w-[40rem] text-left text-sm">
+                <thead className="bg-surface-2 text-xs font-semibold text-fg-subtle">
+                  <tr>
+                    <th className="px-4 py-2.5">Person</th>
+                    <th className="px-4 py-2.5">Kontakt</th>
+                    <th className="px-4 py-2.5">Schichten</th>
+                    {event.questions.map((q) => (
+                      <th key={q.id} className="px-4 py-2.5">
+                        {q.label}
+                        <span className="block font-normal text-fg-subtle">{retentionNotice(q.retentionDays)}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {filteredPeople.map((p) => (
+                    <tr key={p.userId ?? p.displayName} className="align-top">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-fg">{p.displayName}</p>
+                        <p className="text-xs text-fg-muted">
+                          {[
+                            p.firstName && p.lastName && p.lastName !== PLACEHOLDER_LAST_NAME
+                              ? `${p.firstName} ${p.lastName}`
+                              : null,
+                            p.homeDepartmentName ?? 'ohne Abteilung',
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                        {p.viaLink && (
+                          <Badge size="sm" className="mt-1">
+                            <Link2 className="size-3" /> über Link
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-fg-muted">
+                        {p.phone && (
+                          <a href={`tel:${p.phone}`} className="block text-fg hover:underline">
+                            {p.phone}
+                          </a>
+                        )}
+                        {p.email && (
+                          <a href={`mailto:${p.email}`} className="block break-all hover:underline">
+                            {p.email}
+                          </a>
+                        )}
+                        {p.birthDate && <span className="block">geb. {p.birthDate.split('-').reverse().join('.')}</span>}
+                      </td>
+                      <td className="tabular px-4 py-3 text-fg">{p.shiftCount}</td>
+                      {event.questions.map((q) => (
+                        <td key={q.id} className="px-4 py-3 text-fg">
+                          {q.scope === 'PER_SIGNUP' ? (
+                            perSignup(q, p).length ? (
+                              <ul className="space-y-0.5">
+                                {perSignup(q, p).map((a, i) => (
+                                  <li key={i}>
+                                    <span className="text-xs text-fg-subtle">{a.label}:</span> {a.text}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-fg-subtle">–</span>
+                            )
+                          ) : (
+                            answerText(q, p.answers[q.id]) || <span className="text-fg-subtle">–</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </section>
