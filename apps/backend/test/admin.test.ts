@@ -329,4 +329,71 @@ describe.skipIf(!hasTestDb)('Admin-Portal: Abteilungen, Anlässe, Rollen', () =>
     expect(del.statusCode).toBe(200);
     expect(await app.prisma.event.count()).toBe(0);
   });
+
+  it('setzt Heimabteilung, filtert Personen nach Abteilung/Verwaist und führt doppelte Konten zusammen', async () => {
+    const { cookie } = await admin();
+    const department = await createDepartment(app, { name: 'Cevi Merge', slug: 'merge-abt' });
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+
+    const guestOld = await createUser(app, { email: null, ceviName: 'AltFuchs', firstName: 'AltFuchs' });
+    await app.prisma.user.update({
+      where: { id: guestOld.id },
+      data: { createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000) },
+    });
+
+    // Verwaiste Cevi-Name-Profile (0 Eintragungen, >30 Tage alt) filtern
+    const staleList = await inject(app, {
+      method: 'GET',
+      url: '/api/admin/users?method=stale_ceviname',
+      cookie,
+    });
+    expect(staleList.statusCode).toBe(200);
+    expect(staleList.json().items.map((u: { id: string }) => u.id)).toContain(guestOld.id);
+
+    // Heimabteilung über Admin-API setzen
+    const targetUser = await createUser(app, { ceviDbId: 9001, firstName: 'Nora', lastName: 'Ziel' });
+    const setHome = await inject(app, {
+      method: 'PATCH',
+      url: `/api/admin/users/${targetUser.id}`,
+      cookie,
+      payload: { homeDepartmentId: department.id },
+    });
+    expect(setHome.statusCode).toBe(200);
+
+    const byDept = await inject(app, {
+      method: 'GET',
+      url: `/api/admin/users?departmentId=${department.id}`,
+      cookie,
+    });
+    expect(byDept.statusCode).toBe(200);
+    expect(byDept.json().items.map((u: { id: string }) => u.id)).toContain(targetUser.id);
+    expect(byDept.json().items[0].homeDepartmentName).toBe('Cevi Merge');
+
+    // Eintragung auf dem Gastprofil anlegen und dann in targetUser zusammenführen
+    await app.prisma.shiftSignup.create({ data: { shiftId: shift.id, userId: guestOld.id } });
+
+    const mergeRes = await inject(app, {
+      method: 'POST',
+      url: `/api/admin/users/${guestOld.id}/merge`,
+      cookie,
+      payload: { targetUserId: targetUser.id },
+    });
+    expect(mergeRes.statusCode).toBe(200);
+    expect(await app.prisma.user.findUnique({ where: { id: guestOld.id } })).toBeNull();
+    expect(await app.prisma.shiftSignup.count({ where: { userId: targetUser.id } })).toBe(1);
+
+    // Protokoll-Suche nach USER_MERGE
+    const auditSearch = await inject(app, {
+      method: 'GET',
+      url: '/api/admin/audit?q=USER_MERGE',
+      cookie,
+    });
+    expect(auditSearch.statusCode).toBe(200);
+    expect(auditSearch.json().items).toHaveLength(1);
+    expect(auditSearch.json().items[0]).toMatchObject({
+      action: 'USER_MERGE',
+      targetId: targetUser.id,
+    });
+  });
 });

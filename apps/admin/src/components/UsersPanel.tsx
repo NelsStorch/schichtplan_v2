@@ -17,13 +17,17 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import type { AdminOverviewDto, AdminUserListDto, AdminUserListItemDto } from '@schichtplan/shared';
+import type {
+  AdminDepartmentListItemDto,
+  AdminOverviewDto,
+  AdminUserListDto,
+  AdminUserListItemDto,
+} from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
 import { formatDate, fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
-import { UserDialog } from './UserDialog';
 
-type Filter = 'all' | 'cevidb' | 'password' | 'ceviname' | 'admin';
+type Filter = 'all' | 'cevidb' | 'password' | 'ceviname' | 'stale_ceviname' | 'admin';
 
 const PAGE_SIZE = 25;
 
@@ -34,10 +38,11 @@ const sortOptions = [
   { value: 'email:asc', label: 'E-Mail A–Z' },
 ];
 
-function buildQuery(params: { query: string; filter: Filter; sort: string; page: number }) {
+function buildQuery(params: { query: string; filter: Filter; departmentId: string; sort: string; page: number }) {
   const [sort, dir] = params.sort.split(':');
   const search = new URLSearchParams({ sort, dir, page: String(params.page), pageSize: String(PAGE_SIZE) });
   if (params.query) search.set('q', params.query);
+  if (params.departmentId) search.set('departmentId', params.departmentId);
   if (params.filter === 'admin') search.set('role', 'admin');
   else if (params.filter !== 'all') search.set('method', params.filter);
   return search.toString();
@@ -63,14 +68,57 @@ function PersonCell({ user }: { user: AdminUserListItemDto }) {
   );
 }
 
-function Departments({ user }: { user: AdminUserListItemDto }) {
-  if (user.memberships.length === 0) return <span className="text-fg-subtle">–</span>;
+function Departments({
+  user,
+  onOpenDepartment,
+}: {
+  user: AdminUserListItemDto;
+  onOpenDepartment?: (id: string) => void;
+}) {
+  if (user.memberships.length === 0) {
+    if (user.homeDepartmentId && user.homeDepartmentName) {
+      return onOpenDepartment ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDepartment(user.homeDepartmentId!);
+          }}
+          className="inline-flex items-center"
+        >
+          <Badge tone="outline" className="max-w-40 truncate hover:border-line-strong">
+            {user.homeDepartmentName}
+          </Badge>
+        </button>
+      ) : (
+        <Badge tone="outline" className="max-w-40 truncate">
+          {user.homeDepartmentName}
+        </Badge>
+      );
+    }
+    return <span className="text-fg-subtle">–</span>;
+  }
   const [first, ...rest] = user.memberships;
   return (
     <span className="flex items-center gap-1.5">
-      <Badge tone="outline" className="max-w-40 truncate">
-        {first.departmentName}
-      </Badge>
+      {onOpenDepartment ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDepartment(first.departmentId);
+          }}
+          className="inline-flex items-center"
+        >
+          <Badge tone="outline" className="max-w-40 truncate hover:border-line-strong">
+            {first.departmentName}
+          </Badge>
+        </button>
+      ) : (
+        <Badge tone="outline" className="max-w-40 truncate">
+          {first.departmentName}
+        </Badge>
+      )}
       {rest.length > 0 && (
         <span
           className="text-xs font-medium text-fg-subtle"
@@ -86,10 +134,16 @@ function Departments({ user }: { user: AdminUserListItemDto }) {
 export function UsersPanel({
   currentUserId,
   overview,
+  departments = [],
+  onOpenUser,
+  onOpenDepartment,
   onChanged,
 }: {
   currentUserId?: string;
   overview: AdminOverviewDto | null;
+  departments?: AdminDepartmentListItemDto[];
+  onOpenUser: (user: AdminUserListItemDto) => void;
+  onOpenDepartment?: (departmentId: string) => void;
   onChanged: () => void;
 }) {
   const confirm = useConfirm();
@@ -98,6 +152,7 @@ export function UsersPanel({
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [departmentId, setDepartmentId] = useState('');
   const [sort, setSort] = useState('created:desc');
   const [page, setPage] = useState(1);
 
@@ -105,7 +160,6 @@ export function UsersPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
-  const [selected, setSelected] = useState<AdminUserListItemDto | null>(null);
 
   const handleDeleteUser = async (target: AdminUserListItemDto) => {
     if (target.id === currentUserId) {
@@ -138,9 +192,6 @@ export function UsersPanel({
         description: `${name} wurde vollständig gelöscht.`,
         tone: 'success',
       });
-      if (selected?.id === target.id) {
-        setSelected(null);
-      }
       setReload((n) => n + 1);
       onChanged();
     } catch (err) {
@@ -164,7 +215,7 @@ export function UsersPanel({
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    api<AdminUserListDto>(`/api/admin/users?${buildQuery({ query, filter, sort, page })}`, {
+    api<AdminUserListDto>(`/api/admin/users?${buildQuery({ query, filter, departmentId, sort, page })}`, {
       signal: controller.signal,
     })
       .then((result) => {
@@ -180,19 +231,26 @@ export function UsersPanel({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [query, filter, sort, page, reload]);
+  }, [query, filter, departmentId, sort, page, reload]);
 
   const changeFilter = (next: Filter) => {
     setFilter(next);
     setPage(1);
   };
 
+  const hasSubFilter = Boolean(query || departmentId);
+  const chipCount = (id: Filter, globalCount?: number) => {
+    if (!hasSubFilter) return globalCount;
+    return filter === id ? data?.total : undefined;
+  };
+
   const filters: { id: Filter; label: string; count?: number }[] = [
-    { id: 'all', label: 'Alle', count: overview?.users },
-    { id: 'cevidb', label: 'Cevi.DB', count: overview?.cevidbUsers },
-    { id: 'password', label: 'Passwort', count: overview?.passwordUsers },
-    { id: 'ceviname', label: 'Nur Cevi-Name', count: overview?.guestUsers },
-    { id: 'admin', label: 'Admins', count: overview?.globalAdmins },
+    { id: 'all', label: 'Alle', count: chipCount('all', overview?.users) },
+    { id: 'cevidb', label: 'Cevi.DB', count: chipCount('cevidb', overview?.cevidbUsers) },
+    { id: 'password', label: 'Passwort', count: chipCount('password', overview?.passwordUsers) },
+    { id: 'ceviname', label: 'Nur Cevi-Name', count: chipCount('ceviname', overview?.guestUsers) },
+    { id: 'stale_ceviname', label: 'Verwaist (>30 T.)', count: chipCount('stale_ceviname', overview?.staleGuestUsers) },
+    { id: 'admin', label: 'Admins', count: chipCount('admin', overview?.globalAdmins) },
   ];
 
   const items = data?.items ?? [];
@@ -229,7 +287,25 @@ export function UsersPanel({
               </button>
             )}
           </div>
-          <div className="md:w-52">
+          <div className="md:w-56">
+            <Select
+              value={departmentId}
+              onChange={(e) => {
+                setDepartmentId(e.target.value);
+                setPage(1);
+              }}
+              aria-label="Abteilung filtern"
+            >
+              <option value="">Alle Abteilungen</option>
+              <option value="none">Ohne Abteilung</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="md:w-48">
             <Select
               value={sort}
               onChange={(e) => {
@@ -283,16 +359,17 @@ export function UsersPanel({
           icon={<SearchX />}
           title="Niemand gefunden"
           description={
-            query || filter !== 'all'
+            query || filter !== 'all' || departmentId
               ? 'Mit dieser Suche und diesem Filter gibt es keine Treffer.'
               : 'Es sind noch keine Personen registriert.'
           }
           action={
-            query || filter !== 'all' ? (
+            query || filter !== 'all' || departmentId ? (
               <Button
                 variant="secondary"
                 onClick={() => {
                   setSearch('');
+                  setDepartmentId('');
                   changeFilter('all');
                 }}
               >
@@ -323,7 +400,7 @@ export function UsersPanel({
                 {items.map((user) => (
                   <tr
                     key={user.id}
-                    onClick={() => setSelected(user)}
+                    onClick={() => onOpenUser(user)}
                     className="cursor-pointer transition-colors hover:bg-surface-2 focus-within:bg-surface-2"
                   >
                     <td className="max-w-64 px-5 py-3">
@@ -331,7 +408,7 @@ export function UsersPanel({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelected(user);
+                          onOpenUser(user);
                         }}
                         className="w-full text-left outline-none focus-visible:underline"
                         aria-label={`${fullName(user)} anzeigen`}
@@ -346,7 +423,7 @@ export function UsersPanel({
                       <LoginMethodBadges methods={user.loginMethods} />
                     </td>
                     <td className="px-3 py-3">
-                      <Departments user={user} />
+                      <Departments user={user} onOpenDepartment={onOpenDepartment} />
                     </td>
                     <td className="tabular px-3 py-3 text-right font-mono text-fg-muted">{user.signupCount}</td>
                     <td className="tabular whitespace-nowrap px-5 py-3 text-right font-mono text-fg-muted">
@@ -379,7 +456,7 @@ export function UsersPanel({
                 <li key={user.id} className="flex items-center transition-colors hover:bg-surface-2">
                   <button
                     type="button"
-                    onClick={() => setSelected(user)}
+                    onClick={() => onOpenUser(user)}
                     className="flex min-w-0 flex-1 flex-col gap-2 px-4 py-3.5 text-left focus-visible:bg-surface-2 focus-visible:outline-none"
                   >
                     <span className="flex items-center justify-between gap-3">
@@ -408,7 +485,7 @@ export function UsersPanel({
                     )}
                     <button
                       type="button"
-                      onClick={() => setSelected(user)}
+                      onClick={() => onOpenUser(user)}
                       aria-label={`${fullName(user)} Details`}
                       className="flex size-8 items-center justify-center rounded-full text-fg-subtle hover:text-fg"
                     >
@@ -452,16 +529,6 @@ export function UsersPanel({
           </div>
         </nav>
       )}
-
-      <UserDialog
-        preview={selected}
-        currentUserId={currentUserId}
-        onClose={() => setSelected(null)}
-        onChanged={() => {
-          setReload((n) => n + 1);
-          onChanged();
-        }}
-      />
     </div>
   );
 }

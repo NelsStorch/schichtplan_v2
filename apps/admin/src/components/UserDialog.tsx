@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Building2, CalendarClock, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowUpRight, Building2, CalendarClock, GitMerge, History, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -17,9 +17,12 @@ import {
 } from '@schichtplan/ui';
 import {
   getRootDomain,
+  normalizePermissions,
   type AdminDepartmentListItemDto,
   type AdminUserDetailDto,
   type AdminUserListItemDto,
+  type AdminUserMembershipDto,
+  type DepartmentPermission,
 } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
 import { ACCESS_OPTIONS, CUSTOM_ACCESS, accessLabel, accessPayload, accessValue } from '../lib/access';
@@ -32,7 +35,9 @@ import {
   fullName,
   organizerRoleLabels,
 } from '../lib/format';
+import { AdminPermissionChecks } from './DepartmentDialog';
 import { LoginMethodBadges } from './LoginMethodBadges';
+import { PersonPicker } from './PersonPicker';
 
 function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
@@ -57,18 +62,132 @@ function Fact({ label, children, wide }: { label: string; children: ReactNode; w
 
 const Missing = () => <span className="font-normal text-fg-subtle">–</span>;
 
+function UserMembershipRow({
+  membership: m,
+  ceviNameOnly,
+  saving,
+  onSetMembership,
+  onSetPermissions,
+  onOpenDepartment,
+}: {
+  membership: AdminUserMembershipDto;
+  ceviNameOnly: boolean;
+  saving: boolean;
+  onSetMembership: (departmentId: string, value: string) => void;
+  onSetPermissions: (departmentId: string, permissions: DepartmentPermission[]) => void;
+  onOpenDepartment?: (departmentId: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<DepartmentPermission[]>(m.permissions);
+  const value = accessValue(m.role, m.permissions);
+
+  return (
+    <li className="px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted">
+          <Building2 className="size-4" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          {onOpenDepartment ? (
+            <button
+              type="button"
+              onClick={() => onOpenDepartment(m.departmentId)}
+              className="block truncate text-left text-sm font-semibold text-fg hover:text-accent hover:underline"
+            >
+              {m.departmentName}
+            </button>
+          ) : (
+            <span className="block truncate text-sm font-semibold text-fg">{m.departmentName}</span>
+          )}
+          <span className="block truncate font-mono text-xs text-fg-subtle">{m.departmentSlug}</span>
+        </span>
+        <span className="w-44 shrink-0">
+          <Select
+            value={value}
+            disabled={saving}
+            onChange={(e) => onSetMembership(m.departmentId, e.target.value)}
+            aria-label={`Zugang in ${m.departmentName}`}
+            className="h-10 text-sm sm:text-sm"
+          >
+            {ACCESS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} disabled={ceviNameOnly && o.needsAccount}>
+                {o.label}
+              </option>
+            ))}
+            {value === CUSTOM_ACCESS && (
+              <option value={CUSTOM_ACCESS} disabled>
+                Eigene Rechte
+              </option>
+            )}
+            <option value="">Zugehörigkeit entfernen</option>
+          </Select>
+        </span>
+        {m.role === 'HELPER' && !ceviNameOnly && (
+          <Button
+            size="sm"
+            variant={editing ? 'primary' : 'ghost'}
+            onClick={() => {
+              setDraft(m.permissions);
+              setEditing(!editing);
+            }}
+            aria-expanded={editing}
+          >
+            Rechte
+          </Button>
+        )}
+        <a
+          href={departmentUrl(m.departmentSlug)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${m.departmentName} in neuem Tab öffnen`}
+          title="Abteilungsseite öffnen"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full text-fg-subtle transition hover:bg-surface-2 hover:text-fg"
+        >
+          <ArrowUpRight className="size-4" aria-hidden />
+        </a>
+      </div>
+      {editing && (
+        <div className="mt-3 space-y-3 rounded-field border border-line bg-surface-2/50 p-3">
+          <AdminPermissionChecks value={draft} onChange={setDraft} />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              size="sm"
+              disabled={saving}
+              onClick={() => {
+                onSetPermissions(m.departmentId, normalizePermissions(draft));
+                setEditing(false);
+              }}
+            >
+              Rechte speichern
+            </Button>
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
 /** Details einer Person. Die Kopfzeile erscheint sofort aus der Liste, der Rest wird nachgeladen. */
 export function UserDialog({
   preview,
   currentUserId,
   onClose,
   onChanged,
+  onOpenDepartment,
+  onOpenAudit,
+  onSwitchUser,
 }: {
   preview: AdminUserListItemDto | null;
   currentUserId?: string;
   onClose: () => void;
   /** Nach Löschen oder geänderten Rollen: Listen neu laden */
   onChanged?: () => void;
+  onOpenDepartment?: (departmentId: string) => void;
+  onOpenAudit?: (userId: string, label: string) => void;
+  onSwitchUser?: (user: AdminUserListItemDto) => void;
 }) {
   const confirm = useConfirm();
   const toast = useToast();
@@ -76,6 +195,8 @@ export function UserDialog({
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const [mergeTarget, setMergeTarget] = useState<AdminUserListItemDto | null>(null);
   const [reload, setReload] = useState(0);
   const [departments, setDepartments] = useState<AdminDepartmentListItemDto[] | null>(null);
   const [addDepartmentId, setAddDepartmentId] = useState('');
@@ -98,8 +219,10 @@ export function UserDialog({
     if (!id) {
       setDetail(null);
       setAddDepartmentId('');
+      setMergeTarget(null);
       return;
     }
+    setMergeTarget(null);
     if (departments) return;
     api<{ items: AdminDepartmentListItemDto[] }>('/api/admin/departments')
       .then((r) => setDepartments(r.items))
@@ -158,6 +281,63 @@ export function UserDialog({
           : send(`/api/admin/departments/${departmentId}/members/${user.id}`, 'DELETE'),
       payload ? `Zugang: ${accessLabel(payload.role, payload.permissions)}` : 'Zugehörigkeit entfernt'
     );
+  };
+
+  const setCustomPermissions = async (departmentId: string, permissions: DepartmentPermission[]) => {
+    if (!user) return;
+    const payload = { role: 'HELPER' as const, permissions };
+    await change(
+      () => send(`/api/admin/departments/${departmentId}/members/${user.id}`, 'PUT', payload),
+      `Zugang: ${accessLabel(payload.role, payload.permissions)}`
+    );
+  };
+
+  const setHomeDepartment = async (homeDepartmentId: string | null) => {
+    if (!user) return;
+    await change(
+      () => send(`/api/admin/users/${user.id}`, 'PATCH', { homeDepartmentId }),
+      homeDepartmentId ? 'Heimabteilung gespeichert' : 'Heimabteilung entfernt'
+    );
+  };
+
+  const handleMerge = async () => {
+    if (!user || !mergeTarget) return;
+    const sourceName = fullName(user);
+    const targetName = fullName(mergeTarget);
+    const ok = await confirm({
+      title: `«${sourceName}» in «${targetName}» zusammenführen?`,
+      description: `Alle Schichteintragungen, Antworten, Stufen, OK-Aufgaben und Abteilungszugehörigkeiten von ${sourceName} werden auf ${targetName} übertragen. Danach wird das Quell-Konto (${sourceName}) gelöscht. Das lässt sich nicht rückgängig machen.`,
+      confirmLabel: 'Konten zusammenführen',
+      cancelLabel: 'Abbrechen',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
+    setMerging(true);
+    try {
+      await send(`/api/admin/users/${encodeURIComponent(user.id)}/merge`, 'POST', {
+        targetUserId: mergeTarget.id,
+      });
+      toast({
+        title: 'Konten zusammengeführt',
+        description: `${sourceName} wurde in ${targetName} überführt.`,
+        tone: 'success',
+      });
+      onChanged?.();
+      if (onSwitchUser) {
+        onSwitchUser(mergeTarget);
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      toast({
+        title: 'Zusammenführen fehlgeschlagen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    } finally {
+      setMerging(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -249,21 +429,33 @@ export function UserDialog({
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <LoginMethodBadges methods={user.loginMethods} isAdmin={user.isGlobalAdmin} />
-            {user.ceviDbId && (
-              <a
-                href={
-                  typeof window !== 'undefined' &&
-                  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-                    ? `http://localhost:3002/cevidb-daten?userId=${encodeURIComponent(user.id)}`
-                    : `https://login.${getRootDomain()}/cevidb-daten?userId=${encodeURIComponent(user.id)}`
-                }
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
-              >
-                Cevi.DB Rohdaten prüfen ↗
-              </a>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {onOpenAudit && (
+                <button
+                  type="button"
+                  onClick={() => onOpenAudit(user.id, fullName(user))}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-fg-muted hover:text-fg hover:underline"
+                >
+                  <History className="size-3.5" aria-hidden />
+                  Im Protokoll zeigen
+                </button>
+              )}
+              {user.ceviDbId && (
+                <a
+                  href={
+                    typeof window !== 'undefined' &&
+                    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                      ? `http://localhost:3002/cevidb-daten?userId=${encodeURIComponent(user.id)}`
+                      : `https://login.${getRootDomain()}/cevidb-daten?userId=${encodeURIComponent(user.id)}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
+                >
+                  Cevi.DB Rohdaten prüfen ↗
+                </a>
+              )}
+            </div>
           </div>
 
           <div className="mt-6">
@@ -271,13 +463,20 @@ export function UserDialog({
               <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                 <Fact label="E-Mail">
                   {user.email ? (
-                    <a
-                      href={`mailto:${user.email}`}
-                      className="inline-flex items-center gap-1.5 text-accent-ink underline-offset-4 hover:underline"
-                    >
-                      <Mail className="size-3.5 shrink-0" aria-hidden />
-                      <span className="break-all">{user.email}</span>
-                    </a>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={`mailto:${user.email}`}
+                        className="inline-flex items-center gap-1.5 text-accent-ink underline-offset-4 hover:underline"
+                      >
+                        <Mail className="size-3.5 shrink-0" aria-hidden />
+                        <span className="break-all">{user.email}</span>
+                      </a>
+                      {user.emailVerified !== undefined && (
+                        <Badge tone={user.emailVerified ? 'success' : 'warning'}>
+                          {user.emailVerified ? 'Bestätigt' : 'Unbestätigt'}
+                        </Badge>
+                      )}
+                    </span>
                   ) : (
                     <Missing />
                   )}
@@ -367,6 +566,35 @@ export function UserDialog({
                 <Fact label="Eintragungen">
                   <span className="tabular">{user.signupCount}</span>
                 </Fact>
+                <Fact label="Heimabteilung">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {departments ? (
+                      <Select
+                        value={user.homeDepartmentId ?? ''}
+                        disabled={saving}
+                        onChange={(e) => setHomeDepartment(e.target.value || null)}
+                        aria-label="Heimabteilung"
+                        className="h-9 max-w-56 text-xs sm:text-xs"
+                      >
+                        <option value="">Keine Heimabteilung</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : user.homeDepartmentName ? (
+                      <span>{user.homeDepartmentName}</span>
+                    ) : (
+                      <Missing />
+                    )}
+                    {user.homeDepartmentSource && (
+                      <Badge tone="outline">
+                        {user.homeDepartmentSource === 'CEVIDB' ? 'aus Cevi.DB' : 'selbst gewählt'}
+                      </Badge>
+                    )}
+                  </div>
+                </Fact>
                 <Fact label="Stufe" wide>
                   {!loaded ? (
                     <Skeleton className="h-5 w-40" />
@@ -393,49 +621,26 @@ export function UserDialog({
 
             <Section title="Abteilungen" count={user.memberships.length}>
               {user.memberships.length === 0 ? (
-                <p className="text-sm text-fg-subtle">Noch keiner Abteilung zugeordnet.</p>
+                <p className="text-sm text-fg-subtle">Noch keiner Abteilung mit einer Rolle zugeordnet.</p>
               ) : (
                 <ul className="divide-y divide-line overflow-hidden rounded-card border border-line">
                   {user.memberships.map((m) => (
-                    <li key={m.departmentId} className="flex items-center gap-3 px-4 py-3">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted">
-                        <Building2 className="size-4" aria-hidden />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-fg">{m.departmentName}</span>
-                        <span className="block truncate font-mono text-xs text-fg-subtle">{m.departmentSlug}</span>
-                      </span>
-                      <span className="w-44 shrink-0">
-                        <Select
-                          value={accessValue(m.role, m.permissions)}
-                          disabled={saving}
-                          onChange={(e) => setMembership(m.departmentId, e.target.value)}
-                          aria-label={`Zugang in ${m.departmentName}`}
-                          className="h-10 text-sm sm:text-sm"
-                        >
-                          {ACCESS_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value} disabled={ceviNameOnly && o.needsAccount}>
-                              {o.label}
-                            </option>
-                          ))}
-                          {accessValue(m.role, m.permissions) === CUSTOM_ACCESS && (
-                            <option value={CUSTOM_ACCESS} disabled>
-                              Eigene Rechte (in der Abteilung ändern)
-                            </option>
-                          )}
-                          <option value="">Zugehörigkeit entfernen</option>
-                        </Select>
-                      </span>
-                      <a
-                        href={departmentUrl(m.departmentSlug)}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`${m.departmentName} öffnen`}
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-fg-subtle transition hover:bg-surface-2 hover:text-fg"
-                      >
-                        <ArrowUpRight className="size-4" aria-hidden />
-                      </a>
-                    </li>
+                    <UserMembershipRow
+                      key={`${m.departmentId}-${m.role}-${m.permissions.join()}`}
+                      membership={m}
+                      ceviNameOnly={ceviNameOnly}
+                      saving={saving}
+                      onSetMembership={setMembership}
+                      onSetPermissions={setCustomPermissions}
+                      onOpenDepartment={
+                        onOpenDepartment
+                          ? (deptId) => {
+                              onClose();
+                              onOpenDepartment(deptId);
+                            }
+                          : undefined
+                      }
+                    />
                   ))}
                 </ul>
               )}
@@ -562,24 +767,66 @@ export function UserDialog({
 
             {user && !isSelf && (
               <Section title="Gefahrenzone">
-                <div className="rounded-card border border-danger/30 bg-danger/5 p-4 sm:p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h4 className="text-sm font-semibold text-danger-ink">Konto unwiderruflich löschen</h4>
+                <div className="space-y-4">
+                  {!user.isGlobalAdmin && (
+                    <div className="rounded-card border border-line bg-surface-2/50 p-4 sm:p-5">
+                      <h4 className="text-sm font-semibold text-fg">Doppeltes Konto zusammenführen</h4>
                       <p className="mt-1 text-xs leading-relaxed text-fg-muted">
-                        Entfernt diese Person mitsamt allen Schichten, Abteilungsrollen und Verknüpfungen vollständig aus der Datenbank.
+                        Überträgt alle Schichteintragungen, Antworten, Stufen und Abteilungszugehörigkeiten von{' '}
+                        <span className="font-semibold text-fg">{fullName(user)}</span> auf ein anderes Ziel-Konto und
+                        löscht danach dieses Profil.
                       </p>
+                      <div className="mt-3 space-y-3">
+                        <PersonPicker
+                          value={mergeTarget}
+                          onChange={setMergeTarget}
+                          placeholder="Ziel-Konto suchen (Name, Cevi-Name, E-Mail) …"
+                          disabledIds={[user.id]}
+                        />
+                        {mergeTarget && !ceviNameOnly && mergeTarget.loginMethods.includes('CEVINAME') && (
+                          <p className="text-xs text-danger-ink">
+                            Ein Konto mit Cevi.DB oder Passwort kann nicht in ein reines Cevi-Name-Profil überführt
+                            werden. Bitte öffne stattdessen das Cevi-Name-Profil und führe es hierher zusammen.
+                          </p>
+                        )}
+                        <div className="flex justify-end">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleMerge}
+                            disabled={
+                              !mergeTarget ||
+                              merging ||
+                              (!ceviNameOnly && mergeTarget.loginMethods.includes('CEVINAME'))
+                            }
+                          >
+                            <GitMerge className="size-4" aria-hidden />
+                            {merging ? 'Wird zusammengeführt …' : 'In Ziel-Konto zusammenführen'}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="shrink-0"
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                      {deleting ? 'Wird gelöscht …' : 'Person löschen'}
-                    </Button>
+                  )}
+
+                  <div className="rounded-card border border-danger/30 bg-danger/5 p-4 sm:p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h4 className="text-sm font-semibold text-danger-ink">Konto unwiderruflich löschen</h4>
+                        <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+                          Entfernt diese Person mitsamt allen Schichten, Abteilungsrollen und Verknüpfungen vollständig aus der Datenbank.
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="shrink-0"
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                        {deleting ? 'Wird gelöscht …' : 'Person löschen'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Section>

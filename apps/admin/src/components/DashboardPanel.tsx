@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, CalendarDays, ShieldCheck, Users } from 'lucide-react';
-import { Avatar, Badge, Callout, Card, EmptyState, Skeleton } from '@schichtplan/ui';
+import { AlertTriangle, ArrowRight, ArrowUpRight, BellRing, CalendarDays, ShieldCheck, Users } from 'lucide-react';
+import { Avatar, Badge, Button, Callout, Card, EmptyState, Skeleton, useToast } from '@schichtplan/ui';
 import type { AdminDashboardDto, AdminOverviewDto, AdminUserListItemDto } from '@schichtplan/shared';
-import { api, errorMessage } from '../lib/api';
+import { api, departmentUrl, errorMessage, send } from '../lib/api';
 import { formatDate, formatEventRange, fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
@@ -51,14 +51,49 @@ export function DashboardPanel({
   onOpenDepartment: (id: string) => void;
   onOpenUser: (user: AdminUserListItemDto) => void;
 }) {
+  const toast = useToast();
   const [data, setData] = useState<AdminDashboardDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [testingAlert, setTestingAlert] = useState(false);
 
   useEffect(() => {
     api<AdminDashboardDto>('/api/admin/dashboard')
       .then(setData)
       .catch((err) => setError(errorMessage(err)));
   }, []);
+
+  const testServerAlert = async () => {
+    setTestingAlert(true);
+    try {
+      const res = await send<{
+        ok: boolean;
+        result: { sent: boolean; webhookSent?: boolean; emailSent?: boolean; reason?: string };
+      }>('/api/admin/alert-test', 'POST');
+      const { result } = res;
+      if (result.sent) {
+        const channels = [result.webhookSent && 'Webhook', result.emailSent && 'E-Mail'].filter(Boolean).join(' & ');
+        toast({
+          title: 'Test-Alarm gesendet',
+          description: `Erfolgreich über ${channels} zugestellt.`,
+          tone: 'success',
+        });
+      } else {
+        toast({
+          title: 'Kein Alarm versendet',
+          description: result.reason || 'Weder Webhook noch Alert-E-Mail konfiguriert.',
+          tone: 'error',
+        });
+      }
+    } catch (err) {
+      toast({
+        title: 'Test-Alarm fehlgeschlagen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    } finally {
+      setTestingAlert(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -72,6 +107,19 @@ export function DashboardPanel({
           <Stat label="Eintragungen 7 Tage" value={data?.signups7d} />
         </dl>
       </Card>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-5 py-3.5">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-fg">Server-Überwachung & Alarme</p>
+          <p className="text-xs text-fg-muted">
+            Prüft, ob kritische Server-Alarme (Datenbank-Überlastung, SMTP-Ausfall, 500-Fehler) per Webhook oder E-Mail ankommen.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={testServerAlert} disabled={testingAlert}>
+          <BellRing className="size-4" aria-hidden />
+          {testingAlert ? 'Wird gesendet …' : 'Server-Alarm testen'}
+        </Button>
+      </div>
 
       {error && <Callout tone="danger">{error}</Callout>}
 
@@ -129,32 +177,42 @@ export function DashboardPanel({
                 {data.upcomingEvents.map((e) => {
                   const pct = e.slotCount ? Math.round((Math.min(e.signupCount, e.slotCount) / e.slotCount) * 100) : null;
                   return (
-                    <li key={e.id}>
-                      <button
-                        type="button"
-                        onClick={() => onOpenDepartment(e.departmentId)}
-                        className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-surface-2"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate text-sm font-semibold text-fg">{e.title}</span>
-                            {!e.isPublished && <Badge tone="warning">Entwurf</Badge>}
-                          </span>
-                          <span className="tabular block truncate text-xs text-fg-subtle">
-                            {formatEventRange(e.startDate, e.endDate)} · {e.departmentName}
-                          </span>
+                    <li key={e.id} className="flex items-center gap-4 px-5 py-3.5 transition hover:bg-surface-2">
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <a
+                            href={departmentUrl(e.departmentSlug, `/events/${e.slug}`)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 truncate text-sm font-semibold text-fg hover:text-accent hover:underline"
+                          >
+                            <span className="truncate">{e.title}</span>
+                            <ArrowUpRight className="size-3.5 shrink-0 text-fg-subtle" aria-hidden />
+                          </a>
+                          {!e.isPublished && <Badge tone="warning">Entwurf</Badge>}
                         </span>
-                        <span className="tabular shrink-0 text-right text-xs text-fg-muted">
-                          {pct === null ? (
-                            'Keine Schichten'
-                          ) : (
-                            <>
-                              <span className="block font-semibold text-fg">{pct}% belegt</span>
-                              {e.signupCount} / {e.slotCount}
-                            </>
-                          )}
+                        <span className="tabular block truncate text-xs text-fg-subtle">
+                          {formatEventRange(e.startDate, e.endDate)}
+                          {' · '}
+                          <button
+                            type="button"
+                            onClick={() => onOpenDepartment(e.departmentId)}
+                            className="font-medium text-fg-muted hover:text-accent hover:underline"
+                          >
+                            {e.departmentName}
+                          </button>
                         </span>
-                      </button>
+                      </span>
+                      <span className="tabular shrink-0 text-right text-xs text-fg-muted">
+                        {pct === null ? (
+                          'Keine Schichten'
+                        ) : (
+                          <>
+                            <span className="block font-semibold text-fg">{pct}% belegt</span>
+                            {e.signupCount} / {e.slotCount}
+                          </>
+                        )}
+                      </span>
                     </li>
                   );
                 })}
@@ -186,7 +244,7 @@ export function DashboardPanel({
                           {u.isGlobalAdmin && <ShieldCheck aria-label="Globale Admin" className="size-3.5 text-accent-ink" />}
                         </span>
                         <span className="block truncate text-xs text-fg-subtle">
-                          {u.memberships[0]?.departmentName ?? 'Ohne Abteilung'} · {formatDate(u.createdAt)}
+                          {u.memberships[0]?.departmentName ?? u.homeDepartmentName ?? 'Ohne Abteilung'} · {formatDate(u.createdAt)}
                         </span>
                       </span>
                       <span className="hidden sm:block">

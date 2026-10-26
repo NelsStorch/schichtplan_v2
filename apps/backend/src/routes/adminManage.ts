@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   ConfirmDeleteSchema,
   AdminCreateDepartmentSchema,
+  AdminMergeUserSchema,
   AdminSetMemberRoleSchema,
   AdminUpdateDepartmentSchema,
   AdminUpdateEventSchema,
@@ -22,6 +23,7 @@ import {
 } from '@schichtplan/shared';
 import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen } from '../services/homeDepartment.js';
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
+import { mergeUserInto } from '../services/mergeProfiles.js';
 import { personLabel } from '../services/profile.js';
 import { notifyAdminChange, recordAdminAction } from '../services/adminAudit.js';
 import { sendServerAlert } from '../services/serverAlert.js';
@@ -38,6 +40,7 @@ const EventListQuerySchema = z.object({
 });
 
 const AuditQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
   targetType: z.enum(['USER', 'DEPARTMENT', 'EVENT']).optional(),
   targetId: z.string().max(100).optional(),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
@@ -834,18 +837,27 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // ---------------------------------------------------------------------------
-  // Personen: globale Admin-Rolle
+  // Personen: globale Admin-Rolle, Heimabteilung & Konten zusammenführen
   // ---------------------------------------------------------------------------
 
   fastify.patch<{ Params: { id: string } }>('/api/admin/users/:id', guard, async (request, reply) => {
     const parse = AdminUpdateUserSchema.safeParse(request.body);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const { isGlobalAdmin } = parse.data;
+    const { isGlobalAdmin, homeDepartmentId } = parse.data;
 
     const user = await fastify.prisma.user
       .findUnique({
         where: { id: request.params.id },
-        select: { id: true, isGlobalAdmin: true, ceviDbId: true, firstName: true, lastName: true, ceviName: true },
+        select: {
+          id: true,
+          isGlobalAdmin: true,
+          ceviDbId: true,
+          firstName: true,
+          lastName: true,
+          ceviName: true,
+          homeDepartmentId: true,
+          homeDepartment: { select: { name: true } },
+        },
       })
       .catch(() => null);
     if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
@@ -884,7 +896,128 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
         actorLabel: actor ? personLabel(actor) : request.user.email,
       });
     }
+
+    if (homeDepartmentId !== undefined && homeDepartmentId !== user.homeDepartmentId) {
+      let targetDept: { id: string; name: string } | null = null;
+      if (homeDepartmentId !== null) {
+        targetDept = await fastify.prisma.department
+          .findUnique({ where: { id: homeDepartmentId }, select: { id: true, name: true } })
+          .catch(() => null);
+        if (!targetDept) {
+          return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
+        }
+      }
+      await fastify.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            homeDepartmentId,
+            homeDepartmentSource: homeDepartmentId ? 'SELF' : null,
+            departmentSetupAt: new Date(),
+          },
+        });
+        if (homeDepartmentId) {
+          await tx.departmentMember.upsert({
+            where: { departmentId_userId: { departmentId: homeDepartmentId, userId: user.id } },
+            update: {},
+            create: { departmentId: homeDepartmentId, userId: user.id, role: 'HELPER' },
+          });
+        }
+      });
+      await recordAdminAction(fastify.prisma, request, {
+        action: 'USER_HOME_DEPARTMENT_SET',
+        targetType: 'USER',
+        targetId: user.id,
+        targetLabel: personLabel(user),
+        details: {
+          before: user.homeDepartment?.name ?? null,
+          after: targetDept?.name ?? null,
+        },
+      });
+    }
+
     return { success: true };
+  });
+
+  fastify.post<{ Params: { id: string } }>('/api/admin/users/:id/merge', guard, async (request, reply) => {
+    const parse = AdminMergeUserSchema.safeParse(request.body);
+    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+    const sourceId = request.params.id;
+    const { targetUserId } = parse.data;
+
+    if (sourceId === targetUserId) {
+      return reply.status(400).send({ error: 'Quelle und Ziel dürfen nicht dasselbe Konto sein.' });
+    }
+    if (sourceId === request.user.id) {
+      return reply.status(400).send({ error: 'Du kannst dein eigenes Admin-Konto nicht als Quelle zusammenführen.' });
+    }
+
+    const [source, target] = await Promise.all([
+      fastify.prisma.user
+        .findUnique({
+          where: { id: sourceId },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            ceviName: true,
+            isGlobalAdmin: true,
+            ceviDbId: true,
+            passwordHash: true,
+          },
+        })
+        .catch(() => null),
+      fastify.prisma.user
+        .findUnique({
+          where: { id: targetUserId },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            ceviName: true,
+            isGlobalAdmin: true,
+            ceviDbId: true,
+            passwordHash: true,
+          },
+        })
+        .catch(() => null),
+    ]);
+
+    if (!source) return reply.status(404).send({ error: 'Quell-Person nicht gefunden' });
+    if (!target) return reply.status(404).send({ error: 'Ziel-Person nicht gefunden' });
+
+    if (source.isGlobalAdmin) {
+      return reply.status(400).send({
+        error: 'Konten mit globalen Admin-Rechten können nicht als Quelle zusammengeführt werden.',
+      });
+    }
+
+    if (isCeviNameProfile(target) && !isCeviNameProfile(source)) {
+      return reply.status(400).send({
+        error: 'Ein Konto mit Cevi.DB oder Passwort kann nicht in ein reines Cevi-Name-Profil überführt werden. Bitte umgekehrt zusammenführen.',
+      });
+    }
+
+    await mergeUserInto(fastify.prisma, sourceId, targetUserId);
+
+    const sourceLabel = personLabel(source);
+    const targetLabel = personLabel(target);
+
+    await recordAdminAction(fastify.prisma, request, {
+      action: 'USER_MERGE',
+      targetType: 'USER',
+      targetId: targetUserId,
+      targetLabel,
+      details: {
+        sourceId,
+        sourceLabel,
+        sourceEmail: source.email,
+      },
+    });
+
+    return { success: true, targetUserId };
   });
 
   // ---------------------------------------------------------------------------
@@ -894,10 +1027,20 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/api/admin/audit', guard, async (request, reply) => {
     const parse = AuditQuerySchema.safeParse(request.query);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const { targetType, targetId, page, pageSize } = parse.data;
+    const { q, targetType, targetId, page, pageSize } = parse.data;
+    const terms = (q ?? '').split(/\s+/).filter(Boolean).slice(0, 5);
     const where: Prisma.AdminAuditLogWhereInput = {
-      ...(targetType ? { targetType } : {}),
-      ...(targetId ? { targetId } : {}),
+      AND: [
+        ...(targetType ? [{ targetType }] : []),
+        ...(targetId ? [{ targetId }] : []),
+        ...terms.map((term) => ({
+          OR: [
+            { targetLabel: { contains: term, mode: 'insensitive' as const } },
+            { adminName: { contains: term, mode: 'insensitive' as const } },
+            { action: { contains: term, mode: 'insensitive' as const } },
+          ],
+        })),
+      ],
     };
     const [total, rows] = await fastify.prisma.$transaction([
       fastify.prisma.adminAuditLog.count({ where }),

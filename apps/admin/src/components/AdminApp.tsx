@@ -269,9 +269,11 @@ const TABS: { id: AdminTab; label: string; icon: React.ReactNode; intro: string 
   },
 ];
 
-const tabFromHash = (): AdminTab => {
-  const hash = window.location.hash.slice(1);
-  return TABS.some((t) => t.id === hash) ? (hash as AdminTab) : 'uebersicht';
+const parseHash = (): { tab: AdminTab; entity?: string } => {
+  const raw = window.location.hash.slice(1);
+  const [first, second] = raw.split('/');
+  const tab = TABS.some((t) => t.id === first) ? (first as AdminTab) : 'uebersicht';
+  return { tab, entity: second ? decodeURIComponent(second) : undefined };
 };
 
 const timeFmt = new Intl.DateTimeFormat('de-CH', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' });
@@ -290,16 +292,87 @@ function AdminHome({
   const [departments, setDepartments] = useState<AdminDepartmentListItemDto[] | null>(null);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [openDepartment, setOpenDepartment] = useState<string | null>(null);
+  const [pendingDeptKey, setPendingDeptKey] = useState<string | null>(null);
   const [openUser, setOpenUser] = useState<AdminUserListItemDto | null>(null);
+  const [auditTarget, setAuditTarget] = useState<{ id: string; label: string } | null>(null);
   const [usersReload, setUsersReload] = useState(0);
+  const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
 
-  // Bereich im Hash (#abteilungen), damit Neu laden und Zurück funktionieren
+  // Ablauf-Countdown für die Admin-Sitzung (prüft alle 30 Sekunden)
   useEffect(() => {
-    const sync = () => setTab(tabFromHash());
+    if (!adminSession.expiresAt) return;
+    const expiresMs = new Date(adminSession.expiresAt).getTime();
+    const update = () => {
+      const diffMin = Math.max(0, Math.ceil((expiresMs - Date.now()) / 60_000));
+      setMinutesLeft(diffMin);
+    };
+    update();
+    const timer = window.setInterval(update, 30_000);
+    return () => window.clearInterval(timer);
+  }, [adminSession.expiresAt]);
+
+  const openUserById = useCallback((userId: string) => {
+    api<AdminUserListItemDto>(`/api/admin/users/${encodeURIComponent(userId)}`)
+      .then((u) => setOpenUser(u))
+      .catch(() => undefined);
+  }, []);
+
+  // Bereich und optional geöffnete Abteilung/Person im Hash (#abteilungen/<id>, #personen/<id>)
+  useEffect(() => {
+    const sync = () => {
+      const { tab: nextTab, entity } = parseHash();
+      setTab(nextTab);
+      if (nextTab === 'abteilungen' && entity) {
+        setPendingDeptKey(entity);
+      } else if (nextTab === 'personen' && entity) {
+        setOpenUser((curr) => {
+          if (curr?.id !== entity) openUserById(entity);
+          return curr;
+        });
+      }
+    };
     sync();
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
-  }, []);
+  }, [openUserById]);
+
+  // Sobald die Abteilungsliste geladen ist, #abteilungen/<slug-oder-id> auflösen
+  useEffect(() => {
+    if (!pendingDeptKey || !departments) return;
+    const match = departments.find((d) => d.id === pendingDeptKey || d.slug === pendingDeptKey);
+    if (match) setOpenDepartment(match.id);
+    setPendingDeptKey(null);
+  }, [pendingDeptKey, departments]);
+
+  const setHashSilently = (nextHash: string) => {
+    const url = nextHash ? `#${nextHash}` : window.location.pathname;
+    history.replaceState(null, '', url);
+  };
+
+  const handleOpenDepartment = (id: string | null) => {
+    setOpenDepartment(id);
+    if (id) {
+      const slug = departments?.find((d) => d.id === id)?.slug ?? id;
+      setHashSilently(`abteilungen/${encodeURIComponent(slug)}`);
+    } else {
+      setHashSilently(tab === 'uebersicht' ? '' : tab);
+    }
+  };
+
+  const handleOpenUser = (u: AdminUserListItemDto | null) => {
+    setOpenUser(u);
+    if (u) {
+      setHashSilently(`personen/${encodeURIComponent(u.id)}`);
+    } else {
+      setHashSilently(tab === 'uebersicht' ? '' : tab);
+    }
+  };
+
+  const handleOpenUserById = (userId: string) => {
+    setOpenDepartment(null);
+    setHashSilently(`personen/${encodeURIComponent(userId)}`);
+    openUserById(userId);
+  };
 
   const navigate = (next: AdminTab) => {
     if (next === 'uebersicht') history.pushState(null, '', window.location.pathname);
@@ -353,8 +426,25 @@ function AdminHome({
       {adminSession.expiresAt && (
         <p className="mb-4 text-xs text-fg-subtle">
           Admin-Sitzung gültig bis {timeFmt.format(new Date(adminSession.expiresAt))}
+          {minutesLeft !== null && ` (noch ${minutesLeft} Min.)`}
           {adminSession.loginMethod === 'cevidb' ? ' · angemeldet mit Cevi.DB' : ''}
         </p>
+      )}
+      {minutesLeft !== null && minutesLeft <= 15 && (
+        <div className="mb-6">
+          <Callout tone="warning" title="Admin-Sitzung läuft bald ab">
+            <span className="mt-1 flex flex-wrap items-center justify-between gap-3">
+              <span>
+                {minutesLeft <= 0
+                  ? 'Deine Admin-Sitzung ist abgelaufen. Bitte melde dich jetzt neu an, bevor du weitere Änderungen speicherst.'
+                  : `Deine Admin-Sitzung läuft in ${minutesLeft} ${minutesLeft === 1 ? 'Minute' : 'Minuten'} ab.`}
+              </span>
+              <Button size="sm" variant="secondary" onClick={logout}>
+                Jetzt neu anmelden
+              </Button>
+            </span>
+          </Callout>
+        </div>
       )}
       <div className="mb-7">
         <h1 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight text-fg">{current.label}</h1>
@@ -365,33 +455,67 @@ function AdminHome({
         <DashboardPanel
           overview={overview}
           onNavigate={navigate}
-          onOpenDepartment={setOpenDepartment}
-          onOpenUser={setOpenUser}
+          onOpenDepartment={handleOpenDepartment}
+          onOpenUser={handleOpenUser}
         />
       )}
       {tab === 'abteilungen' && (
         <DepartmentsPanel
           departments={departments}
           loading={departmentsLoading}
-          onOpen={setOpenDepartment}
+          onOpen={handleOpenDepartment}
           onChanged={refresh}
         />
       )}
-      {tab === 'anlaesse' && <EventsPanel departments={departments ?? []} />}
-      {tab === 'protokoll' && <AuditPanel />}
+      {tab === 'anlaesse' && <EventsPanel departments={departments ?? []} onOpenDepartment={handleOpenDepartment} />}
+      {tab === 'protokoll' && (
+        <AuditPanel
+          targetFilter={auditTarget}
+          onClearTargetFilter={() => setAuditTarget(null)}
+          onOpenDepartment={handleOpenDepartment}
+          onOpenUserById={handleOpenUserById}
+        />
+      )}
       {tab === 'personen' && (
-        <UsersPanel key={usersReload} currentUserId={user.id} overview={overview} onChanged={refresh} />
+        <UsersPanel
+          key={usersReload}
+          currentUserId={user.id}
+          overview={overview}
+          departments={departments ?? []}
+          onOpenUser={handleOpenUser}
+          onOpenDepartment={handleOpenDepartment}
+          onChanged={refresh}
+        />
       )}
 
       <DepartmentDialog
         departmentId={openDepartment}
-        onClose={() => setOpenDepartment(null)}
+        onClose={() => handleOpenDepartment(null)}
+        onOpenUser={handleOpenUserById}
         onChanged={() => {
           refresh();
           setUsersReload((n) => n + 1);
         }}
       />
-      <UserDialog preview={openUser} currentUserId={user.id} onClose={() => setOpenUser(null)} onChanged={refresh} />
+      <UserDialog
+        preview={openUser}
+        currentUserId={user.id}
+        onClose={() => handleOpenUser(null)}
+        onOpenDepartment={handleOpenDepartment}
+        onOpenAudit={(id, label) => {
+          handleOpenUser(null);
+          setAuditTarget({ id, label });
+          navigate('protokoll');
+        }}
+        onSwitchUser={(target) => {
+          setUsersReload((n) => n + 1);
+          handleOpenUser(target);
+        }}
+        onChanged={() => {
+          refresh();
+          setUsersReload((n) => n + 1);
+        }}
+      />
     </Shell>
   );
 }

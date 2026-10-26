@@ -29,21 +29,32 @@ export async function mergeCeviNameProfilesInto(
   }
 
   for (const sourceId of sourceIds) {
-    await prisma.$transaction((tx) => mergeOne(tx, sourceId, target.id));
+    await mergeUserInto(prisma, sourceId, target.id);
   }
   return sourceIds.size;
 }
 
+/**
+ * Führt das Quell-Konto (`sourceId`) vollständig in das Ziel-Konto (`targetId`) zusammen
+ * und löscht danach das Quell-Konto. Bei Konflikten (z. B. gleiche Schicht) gewinnt das Ziel-Konto.
+ */
+export async function mergeUserInto(prisma: PrismaClient, sourceId: string, targetId: string): Promise<void> {
+  await prisma.$transaction((tx) => mergeOne(tx, sourceId, targetId));
+}
+
 async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
-  // Angaben, die im Cevi.DB-Konto fehlen, vom Cevi-Name-Profil übernehmen
+  // Angaben, die im Ziel-Konto fehlen, vom Quell-Profil übernehmen
   const [source, target] = await Promise.all([
     tx.user.findUniqueOrThrow({ where: { id: sourceId } }),
     tx.user.findUniqueOrThrow({ where: { id: targetId } }),
   ]);
+  const targetIsGuest = isCeviNameProfile(target);
   await tx.user.update({
     where: { id: targetId },
     data: {
       phone: target.phone || source.phone,
+      ceviName: target.ceviName || source.ceviName,
+      birthDate: target.birthDate ?? source.birthDate,
       lastName:
         (!target.lastName || target.lastName === PLACEHOLDER_LAST_NAME) && source.lastName !== PLACEHOLDER_LAST_NAME
           ? source.lastName
@@ -54,7 +65,7 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
     },
   });
 
-  // Schicht-Eintragungen: doppelte (gleiche Schicht) bleiben beim Cevi.DB-Konto
+  // Schicht-Eintragungen: doppelte (gleiche Schicht) bleiben beim Ziel-Konto
   const targetShiftIds = new Set(
     (await tx.shiftSignup.findMany({ where: { userId: targetId }, select: { shiftId: true } })).map((s) => s.shiftId)
   );
@@ -99,19 +110,71 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
     async () => (await tx.eventOrganizer.findMany({ where: { userId: sourceId }, select: { id: true, eventId: true } })).map((r) => ({ id: r.id, key: r.eventId })),
     (ids) => tx.eventOrganizer.updateMany({ where: { id: { in: ids } }, data: { userId: targetId } })
   );
-
-  // Mitgliedschaften: nur als Helfer*in, bestehende Rollen des Ziels bleiben
-  const targetDepartments = new Set(
-    (await tx.departmentMember.findMany({ where: { userId: targetId }, select: { departmentId: true } })).map((m) => m.departmentId)
+  await moveUnique(
+    async () => (await tx.shiftResponsible.findMany({ where: { userId: targetId }, select: { shiftId: true } })).map((r) => r.shiftId),
+    async () => (await tx.shiftResponsible.findMany({ where: { userId: sourceId }, select: { id: true, shiftId: true } })).map((r) => ({ id: r.id, key: r.shiftId })),
+    (ids) => tx.shiftResponsible.updateMany({ where: { id: { in: ids } }, data: { userId: targetId } })
   );
-  for (const m of await tx.departmentMember.findMany({ where: { userId: sourceId }, select: { departmentId: true } })) {
-    if (!targetDepartments.has(m.departmentId)) {
-      await tx.departmentMember.create({ data: { departmentId: m.departmentId, userId: targetId, role: 'HELPER' } });
+  await moveUnique(
+    async () =>
+      (await tx.eventDayResponsible.findMany({ where: { userId: targetId }, select: { eventId: true, dayDate: true } })).map(
+        (r) => `${r.eventId}:${r.dayDate}`
+      ),
+    async () =>
+      (await tx.eventDayResponsible.findMany({ where: { userId: sourceId }, select: { id: true, eventId: true, dayDate: true } })).map(
+        (r) => ({ id: r.id, key: `${r.eventId}:${r.dayDate}` })
+      ),
+    (ids) => tx.eventDayResponsible.updateMany({ where: { id: { in: ids } }, data: { userId: targetId } })
+  );
+
+  // Mitgliedschaften übernehmen (bei Cevi-Name-Zielen höchstens als Helfer*in ohne Rechte)
+  const targetMemberships = new Map(
+    (
+      await tx.departmentMember.findMany({
+        where: { userId: targetId },
+        select: { departmentId: true, role: true, permissions: true, leaderSource: true },
+      })
+    ).map((m) => [m.departmentId, m])
+  );
+  for (const m of await tx.departmentMember.findMany({
+    where: { userId: sourceId },
+    select: { departmentId: true, role: true, permissions: true, leaderSource: true },
+  })) {
+    const existing = targetMemberships.get(m.departmentId);
+    if (!existing) {
+      await tx.departmentMember.create({
+        data: {
+          departmentId: m.departmentId,
+          userId: targetId,
+          role: targetIsGuest ? 'HELPER' : m.role,
+          permissions: targetIsGuest ? [] : m.permissions,
+          leaderSource: targetIsGuest ? null : m.leaderSource,
+        },
+      });
+    } else if (!targetIsGuest) {
+      if (existing.role !== 'ADMIN' && m.role === 'ADMIN') {
+        await tx.departmentMember.update({
+          where: { departmentId_userId: { departmentId: m.departmentId, userId: targetId } },
+          data: { role: 'ADMIN', permissions: [], leaderSource: m.leaderSource ?? 'MANUAL' },
+        });
+      } else if (existing.role !== 'ADMIN' && m.permissions.length > 0) {
+        const mergedPermissions = Array.from(new Set([...existing.permissions, ...m.permissions]));
+        await tx.departmentMember.update({
+          where: { departmentId_userId: { departmentId: m.departmentId, userId: targetId } },
+          data: { permissions: mergedPermissions },
+        });
+      }
     }
   }
 
-  // Persönliche Zugangs-Links zeigen jetzt aufs Cevi.DB-Konto
+  // Referenzen ohne Unique-Constraint umhängen
   await tx.eventAccessLink.updateMany({ where: { boundUserId: sourceId }, data: { boundUserId: targetId } });
+  await tx.eventAccessLink.updateMany({ where: { createdById: sourceId }, data: { createdById: targetId } });
+  await tx.eventDeregistration.updateMany({ where: { createdById: sourceId }, data: { createdById: targetId } });
+  await tx.event.updateMany({ where: { contactUserId: sourceId }, data: { contactUserId: targetId } });
+  await tx.department.updateMany({ where: { contactUserId: sourceId }, data: { contactUserId: targetId } });
+  await tx.shiftSignupLog.updateMany({ where: { helperUserId: sourceId }, data: { helperUserId: targetId } });
+  await tx.shiftSignupLog.updateMany({ where: { performedByUserId: sourceId }, data: { performedByUserId: targetId } });
 
   // Rest (doppelte Antworten, Mitgliedschaften usw.) verschwindet mit dem Profil
   await tx.user.delete({ where: { id: sourceId } });

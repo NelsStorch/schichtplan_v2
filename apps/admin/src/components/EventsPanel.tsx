@@ -202,10 +202,12 @@ function EventActions({
 export function EventRows({
   items,
   showDepartment = true,
+  onOpenDepartment,
   onChanged,
 }: {
   items: AdminEventListItemDto[];
   showDepartment?: boolean;
+  onOpenDepartment?: (departmentId: string) => void;
   onChanged: () => void;
 }) {
   const toast = useToast();
@@ -220,10 +222,32 @@ export function EventRows({
             <li key={event.id} className="flex items-start gap-3 px-4 py-3.5 sm:items-center sm:px-5">
               <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] sm:items-center lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-fg">{event.title}</span>
+                  <a
+                    href={departmentUrl(event.departmentSlug, `/events/${event.slug}`)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-sm font-semibold text-fg hover:text-accent hover:underline"
+                  >
+                    {event.title}
+                  </a>
                   <span className="tabular block truncate text-xs text-fg-subtle">
                     {formatEventRange(event.startDate, event.endDate)}
-                    {showDepartment && <> · {event.departmentName}</>}
+                    {showDepartment && (
+                      <>
+                        {' · '}
+                        {onOpenDepartment ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenDepartment(event.departmentId)}
+                            className="font-medium text-fg-muted hover:text-accent hover:underline"
+                          >
+                            {event.departmentName}
+                          </button>
+                        ) : (
+                          event.departmentName
+                        )}
+                      </>
+                    )}
                     {' · '}
                     {event.shiftCount} Schichten · {event.organizerCount} im OK
                   </span>
@@ -265,7 +289,13 @@ export function EventRows({
   );
 }
 
-export function EventsPanel({ departments }: { departments: AdminDepartmentListItemDto[] }) {
+export function EventsPanel({
+  departments,
+  onOpenDepartment,
+}: {
+  departments: AdminDepartmentListItemDto[];
+  onOpenDepartment?: (departmentId: string) => void;
+}) {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [when, setWhen] = useState<When>('upcoming');
@@ -421,7 +451,7 @@ export function EventsPanel({ departments }: { departments: AdminDepartmentListI
         />
       ) : (
         <div className={cn('transition-opacity duration-200', loading && 'opacity-60')} aria-busy={loading}>
-          <EventRows items={items} onChanged={() => setReload((n) => n + 1)} />
+          <EventRows items={items} onOpenDepartment={onOpenDepartment} onChanged={() => setReload((n) => n + 1)} />
         </div>
       )}
 

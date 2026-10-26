@@ -85,10 +85,12 @@ function Stat({ label, value }: { label: string; value: number }) {
 function PersonRow({
   person,
   onAccessChange,
+  onOpenUser,
   busy,
 }: {
   person: AdminDepartmentPersonDto;
   onAccessChange: (payload: { role: 'ADMIN' | 'HELPER'; permissions: DepartmentPermission[] } | null) => void;
+  onOpenUser?: (userId: string) => void;
   busy: boolean;
 }) {
   const name = fullName(person);
@@ -103,7 +105,17 @@ function PersonRow({
           <Avatar name={name} size="sm" highlight={person.role === 'ADMIN'} />
           <span className="min-w-0">
             <span className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-semibold text-fg">{name}</span>
+              {onOpenUser ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenUser(person.userId)}
+                  className="truncate text-left text-sm font-semibold text-fg hover:text-accent hover:underline"
+                >
+                  {name}
+                </button>
+              ) : (
+                <span className="truncate text-sm font-semibold text-fg">{name}</span>
+              )}
               {person.isGlobalAdmin && <ShieldCheck aria-label="Globale Admin" className="size-3.5 shrink-0 text-accent-ink" />}
             </span>
             <span className="block truncate text-xs text-fg-subtle">
@@ -191,7 +203,7 @@ function PersonRow({
 }
 
 /** Einzelne Rechte ankreuzen (globale Admins dürfen alles vergeben) */
-function AdminPermissionChecks({
+export function AdminPermissionChecks({
   value,
   onChange,
 }: {
@@ -227,7 +239,15 @@ function AdminPermissionChecks({
   );
 }
 
-function PeopleTab({ detail, onChanged }: { detail: AdminDepartmentDetailDto; onChanged: () => void }) {
+function PeopleTab({
+  detail,
+  onChanged,
+  onOpenUser,
+}: {
+  detail: AdminDepartmentDetailDto;
+  onChanged: () => void;
+  onOpenUser?: (userId: string) => void;
+}) {
   const toast = useToast();
   const [filter, setFilter] = useState<PeopleFilter>('all');
   const [search, setSearch] = useState('');
@@ -385,6 +405,7 @@ function PeopleTab({ detail, onChanged }: { detail: AdminDepartmentDetailDto; on
               person={person}
               busy={busyId === person.userId}
               onAccessChange={(payload) => setAccess(person.userId, payload)}
+              onOpenUser={onOpenUser}
             />
           ))}
         </ul>
@@ -608,10 +629,12 @@ export function DepartmentDialog({
   departmentId,
   onClose,
   onChanged,
+  onOpenUser,
 }: {
   departmentId: string | null;
   onClose: () => void;
   onChanged: () => void;
+  onOpenUser?: (userId: string) => void;
 }) {
   const [detail, setDetail] = useState<AdminDepartmentDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -732,7 +755,7 @@ export function DepartmentDialog({
           </div>
 
           <div className="pt-5">
-            {tab === 'personen' && <PeopleTab detail={loaded} onChanged={refresh} />}
+            {tab === 'personen' && <PeopleTab detail={loaded} onChanged={refresh} onOpenUser={onOpenUser} />}
             {tab === 'anlaesse' &&
               (loaded.events.length === 0 ? (
                 <EmptyState title="Noch keine Anlässe" className="py-8" />

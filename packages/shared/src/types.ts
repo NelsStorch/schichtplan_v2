@@ -568,6 +568,7 @@ export interface AdminUserMembershipDto {
 export interface AdminUserListItemDto {
   id: string;
   email: string | null;
+  emailVerified?: boolean;
   firstName: string;
   lastName: string | null;
   ceviName: string | null;
@@ -578,6 +579,10 @@ export interface AdminUserListItemDto {
   loginMethods: LoginMethod[];
   signupCount: number;
   memberships: AdminUserMembershipDto[];
+  homeDepartmentId?: string | null;
+  homeDepartmentName?: string | null;
+  homeDepartmentSlug?: string | null;
+  homeDepartmentSource?: string | null;
   ceviDbOrtsgruppeId?: number | null;
   ceviDbOrtsgruppeName?: string | null;
   ceviDbDepartmentLeader?: boolean;
@@ -644,6 +649,8 @@ export interface AdminOverviewDto {
   passwordUsers: number;
   /** Personen ohne Passwort und ohne Cevi.DB (Cevi-Name-Schnelllogin) */
   guestUsers: number;
+  /** Verwaiste Cevi-Name-Profile (0 Eintragungen, älter als 30 Tage) */
+  staleGuestUsers?: number;
   globalAdmins: number;
   newUsers7d: number;
   departments: number;

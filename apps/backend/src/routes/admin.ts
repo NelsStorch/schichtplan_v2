@@ -14,8 +14,9 @@ import { recordAdminAction } from '../services/adminAudit.js';
 
 const ListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
-  method: z.enum(['cevidb', 'password', 'ceviname']).optional(),
+  method: z.enum(['cevidb', 'password', 'ceviname', 'stale_ceviname']).optional(),
   role: z.enum(['admin']).optional(),
+  departmentId: z.union([z.string().uuid(), z.literal('none')]).optional(),
   sort: z.enum(['created', 'name', 'email']).default('created'),
   dir: z.enum(['asc', 'desc']).optional(),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
@@ -25,6 +26,7 @@ const ListQuerySchema = z.object({
 export const userSelect = {
   id: true,
   email: true,
+  emailVerified: true,
   firstName: true,
   lastName: true,
   ceviName: true,
@@ -36,6 +38,9 @@ export const userSelect = {
   ceviDbOrtsgruppeName: true,
   ceviDbDepartmentLeader: true,
   ceviDbLeaderGroupName: true,
+  homeDepartmentId: true,
+  homeDepartmentSource: true,
+  homeDepartment: { select: { id: true, name: true, slug: true } },
   // passwordHash wird nur gelesen, um "hat Passwort" abzuleiten, und nie ausgeliefert
   passwordHash: true,
   createdAt: true,
@@ -65,6 +70,7 @@ export function toListItem(user: UserRow): AdminUserListItemDto {
   return {
     id: user.id,
     email: user.email,
+    emailVerified: user.emailVerified,
     firstName: user.firstName,
     lastName: user.lastName,
     ceviName: user.ceviName,
@@ -81,6 +87,10 @@ export function toListItem(user: UserRow): AdminUserListItemDto {
       role: m.role,
       permissions: m.role === 'ADMIN' ? [] : normalizePermissions(m.permissions),
     })),
+    homeDepartmentId: user.homeDepartmentId,
+    homeDepartmentName: user.homeDepartment?.name ?? null,
+    homeDepartmentSlug: user.homeDepartment?.slug ?? null,
+    homeDepartmentSource: user.homeDepartmentSource,
     ceviDbOrtsgruppeId: user.ceviDbOrtsgruppeId,
     ceviDbOrtsgruppeName: user.ceviDbOrtsgruppeName,
     ceviDbDepartmentLeader: user.ceviDbDepartmentLeader,
@@ -107,11 +117,27 @@ function searchFilter(q: string | undefined): Prisma.UserWhereInput[] {
   });
 }
 
-function methodFilter(method: 'cevidb' | 'password' | 'ceviname' | undefined): Prisma.UserWhereInput[] {
+function methodFilter(method: 'cevidb' | 'password' | 'ceviname' | 'stale_ceviname' | undefined): Prisma.UserWhereInput[] {
   if (method === 'cevidb') return [{ ceviDbId: { not: null } }];
   if (method === 'password') return [{ passwordHash: { not: null } }];
   if (method === 'ceviname') return [{ ceviDbId: null, passwordHash: null }];
+  if (method === 'stale_ceviname') {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    return [{ ceviDbId: null, passwordHash: null, signups: { none: {} }, createdAt: { lt: thirtyDaysAgo } }];
+  }
   return [];
+}
+
+function departmentFilter(departmentId: string | undefined): Prisma.UserWhereInput[] {
+  if (!departmentId) return [];
+  if (departmentId === 'none') {
+    return [{ homeDepartmentId: null, memberships: { none: {} } }];
+  }
+  return [
+    {
+      OR: [{ homeDepartmentId: departmentId }, { memberships: { some: { departmentId } } }],
+    },
+  ];
 }
 
 const adminRoutes: FastifyPluginAsync = async (fastify) => {
@@ -122,24 +148,39 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/api/admin/overview', { preHandler: [fastify.requireGlobalAdmin] }, async () => {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const [users, cevidbUsers, passwordUsers, guestUsers, globalAdmins, newUsers7d, departments, events, signups] =
-      await fastify.prisma.$transaction([
-        fastify.prisma.user.count(),
-        fastify.prisma.user.count({ where: { ceviDbId: { not: null } } }),
-        fastify.prisma.user.count({ where: { passwordHash: { not: null } } }),
-        fastify.prisma.user.count({ where: { ceviDbId: null, passwordHash: null } }),
-        fastify.prisma.user.count({ where: { isGlobalAdmin: true } }),
-        fastify.prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
-        fastify.prisma.department.count(),
-        fastify.prisma.event.count(),
-        fastify.prisma.shiftSignup.count(),
-      ]);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [
+      users,
+      cevidbUsers,
+      passwordUsers,
+      guestUsers,
+      staleGuestUsers,
+      globalAdmins,
+      newUsers7d,
+      departments,
+      events,
+      signups,
+    ] = await fastify.prisma.$transaction([
+      fastify.prisma.user.count(),
+      fastify.prisma.user.count({ where: { ceviDbId: { not: null } } }),
+      fastify.prisma.user.count({ where: { passwordHash: { not: null } } }),
+      fastify.prisma.user.count({ where: { ceviDbId: null, passwordHash: null } }),
+      fastify.prisma.user.count({
+        where: { ceviDbId: null, passwordHash: null, signups: { none: {} }, createdAt: { lt: thirtyDaysAgo } },
+      }),
+      fastify.prisma.user.count({ where: { isGlobalAdmin: true } }),
+      fastify.prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
+      fastify.prisma.department.count(),
+      fastify.prisma.event.count(),
+      fastify.prisma.shiftSignup.count(),
+    ]);
 
     const overview: AdminOverviewDto = {
       users,
       cevidbUsers,
       passwordUsers,
       guestUsers,
+      staleGuestUsers,
       globalAdmins,
       newUsers7d,
       departments,
@@ -154,13 +195,14 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parse.success) {
       return reply.status(400).send({ error: parse.error.issues[0].message });
     }
-    const { q, method, role, sort, page, pageSize } = parse.data;
+    const { q, method, role, departmentId, sort, page, pageSize } = parse.data;
     const dir = parse.data.dir ?? (sort === 'created' ? 'desc' : 'asc');
 
     const where: Prisma.UserWhereInput = {
       AND: [
         ...searchFilter(q),
         ...methodFilter(method),
+        ...departmentFilter(departmentId),
         ...(role === 'admin' ? [{ isGlobalAdmin: true }] : []),
       ],
     };

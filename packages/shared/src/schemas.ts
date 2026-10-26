@@ -606,6 +606,11 @@ export const AdminSetMemberRoleSchema = z.object({
 
 export const AdminUpdateUserSchema = z.object({
   isGlobalAdmin: z.boolean().optional(),
+  homeDepartmentId: z.string().uuid().nullable().optional(),
+});
+
+export const AdminMergeUserSchema = z.object({
+  targetUserId: z.string().uuid('Ungültige Ziel-Personen-ID'),
 });
 
 export const AdminUpdateEventSchema = z.object({
