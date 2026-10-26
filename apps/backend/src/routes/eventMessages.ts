@@ -3,6 +3,8 @@ import {
   PLACEHOLDER_EMAIL_REGEX,
   SendEventMessageSchema,
   accessTypeConfig,
+  businessDayKey,
+  toZurichInput,
   type EventMessageDto,
   type EventMessageResultDto,
   type EventMessageTarget,
@@ -116,17 +118,46 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (target === 'ALL' || target === 'SHIFTS') {
         const shiftIds = target === 'SHIFTS' ? [...new Set(parse.data.shiftIds ?? [])] : null;
+        let selectedDayKeys: string[] = [];
         if (shiftIds) {
-          const count = await fastify.prisma.shift.count({ where: { id: { in: shiftIds }, eventId: event.id } });
-          if (count !== shiftIds.length) {
+          const selectedShifts = await fastify.prisma.shift.findMany({
+            where: { id: { in: shiftIds }, eventId: event.id },
+            select: { id: true, startTime: true },
+          });
+          if (selectedShifts.length !== shiftIds.length) {
             return reply.status(400).send({ error: 'Eine Schicht gehört nicht zu diesem Anlass' });
           }
+          const cutoff = event.dayCutoffTime || '04:00';
+          selectedDayKeys = [
+            ...new Set(
+              selectedShifts.flatMap((s) => [
+                businessDayKey(s.startTime.toISOString(), cutoff),
+                toZurichInput(s.startTime).slice(0, 10),
+              ])
+            ),
+          ];
         }
         const users = await fastify.prisma.user.findMany({
           where: {
-            signups: {
-              some: shiftIds ? { shiftId: { in: shiftIds } } : { shift: { eventId: event.id } },
-            },
+            OR: shiftIds
+              ? [
+                  { signups: { some: { shiftId: { in: shiftIds } } } },
+                  { shiftResponsibles: { some: { shiftId: { in: shiftIds } } } },
+                  ...(selectedDayKeys.length > 0
+                    ? [
+                        {
+                          eventDayResponsibles: {
+                            some: { eventId: event.id, dayDate: { in: selectedDayKeys } },
+                          },
+                        },
+                      ]
+                    : []),
+                ]
+              : [
+                  { signups: { some: { shift: { eventId: event.id } } } },
+                  { shiftResponsibles: { some: { shift: { eventId: event.id } } } },
+                  { eventDayResponsibles: { some: { eventId: event.id } } },
+                ],
           },
           select: userSelect,
         });
@@ -224,6 +255,8 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
             id: { in: userIds },
             OR: [
               { signups: { some: { shift: { eventId: event.id } } } },
+              { shiftResponsibles: { some: { shift: { eventId: event.id } } } },
+              { eventDayResponsibles: { some: { eventId: event.id } } },
               { organizedEvents: { some: { eventId: event.id } } },
               { eventAccessGrants: { some: { eventId: event.id } } },
               { homeDepartmentId: { in: departmentIds } },

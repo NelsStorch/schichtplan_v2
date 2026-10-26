@@ -128,7 +128,7 @@ export default function MessagesPage() {
   };
 
   const options: { key: EventMessageTarget; label: string; text: string; show: boolean }[] = [
-    { key: 'ALL', label: 'Alle Eingetragenen', text: 'Alle mit mindestens einer Schicht', show: true },
+    { key: 'ALL', label: 'Alle Eingetragenen', text: 'Alle mit mindestens einer Schicht (inkl. Verantwortliche)', show: true },
     {
       key: 'OPEN',
       label: event.minShiftsPerPerson ? 'Unter dem Soll' : 'Noch ohne Schicht',
@@ -137,7 +137,7 @@ export default function MessagesPage() {
         : 'Alle im Helfer-Pool ohne Schicht (ohne Abgemeldete)',
       show: true,
     },
-    { key: 'SHIFTS', label: 'Bestimmte Schichten', text: 'Nur wer in den gewählten Schichten ist', show: event.shifts.length > 0 },
+    { key: 'SHIFTS', label: 'Bestimmte Schichten', text: 'Nur wer in den gewählten Schichten ist (inkl. Verantwortliche)', show: event.shifts.length > 0 },
     {
       key: 'PEOPLE',
       label: 'Ausgewählte Personen',

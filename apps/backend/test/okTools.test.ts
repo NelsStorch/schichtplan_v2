@@ -76,6 +76,60 @@ describe.skipIf(!hasTestDb)('OK-Werkzeuge: Nachrichten und Massenbearbeitung', (
       expect(history.json()[0]).toMatchObject({ subject: 'Treffpunkt', targetLabel: 'Eingetragene in 1 Schicht', recipientCount: 1 });
     });
 
+    it('bezieht Schicht- und Tages-Verantwortliche bei ALL und SHIFTS mit ein', async () => {
+      const { department, lead, event } = await setup();
+      const shift1 = await createShift(app, event.id, {
+        title: 'Tag 1',
+        startTime: new Date('2030-06-01T10:00:00Z'),
+        endTime: new Date('2030-06-01T14:00:00Z'),
+      });
+      const shift2 = await createShift(app, event.id, {
+        title: 'Tag 2',
+        startTime: new Date('2030-06-02T10:00:00Z'),
+        endTime: new Date('2030-06-02T14:00:00Z'),
+      });
+
+      const shiftLead = await createUser(app, { firstName: 'Sara', lastName: 'Schichtchefin' });
+      const dayLead = await createUser(app, { firstName: 'Tom', lastName: 'Tageschef' });
+      await app.prisma.shiftResponsible.create({ data: { shiftId: shift1.id, userId: shiftLead.id } });
+      await app.prisma.eventDayResponsible.create({
+        data: { eventId: event.id, dayDate: '2030-06-02', userId: dayLead.id },
+      });
+
+      const url = `/api/events/${event.slug}/messages`;
+      const cookie = authCookie(app, lead);
+
+      const allRes = await inject(app, {
+        method: 'POST',
+        url,
+        tenant: department.slug,
+        cookie,
+        payload: { subject: 'Info', body: 'An alle', target: 'ALL', dryRun: true },
+      });
+      expect(allRes.statusCode).toBe(200);
+      expect(allRes.json().recipientCount).toBe(2);
+
+      const shift1Res = await inject(app, {
+        method: 'POST',
+        url,
+        tenant: department.slug,
+        cookie,
+        payload: { subject: 'Info', body: 'Nur Schicht 1', target: 'SHIFTS', shiftIds: [shift1.id], dryRun: true },
+      });
+      expect(shift1Res.statusCode).toBe(200);
+      expect(shift1Res.json().recipientCount).toBe(1);
+
+      const shift2Res = await inject(app, {
+        method: 'POST',
+        url,
+        tenant: department.slug,
+        cookie,
+        payload: { subject: 'Info', body: 'Nur Schicht 2', target: 'SHIFTS', shiftIds: [shift2.id], dryRun: true },
+      });
+      expect(shift2Res.statusCode).toBe(200);
+      expect(shift2Res.json().recipientCount).toBe(1);
+    });
+
     it('schickt nicht an Personen ohne Bezug zum Anlass', async () => {
       const { department, lead, event } = await setup();
       const stranger = await createUser(app, { firstName: 'Fremd', lastName: 'Person' });
