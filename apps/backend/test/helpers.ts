@@ -46,6 +46,7 @@ export async function createUser(
     passwordHash: string | null;
     ceviDbId: number | null;
     ceviName: string | null;
+    phone: string | null;
     firstName: string;
     lastName: string;
     birthDate: Date | null;
@@ -61,6 +62,7 @@ export async function createUser(
       passwordHash: data.passwordHash ?? null,
       ceviDbId: data.ceviDbId ?? null,
       ceviName: data.ceviName ?? null,
+      phone: data.phone ?? null,
       firstName: data.firstName ?? 'Test',
       lastName: data.lastName ?? 'Person',
       birthDate: data.birthDate ?? null,
@@ -93,7 +95,13 @@ export async function addMember(
 export async function createEvent(
   app: FastifyInstance,
   departmentId: string,
-  data: Partial<{ slug: string; accessType: string; organizerId: string; allowPublicSignup: boolean }> = {}
+  data: Partial<{
+    slug: string;
+    accessType: string;
+    organizerId: string;
+    allowPublicSignup: boolean;
+    contactVisibility: string;
+  }> = {}
 ) {
   return app.prisma.event.create({
     data: {
@@ -104,6 +112,7 @@ export async function createEvent(
       endDate: new Date('2030-06-02T20:00:00Z'),
       accessType: data.accessType ?? 'PUBLIC',
       allowPublicSignup: data.allowPublicSignup ?? true,
+      contactVisibility: data.contactVisibility ?? 'BOTH',
       organizers: data.organizerId
         ? { create: [{ userId: data.organizerId, role: 'OK_LEAD', roleTitle: 'Event-Leitung' }] }
         : undefined,

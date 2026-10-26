@@ -190,7 +190,7 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
     expect(await app.prisma.shiftSignup.count({ where: { shiftId: shift2.id, userId: helper.id } })).toBe(1);
   });
 
-  it('liefert in /api/shifts/me Einsatz-Briefing-Felder (Mithelfende, Verantwortliche, Belegung) ohne Platzhalter-Mails', async () => {
+  it('liefert in /api/shifts/my Einsatz-Briefing-Felder (Mithelfende, Verantwortliche, Belegung) ohne Platzhalter-Mails', async () => {
     const department = await createDepartment(app);
     const okLead = await createUser(app, {
       firstName: 'Klara',
@@ -218,7 +218,7 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
 
     const res = await inject(app, {
       method: 'GET',
-      url: '/api/shifts/me',
+      url: '/api/shifts/my',
       tenant: department.slug,
       cookie: authCookie(app, helper1),
     });
@@ -226,7 +226,7 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
     const items = res.json();
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
-      id: shift.id,
+      shiftId: shift.id,
       coHelpers: ['Bär'],
       filledSlots: 2,
       requiredSlots: 3,

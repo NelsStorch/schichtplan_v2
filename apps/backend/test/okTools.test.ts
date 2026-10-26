@@ -202,7 +202,8 @@ describe.skipIf(!hasTestDb)('OK-Werkzeuge: Nachrichten und Massenbearbeitung', (
   describe('OK-Team verwalten', () => {
     it('aktualisiert und leert Rolle sowie Funktion/Ressort bestehender OK-Mitglieder', async () => {
       const { department, lead, event } = await setup();
-      const co = await createUser(app, { firstName: 'Lena', lastName: 'Ressort', ceviName: 'Fuchs' });
+      // Mit Passwort: reine Cevi-Name-Profile dürfen keine OK-Rolle erhalten
+      const co = await createUser(app, { firstName: 'Lena', lastName: 'Ressort', ceviName: 'Fuchs', passwordHash: 'x' });
       const url = `/api/events/${event.slug}/organizers`;
       const cookie = authCookie(app, lead);
 
@@ -211,30 +212,30 @@ describe.skipIf(!hasTestDb)('OK-Werkzeuge: Nachrichten und Massenbearbeitung', (
         url,
         tenant: department.slug,
         cookie,
-        payload: { userId: co.id, role: 'HELPER', roleTitle: 'Küche' },
+        payload: { userId: co.id, role: 'OK_MEMBER', roleTitle: 'Küche' },
       });
       expect(added.statusCode).toBe(200);
-      expect(added.json()).toMatchObject({ userId: co.id, role: 'HELPER', roleTitle: 'Küche' });
+      expect(added.json()).toMatchObject({ userId: co.id, role: 'OK_MEMBER', roleTitle: 'Küche' });
 
       const updated = await inject(app, {
         method: 'POST',
         url,
         tenant: department.slug,
         cookie,
-        payload: { userId: co.id, role: 'LEAD', roleTitle: 'Co-Leitung & Bau' },
+        payload: { userId: co.id, role: 'OK_LEAD', roleTitle: 'Co-Leitung & Bau' },
       });
       expect(updated.statusCode).toBe(200);
-      expect(updated.json()).toMatchObject({ userId: co.id, role: 'LEAD', roleTitle: 'Co-Leitung & Bau' });
+      expect(updated.json()).toMatchObject({ userId: co.id, role: 'OK_LEAD', roleTitle: 'Co-Leitung & Bau' });
 
       const clearedTitle = await inject(app, {
         method: 'POST',
         url,
         tenant: department.slug,
         cookie,
-        payload: { userId: co.id, role: 'LEAD', roleTitle: '   ' },
+        payload: { userId: co.id, role: 'OK_LEAD', roleTitle: '   ' },
       });
       expect(clearedTitle.statusCode).toBe(200);
-      expect(clearedTitle.json()).toMatchObject({ userId: co.id, role: 'LEAD', roleTitle: null });
+      expect(clearedTitle.json()).toMatchObject({ userId: co.id, role: 'OK_LEAD', roleTitle: null });
     });
   });
 

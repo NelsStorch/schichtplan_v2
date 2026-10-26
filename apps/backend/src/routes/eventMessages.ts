@@ -246,7 +246,9 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         });
 
         recipients = matching.map((u) => ({ id: u.id, label: personLabel(u), email: usableEmail(u) }));
-        targetLabel = event.minShiftsPerPerson ? 'Unter dem Soll' : 'Noch ohne Schicht';
+        targetLabel = event.minShiftsPerPerson
+          ? `Unter dem Soll (mind. ${event.minShiftsPerPerson} Schicht${event.minShiftsPerPerson === 1 ? '' : 'en'})`
+          : 'Noch ohne Schicht';
       } else {
         const userIds = [...new Set(parse.data.userIds ?? [])];
         // Nur Personen mit Bezug zum Anlass oder zur Abteilung, nie beliebige Konten

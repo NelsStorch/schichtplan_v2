@@ -1044,6 +1044,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
 
       return {
         id: organizer.id,
+        userId: organizer.userId,
         displayName: organizer.user.ceviName
           ? `${organizer.user.firstName} / ${organizer.user.ceviName}`
           : `${organizer.user.firstName} ${organizer.user.lastName}`,
