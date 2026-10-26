@@ -124,6 +124,8 @@ model User {
   shiftRemindersEnabled Boolean          @default(true) @map("shift_reminders_enabled")
   /// Geheimer Token für den persönlichen Webcal/iCal-Kalenderfeed
   calendarToken       String?            @unique @map("calendar_token")
+  /// Letzter Tag mit Nutzung (nur das Datum, ohne Uhrzeit). Höchstens ein Schreibzugriff pro Person und Tag (plugins/jwt.ts)
+  lastSeenOn          DateTime?          @db.Date @map("last_seen_on")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
@@ -144,6 +146,7 @@ model User {
   helperSignupLogs        ShiftSignupLog[]   @relation("HelperUser")
   performedSignupLogs     ShiftSignupLog[]   @relation("PerformedByUser")
 
+  @@index([lastSeenOn])
   @@map("users")
 }
 
@@ -612,4 +615,49 @@ model RevokedToken {
 
   @@index([expiresAt])
   @@map("revoked_tokens")
+}
+
+/// Nutzungsstatistik ohne Personenbezug: Zähler pro Schweizer Kalendertag (services/usageStats.ts).
+/// dim = Unterteilung aus einer festen Liste (z. B. Anmeldeart), department_id = '' für «ohne Abteilung».
+model UsageCounter {
+  day          DateTime @db.Date
+  metric       String
+  dim          String   @default("")
+  departmentId String   @default("") @map("department_id")
+  count        Int      @default(0)
+
+  @@id([day, metric, dim, departmentId])
+  @@index([metric, day])
+  @@map("usage_counters")
+}
+
+/// Anfragen pro Route-Muster (nie die echte URL), Stunde und Statusklasse. Nach 90 Tagen zu Tageswerten zusammengefasst.
+model RequestStat {
+  // "HOUR" oder "DAY"
+  granularity String
+  // Beginn der Stunde bzw. des Tages (UTC)
+  period      DateTime
+  route       String
+  method      String
+  // "2xx", "3xx", "4xx", "5xx"
+  statusClass String   @map("status_class")
+  count       Int
+  totalMs     Float    @map("total_ms")
+  maxMs       Float    @map("max_ms")
+  // Anzahl pro Laufzeit-Stufe (Grenzen in REQUEST_DURATION_BUCKETS_MS, letzte Stufe = darüber)
+  buckets     Int[]
+
+  @@id([granularity, period, route, method, statusClass])
+  @@index([period])
+  @@map("request_stats")
+}
+
+/// Tägliche Momentaufnahme von Bestandszahlen aus der DB (z. B. Anzahl Konten), damit Verläufe sichtbar sind
+model StatsSnapshot {
+  day   DateTime @db.Date
+  key   String
+  value Float
+
+  @@id([day, key])
+  @@map("stats_snapshots")
 }

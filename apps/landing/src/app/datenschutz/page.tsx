@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 // Rechtliche Stammdaten: Platzhalter in eckigen Klammern vor dem Livegang ausfüllen
-const STAND = "25. Oktober 2026";
+const STAND = "26. Oktober 2026";
 
 function Section({
   id,
@@ -251,6 +251,37 @@ export default function DatenschutzPage() {
             E-Mail bzw. Cevi-Name nur im Arbeitsspeicher; diese Einträge gelten
             höchstens eine Stunde und gehen bei jedem Neustart verloren.
           </p>
+
+          <h3 className="pt-2 font-semibold text-fg">Anonyme Nutzungsstatistik</h3>
+          <p>
+            Um zu sehen, ob der Schichtplan gut läuft und welche Funktionen
+            gebraucht werden, zählen wir Nutzungen als{" "}
+            <strong>Summen pro Tag</strong>, z.&nbsp;B. «12 Anmeldungen mit
+            Cevi.DB», «3 PDF-Schichtpläne gedruckt» oder «40 Aufrufe der Hilfe
+            zum Eintragen». Gespeichert werden nur die Art der Nutzung, eine
+            feste Unterteilung (z.&nbsp;B. die Anmeldeart), die Abteilung und
+            der Tag. Für den Betrieb zählen wir zusätzlich pro Stunde, wie viele
+            Anfragen eine Funktion des Servers bekam, wie lange die Antwort
+            dauerte und ob Fehler auftraten; dabei speichern wir nur das Muster
+            der Adresse (z.&nbsp;B. «Anlass ansehen»), nie die echte Adresse
+            mit Namen von Anlässen, Zugangs- oder Check-in-Codes.
+          </p>
+          <p>
+            Dafür speichern wir <strong>keine</strong> IP-Adresse, keine
+            Kennung deines Browsers oder Geräts, kein Cookie und nichts, was
+            einer Person zugeordnet werden kann. Dein Browser meldet nur
+            Nutzungen, die auf dem Server nicht sichtbar sind (z.&nbsp;B. ein
+            PDF-Export, die Fenstergrösse als «Handy», «Tablet» oder «Computer»
+            und ob die dunkle Darstellung aktiv ist). Hast du in deinem Browser
+            «nicht verfolgen» eingestellt (Global Privacy Control oder Do Not
+            Track), schickt er keine solchen Meldungen.
+          </p>
+          <p>
+            Pro Konto speichern wir einzig den <strong>letzten Tag</strong>,
+            an dem du den Schichtplan angemeldet genutzt hast (nur das Datum,
+            ohne Uhrzeit). Daraus zählen wir, wie viele Personen pro Tag, Woche
+            und Monat aktiv sind, und erkennen lange unbenutzte Konten.
+          </p>
         </Section>
 
         <Section id="zweck" title="4. Wozu wir die Daten bearbeiten">
@@ -279,7 +310,11 @@ export default function DatenschutzPage() {
               Passworts und Erinnerung 24 Stunden vor deinen Schichten (im
               Profil abschaltbar),
             </li>
-            <li>Betrieb, Sicherheit und Fehlerbehebung der Plattform.</li>
+            <li>Betrieb, Sicherheit und Fehlerbehebung der Plattform,</li>
+            <li>
+              anonyme Nutzungsstatistik, um den Schichtplan zu verbessern
+              (siehe Abschnitt 3).
+            </li>
           </List>
           <p>
             Wir verwenden die Daten nicht für Werbung, verkaufen sie nicht und
@@ -304,7 +339,8 @@ export default function DatenschutzPage() {
             <li>
               <strong>Globale Administrator*innen</strong> des Betreibers sehen
               im Admin-Portal alle Konten über alle Abteilungen (Profil,
-              Anmeldeart, Abteilungen, Rollen und Eintragungen) und können
+              Anmeldeart, Abteilungen, Rollen, Eintragungen und den Tag der
+              letzten Nutzung) sowie die anonyme Nutzungsstatistik und können
               Konten löschen. Dieser Zugriff ist auf wenige Personen beschränkt
               und dient Support und Missbrauchsbekämpfung.
             </li>
@@ -317,7 +353,8 @@ export default function DatenschutzPage() {
             gibt keine Analyse-, Tracking- oder Werbe-Cookies und keine
             Einbindung von Diensten wie Google Analytics, Facebook oder YouTube.
             Die Schriften sind selbst gehostet, beim Aufruf entsteht also keine
-            Verbindung zu Google.
+            Verbindung zu Google. Die anonyme Nutzungsstatistik (Abschnitt 3)
+            kommt ohne Cookies und ohne lokalen Speicher aus.
           </p>
           <StorageTable
             rows={[
@@ -440,6 +477,12 @@ export default function DatenschutzPage() {
             <li>
               Links zum Bestätigen der E-Mail und zum Zurücksetzen des Passworts
               verfallen nach kurzer Zeit.
+            </li>
+            <li>
+              Die anonyme Nutzungsstatistik bewahren wir zwei Jahre auf, die
+              Stundenwerte zum Betrieb des Servers 90 Tage (danach nur noch als
+              Tagessumme). Der Tag der letzten Nutzung wird mit dem Konto
+              gelöscht.
             </li>
             <li>
               Wir sichern die Datenbank jede Nacht und bewahren diese

@@ -7,6 +7,7 @@ import compress from '@fastify/compress';
 import prismaPlugin from './plugins/prisma.js';
 import jwtPlugin from './plugins/jwt.js';
 import tenantPlugin from './plugins/tenant.js';
+import statsPlugin from './plugins/stats.js';
 
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
@@ -21,6 +22,7 @@ import adminRoutes from './routes/admin.js';
 import adminManageRoutes from './routes/adminManage.js';
 import uploadRoutes from './routes/uploads.js';
 import calendarRoutes from './routes/calendar.js';
+import statsRoutes from './routes/stats.js';
 import { isDatabaseOverloadError, sendServerAlert } from './services/serverAlert.js';
 import eventTemplateRoutes from './routes/eventTemplates.js';
 import taskDefinitionRoutes from './routes/taskDefinitions.js';
@@ -87,6 +89,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Custom core plugins
   await app.register(prismaPlugin);
+  await app.register(statsPlugin);
   await app.register(jwtPlugin);
   await app.register(tenantPlugin);
 
@@ -106,6 +109,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(adminManageRoutes);
   await app.register(uploadRoutes);
   await app.register(calendarRoutes);
+  await app.register(statsRoutes);
 
 
   // Zentraler Fehler-Handler für Server-Fehler & Admin-Webhook-Alarme

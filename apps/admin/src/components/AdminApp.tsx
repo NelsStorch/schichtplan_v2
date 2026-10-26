@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Building2,
   CalendarDays,
+  ChartColumn,
   History,
   KeyRound,
   LayoutDashboard,
@@ -27,6 +28,7 @@ import { DashboardPanel, type AdminTab } from './DashboardPanel';
 import { DepartmentDialog } from './DepartmentDialog';
 import { DepartmentsPanel } from './DepartmentsPanel';
 import { EventsPanel } from './EventsPanel';
+import { StatsPanel } from './StatsPanel';
 import { UserDialog } from './UserDialog';
 import { UsersPanel } from './UsersPanel';
 
@@ -262,6 +264,12 @@ const TABS: { id: AdminTab; label: string; icon: React.ReactNode; intro: string 
     intro: 'Alle Konten über sämtliche Abteilungen. Rollen und globale Admin-Rechte vergeben.',
   },
   {
+    id: 'statistik',
+    label: 'Statistik',
+    icon: <ChartColumn aria-hidden />,
+    intro: 'Wie der Schichtplan genutzt wird: anonyme Tageszahlen, Funktionen, Anlässe und Betrieb.',
+  },
+  {
     id: 'protokoll',
     label: 'Protokoll',
     icon: <History aria-hidden />,
@@ -468,6 +476,7 @@ function AdminHome({
         />
       )}
       {tab === 'anlaesse' && <EventsPanel departments={departments ?? []} onOpenDepartment={handleOpenDepartment} />}
+      {tab === 'statistik' && <StatsPanel departments={departments ?? []} />}
       {tab === 'protokoll' && (
         <AuditPanel
           targetFilter={auditTarget}

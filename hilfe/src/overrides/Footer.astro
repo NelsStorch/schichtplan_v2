@@ -2,6 +2,7 @@
 // Unter jeder Seite: Weiter/Zurück und ein ruhiger Kontakt-Streifen statt «Built with Starlight».
 import Pagination from 'virtual:starlight/components/Pagination';
 import LifeBuoy from '@lucide/astro/icons/life-buoy';
+import UsageStats from '../components/UsageStats.astro';
 
 const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
 ---
@@ -28,6 +29,7 @@ const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
       <a href="https://github.com/NelsStorch/schichtplan_v2" rel="noopener">GitHub</a>
     </nav>
   </div>
+  <UsageStats />
 </footer>
 
 <style>

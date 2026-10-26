@@ -29,6 +29,7 @@ import { validateAnswers } from './eventParticipation.js';
 import { findShiftCollisions } from '../services/shiftCollision.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
 import { syncEventRange } from '../services/eventRange.js';
+import { trackUsage } from '../services/usageStats.js';
 
 function toResponsiblePersonDto(
   r: {
@@ -1098,6 +1099,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         request.log.error(logErr, 'Fehler beim Erstellen des Signup-Logs');
       }
 
+      trackUsage('SIGNUP', {
+        dim: targetUserId === request.user.id ? 'SELF' : targetUserId ? 'OK' : 'GUEST',
+        departmentId: event.departmentId,
+      });
+
       return {
         id: signup.id,
         shiftId: signup.shiftId,
@@ -1216,6 +1222,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       await fastify.prisma.shiftSignup.delete({
         where: { id: existingSignup.id },
       });
+      trackUsage('SIGNOFF', { dim: isSelf ? 'SELF' : 'OK', departmentId: event.departmentId });
 
       return { message: 'Erfolgreich aus der Schicht ausgetragen' };
     }

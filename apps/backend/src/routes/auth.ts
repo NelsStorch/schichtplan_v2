@@ -35,6 +35,7 @@ import {
   tooManyRequests,
 } from '../services/ceviNameLogin.js';
 import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
+import { trackUsage } from '../services/usageStats.js';
 import { withoutCeviDbAddress } from '../services/profile.js';
 import { syncCeviDbLeadership } from '../services/departmentLeaders.js';
 import { accessFrom } from '../services/permissions.js';
@@ -249,6 +250,12 @@ function registrationAccepted(email: string) {
   };
 }
 
+/** Cevi.DB nicht erreichbar oder Antwort unbrauchbar (für die Statistik) */
+function trackCeviDbFailure() {
+  trackUsage('EXTERNAL', { dim: 'CEVIDB_ERROR' });
+  trackUsage('LOGIN_FAILED', { dim: 'CEVIDB_ERROR' });
+}
+
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   const CEVIDB_BASE_URL = process.env.CEVIDB_BASE_URL || 'https://db.cevi.ch';
   const CEVIDB_CLIENT_ID = process.env.CEVIDB_CLIENT_ID || '';
@@ -359,6 +366,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         if (!tokenRes.ok) {
           const errText = await tokenRes.text();
           fastify.log.error(`Cevi.DB Token-Abruf fehlgeschlagen: ${errText}`);
+          trackCeviDbFailure();
           return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
         }
 
@@ -382,6 +390,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (!profileRes.ok) {
           fastify.log.error('Cevi.DB Profilabruf fehlgeschlagen');
+          trackCeviDbFailure();
           return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
         }
 
@@ -411,9 +420,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         };
       } catch (err) {
         fastify.log.error(err, 'Cevi.DB nicht erreichbar');
+        trackCeviDbFailure();
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
       }
 
+      trackUsage('EXTERNAL', { dim: 'CEVIDB_OK' });
       reply.clearCookie('cevidb_oauth_state', { path: '/' });
       return reply.redirect(await finishCeviDbLogin(reply, profile, returnTo, tenantSlug));
     }
@@ -511,6 +522,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     // übernehmen wir bewusst nicht (Datensparsamkeit; wer sie braucht, fragt beim Anlass danach). Die
     // Handynummer liefert Cevi.DB nicht (Scope `with_roles` hat keine Telefonnummern).
     if (!user) {
+      trackUsage('REGISTER', { dim: 'cevidb' });
       user = await fastify.prisma.user.create({
         data: {
           email,
@@ -588,6 +600,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       );
       if (merged > 0) {
         fastify.log.info({ userId: user.id, merged }, 'Cevi-Name-Profile ins Cevi.DB-Konto übernommen');
+        trackUsage('PROFILE_MERGE', { n: merged, departmentId: homeDepartment?.id ?? tenantDepartmentId });
         user = await fastify.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
       }
     } catch (err) {
@@ -602,6 +615,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     setAuthCookie(reply, token);
+    trackUsage('LOGIN', { dim: 'cevidb', departmentId: homeDepartment?.id ?? tenantDepartmentId });
 
     // Ohne Ziel: Abteilungsseite, sonst Landingpage (nicht zurück auf die Login-Seite)
     const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null);
@@ -657,6 +671,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     reply.clearCookie(PENDING_LINK_COOKIE, { path: '/' });
     const redirectUrl = await finishCeviDbLogin(reply, link.profile, link.returnTo, link.tenantSlug, user.id);
     fastify.log.info({ userId: user.id }, 'Passwort-Konto mit Cevi.DB verknüpft');
+    trackUsage('ACCOUNT_LINK');
     return { redirectUrl };
   });
 
@@ -697,18 +712,21 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const result = pickCeviNameMatch(matches);
     if (result.kind !== 'LOGIN') recordCeviNameMiss(department.id, ceviName);
     if (result.kind === 'USE_CEVIDB') {
+      trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_USE_CEVIDB', departmentId: department.id });
       return reply.status(403).send({
         code: 'USE_CEVIDB',
         error: 'Zu diesem Cevi-Namen gibt es ein Konto mit Cevi.DB. Melde dich bitte mit Cevi.DB an.',
       });
     }
     if (result.kind === 'USE_PASSWORD') {
+      trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_USE_PASSWORD', departmentId: department.id });
       return reply.status(403).send({
         code: 'USE_PASSWORD',
         error: 'Zu diesem Cevi-Namen gibt es ein geschütztes Konto. Melde dich bitte mit E-Mail und Passwort an.',
       });
     }
     if (result.kind === 'NONE') {
+      trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_NOT_FOUND', departmentId: department.id });
       return reply.status(404).send({
         code: 'NOT_FOUND',
         error: `Bei ${department.name} gibt es noch kein Profil mit diesem Cevi-Namen und Geburtsdatum.`,
@@ -717,6 +735,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     await ensureHelperMembership(fastify.prisma, department.id, result.userId);
     const user = await fastify.prisma.user.findUniqueOrThrow({ where: { id: result.userId } });
+    trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
     return signInCeviNameProfile(reply, user, returnTo);
   });
 
@@ -794,6 +813,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     fastify.log.info({ userId: user.id, departmentId: department.id }, 'Cevi-Name-Profil angelegt');
+    trackUsage('REGISTER', { dim: 'ceviname', departmentId: department.id });
+    trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
     return signInCeviNameProfile(reply, user, returnTo);
   });
 
@@ -839,6 +860,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
       loginFailuresByIp.hit(request.ip);
       loginFailuresByEmail.hit(emailKey);
+      trackUsage('LOGIN_FAILED', { dim: 'PASSWORD_WRONG', departmentId: request.tenant?.id });
       return reply.status(401).send({ error: 'E-Mail oder Passwort falsch' });
     }
     loginFailuresByEmail.reset(emailKey);
@@ -860,6 +882,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     setAuthCookie(reply, token);
+    trackUsage('LOGIN', { dim: 'password', departmentId: request.tenant?.id });
 
     // Das Token steht nur im httpOnly-Cookie, nicht in der Antwort (für Skripte unerreichbar)
     return {
@@ -915,6 +938,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (request.tenant) {
       await ensureHelperMembership(fastify.prisma, request.tenant.id, user.id);
     }
+    trackUsage('REGISTER', { dim: 'password', departmentId: request.tenant?.id });
 
     // Token erzeugen & altes löschen
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -1041,6 +1065,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return u;
     });
 
+    trackUsage('EMAIL_VERIFIED');
+
     // Bewusst kein automatisches Login: Wer die Mail bekommt, hat das Konto nicht unbedingt angelegt
     // (jemand kann ein Konto mit fremder E-Mail vorbereiten). Anmelden geht nur mit dem eigenen Passwort.
     return {
@@ -1160,6 +1186,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       clearAuthCookie(reply);
+      trackUsage('ACCOUNT_DELETE');
 
       const userDisplayName = user.ceviName
         ? `${user.ceviName} (${user.firstName} ${user.lastName})`

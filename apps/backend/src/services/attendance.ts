@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { CHECKIN_EARLY_MINUTES } from '@schichtplan/shared';
 import { eventUrl } from './shiftReminders.js';
+import { trackUsage } from './usageStats.js';
 
 /** Zufälliger, nicht erratbarer Code für den QR-Link (24 Zeichen, URL-sicher) */
 export function generateCheckinToken(): string {
@@ -62,7 +63,9 @@ export async function fetchCeviQrCode(
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
+    trackUsage('EXTERNAL', { dim: 'QR_ERROR' });
     throw new Error(`QR-Generator antwortet mit ${res.status}`);
   }
+  trackUsage('EXTERNAL', { dim: 'QR_OK' });
   return Buffer.from(await res.arrayBuffer());
 }

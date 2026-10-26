@@ -17,7 +17,7 @@ const ListQuerySchema = z.object({
   method: z.enum(['cevidb', 'password', 'ceviname', 'stale_ceviname']).optional(),
   role: z.enum(['admin']).optional(),
   departmentId: z.union([z.string().uuid(), z.literal('none')]).optional(),
-  sort: z.enum(['created', 'name', 'email']).default('created'),
+  sort: z.enum(['created', 'name', 'email', 'seen']).default('created'),
   dir: z.enum(['asc', 'desc']).optional(),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -43,6 +43,7 @@ export const userSelect = {
   homeDepartment: { select: { id: true, name: true, slug: true } },
   // passwordHash wird nur gelesen, um "hat Passwort" abzuleiten, und nie ausgeliefert
   passwordHash: true,
+  lastSeenOn: true,
   createdAt: true,
   updatedAt: true,
   memberships: {
@@ -95,6 +96,7 @@ export function toListItem(user: UserRow): AdminUserListItemDto {
     ceviDbOrtsgruppeName: user.ceviDbOrtsgruppeName,
     ceviDbDepartmentLeader: user.ceviDbDepartmentLeader,
     ceviDbLeaderGroupName: user.ceviDbLeaderGroupName,
+    lastSeenOn: user.lastSeenOn ? user.lastSeenOn.toISOString().slice(0, 10) : null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };
@@ -212,7 +214,9 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         ? [{ lastName: dir }, { firstName: dir }, { id: 'asc' }]
         : sort === 'email'
           ? [{ email: { sort: dir, nulls: 'last' } }, { id: 'asc' }]
-          : [{ createdAt: dir }, { id: 'asc' }];
+          : sort === 'seen'
+            ? [{ lastSeenOn: { sort: dir, nulls: 'last' } }, { id: 'asc' }]
+            : [{ createdAt: dir }, { id: 'asc' }];
 
     const [total, rows] = await fastify.prisma.$transaction([
       fastify.prisma.user.count({ where }),

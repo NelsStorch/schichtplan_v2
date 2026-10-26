@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
+import type { MailKind } from '@schichtplan/shared';
 import { sendServerAlert } from './serverAlert.js';
+import { trackUsage } from './usageStats.js';
 
 const host = process.env.SMTP_HOST || 'mail.infomaniak.com';
 const port = Number(process.env.SMTP_PORT || 587);
@@ -328,6 +330,7 @@ export async function sendEmail({
   html,
   text,
   replyTo,
+  kind = 'OTHER',
 }: {
   to: string;
   subject: string;
@@ -335,6 +338,8 @@ export async function sendEmail({
   text?: string;
   /** Antworten gehen an diese Adresse statt an den Absender */
   replyTo?: string;
+  /** Art der Mail, nur für die Statistik */
+  kind?: MailKind;
 }): Promise<boolean> {
   const plainText = text || html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
 
@@ -356,9 +361,11 @@ export async function sendEmail({
       replyTo,
     });
     console.log(`[Mail] Gesendet an ${to} (ID: ${info.messageId})`);
+    trackUsage('MAIL_SENT', { dim: kind });
     return true;
   } catch (error) {
     console.error(`[Mail] Fehler beim Senden an ${to}:`, error);
+    trackUsage('MAIL_FAILED', { dim: kind });
     return false;
   }
 }
@@ -411,7 +418,7 @@ export async function sendVerificationEmail({
 
   const text = `Hallo ${displayName},\n\nWillkommen beim Cevi Schichtplan!\n\nBitte öffne den folgenden Link in deinem Browser, um deine E-Mail-Adresse zu bestätigen und dein Konto zu aktivieren:\n${verificationUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig.\n\nFalls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.\n\nViele Grüsse,\nDein Cevi Schichtplan Team\nhttps://cevi-schichtplan.ch`;
 
-  return sendEmail({ to, subject, html, text });
+  return sendEmail({ to, subject, html, text, kind: 'VERIFICATION' });
 }
 
 /**
@@ -459,7 +466,7 @@ export async function sendPasswordResetEmail({
 
   const text = `Hallo ${displayName},\n\nKlicke auf folgenden Link, um dein Passwort zurückzusetzen:\n${resetUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig.\n\nDein Cevi Schichtplan Team`;
 
-  return sendEmail({ to, subject, html, text });
+  return sendEmail({ to, subject, html, text, kind: 'PASSWORD_RESET' });
 }
 
 /**
@@ -502,7 +509,7 @@ export async function sendAccountExistsEmail({
 
   const text = `Hallo ${displayName},\n\njemand wollte mit dieser E-Mail-Adresse ein neues Konto anlegen. Du hast aber schon eines.\n\nAnmelden: ${loginUrl}\nPasswort vergessen: ${resetUrl}\n\nWarst das nicht du? Dann ignoriere diese E-Mail.\n\nDein Cevi Schichtplan Team`;
 
-  return sendEmail({ to, subject, html, text });
+  return sendEmail({ to, subject, html, text, kind: 'ACCOUNT_EXISTS' });
 }
 
 /**
@@ -562,7 +569,7 @@ export async function sendShiftReminderEmail({
     ctaUrl: shiftUrl,
   });
 
-  return sendEmail({ to, subject, html });
+  return sendEmail({ to, subject, html, kind: 'SHIFT_REMINDER' });
 }
 
 /**
@@ -596,5 +603,5 @@ export async function sendGenericEmail({
     ctaUrl,
   });
 
-  return sendEmail({ to, subject, html });
+  return sendEmail({ to, subject, html, kind: 'ADMIN_NOTICE' });
 }

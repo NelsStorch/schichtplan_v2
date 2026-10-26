@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -23,8 +23,8 @@ import {
   Wrench,
   type LucideProps,
 } from 'lucide-react';
-import { helpUrl, type EventCapability } from '@schichtplan/shared';
-import { Badge, Dialog, EmptyState, Skeleton, buttonClasses, cn } from '@schichtplan/ui';
+import { helpUrl, type EventCapability, type OK_PAGES } from '@schichtplan/shared';
+import { Badge, Dialog, EmptyState, Skeleton, buttonClasses, cn, trackUi } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { fmtDateRange } from '@/lib/format';
 import { OkProvider, useOk } from './OkContext';
@@ -166,6 +166,12 @@ function OkFrame({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const currentItem = useCurrentItem();
   const currentLabel = currentItem?.label ?? 'Übersicht';
+  const currentPath = currentItem?.path ?? '';
+
+  // Welche Bereiche das OK nutzt (nur der Bereich, nicht der Anlass)
+  useEffect(() => {
+    trackUi('UI_OK_PAGE', (currentPath || 'uebersicht') as keyof typeof OK_PAGES);
+  }, [currentPath]);
 
   if (loading) {
     return (

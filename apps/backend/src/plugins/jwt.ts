@@ -10,6 +10,7 @@ import {
   type LoginMethodClaim,
 } from '../services/adminSecurity.js';
 import { createRateLimiter } from '../services/rateLimit.js';
+import { markUserSeen } from '../services/lastSeen.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -109,7 +110,14 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     const [user, revoked] = await Promise.all([
       fastify.prisma.user.findUnique({
         where: { id: request.user.id },
-        select: { id: true, email: true, isGlobalAdmin: true, passwordChangedAt: true },
+        select: {
+          id: true,
+          email: true,
+          isGlobalAdmin: true,
+          passwordChangedAt: true,
+          lastSeenOn: true,
+          homeDepartmentId: true,
+        },
       }),
       jti ? fastify.prisma.revokedToken.findUnique({ where: { jti }, select: { jti: true } }) : null,
     ]);
@@ -126,6 +134,8 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
       email: user.email || request.user.email,
       isGlobalAdmin: user.isGlobalAdmin,
     };
+    // Höchstens ein Schreibzugriff pro Person und Tag, läuft neben der Anfrage
+    markUserSeen(fastify.prisma, user, (err) => request.log.warn(err, 'last_seen_on nicht gesetzt'));
     return true;
   }
 

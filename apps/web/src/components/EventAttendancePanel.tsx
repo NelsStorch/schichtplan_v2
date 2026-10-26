@@ -23,7 +23,7 @@ import {
   type ShiftDto,
   type ShiftSignupDto,
 } from '@schichtplan/shared';
-import { Badge, Button, Callout, Card, Chip, EmptyState, Input, cn, useConfirm, useToast } from '@schichtplan/ui';
+import { Badge, Button, Callout, Card, Chip, EmptyState, Input, cn, trackUi, useConfirm, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay, fmtTimeRange } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
@@ -244,6 +244,7 @@ export function EventAttendancePanel({
     link.download = `anwesenheit-${event.slug}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    trackUi('UI_CSV', 'ATTENDANCE');
   };
 
   const printList = () => {
@@ -289,6 +290,7 @@ export function EventAttendancePanel({
     win.document.close();
     win.focus();
     win.print();
+    trackUi('UI_ATTENDANCE_PRINT');
   };
 
   if (mode === 'OFF') {

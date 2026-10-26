@@ -239,6 +239,7 @@ export async function sendServerAlert(
         to: alertEmail,
         subject: `[Cevi Schichtplan Alert] ${payload.title}`,
         html: emailHtml,
+        kind: 'SERVER_ALERT',
       });
     } catch (err) {
       console.error('[ServerAlert] Alert-E-Mail fehlgeschlagen:', err instanceof Error ? err.message : err);

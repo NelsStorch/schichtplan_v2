@@ -27,6 +27,7 @@ import {
   Field,
   Input,
   cn,
+  trackUi,
 } from '@schichtplan/ui';
 import {
   DEFAULT_HELPER_STATS_CONFIG,
@@ -71,6 +72,7 @@ export function HelperHoursDialog({
 
   const handleExport = () => {
     exportHelperHoursCsv(event.slug, helpers, summary);
+    trackUi('UI_CSV', 'HOURS');
   };
 
   const hasAttendanceTracking = Boolean(event.attendanceMode);

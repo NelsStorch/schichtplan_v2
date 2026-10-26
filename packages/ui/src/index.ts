@@ -41,3 +41,6 @@ export {
   type ErrorViewProps,
   type ErrorAction,
 } from './components/ErrorView';
+
+export { trackUi, usageOptedOut } from './stats/usage';
+export { UsageTracker } from './stats/UsageTracker';

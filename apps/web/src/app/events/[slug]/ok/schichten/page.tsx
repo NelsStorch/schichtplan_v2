@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CalendarDays, CheckSquare, Filter, LayoutList, Plus, Rows3, Search, Sparkles } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
-import { Badge, Button, Chip, EmptyState, Input, Select, cn, useConfirm, useToast } from '@schichtplan/ui';
+import { Badge, Button, Chip, EmptyState, Input, Select, cn, trackUi, useConfirm, useToast } from '@schichtplan/ui';
 import { BulkShiftBar } from '@/components/ok/BulkShiftBar';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
@@ -56,6 +56,7 @@ function ShiftsPage() {
 
   const changeView = (v: View) => {
     setView(v);
+    trackUi('UI_PLAN_VIEW', v === 'plan' ? 'OK_PLAN' : 'OK_LIST');
     try {
       localStorage.setItem(VIEW_KEY, v);
     } catch {

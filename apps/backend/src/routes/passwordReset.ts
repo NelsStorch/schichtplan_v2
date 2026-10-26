@@ -17,6 +17,7 @@ import { sendPasswordResetEmail } from '../services/email.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 import { RATE_LIMIT_ERROR } from '../services/ceviNameLogin.js';
 import { getLoginPortalBaseUrl } from './auth.js';
+import { trackUsage } from '../services/usageStats.js';
 
 export const PASSWORD_RESET_TTL_HOURS = 2;
 
@@ -42,6 +43,7 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: parse.error.issues[0].message });
     }
     const email = parse.data.email.toLowerCase();
+    trackUsage('PASSWORD_RESET', { dim: 'REQUEST' });
 
     const user = await fastify.prisma.user.findUnique({
       where: { email },
@@ -122,6 +124,7 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     request.log.info({ userId: record.userId }, 'Passwort zurückgesetzt');
+    trackUsage('PASSWORD_RESET', { dim: 'DONE' });
     return { success: true, message: 'Dein Passwort ist geändert. Du kannst dich jetzt damit anmelden.' };
   });
 };

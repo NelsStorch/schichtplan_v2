@@ -5,6 +5,8 @@ import { buildApp } from './app.js';
 import { ANSWER_RETENTION_INTERVAL_MS, purgeExpiredAnswers } from './services/answerRetention.js';
 import { REMINDER_INTERVAL_MS, sendDueShiftReminders } from './services/shiftReminders.js';
 import { isDatabaseOverloadError, sendServerAlert } from './services/serverAlert.js';
+import { STATS_MAINTENANCE_INTERVAL_MS, runStatsMaintenance } from './services/statsMaintenance.js';
+import { trackUsage } from './services/usageStats.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -36,8 +38,15 @@ async function main() {
   if (process.env.SHIFT_REMINDERS_ENABLED === 'true') {
     const run = () =>
       sendDueShiftReminders(app.prisma)
-        .then((sent) => sent > 0 && app.log.info({ sent }, 'Schicht-Erinnerungen verschickt'))
+        .then((sent) => {
+          trackUsage('JOB_RUN', { dim: 'SHIFT_REMINDERS' });
+          if (sent > 0) {
+            trackUsage('JOB_ITEMS', { dim: 'SHIFT_REMINDERS', n: sent });
+            app.log.info({ sent }, 'Schicht-Erinnerungen verschickt');
+          }
+        })
         .catch((err) => {
+          trackUsage('JOB_FAILED', { dim: 'SHIFT_REMINDERS' });
           app.log.error(err, 'Schicht-Erinnerungen fehlgeschlagen');
           void sendServerAlert({
             category: isDatabaseOverloadError(err) ? 'DB_OVERLOAD' : 'SERVER_ERROR',
@@ -61,8 +70,15 @@ async function main() {
   // Antworten auf eigene Fragen nach der eingestellten Frist löschen (immer an, auch vor listen())
   const purge = () =>
     purgeExpiredAnswers(app.prisma)
-      .then((deleted) => deleted > 0 && app.log.info({ deleted }, 'Abgelaufene Antworten gelöscht'))
+      .then((deleted) => {
+        trackUsage('JOB_RUN', { dim: 'ANSWER_RETENTION' });
+        if (deleted > 0) {
+          trackUsage('JOB_ITEMS', { dim: 'ANSWER_RETENTION', n: deleted });
+          app.log.info({ deleted }, 'Abgelaufene Antworten gelöscht');
+        }
+      })
       .catch((err) => {
+        trackUsage('JOB_FAILED', { dim: 'ANSWER_RETENTION' });
         app.log.error(err, 'Löschen abgelaufener Antworten fehlgeschlagen');
         if (isDatabaseOverloadError(err)) {
           void sendServerAlert({
@@ -81,6 +97,26 @@ async function main() {
   app.addHook('onClose', async () => {
     clearInterval(purgeTimer);
     clearTimeout(firstPurge);
+  });
+
+  // Nutzungsstatistik: Momentaufnahme des Vortags, alte Stundenwerte zusammenfassen, Altes löschen
+  const maintainStats = () =>
+    runStatsMaintenance(app.prisma)
+      .then((rolled) => {
+        trackUsage('JOB_RUN', { dim: 'STATS_MAINTENANCE' });
+        if (rolled > 0) trackUsage('JOB_ITEMS', { dim: 'STATS_MAINTENANCE', n: rolled });
+      })
+      .catch((err) => {
+        trackUsage('JOB_FAILED', { dim: 'STATS_MAINTENANCE' });
+        app.log.error(err, 'Pflege der Statistik fehlgeschlagen');
+      });
+  const statsTimer = setInterval(maintainStats, STATS_MAINTENANCE_INTERVAL_MS);
+  statsTimer.unref();
+  const firstStats = setTimeout(maintainStats, 3 * 60 * 1000);
+  firstStats.unref();
+  app.addHook('onClose', async () => {
+    clearInterval(statsTimer);
+    clearTimeout(firstStats);
   });
 
   try {

@@ -31,6 +31,7 @@ import {
   formatBirthDate,
   formatDate,
   formatDateTime,
+  formatLastSeen,
   formatShiftStart,
   fullName,
   organizerRoleLabels,
@@ -562,6 +563,7 @@ export function UserDialog({
                   </>
                 )}
                 <Fact label="Registriert">{formatDateTime(user.createdAt)}</Fact>
+                <Fact label="Zuletzt aktiv">{formatLastSeen(user.lastSeenOn)}</Fact>
                 <Fact label="Zuletzt geändert">{formatDateTime(user.updatedAt)}</Fact>
                 <Fact label="Eintragungen">
                   <span className="tabular">{user.signupCount}</span>

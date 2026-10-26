@@ -1,0 +1,50 @@
+---
+// Anonyme Nutzungsstatistik (wie in den Apps, Kennzahlen in packages/shared/src/stats.ts): welche Seite
+// gelesen wird (nur der Pfad) und wie oft die Suche nichts findet (ohne Suchbegriff). Kein Cookie, keine
+// Kennung. Wer «nicht verfolgen» (GPC/DNT) eingestellt hat, schickt nichts. /api geht über Traefik ans
+// Backend; lokal (astro dev) gibt es kein /api, die Meldung geht dann still verloren.
+---
+
+<script>
+  type StatsEvent = { name: 'HELP_PAGE' | 'HELP_SEARCH_EMPTY'; dim?: string };
+
+  const nav = navigator as Navigator & { globalPrivacyControl?: boolean };
+  const optedOut = nav.globalPrivacyControl === true || nav.doNotTrack === '1';
+
+  function send(events: StatsEvent[]) {
+    fetch('/api/stats/ui', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events }),
+      credentials: 'omit',
+      keepalive: true,
+    }).catch(() => undefined);
+  }
+
+  if (!optedOut) {
+    send([{ name: 'HELP_PAGE', dim: location.pathname }]);
+
+    // Suche ohne Treffer: Pagefind zeigt dann eine Meldung und keine Ergebnisse. Erst zählen, wenn eine
+    // Weile nicht mehr getippt wurde, und jede Suche nur einmal (der Begriff bleibt im Browser).
+    const counted = new Set<string>();
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const check = () => {
+      const input = document.querySelector<HTMLInputElement>('.pagefind-ui__search-input');
+      const query = input?.value.trim().toLowerCase() ?? '';
+      const empty =
+        document.querySelector('.pagefind-ui__message') !== null &&
+        document.querySelectorAll('.pagefind-ui__result').length === 0;
+      if (query.length >= 3 && empty && !counted.has(query)) {
+        counted.add(query);
+        send([{ name: 'HELP_SEARCH_EMPTY' }]);
+      }
+    };
+    const search = document.querySelector('site-search');
+    if (search) {
+      new MutationObserver(() => {
+        clearTimeout(pending);
+        pending = setTimeout(check, 2000);
+      }).observe(search, { childList: true, subtree: true });
+    }
+  }
+</script>

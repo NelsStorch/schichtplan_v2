@@ -42,6 +42,7 @@ import {
   Skeleton,
   buttonClasses,
   cn,
+  trackUi,
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
@@ -127,6 +128,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   const changeView = (next: View) => {
     setView(next);
+    trackUi('UI_PLAN_VIEW', next === 'grid' ? 'EVENT_GRID' : 'EVENT_LIST');
     try {
       window.localStorage.setItem(VIEW_STORAGE_KEY, next);
     } catch {

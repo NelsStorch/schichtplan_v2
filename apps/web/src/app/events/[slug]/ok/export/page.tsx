@@ -4,7 +4,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { CalendarDays, ClipboardCheck, Clock, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
 import type { EventRosterResponseDto } from '@schichtplan/shared';
-import { Button, Card, Chip, Dialog, Switch, cn, useToast } from '@schichtplan/ui';
+import { Button, Card, Chip, Dialog, Switch, cn, trackUi, useToast } from '@schichtplan/ui';
 import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
@@ -51,6 +51,7 @@ export default function ExportPage() {
       }
     }
     downloadCsv(`schichtplan-${event.slug}.csv`, rows);
+    trackUi('UI_CSV', 'SHIFTS');
   };
 
   const exportAssignments = () => {
@@ -73,6 +74,7 @@ export default function ExportPage() {
       ]);
     }
     downloadCsv(`einteilung-${event.slug}.csv`, rows);
+    trackUi('UI_CSV', 'ASSIGNMENTS');
   };
 
   const exportRoster = async () => {
@@ -98,6 +100,7 @@ export default function ExportPage() {
         ]);
       }
       downloadCsv(`helfende-${event.slug}.csv`, rows);
+      trackUi('UI_CSV', 'ROSTER');
     } catch (err) {
       toast({ title: 'Export fehlgeschlagen', description: errorMessage(err), tone: 'error' });
     } finally {
@@ -108,6 +111,7 @@ export default function ExportPage() {
   const exportHelperHours = () => {
     const { helpers, summary } = computeHelperStats(event, roster, DEFAULT_HELPER_STATS_CONFIG);
     exportHelperHoursCsv(event.slug, helpers, summary);
+    trackUi('UI_CSV', 'HOURS');
   };
 
   const empty = event.shifts.length === 0;
@@ -231,6 +235,7 @@ function PrintDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
       const blob = await createShiftPlanPdf(event, department, options);
       if (action === 'print') printBlob(blob, pdfFilename(event, options));
       else downloadBlob(blob, pdfFilename(event, options));
+      trackUi('UI_PDF', `${layout}_${action}`);
     } catch (err) {
       toast({ title: 'PDF konnte nicht erstellt werden', description: errorMessage(err), tone: 'error' });
     } finally {

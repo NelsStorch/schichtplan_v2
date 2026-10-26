@@ -587,6 +587,8 @@ export interface AdminUserListItemDto {
   ceviDbOrtsgruppeName?: string | null;
   ceviDbDepartmentLeader?: boolean;
   ceviDbLeaderGroupName?: string | null;
+  /** Letzter Tag mit Nutzung (YYYY-MM-DD, Schweizer Zeit), null = seit Einführung nicht gesehen */
+  lastSeenOn?: string | null;
   createdAt: string;
   updatedAt: string;
 }

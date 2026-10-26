@@ -1,4 +1,4 @@
-import { ageAt, type AdminUserListItemDto, type LoginMethod } from '@schichtplan/shared';
+import { addDaysToDayKey, ageAt, zurichDayKey, type AdminUserListItemDto, type LoginMethod } from '@schichtplan/shared';
 
 // Immer Schweizer Zeit, auch wenn jemand aus dem Ausland schaut
 const TZ = 'Europe/Zurich';
@@ -28,6 +28,15 @@ export const formatShiftStart = (iso: string) => shiftFmt.format(new Date(iso));
 export function formatBirthDate(value: string) {
   const [y, m, d] = value.split('-');
   return `${d}.${m}.${y}`;
+}
+
+/** «Zuletzt aktiv» (YYYY-MM-DD): heute, gestern oder Datum */
+export function formatLastSeen(value: string | null | undefined, today = new Date()) {
+  if (!value) return 'noch nie';
+  const todayKey = zurichDayKey(today);
+  if (value === todayKey) return 'heute';
+  if (value === addDaysToDayKey(todayKey, -1)) return 'gestern';
+  return formatBirthDate(value);
 }
 
 /** Heutiges Alter (Schweizer Kalendertag) */

@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
-import { FeedbackProvider, ThemeScript } from '@schichtplan/ui';
+import { FeedbackProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
@@ -60,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PortalProvider>{children}</PortalProvider>
           <ServiceWorkerRegister />
         </FeedbackProvider>
+        <UsageTracker app="web" />
       </body>
     </html>
   );

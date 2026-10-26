@@ -1,6 +1,6 @@
 import './globals.css';
 import { fontVariables } from '@schichtplan/ui/fonts';
-import { FeedbackProvider } from '@schichtplan/ui';
+import { FeedbackProvider, UsageTracker } from '@schichtplan/ui';
 import type { Metadata } from 'next';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 
@@ -39,6 +39,8 @@ export default function RootLayout({
       </head>
       <body className="min-h-[100dvh] bg-canvas text-fg antialiased flex flex-col selection:bg-accent selection:text-white grain">
         <FeedbackProvider>{children}</FeedbackProvider>
+        {/* Immer dunkel: hell/dunkel zu zählen bringt hier nichts */}
+        <UsageTracker app="landing" reportTheme={false} />
       </body>
     </html>
   );

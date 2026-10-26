@@ -25,7 +25,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { cancelDeadlineAt, cancelDeadlineText, type ResponsiblePersonDto } from '@schichtplan/shared';
-import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, useConfirm, useToast } from '@schichtplan/ui';
+import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, trackUi, useConfirm, useToast } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { CalendarSubscribeDialog } from '@/components/CalendarSubscribeDialog';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
@@ -168,6 +168,11 @@ export default function MyShiftsPage() {
     load();
     loadCalToken();
   }, [sessionLoading, user, load, loadCalToken]);
+
+  // Wie oft die Seite offline (aus dem Zwischenspeicher) genutzt wird. Die Meldung wartet, bis wieder Netz da ist.
+  useEffect(() => {
+    trackUi('UI_MY_SHIFTS', navigator.onLine ? 'online' : 'offline');
+  }, []);
 
   const cancel = async (shift: MyShift) => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -591,6 +596,7 @@ function Timeline({
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
   const toggleBriefing = (id: string) => {
+    if (!expandedIds[id]) trackUi('UI_BRIEFING');
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 

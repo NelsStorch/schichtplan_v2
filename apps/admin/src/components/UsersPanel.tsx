@@ -24,7 +24,7 @@ import type {
   AdminUserListItemDto,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
-import { formatDate, fullName } from '../lib/format';
+import { formatDate, formatLastSeen, fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
 type Filter = 'all' | 'cevidb' | 'password' | 'ceviname' | 'stale_ceviname' | 'admin';
@@ -36,6 +36,8 @@ const sortOptions = [
   { value: 'created:asc', label: 'Älteste zuerst' },
   { value: 'name:asc', label: 'Name A–Z' },
   { value: 'email:asc', label: 'E-Mail A–Z' },
+  { value: 'seen:desc', label: 'Zuletzt aktiv' },
+  { value: 'seen:asc', label: 'Am längsten inaktiv' },
 ];
 
 function buildQuery(params: { query: string; filter: Filter; departmentId: string; sort: string; page: number }) {
@@ -390,6 +392,7 @@ export function UsersPanel({
                   <th scope="col" className="px-3 py-3 font-semibold">Anmeldung</th>
                   <th scope="col" className="px-3 py-3 font-semibold">Abteilung</th>
                   <th scope="col" className="px-3 py-3 text-right font-semibold">Einträge</th>
+                  <th scope="col" className="px-3 py-3 text-right font-semibold">Zuletzt aktiv</th>
                   <th scope="col" className="px-5 py-3 text-right font-semibold">Registriert</th>
                   <th scope="col" className="w-12 px-3 py-3 text-right font-semibold">
                     <span className="sr-only">Aktionen</span>
@@ -426,6 +429,9 @@ export function UsersPanel({
                       <Departments user={user} onOpenDepartment={onOpenDepartment} />
                     </td>
                     <td className="tabular px-3 py-3 text-right font-mono text-fg-muted">{user.signupCount}</td>
+                    <td className="tabular whitespace-nowrap px-3 py-3 text-right font-mono text-fg-muted">
+                      {formatLastSeen(user.lastSeenOn)}
+                    </td>
                     <td className="tabular whitespace-nowrap px-5 py-3 text-right font-mono text-fg-muted">
                       {formatDate(user.createdAt)}
                     </td>

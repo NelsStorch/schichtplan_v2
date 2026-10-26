@@ -14,6 +14,7 @@ import { escapeHtml, renderEmailTemplate, sendEmail } from '../services/email.js
 import { personLabel } from '../services/profile.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 import { eventUrl } from '../services/shiftReminders.js';
+import { trackUsage } from '../services/usageStats.js';
 
 // Schutz vor versehentlichem Mehrfach-Versand und Missbrauch: pro Anlass und pro Person
 const eventLimiter = createRateLimiter(60 * 60 * 1000, 10);
@@ -296,6 +297,8 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
       }
       eventLimiter.hit(event.id);
       senderLimiter.hit(request.user.id);
+      trackUsage('MESSAGE', { dim: target, departmentId: event.departmentId });
+      trackUsage('MESSAGE_RECIPIENTS', { dim: target, departmentId: event.departmentId, n: withEmail.length });
 
       const sender = await fastify.prisma.user.findUnique({ where: { id: request.user.id }, select: userSelect });
       const senderName = sender ? personLabel(sender) : 'OK';
@@ -329,7 +332,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
       void (async () => {
         let failed = 0;
         for (const r of withEmail) {
-          const ok = await sendEmail({ to: r.email, subject: `${subject} – ${event.title}`, html, text, replyTo });
+          const ok = await sendEmail({ to: r.email, subject: `${subject} – ${event.title}`, html, text, replyTo, kind: 'OK_MESSAGE' });
           if (!ok) failed++;
         }
         if (failed > 0) {

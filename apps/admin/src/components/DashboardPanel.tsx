@@ -8,7 +8,7 @@ import { api, departmentUrl, errorMessage, send } from '../lib/api';
 import { formatDate, formatEventRange, fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
-export type AdminTab = 'uebersicht' | 'abteilungen' | 'anlaesse' | 'personen' | 'protokoll';
+export type AdminTab = 'uebersicht' | 'abteilungen' | 'anlaesse' | 'personen' | 'statistik' | 'protokoll';
 
 function Stat({ label, value, hint }: { label: string; value?: number; hint?: string }) {
   return (
