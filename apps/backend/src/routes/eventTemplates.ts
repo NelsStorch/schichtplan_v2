@@ -197,6 +197,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             contactVisibility: parse.data.contactVisibility || (template.data as any)?.contactVisibility || 'BOTH',
             signupOpensAt: parse.data.signupOpensAt ? new Date(parse.data.signupOpensAt) : null,
             attendanceMode: instantiateAttendanceMode,
+            allowReplacement: parse.data.allowReplacement ?? templateData?.allowReplacement ?? true,
+            replacementCutoffHours: parse.data.replacementCutoffHours ?? templateData?.replacementCutoffHours ?? 0,
             checkinToken: instantiateAttendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
           },
         });

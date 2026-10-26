@@ -18,16 +18,23 @@ import {
   Mail,
   Phone,
   RefreshCw,
+  Repeat,
   Shield,
   Ticket,
   UserMinus,
   Users,
   Zap,
 } from 'lucide-react';
-import { cancelDeadlineAt, cancelDeadlineText, type ResponsiblePersonDto } from '@schichtplan/shared';
+import {
+  cancelDeadlineAt,
+  cancelDeadlineText,
+  replacementDeadline,
+  type ResponsiblePersonDto,
+} from '@schichtplan/shared';
 import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, trackUi, useConfirm, useToast } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { CalendarSubscribeDialog } from '@/components/CalendarSubscribeDialog';
+import { ReplacementDialog } from '@/components/event/ReplacementDialog';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
 import {
   dayKeyToIso,
@@ -99,6 +106,7 @@ export default function MyShiftsPage() {
   const [shifts, setShifts] = useState<MyShift[] | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [replacementFor, setReplacementFor] = useState<MyShift | null>(null);
   const [calData, setCalData] = useState<CalendarTokenData | null>(null);
   const [resettingToken, setResettingToken] = useState(false);
   const [calDialogOpen, setCalDialogOpen] = useState(false);
@@ -216,6 +224,34 @@ export default function MyShiftsPage() {
       await load();
     } catch (err) {
       toast({ title: 'Austragen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const offerReplacement = async (note: string) => {
+    if (!replacementFor) return;
+    setBusy(replacementFor.signupId);
+    try {
+      await api(`/api/signups/${replacementFor.signupId}/replacement`, { method: 'PUT', json: { note: note || null } });
+      toast({ title: 'Ersatz wird gesucht', description: 'Du bleibst eingetragen, bis jemand übernimmt. Du bekommst dann eine Mail.' });
+      setReplacementFor(null);
+      await load();
+    } catch (err) {
+      toast({ title: 'Hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const withdrawReplacement = async (shift: MyShift) => {
+    setBusy(shift.signupId);
+    try {
+      await api(`/api/signups/${shift.signupId}/replacement`, { method: 'DELETE' });
+      toast({ title: 'Ersatz-Suche beendet', description: 'Du bleibst eingetragen.' });
+      await load();
+    } catch (err) {
+      toast({ title: 'Hat nicht geklappt', description: errorMessage(err), tone: 'error' });
     } finally {
       setBusy(null);
     }
@@ -377,7 +413,13 @@ export default function MyShiftsPage() {
                     </Button>
                   )}
                 </div>
-                <Timeline shifts={upcoming} busy={busy} onCancel={cancel} />
+                <Timeline
+                  shifts={upcoming}
+                  busy={busy}
+                  onCancel={cancel}
+                  onOfferReplacement={setReplacementFor}
+                  onWithdrawReplacement={withdrawReplacement}
+                />
               </section>
             )}
 
@@ -470,6 +512,14 @@ export default function MyShiftsPage() {
           resettingToken={resettingToken}
         />
       )}
+
+      <ReplacementDialog
+        open={Boolean(replacementFor)}
+        shiftLabel={replacementFor ? `${replacementFor.title}, ${replacementFor.eventTitle}` : undefined}
+        busy={Boolean(replacementFor && busy === replacementFor.signupId)}
+        onClose={() => setReplacementFor(null)}
+        onSubmit={offerReplacement}
+      />
     </AppShell>
   );
 }
@@ -587,11 +637,15 @@ function Timeline({
   muted,
   busy,
   onCancel,
+  onOfferReplacement,
+  onWithdrawReplacement,
 }: {
   shifts: MyShift[];
   muted?: boolean;
   busy?: string | null;
   onCancel?: (shift: MyShift) => void;
+  onOfferReplacement?: (shift: MyShift) => void;
+  onWithdrawReplacement?: (shift: MyShift) => void;
 }) {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
@@ -668,6 +722,11 @@ function Timeline({
                             {s.taskTitle && s.taskTitle !== s.title && (
                               <Badge tone="neutral">{s.taskTitle}</Badge>
                             )}
+                            {s.replacementWantedAt && (
+                              <Badge tone="warning">
+                                <Repeat className="size-3" /> Ersatz gesucht
+                              </Badge>
+                            )}
                           </div>
                           <p className="font-bold text-fg">{s.title}</p>
                           <Link href={`/events/${s.eventSlug}`} className="text-sm text-fg-muted hover:text-fg">
@@ -731,6 +790,29 @@ function Timeline({
                           >
                             <Download className="size-4" />
                           </Button>
+                          {s.isSignup !== false && s.replacementWantedAt && onWithdrawReplacement ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={busy === s.signupId}
+                              onClick={() => onWithdrawReplacement(s)}
+                              title="Du bleibst eingetragen"
+                            >
+                              Ersatz-Suche beenden
+                            </Button>
+                          ) : s.isSignup !== false &&
+                            onOfferReplacement &&
+                            s.allowReplacement &&
+                            Date.now() < replacementDeadline(s.startTime, s.replacementCutoffHours ?? 0).getTime() ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => onOfferReplacement(s)}
+                              title="Du bleibst eingetragen, bis jemand übernimmt"
+                            >
+                              <Repeat /> Ersatz suchen
+                            </Button>
+                          ) : null}
                           {s.isSignup !== false && onCancel ? (
                             <Button
                               variant="danger"
@@ -750,6 +832,13 @@ function Timeline({
                           )}
                         </div>
                       </div>
+
+                      {s.replacementWantedAt && (
+                        <p className="mt-3 rounded-field border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-ink">
+                          Du suchst Ersatz{s.replacementNote ? ` («${s.replacementNote}»)` : ''}. Bis jemand übernimmt,
+                          bist du eingetragen. Du bekommst eine Mail, sobald es so weit ist.
+                        </p>
+                      )}
 
                       {/* Aufgeklapptes Einsatz-Briefing */}
                       {isExpanded && hasBriefing && (

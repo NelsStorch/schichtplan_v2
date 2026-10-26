@@ -11,6 +11,7 @@ import {
   Lock,
   Mail,
   Phone,
+  Repeat,
   Shield,
   UserCheck,
   UserMinus,
@@ -18,7 +19,14 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { formatZurichDateTime, isSignupTimeOpen, type ShiftDto, type ShiftTaskDto } from '@schichtplan/shared';
+import {
+  formatZurichDateTime,
+  isSignupTimeOpen,
+  replacementDeadline,
+  type ShiftDto,
+  type ShiftSignupDto,
+  type ShiftTaskDto,
+} from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -49,6 +57,11 @@ export interface ShiftDetailsDialogProps {
   onRemoveHelper: (signupId: string, name: string) => void;
   onAssignHelper?: (shift: ShiftDto, task?: ShiftTaskDto) => void;
   onEditShift?: (shift: ShiftDto) => void;
+  /** «Ersatz gesucht» setzen: personName null = für sich selbst */
+  onOfferReplacement?: (signupId: string, personName: string | null) => void;
+  onWithdrawReplacement?: (signupId: string) => void;
+  /** Schicht mit «Ersatz gesucht» übernehmen */
+  onTakeOver?: (offer: ShiftSignupDto, task?: ShiftTaskDto) => void;
 }
 
 export function ShiftDetailsDialog({
@@ -66,6 +79,9 @@ export function ShiftDetailsDialog({
   onRemoveHelper,
   onAssignHelper,
   onEditShift,
+  onOfferReplacement,
+  onWithdrawReplacement,
+  onTakeOver,
 }: ShiftDetailsDialogProps) {
   if (!shift) return null;
 
@@ -80,6 +96,12 @@ export function ShiftDetailsDialog({
     ? signups.find((s) => s.userId === currentUser.id)
     : null;
   const isMine = Boolean(mySignupInShift);
+
+  // «Ersatz gesucht»: bis zur Frist des Anlasses vor Schichtbeginn
+  const replacementOpen =
+    event.allowReplacement !== false &&
+    Date.now() < replacementDeadline(shift.startTime, event.replacementCutoffHours ?? 0).getTime();
+  const offerCount = signups.filter((s) => s.replacementWantedAt).length;
 
   const conflictingShift = useMemo(() => {
     if (!currentUser || !shift || !event?.shifts) return null;
@@ -145,6 +167,11 @@ export function ShiftDetailsDialog({
             {isMine && (
               <Badge tone="success">
                 <Check className="size-3" /> Du bist dabei
+              </Badge>
+            )}
+            {offerCount > 0 && !over && (
+              <Badge tone="warning">
+                <Repeat className="size-3" /> Ersatz gesucht{offerCount > 1 ? ` (${offerCount})` : ''}
               </Badge>
             )}
             {over && <Badge tone="neutral">Vergangen</Badge>}
@@ -341,6 +368,9 @@ export function ShiftDetailsDialog({
                 : null;
               const isMineInThisTask = Boolean(taskMineSignup);
               const isMineInOtherTask = isMine && !isMineInThisTask;
+              const offers = over ? [] : taskSignups.filter((s) => s.replacementWantedAt && s.userId !== currentUser?.id);
+              const canTakeOverHere =
+                replacementOpen && !isMine && !conflictingShift && (needsLogin || event.viewer.canTakeOver);
 
               return (
                 <div
@@ -420,12 +450,16 @@ export function ShiftDetailsDialog({
                       <ul className="flex flex-wrap gap-1.5" aria-label="Eingetragene Helfende">
                         {taskSignups.map((s) => {
                           const isCurrentUser = currentUser && s.userId === currentUser.id;
+                          const wanted = Boolean(s.replacementWantedAt) && !over;
                           return (
                             <li
                               key={s.id}
+                              title={wanted ? 'Sucht Ersatz' : undefined}
                               className={cn(
                                 'inline-flex h-7 items-center gap-1.5 rounded-full pl-1 pr-2.5 text-xs font-medium transition-colors',
-                                isCurrentUser
+                                wanted
+                                  ? 'border border-dashed border-warning/60 bg-warning/10 text-warning-ink'
+                                  : isCurrentUser
                                   ? 'border border-accent/40 bg-accent/15 text-accent-ink font-semibold'
                                   : 'bg-surface text-fg border border-line'
                               )}
@@ -438,6 +472,26 @@ export function ShiftDetailsDialog({
                               <span>
                                 {s.displayName} {isCurrentUser && '(Du)'}
                               </span>
+                              {wanted && <Repeat className="size-3" aria-label="sucht Ersatz" />}
+                              {canManage && !isCurrentUser && !over && (s.replacementWantedAt || replacementOpen) && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    s.replacementWantedAt
+                                      ? onWithdrawReplacement?.(s.id)
+                                      : onOfferReplacement?.(s.id, s.displayName)
+                                  }
+                                  aria-label={
+                                    s.replacementWantedAt
+                                      ? `Ersatz-Suche für ${s.displayName} beenden`
+                                      : `Ersatz für ${s.displayName} suchen`
+                                  }
+                                  title={s.replacementWantedAt ? 'Ersatz-Suche beenden' : 'Ersatz suchen'}
+                                  className="-mr-1 ml-0.5 rounded-full p-0.5 text-fg-subtle transition hover:bg-warning/15 hover:text-warning-ink"
+                                >
+                                  <Repeat className="size-3" />
+                                </button>
+                              )}
                               {canManage && (
                                 <button
                                   type="button"
@@ -453,12 +507,73 @@ export function ShiftDetailsDialog({
                         })}
                       </ul>
                     )}
+
+                    {/* «Ersatz gesucht»: wer und warum, mit Übernehmen */}
+                    {offers.length > 0 && (
+                      <ul className="mt-3 space-y-2" aria-label="Ersatz gesucht">
+                        {offers.map((o) => (
+                          <li
+                            key={o.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-field border border-warning/40 bg-warning/10 p-2.5"
+                          >
+                            <div className="min-w-0 text-xs">
+                              <p className="font-semibold text-warning-ink">
+                                <Repeat className="mr-1 inline size-3.5" />
+                                {o.userId || o.guestName ? `${o.displayName} sucht Ersatz` : 'Ersatz gesucht'}
+                              </p>
+                              {o.replacementNote && <p className="mt-0.5 text-fg-muted">«{o.replacementNote}»</p>}
+                              {o.replacementByName && (
+                                <p className="mt-0.5 text-2xs text-fg-subtle">eingetragen durch {o.replacementByName}</p>
+                              )}
+                            </div>
+                            {canTakeOverHere &&
+                              (needsLogin ? (
+                                <a
+                                  href={loginUrl()}
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg hover:brightness-110"
+                                >
+                                  <Lock className="size-3" /> Anmelden &amp; übernehmen
+                                </a>
+                              ) : (
+                                <Button size="sm" disabled={busy} onClick={() => onTakeOver?.(o, task.id === 'default' ? undefined : task)}>
+                                  <UserCheck className="size-3.5" /> Übernehmen
+                                </Button>
+                              ))}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   {/* Aktions-Button mit Button-in-Button Muster */}
                   {!over && (
                     <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-line/60">
-                      {isMineInThisTask ? (
+                      {isMineInThisTask && taskMineSignup?.replacementWantedAt ? (
+                        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                          <p className="flex items-center gap-1.5 text-xs font-semibold text-warning-ink">
+                            <Repeat className="size-3.5" /> Du suchst Ersatz. Bis jemand übernimmt, bist du eingetragen.
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() => onWithdrawReplacement?.(taskMineSignup.id)}
+                          >
+                            Zurückziehen
+                          </Button>
+                        </div>
+                      ) : isMineInThisTask ? (
+                        <>
+                        {replacementOpen && onOfferReplacement && taskMineSignup && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() => onOfferReplacement(taskMineSignup.id, null)}
+                          >
+                            <Repeat className="size-3.5" /> Ersatz suchen
+                          </Button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onCancel(taskMineSignup?.id)}
@@ -470,6 +585,7 @@ export function ShiftDetailsDialog({
                             <UserMinus className="size-3" />
                           </span>
                         </button>
+                        </>
                       ) : isMineInOtherTask ? (
                         <div className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
                           <Check className="size-3.5 text-accent-ink" /> Du bist bereits für eine andere Arbeit eingeteilt

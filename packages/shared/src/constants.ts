@@ -387,6 +387,15 @@ export const EVENT_QUESTION_PRESETS: EventQuestionPreset[] = [
   { key: 'EMERGENCY', label: 'Notfallkontakt (Name und Telefon)', type: 'TEXT', options: [], hint: 'Wen das OK im Notfall anruft' },
 ];
 
+/** «Ersatz gesucht» möglich bis so viele Stunden vor Schichtbeginn (0 = bis Schichtbeginn) */
+export const REPLACEMENT_CUTOFF_HOURS = [0, 1, 2, 6, 12, 24] as const;
+export type ReplacementCutoffHours = (typeof REPLACEMENT_CUTOFF_HOURS)[number];
+
+/** Bis wann «Ersatz gesucht» gesetzt und übernommen werden kann */
+export function replacementDeadline(shiftStart: Date | string, cutoffHours: number): Date {
+  return new Date(new Date(shiftStart).getTime() - cutoffHours * 60 * 60 * 1000);
+}
+
 /** Anwesenheit pro Anlass: aus, nur das OK hakt ab, oder zusätzlich Selbst-Check-in per QR-Code */
 export const ATTENDANCE_MODES = {
   OFF: 'Keine Anwesenheitsliste',

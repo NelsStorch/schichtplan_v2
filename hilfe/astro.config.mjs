@@ -44,6 +44,7 @@ export default defineConfig({
             'helfen/eintragen',
             'helfen/angaben-und-fragen',
             'helfen/austragen',
+            'helfen/ersatz-suchen',
             'helfen/meine-schichten',
             'helfen/einchecken',
             'helfen/nicht-freigeschaltet',

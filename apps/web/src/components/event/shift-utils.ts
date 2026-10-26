@@ -30,6 +30,12 @@ export function shiftStats(shift: ShiftDto, now = Date.now()): ShiftStats {
   };
 }
 
+/** Eintragungen mit «Ersatz gesucht» (vergangene Schichten nicht mehr) */
+export function replacementOffers(shift: ShiftDto) {
+  if (isPast(shift.startTime)) return [];
+  return (shift.signups ?? []).filter((s) => s.replacementWantedAt);
+}
+
 /** Arbeiten einer Schicht; Schichten ohne Arbeiten gelten als eine Arbeit mit dem Schichttitel */
 export function shiftTasks(shift: ShiftDto): (ShiftTaskDto & { filled: number })[] {
   const signups = shift.signups ?? [];

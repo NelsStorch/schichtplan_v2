@@ -30,6 +30,8 @@ import { findShiftCollisions } from '../services/shiftCollision.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
 import { syncEventRange } from '../services/eventRange.js';
 import { trackUsage } from '../services/usageStats.js';
+import { personLabel } from '../services/attendance.js';
+import { notifyReplacementTaken, replacementOpen } from '../services/replacement.js';
 
 function toResponsiblePersonDto(
   r: {
@@ -748,6 +750,25 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       const invalidAnswer = validateAnswers(perSignupQuestions, signupAnswers);
       if (invalidAnswer) return reply.status(400).send({ error: invalidAnswer });
 
+      // Schicht übernehmen («Ersatz gesucht»): Die eigene Eintragung ersetzt die angebotene,
+      // deren Platz gilt für alle Prüfungen als frei.
+      const replaced = parse.data.replacesSignupId
+        ? shift.signups.find((s) => s.id === parse.data.replacesSignupId) ?? null
+        : null;
+      if (parse.data.replacesSignupId) {
+        if (!replaced?.replacementWantedAt) {
+          return reply.status(409).send({ error: 'Für diese Eintragung wird kein Ersatz mehr gesucht.' });
+        }
+        if (replaced.userId === request.user.id) {
+          return reply.status(400).send({ error: 'Das ist deine eigene Eintragung.' });
+        }
+        if (!replacementOpen(event, shift.startTime)) {
+          return reply.status(409).send({ error: 'Diese Schicht kann nicht mehr übernommen werden.' });
+        }
+        shift.signups = shift.signups.filter((s) => s.id !== replaced.id);
+        for (const t of shift.tasks) t.signups = t.signups.filter((s) => s.id !== replaced.id);
+      }
+
       let targetUserId: string | null = null;
       let targetUser = null;
       let guestName: string | null = null;
@@ -759,7 +780,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       const canAssign = flags.can.HELPERS;
 
       // Fall 1: OK teilt eine andere Person ein
-      if (canAssign && requestedUserId) {
+      if (canAssign && requestedUserId && !replaced) {
         // Nur Personen der Abteilung oder des Anlasses: sonst sähe das OK danach fremde Kontaktdaten
         if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, [requestedUserId]))) {
           return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
@@ -769,7 +790,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         if (!targetUser) {
           return reply.status(404).send({ error: 'Ausgewählte Person nicht gefunden' });
         }
-      } else if (canAssign && reqGuestName) {
+      } else if (canAssign && reqGuestName && !replaced) {
         // OK trägt manuellen Gast/Helfer ein
         guestName = reqGuestName.trim();
         guestEmail = reqGuestEmail?.trim() || null;
@@ -795,7 +816,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         targetUser = self;
 
         const hasGrant = await hasValidGrant(fastify.prisma, event.id, self.id);
-        const access = evaluateEventAccess(event, event.department.name, self, flags, hasGrant);
+        // Beim Übernehmen kommt kein Platz dazu: geschlossenes Eintragen hält es nicht auf
+        const accessEvent = replaced ? { ...event, allowPublicSignup: true, signupOpensAt: null } : event;
+        const access = evaluateEventAccess(accessEvent, event.department.name, self, flags, hasGrant);
         if (!access.canSignup) {
           return reply.status(403).send({ error: access.message, reason: access.reason });
         }
@@ -885,7 +908,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Arbeit (Task) bestimmen
       let chosenTask = null;
-      if (taskId) {
+      if (replaced) {
+        // Wer übernimmt, übernimmt auch die Arbeit
+        chosenTask = shift.tasks.find((t) => t.id === replaced.taskId) ?? null;
+      } else if (taskId) {
         chosenTask = shift.tasks.find((t) => t.id === taskId);
         if (!chosenTask) {
           return reply.status(404).send({ error: 'Arbeit in dieser Schicht nicht gefunden' });
@@ -971,6 +997,15 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       // Eintragungen für den letzten Platz (oder ein Doppelklick) würden die Schicht sonst überbuchen.
       const result = await fastify.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM shifts WHERE id = ${shiftId} FOR UPDATE`;
+        if (replaced) {
+          // Unter der Sperre: zurückgezogen oder schon von jemand anderem übernommen?
+          const stillOffered = await tx.shiftSignup.findFirst({
+            where: { id: replaced.id, replacementWantedAt: { not: null } },
+            select: { id: true },
+          });
+          if (!stillOffered) return { error: 'Diese Schicht wurde schon übernommen oder wird nicht mehr angeboten.' } as const;
+          await tx.shiftSignup.delete({ where: { id: replaced.id } });
+        }
         if (!allowCollision) {
           if (targetUserId) {
             const overlapping = await tx.shiftSignup.findFirst({
@@ -1084,11 +1119,14 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           data: {
             eventId: event.id,
             shiftId: shift.id,
-            action: 'SIGNUP',
+            // REPLACE: performedByName = wer die Schicht abgegeben hat
+            action: replaced ? 'REPLACE' : 'SIGNUP',
             helperUserId: targetUserId,
             helperName: displayName,
             performedByUserId: request.user?.id || null,
-            performedByName: isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
+            performedByName: replaced
+              ? personLabel(replaced.user, replaced.guestName)
+              : isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
             shiftTitle: shift.title,
             shiftStartTime: shift.startTime,
             shiftEndTime: shift.endTime,
@@ -1099,10 +1137,17 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         request.log.error(logErr, 'Fehler beim Erstellen des Signup-Logs');
       }
 
-      trackUsage('SIGNUP', {
-        dim: targetUserId === request.user.id ? 'SELF' : targetUserId ? 'OK' : 'GUEST',
-        departmentId: event.departmentId,
-      });
+      if (replaced) {
+        trackUsage('REPLACEMENT_TAKEN', { departmentId: event.departmentId });
+        void notifyReplacementTaken(fastify.prisma, replaced, shift, event, displayName).catch((err) =>
+          request.log.error(err, 'Mail «Ersatz gefunden» fehlgeschlagen')
+        );
+      } else {
+        trackUsage('SIGNUP', {
+          dim: targetUserId === request.user.id ? 'SELF' : targetUserId ? 'OK' : 'GUEST',
+          departmentId: event.departmentId,
+        });
+      }
 
       return {
         id: signup.id,
@@ -1110,7 +1155,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         taskId: signup.taskId,
         taskTitle: signup.task?.title || null,
         displayName,
-        message: 'Erfolgreich für die Schicht eingetragen!',
+        message: replaced ? 'Du hast die Schicht übernommen. Danke!' : 'Erfolgreich für die Schicht eingetragen!',
       };
     }
   );
@@ -1247,6 +1292,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                     slug: true,
                     startDate: true,
                     cancelDeadlineDays: true,
+                    allowReplacement: true,
+                    replacementCutoffHours: true,
                     department: { select: { name: true, slug: true } },
                   },
                 },
@@ -1306,6 +1353,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         eventSlug: string;
         eventStartDate: string;
         cancelDeadlineDays: number | null;
+        /** «Ersatz gesucht»: erlaubt, Frist und eigener Stand (nur bei eigener Eintragung) */
+        allowReplacement?: boolean;
+        replacementCutoffHours?: number;
+        replacementWantedAt?: string | null;
+        replacementNote?: string | null;
         departmentName: string;
         departmentSlug: string;
         createdAt: string;
@@ -1338,6 +1390,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           eventSlug: su.shift.event.slug,
           eventStartDate: su.shift.event.startDate.toISOString(),
           cancelDeadlineDays: su.shift.event.cancelDeadlineDays,
+          allowReplacement: su.shift.event.allowReplacement,
+          replacementCutoffHours: su.shift.event.replacementCutoffHours,
+          replacementWantedAt: su.replacementWantedAt?.toISOString() ?? null,
+          replacementNote: su.replacementNote,
           departmentName: su.shift.event.department.name,
           departmentSlug: su.shift.event.department.slug,
           createdAt: su.createdAt.toISOString(),

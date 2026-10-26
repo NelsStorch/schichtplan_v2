@@ -48,6 +48,7 @@ import {
   extractPrimaryStufe,
   type DisambiguationCandidate,
 } from '../services/disambiguation.js';
+import { canTakeOver } from '../services/replacement.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -405,6 +406,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         cancelDeadlineDays: event.cancelDeadlineDays ?? null,
         overlapToleranceMinutes: event.overlapToleranceMinutes ?? 15,
         attendanceMode: event.attendanceMode,
+        allowReplacement: event.allowReplacement,
+        replacementCutoffHours: event.replacementCutoffHours,
         checkinToken: access.isManager ? event.checkinToken : null,
         audience: audienceLabel(event, request.tenant.name),
         allowedDepartments: event.allowedDepartments.map((a) => ({
@@ -419,6 +422,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         questions: event.questions.map(toQuestionDto),
         viewer: {
           access,
+          canTakeOver: canTakeOver(event, request.tenant.name, viewer, flags, hasGrant),
           missingFields: viewer ? missingProfileFields(viewer, event.requiredFields) : [],
           missingQuestionIds: viewer ? missingQuestionIds : [],
           answers,
@@ -502,6 +506,10 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                     attendanceByName: su.attendanceByName,
                   }
                 : {}),
+              // «Ersatz gesucht» sehen alle (sonst übernimmt niemand), Grund und Name nur mit Namen
+              replacementWantedAt: su.replacementWantedAt?.toISOString() ?? null,
+              replacementNote: showName ? su.replacementNote : null,
+              replacementByName: showName ? su.replacementByName : null,
             };
           });
 
@@ -588,6 +596,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         cancelDeadlineDays,
         overlapToleranceMinutes,
         attendanceMode,
+        allowReplacement,
+        replacementCutoffHours,
         allowedDepartmentIds,
         allowedStufeIds,
         questions,
@@ -707,6 +717,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             overlapToleranceMinutes: overlapToleranceMinutes ?? 15,
             attendanceMode: attendanceMode ?? 'OFF',
             checkinToken: attendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
+            allowReplacement: allowReplacement ?? true,
+            replacementCutoffHours: replacementCutoffHours ?? 0,
             organizers: {
               create: organizersToCreate,
             },
@@ -827,6 +839,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             cancelDeadlineDays: body.cancelDeadlineDays !== undefined ? body.cancelDeadlineDays : undefined,
             overlapToleranceMinutes: body.overlapToleranceMinutes !== undefined ? body.overlapToleranceMinutes : undefined,
             attendanceMode: body.attendanceMode,
+            allowReplacement: body.allowReplacement,
+            replacementCutoffHours: body.replacementCutoffHours,
             // Beim ersten Einschalten des Selbst-Check-ins einen Code erzeugen; der bestehende bleibt sonst gültig
             checkinToken:
               body.attendanceMode === 'OK_AND_QR' && !event.checkinToken ? generateCheckinToken() : undefined,
@@ -851,6 +865,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         cancelDeadlineDays: updated.cancelDeadlineDays,
         overlapToleranceMinutes: updated.overlapToleranceMinutes,
         attendanceMode: updated.attendanceMode,
+        allowReplacement: updated.allowReplacement,
+        replacementCutoffHours: updated.replacementCutoffHours,
       };
     }
   );
@@ -1375,6 +1391,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             responsibleMode: event.responsibleMode,
             contactVisibility: event.contactVisibility,
             attendanceMode: event.attendanceMode,
+            allowReplacement: event.allowReplacement,
+            replacementCutoffHours: event.replacementCutoffHours,
             questions: event.questions.map((q) => {
               const { id: _id, ...rest } = toQuestionDto(q);
               return rest;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ClipboardCheck, History, RefreshCw, Search, UserMinus, UserPlus, X } from 'lucide-react';
+import { ClipboardCheck, History, RefreshCw, Repeat, Search, UserMinus, UserPlus, X } from 'lucide-react';
 import type { ShiftSignupLogDto } from '@schichtplan/shared';
 import { ATTENDANCE_STATUSES } from '@schichtplan/shared';
 import { Badge, Button, Card, Chip, EmptyState, Input, Skeleton, cn, useToast } from '@schichtplan/ui';
@@ -10,7 +10,7 @@ import { OkPageHeader } from '@/components/ok/OkLayout';
 import { api, errorMessage } from '@/lib/api';
 import { fmtWeekday, fmtTimeRange } from '@/lib/format';
 
-type Action = 'ALL' | 'SIGNUP' | 'SIGNOFF' | 'ATTENDANCE';
+type Action = 'ALL' | 'SIGNUP' | 'SIGNOFF' | 'REPLACE' | 'ATTENDANCE';
 
 const stampFmt = new Intl.DateTimeFormat('de-CH', {
   timeZone: 'Europe/Zurich',
@@ -52,6 +52,7 @@ export default function LogPage() {
       ALL: list.length,
       SIGNUP: list.filter((l) => l.action === 'SIGNUP').length,
       SIGNOFF: list.filter((l) => l.action === 'SIGNOFF').length,
+      REPLACE: list.filter((l) => l.action === 'REPLACE').length,
       ATTENDANCE: list.filter((l) => l.action === 'ATTENDANCE').length,
     };
   }, [logs]);
@@ -87,6 +88,11 @@ export default function LogPage() {
           <Chip selected={action === 'SIGNOFF'} count={counts.SIGNOFF} onClick={() => setAction('SIGNOFF')}>
             Austragungen
           </Chip>
+          {counts.REPLACE > 0 && (
+            <Chip selected={action === 'REPLACE'} count={counts.REPLACE} onClick={() => setAction('REPLACE')}>
+              Übernommen
+            </Chip>
+          )}
           {counts.ATTENDANCE > 0 && (
             <Chip selected={action === 'ATTENDANCE'} count={counts.ATTENDANCE} onClick={() => setAction('ATTENDANCE')}>
               Anwesenheit
@@ -136,29 +142,52 @@ export default function LogPage() {
           {filtered.map((item) => {
             const isSignup = item.action === 'SIGNUP';
             const isAttendance = item.action === 'ATTENDANCE';
+            const isReplace = item.action === 'REPLACE';
             return (
               <div key={item.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
                   <span
                     className={cn(
                       'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full',
-                      isAttendance ? 'bg-accent/15 text-accent-ink' : isSignup ? 'bg-success/15 text-success-ink' : 'bg-danger/15 text-danger-ink'
+                      isAttendance
+                        ? 'bg-accent/15 text-accent-ink'
+                        : isReplace
+                          ? 'bg-warning/15 text-warning-ink'
+                          : isSignup
+                            ? 'bg-success/15 text-success-ink'
+                            : 'bg-danger/15 text-danger-ink'
                     )}
                   >
-                    {isAttendance ? <ClipboardCheck className="size-4" /> : isSignup ? <UserPlus className="size-4" /> : <UserMinus className="size-4" />}
+                    {isAttendance ? (
+                      <ClipboardCheck className="size-4" />
+                    ) : isReplace ? (
+                      <Repeat className="size-4" />
+                    ) : isSignup ? (
+                      <UserPlus className="size-4" />
+                    ) : (
+                      <UserMinus className="size-4" />
+                    )}
                   </span>
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="font-bold text-fg">{item.helperName}</span>
-                      <Badge tone={isAttendance ? 'accent' : isSignup ? 'success' : 'danger'} size="sm">
+                      <Badge tone={isAttendance ? 'accent' : isReplace ? 'warning' : isSignup ? 'success' : 'danger'} size="sm">
                         {isAttendance
                           ? `Anwesenheit: ${item.attendance ? ATTENDANCE_STATUSES[item.attendance] : 'offen'}`
-                          : isSignup
-                            ? 'Eingetragen'
-                            : 'Ausgetragen'}
+                          : isReplace
+                            ? 'Übernommen'
+                            : isSignup
+                              ? 'Eingetragen'
+                              : 'Ausgetragen'}
                       </Badge>
                       <span className="text-2xs text-fg-subtle">
-                        {item.performedByName ? `durch ${item.performedByName}` : isAttendance ? 'per QR-Code' : 'selbst'}
+                        {isReplace
+                          ? `von ${item.performedByName ?? 'Gast'}`
+                          : item.performedByName
+                            ? `durch ${item.performedByName}`
+                            : isAttendance
+                              ? 'per QR-Code'
+                              : 'selbst'}
                       </span>
                     </p>
                     <p className="mt-0.5 text-xs text-fg-muted">

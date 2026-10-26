@@ -14,6 +14,7 @@ import {
   Mail,
   Plus,
   Unlock,
+  Repeat,
   UserMinus,
   UserPlus,
 } from 'lucide-react';
@@ -124,6 +125,25 @@ export default function OkOverviewPage() {
             : 'Teile den Link zum Schichtplan oder teile Personen direkt ein.',
         href: `${base}/schichten?offen=1`,
         action: 'Offene Schichten',
+      });
+    }
+    const replacementWanted = event.shifts.filter(
+      (sh) => new Date(sh.startTime).getTime() > Date.now() && (sh.signups ?? []).some((su) => su.replacementWantedAt)
+    );
+    if (replacementWanted.length > 0) {
+      const count = replacementWanted.reduce(
+        (sum, sh) => sum + (sh.signups ?? []).filter((su) => su.replacementWantedAt).length,
+        0
+      );
+      list.push({
+        tone: 'warning',
+        title: `${count} Person${count === 1 ? ' sucht' : 'en suchen'} Ersatz`,
+        text: replacementWanted
+          .slice(0, 3)
+          .map((sh) => `${sh.title} (${fmtWeekday(sh.startTime)} ${fmtTime(sh.startTime)})`)
+          .join(' · '),
+        href: `/events/${event.slug}`,
+        action: 'Im Schichtplan ansehen',
       });
     }
     if (underTarget) {
@@ -337,6 +357,8 @@ export default function OkOverviewPage() {
                       <UserPlus className="mt-0.5 size-4 shrink-0 text-success-ink" />
                     ) : l.action === 'SIGNOFF' ? (
                       <UserMinus className="mt-0.5 size-4 shrink-0 text-danger-ink" />
+                    ) : l.action === 'REPLACE' ? (
+                      <Repeat className="mt-0.5 size-4 shrink-0 text-warning-ink" />
                     ) : (
                       <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-accent-ink" />
                     )}
@@ -344,13 +366,23 @@ export default function OkOverviewPage() {
                       <p className="truncate text-fg">
                         <span className="font-semibold">{l.helperName}</span>{' '}
                         <span className="text-fg-muted">
-                          {l.action === 'SIGNUP' ? 'eingetragen in' : l.action === 'SIGNOFF' ? 'ausgetragen aus' : 'Anwesenheit bei'}
+                          {l.action === 'SIGNUP'
+                            ? 'eingetragen in'
+                            : l.action === 'SIGNOFF'
+                              ? 'ausgetragen aus'
+                              : l.action === 'REPLACE'
+                                ? 'übernimmt'
+                                : 'Anwesenheit bei'}
                         </span>{' '}
                         {l.shiftTitle}
                       </p>
                       <p className="text-2xs text-fg-subtle">
                         {relTime(l.createdAt)}
-                        {l.performedByName ? ` · durch ${l.performedByName}` : ''}
+                        {l.performedByName
+                          ? l.action === 'REPLACE'
+                            ? ` · von ${l.performedByName}`
+                            : ` · durch ${l.performedByName}`
+                          : ''}
                       </p>
                     </div>
                   </div>

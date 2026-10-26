@@ -1,10 +1,10 @@
 'use client';
 
-import { AlertCircle, Check, ChevronRight, Coffee, Hammer, Plus, Timer, Zap } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, Coffee, Hammer, Plus, Repeat, Timer, Zap } from 'lucide-react';
 import type { ShiftDto } from '@schichtplan/shared';
 import { Badge, Button, cn } from '@schichtplan/ui';
 import { businessDayKey, fmtDayMonth, fmtShortWeekday, fmtTime } from '@/lib/format';
-import { STATUS_STYLES, freeLabel, shiftStats, shiftTasks } from './shift-utils';
+import { STATUS_STYLES, freeLabel, replacementOffers, shiftStats, shiftTasks } from './shift-utils';
 
 export interface ShiftPauseHint {
   kind: 'direct' | 'break';
@@ -15,6 +15,8 @@ export interface ShiftPauseHint {
 export interface ShiftActions {
   /** Kann sich die angemeldete Person selbst eintragen (Zugang ok oder Login möglich)? */
   canSignup: boolean;
+  /** Darf Schichten mit «Ersatz gesucht» übernehmen (oder kann sich dafür anmelden) */
+  canTakeOver?: boolean;
   isMine: (shift: ShiftDto) => boolean;
   hasConflict?: (shift: ShiftDto) => boolean;
   getHandover?: (shift: ShiftDto) => { otherShift: ShiftDto; overlapMinutes: number } | null;
@@ -41,12 +43,16 @@ export function NeededShifts({
   onShowAll: () => void;
 }) {
   const needed = shifts
-    .map((shift) => ({ shift, stats: shiftStats(shift) }))
-    .filter(({ stats }) => !stats.over && stats.free > 0)
+    .map((shift) => ({
+      shift,
+      stats: shiftStats(shift),
+      offers: actions.isMine(shift) ? 0 : replacementOffers(shift).length,
+    }))
+    .filter(({ stats, offers }) => !stats.over && (stats.free > 0 || offers > 0))
     .sort((a, b) => +new Date(a.shift.startTime) - +new Date(b.shift.startTime));
   if (needed.length === 0) return null;
 
-  const freeTotal = needed.reduce((sum, n) => sum + n.stats.free, 0);
+  const freeTotal = needed.reduce((sum, n) => sum + n.stats.free + n.offers, 0);
 
   return (
     <section aria-labelledby="needed-title" className="animate-fade-up">
@@ -64,7 +70,7 @@ export function NeededShifts({
         )}
       </div>
       <ul className="grid gap-2.5 sm:grid-cols-2">
-        {needed.slice(0, limit).map(({ shift, stats }) => {
+        {needed.slice(0, limit).map(({ shift, stats, offers }) => {
           const openTasks = shiftTasks(shift).filter((t) => t.filled < t.requiredSlots);
           const mine = actions.isMine(shift);
           const handover = !mine ? actions.getHandover?.(shift) : null;
@@ -97,6 +103,11 @@ export function NeededShifts({
                         <Timer className="size-3" /> bald
                       </Badge>
                     )}
+                    {offers > 0 && (
+                      <Badge size="sm" tone="warning">
+                        <Repeat className="size-3" /> Ersatz gesucht
+                      </Badge>
+                    )}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-fg-muted">
                     {openTasks.length > 1 || openTasks[0]?.title !== shift.title
@@ -106,7 +117,7 @@ export function NeededShifts({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className={cn('tabular text-sm font-bold', STATUS_STYLES[stats.status].text)}>
-                    {freeLabel(stats.free)}
+                    {stats.free > 0 ? freeLabel(stats.free) : `${offers} übernehmbar`}
                   </span>
                   {mine ? (
                     <span className="flex size-9 items-center justify-center rounded-full bg-success/15 text-success-ink">
@@ -119,7 +130,7 @@ export function NeededShifts({
                     >
                       <AlertCircle className="size-4 text-warning" />
                     </span>
-                  ) : actions.canSignup ? (
+                  ) : actions.canSignup && stats.free > 0 ? (
                     <div className="flex items-center gap-1">
                       {handover && (
                         <span
@@ -167,6 +178,7 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
         const isFull = stats.free === 0;
         const handover = !mine ? actions.getHandover?.(shift) : null;
         const pauseHint = actions.getPauseHint?.(shift) ?? null;
+        const offers = replacementOffers(shift).length;
         const dayKey = businessDayKey(shift.startTime, actions.dayCutoffTime);
         const responsibles =
           actions.responsibleMode === 'BY_DAY'
@@ -241,6 +253,11 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
                       <Timer className="size-3" /> bald
                     </Badge>
                   )}
+                  {offers > 0 && (
+                    <Badge size="sm" tone="warning">
+                      <Repeat className="size-3" /> Ersatz gesucht{offers > 1 ? ` (${offers})` : ''}
+                    </Badge>
+                  )}
                 </div>
 
                 {showTasks && (
@@ -283,6 +300,18 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
                   <span className="text-2xs text-accent-ink font-semibold truncate max-w-[140px] text-right">
                     Fragen: {actions.contactName}
                   </span>
+                )}
+                {!stats.over && !mine && stats.free === 0 && offers > 0 && actions.canTakeOver && !actions.hasConflict?.(shift) && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      actions.onOpen(shift);
+                    }}
+                  >
+                    <Repeat /> <span className="hidden sm:inline">Übernehmen</span>
+                  </Button>
                 )}
                 {!stats.over && !mine && stats.free > 0 && actions.canSignup && (
                   actions.hasConflict?.(shift) ? (

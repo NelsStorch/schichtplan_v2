@@ -26,6 +26,11 @@ export interface MyShift {
   eventSlug: string;
   eventStartDate?: string;
   cancelDeadlineDays?: number | null;
+  /** «Ersatz gesucht»: erlaubt, Frist und eigener Stand */
+  allowReplacement?: boolean;
+  replacementCutoffHours?: number;
+  replacementWantedAt?: string | null;
+  replacementNote?: string | null;
   departmentName: string;
   departmentSlug: string;
   createdAt: string;
@@ -89,6 +94,8 @@ export interface EventDetails {
   cancelDeadlineDays?: number | null;
   overlapToleranceMinutes?: number;
   attendanceMode?: AttendanceMode;
+  allowReplacement?: boolean;
+  replacementCutoffHours?: number;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
   checkinToken?: string | null;
 }

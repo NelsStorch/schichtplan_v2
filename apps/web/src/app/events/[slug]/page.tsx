@@ -28,6 +28,7 @@ import {
   isSignupTimeOpen,
   type RequiredProfileField,
   type ShiftDto,
+  type ShiftSignupDto,
   type ShiftTaskDto,
 } from '@schichtplan/shared';
 import {
@@ -51,9 +52,10 @@ import { AccessTypeBadge } from '@/components/event-meta';
 import { AccessNotice } from '@/components/event/AccessNotice';
 import { SignupCountdown } from '@/components/SignupCountdown';
 import { ParticipationDialog } from '@/components/event/ParticipationDialog';
+import { ReplacementDialog } from '@/components/event/ReplacementDialog';
 import { ShiftGrid } from '@/components/event/ShiftGrid';
 import { NeededShifts, ShiftRows, type ShiftActions, type ShiftPauseHint } from '@/components/event/ShiftList';
-import { shiftStats, shiftTasks } from '@/components/event/shift-utils';
+import { replacementOffers, shiftStats, shiftTasks } from '@/components/event/shift-utils';
 import { AssignHelperDialog, DayResponsiblesDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { ShiftDetailsDialog } from '@/components/ShiftDetailsDialog';
 import { ApiError, api, departmentSetupUrl, errorMessage, loginUrl, useLoginHref } from '@/lib/api';
@@ -93,6 +95,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const [taskFilter, setTaskFilter] = useState<string>('ALL');
   const [onlySetup, setOnlySetup] = useState(false);
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [onlyReplacement, setOnlyReplacement] = useState(false);
   const [busyShift, setBusyShift] = useState<string | null>(null);
   // Einladungs-Link (?zugang=...), der noch eingelöst werden muss
   const [pendingToken, setPendingToken] = useState<string | null>(null);
@@ -106,6 +109,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     showOnce: boolean;
     /** Nur für diese Schicht nötig, z. B. Geburtsdatum bei Mindestalter */
     extraFields?: RequiredProfileField[];
+    /** Schicht übernehmen: diese Eintragung («Ersatz gesucht») wird ersetzt */
+    replacesSignupId?: string;
+  } | null>(null);
+  const [replacementFor, setReplacementFor] = useState<{
+    shift: ShiftDto;
+    signupId: string;
+    personName: string | null;
   } | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
@@ -260,12 +270,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const free = Math.max(0, total - filled);
   const percent = total > 0 ? Math.round((filled / total) * 100) : 0;
 
-  const filtersActive = day !== 'ALL' || taskFilter !== 'ALL' || onlySetup || onlyOpen;
+  const filtersActive = day !== 'ALL' || taskFilter !== 'ALL' || onlySetup || onlyOpen || onlyReplacement;
   const resetFilters = () => {
     setDay('ALL');
     setTaskFilter('ALL');
     setOnlySetup(false);
     setOnlyOpen(false);
+    setOnlyReplacement(false);
   };
 
   const visibleDays = days
@@ -276,7 +287,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         const matchesOpen = !onlyOpen || shiftStats(s).free > 0;
         const matchesSetup = !onlySetup || s.isSetupTeardown;
         const matchesTask = taskFilter === 'ALL' || shiftTasks(s).some((t) => t.title === taskFilter);
-        return matchesOpen && matchesSetup && matchesTask;
+        const matchesReplacement = !onlyReplacement || replacementOffers(s).length > 0;
+        return matchesOpen && matchesSetup && matchesTask && matchesReplacement;
       }),
     }))
     .filter((d) => d.items.length > 0);
@@ -391,7 +403,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     return null;
   };
 
-  const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto, answers?: Record<string, string>) => {
+  const doSignup = async (
+    shift: ShiftDto,
+    task?: ShiftTaskDto,
+    answers?: Record<string, string>,
+    replacesSignupId?: string
+  ) => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       toast({
         title: 'Keine Internetverbindung',
@@ -404,14 +421,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     try {
       await api(`/api/shifts/${shift.id}/signup`, {
         method: 'POST',
-        json: { taskId: task && task.id !== 'default' ? task.id : undefined, answers },
+        json: { taskId: task && task.id !== 'default' ? task.id : undefined, answers, replacesSignupId },
       });
       const handover = findShiftHandover(shift);
       const handoverDesc = handover
         ? ` (${handover.overlapMinutes} Min. Übergabe mit «${handover.otherShift.title}»)`
         : '';
       toast({
-        title: 'Du bist eingetragen!',
+        title: replacesSignupId ? 'Du hast die Schicht übernommen!' : 'Du bist eingetragen!',
         description: `${shift.title}${task && task.title !== shift.title ? ` · ${task.title}` : ''}${handoverDesc}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
       });
       await load();
@@ -421,7 +438,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         const extraFields = Array.isArray(err.data.missingFields)
           ? (err.data.missingFields as RequiredProfileField[])
           : [];
-        setParticipationFor({ shift, task, showOnce: true, extraFields });
+        setParticipationFor({ shift, task, showOnce: true, extraFields, replacesSignupId });
       } else if (err instanceof ApiError && err.data.code === 'TIME_COLLISION') {
         toast({ title: 'Zeitkollision', description: errorMessage(err), tone: 'error' });
       } else {
@@ -432,12 +449,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     }
   };
 
-  const signup = async (shift: ShiftDto, task?: ShiftTaskDto) => {
+  const signup = async (shift: ShiftDto, task?: ShiftTaskDto, replacesSignupId?: string) => {
     if (!user) {
       window.location.href = loginUrl();
       return;
     }
-    if (!access.canSignup) {
+    // Übernehmen geht auch, wenn das Eintragen geschlossen ist (es kommt kein Platz dazu)
+    if (replacesSignupId ? !event.viewer.canTakeOver : !access.canSignup) {
       toast({ title: 'Eintragen nicht möglich', description: access.message ?? undefined, tone: 'error' });
       return;
     }
@@ -459,10 +477,56 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       event.viewer.missingFields.length > 0 || showOnce || event.questions.some((q) => q.scope === 'PER_SIGNUP');
     if (needsDialog) {
       setSelectedShiftId(null);
-      setParticipationFor({ shift, task, showOnce });
+      setParticipationFor({ shift, task, showOnce, replacesSignupId });
       return;
     }
-    await doSignup(shift, task);
+    await doSignup(shift, task, undefined, replacesSignupId);
+  };
+
+  const takeOver = async (shift: ShiftDto, offer: ShiftSignupDto, task?: ShiftTaskDto) => {
+    const ok = await confirm({
+      title: 'Schicht übernehmen?',
+      description: `Du übernimmst «${shift.title}» (${fmtWeekday(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}) von ${offer.displayName}. Danach bist du eingetragen und ${offer.displayName} nicht mehr.`,
+      confirmLabel: 'Übernehmen',
+    });
+    if (!ok) return;
+    await signup(shift, task, offer.id);
+  };
+
+  const offerReplacement = async (note: string) => {
+    if (!replacementFor) return;
+    setBusyShift(replacementFor.shift.id);
+    try {
+      await api(`/api/signups/${replacementFor.signupId}/replacement`, {
+        method: 'PUT',
+        json: { note: note || null },
+      });
+      toast({
+        title: 'Ersatz wird gesucht',
+        description: replacementFor.personName
+          ? `${replacementFor.personName} bleibt eingetragen, bis jemand übernimmt.`
+          : 'Du bleibst eingetragen, bis jemand übernimmt. Du bekommst dann eine Mail.',
+      });
+      setReplacementFor(null);
+      await load();
+    } catch (err) {
+      toast({ title: 'Hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setBusyShift(null);
+    }
+  };
+
+  const withdrawReplacement = async (shift: ShiftDto, signupId: string) => {
+    setBusyShift(shift.id);
+    try {
+      await api(`/api/signups/${signupId}/replacement`, { method: 'DELETE' });
+      toast({ title: 'Ersatz-Suche beendet', description: 'Die Eintragung bleibt bestehen.' });
+      await load();
+    } catch (err) {
+      toast({ title: 'Hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setBusyShift(null);
+    }
   };
 
   // Schnell eintragen: eine offene Arbeit -> direkt, mehrere -> Auswahl im Detail-Dialog
@@ -548,6 +612,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   const actions: ShiftActions = {
     canSignup: showSignup,
+    canTakeOver: needsLogin || event.viewer.canTakeOver,
     isMine,
     hasConflict: (shift) => Boolean(findConflictingShift(shift)),
     getHandover: (shift) => findShiftHandover(shift),
@@ -812,6 +877,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
             <Chip selected={onlyOpen} onClick={() => setOnlyOpen((v) => !v)}>
               Nur mit freien Plätzen
             </Chip>
+            {event.shifts.some((s) => replacementOffers(s).length > 0) && (
+              <Chip selected={onlyReplacement} onClick={() => setOnlyReplacement((v) => !v)}>
+                Ersatz gesucht
+              </Chip>
+            )}
             {event.shifts.some((s) => s.isSetupTeardown) && (
               <Chip selected={onlySetup} onClick={() => setOnlySetup((v) => !v)}>
                 Auf- &amp; Abbau
@@ -1010,6 +1080,28 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           setEditingShift(shift);
           setShowShiftForm(true);
         }}
+        onOfferReplacement={(signupId, personName) => {
+          if (selectedShift) setReplacementFor({ shift: selectedShift, signupId, personName });
+        }}
+        onWithdrawReplacement={(signupId) => {
+          if (selectedShift) withdrawReplacement(selectedShift, signupId);
+        }}
+        onTakeOver={(offer, task) => {
+          if (selectedShift) takeOver(selectedShift, offer, task);
+        }}
+      />
+
+      <ReplacementDialog
+        open={Boolean(replacementFor)}
+        personName={replacementFor?.personName}
+        shiftLabel={
+          replacementFor
+            ? `${replacementFor.shift.title}, ${fmtShortWeekday(replacementFor.shift.startTime)} ${fmtTimeRange(replacementFor.shift.startTime, replacementFor.shift.endTime)}`
+            : undefined
+        }
+        busy={Boolean(replacementFor && busyShift === replacementFor.shift.id)}
+        onClose={() => setReplacementFor(null)}
+        onSubmit={offerReplacement}
       />
 
       <ParticipationDialog
@@ -1026,7 +1118,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         onSaved={async (answers) => {
           const pending = participationFor;
           setParticipationFor(null);
-          if (pending) await doSignup(pending.shift, pending.task, answers);
+          if (pending) await doSignup(pending.shift, pending.task, answers, pending.replacesSignupId);
           else await load();
         }}
       />

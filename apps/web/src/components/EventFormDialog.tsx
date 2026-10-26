@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'rea
 import { AlertCircle, AlertTriangle, CalendarPlus, Check, Crown, LifeBuoy, Palette, Plus, Save, Shield, Trash2, Users } from 'lucide-react';
 import {
   ATTENDANCE_MODES,
+  REPLACEMENT_CUTOFF_HOURS,
   helpUrl,
   toZurichInput,
   zurichInputToIso,
@@ -39,6 +40,9 @@ export interface EventFormValues {
   contactVisibility: EventContactVisibility;
   signupOpensAt: string;
   attendanceMode: AttendanceMode;
+  /** «Ersatz gesucht» erlaubt, bis so viele Stunden vor Schichtbeginn */
+  allowReplacement: boolean;
+  replacementCutoffHours: number;
   access: EventAccessValues;
 }
 
@@ -60,6 +64,8 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     contactVisibility: event.contactVisibility ?? 'BOTH',
     signupOpensAt: event.signupOpensAt ? toZurichInput(event.signupOpensAt) : '',
     attendanceMode: event.attendanceMode ?? 'OFF',
+    allowReplacement: event.allowReplacement ?? true,
+    replacementCutoffHours: event.replacementCutoffHours ?? 0,
     access: {
       accessType: event.accessType,
       leadersOnly: event.leadersOnly,
@@ -110,6 +116,8 @@ const EMPTY: EventFormValues = {
   contactVisibility: 'BOTH',
   signupOpensAt: '',
   attendanceMode: 'OFF',
+  allowReplacement: true,
+  replacementCutoffHours: 0,
   access: EMPTY_ACCESS,
 };
 
@@ -269,6 +277,8 @@ export function EventForm({
           contactVisibility: form.contactVisibility,
           signupOpensAt: form.signupOpensAt ? zurichInputToIso(form.signupOpensAt) : null,
           attendanceMode: form.attendanceMode,
+          allowReplacement: form.allowReplacement,
+          replacementCutoffHours: form.replacementCutoffHours,
           ...accessPayload(form.access),
         };
 
@@ -420,6 +430,8 @@ export function EventForm({
         contactVisibility: form.contactVisibility,
         signupOpensAt: form.signupOpensAt ? zurichInputToIso(form.signupOpensAt) : null,
         attendanceMode: form.attendanceMode,
+        allowReplacement: form.allowReplacement,
+        replacementCutoffHours: form.replacementCutoffHours,
         ...accessPayload(form.access, mode === 'create'),
       };
 
@@ -536,6 +548,8 @@ export function EventForm({
                         description: found.description || '',
                         cancelDeadlineDays: found.cancelDeadlineDays ?? null,
                         overlapToleranceMinutes: found.overlapToleranceMinutes ?? 15,
+                        allowReplacement: found.data.allowReplacement ?? true,
+                        replacementCutoffHours: found.data.replacementCutoffHours ?? 0,
                         access: {
                           accessType: found.accessType,
                           leadersOnly: found.leadersOnly,
@@ -865,6 +879,42 @@ export function EventForm({
             }}
           />
         </Field>
+
+        <Switch
+          checked={form.allowReplacement}
+          onChange={(v) => set('allowReplacement', v)}
+          label="Helfende können «Ersatz suchen»"
+          description="Wer nicht kann, bietet die Schicht an und bleibt eingetragen, bis jemand übernimmt. Geht auch nach der Austrage-Sperre."
+        />
+        {form.allowReplacement && (
+          <Field
+            label="Ersatz suchen und übernehmen bis"
+            hint={
+              <span>
+                Danach hilft nur noch das OK.{' '}
+                <a
+                  href={helpUrl('/helfen/ersatz-suchen/')}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-accent-ink hover:underline inline-flex items-center gap-0.5"
+                >
+                  <LifeBuoy className="size-3 inline" /> Hilfe
+                </a>
+              </span>
+            }
+          >
+            <Select
+              value={form.replacementCutoffHours}
+              onChange={(e) => set('replacementCutoffHours', Number(e.target.value))}
+            >
+              {REPLACEMENT_CUTOFF_HOURS.map((h) => (
+                <option key={h} value={h}>
+                  {h === 0 ? 'Schichtbeginn' : `${h} ${h === 1 ? 'Stunde' : 'Stunden'} vor Schichtbeginn`}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
 
         <Field
           label="Schicht-Überlappung für Übergaben"

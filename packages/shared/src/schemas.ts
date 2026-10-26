@@ -6,6 +6,7 @@ import {
   DEPARTMENT_PERMISSION_KEYS,
   EVENT_ACCESS_TYPE_KEYS,
   QUESTION_RETENTION_DAYS,
+  REPLACEMENT_CUTOFF_HOURS,
   type DepartmentPermission,
   REQUIRED_PROFILE_FIELD_KEYS,
   RESERVED_SUBDOMAINS,
@@ -161,6 +162,12 @@ export const CreateEventOrganizerItemSchema = z.object({
 
 export type CreateEventOrganizerItemInput = z.infer<typeof CreateEventOrganizerItemSchema>;
 
+/** Erlaubte Fristen für «Ersatz gesucht» (Stunden vor Schichtbeginn) */
+const ReplacementCutoffSchema = z
+  .number()
+  .int()
+  .refine((h) => (REPLACEMENT_CUTOFF_HOURS as readonly number[]).includes(h), 'Ungültige Frist');
+
 export const CreateEventSchema = z.object({
   title: z.string().trim().min(2, 'Titel ist erforderlich').max(120),
   slug: z
@@ -186,6 +193,8 @@ export const CreateEventSchema = z.object({
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
+  allowReplacement: z.boolean().optional(),
+  replacementCutoffHours: ReplacementCutoffSchema.optional(),
   organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
 });
 
@@ -213,6 +222,8 @@ export const UpdateEventSchema = z.object({
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
+  allowReplacement: z.boolean().optional(),
+  replacementCutoffHours: ReplacementCutoffSchema.optional(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
   requiredFields: RequiredFieldsSchema.optional(),
@@ -407,9 +418,16 @@ export const SignupShiftSchema = z.object({
   answers: z.record(z.string().uuid(), z.string().trim().max(1000)).optional(),
   /** OK/Admin kann Zeitkollision nach Bestätigung der Warnung ignorieren */
   confirmCollision: z.boolean().optional(),
+  /** Schicht übernehmen: diese Eintragung («Ersatz gesucht») wird durch die eigene ersetzt */
+  replacesSignupId: z.string().uuid().optional(),
 });
 
 export type SignupShiftInput = z.infer<typeof SignupShiftSchema>;
+
+/** «Ersatz gesucht» setzen: Grund freiwillig, sichtbar für alle, die Namen sehen */
+export const ReplacementOfferSchema = z.object({
+  note: z.string().trim().max(300).optional().nullable(),
+});
 
 export const SaveAsTemplateSchema = z.object({
   title: z.string().trim().min(2, 'Name der Vorlage erforderlich').max(120),
@@ -443,6 +461,8 @@ export const InstantiateTemplateSchema = z.object({
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
+  allowReplacement: z.boolean().optional(),
+  replacementCutoffHours: ReplacementCutoffSchema.optional(),
 });
 
 export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;

@@ -85,6 +85,10 @@ export interface EventDto {
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   cancelDeadlineDays?: number | null;
   overlapToleranceMinutes?: number;
+  /** «Ersatz gesucht» erlaubt */
+  allowReplacement?: boolean;
+  /** «Ersatz gesucht» bis so viele Stunden vor Schichtbeginn (0 = bis Schichtbeginn) */
+  replacementCutoffHours?: number;
   createdAt: string;
   shiftCount?: number;
   /** Summe der benötigten bzw. besetzten Plätze über alle Schichten */
@@ -174,6 +178,12 @@ export interface ShiftSignupDto {
   attendanceAt?: string | null;
   attendanceSource?: 'OK' | 'QR' | null;
   attendanceByName?: string | null;
+  /** «Ersatz gesucht» seit (null = nicht angeboten). Sichtbar für alle, auch ohne Namen. */
+  replacementWantedAt?: string | null;
+  /** Grund, nur wenn man den Namen sieht */
+  replacementNote?: string | null;
+  /** Wer «Ersatz gesucht» für die Person gesetzt hat (OK), nur wenn man den Namen sieht */
+  replacementByName?: string | null;
 }
 
 export interface ShiftTaskTemplateItem {
@@ -203,6 +213,8 @@ export interface EventTemplateData {
   allowedDepartmentIds?: string[];
   allowedStufeIds?: string[];
   attendanceMode?: AttendanceMode;
+  allowReplacement?: boolean;
+  replacementCutoffHours?: number;
 }
 
 export interface EventTemplateDto {
@@ -393,6 +405,8 @@ export interface EventQuestionDto {
 /** Was der angemeldeten Person beim Anlass noch fehlt bzw. was sie angegeben hat */
 export interface EventViewerDto {
   access: EventAccessDto;
+  /** Darf Schichten mit «Ersatz gesucht» übernehmen (auch wenn das Eintragen geschlossen ist) */
+  canTakeOver: boolean;
   missingFields: RequiredProfileField[];
   /** Pflichtfragen ohne Antwort */
   missingQuestionIds: string[];
@@ -823,7 +837,8 @@ export interface ShiftSignupLogDto {
   createdAt: string;
 }
 
-export type ShiftSignupLogAction = 'SIGNUP' | 'SIGNOFF' | 'ATTENDANCE';
+/** REPLACE: Schicht übernommen («Ersatz gesucht»), performedByName = wer abgegeben hat */
+export type ShiftSignupLogAction = 'SIGNUP' | 'SIGNOFF' | 'REPLACE' | 'ATTENDANCE';
 
 /** Ergebnis des Selbst-Check-ins per QR-Code */
 export interface CheckinResultDto {

@@ -34,6 +34,7 @@ export const MAIL_KINDS = {
   PASSWORD_RESET: 'Passwort zurücksetzen',
   ACCOUNT_EXISTS: 'Konto existiert schon',
   SHIFT_REMINDER: 'Schicht-Erinnerung',
+  REPLACEMENT_TAKEN: 'Ersatz gefunden',
   OK_MESSAGE: 'Nachricht vom OK',
   ADMIN_NOTICE: 'Admin-Hinweis',
   SERVER_ALERT: 'Server-Alarm',
@@ -135,6 +136,8 @@ export const USAGE_METRICS = {
   },
   SIGNUP: { label: 'Eintragungen', group: 'ANLAESSE', source: 'server', dims: SIGNUP_BY },
   SIGNOFF: { label: 'Austragungen', group: 'ANLAESSE', source: 'server', dims: { SELF: 'selbst', OK: 'durch das OK' } },
+  REPLACEMENT_OFFERED: { label: 'Ersatz gesucht', group: 'ANLAESSE', source: 'server', dims: { SELF: 'selbst', OK: 'durch das OK' } },
+  REPLACEMENT_TAKEN: { label: 'Schichten übernommen', group: 'ANLAESSE', source: 'server' },
   ATTENDANCE: { label: 'Anwesenheit erfasst', group: 'ANLAESSE', source: 'server', dims: { OK: 'durch das OK', QR: 'QR-Check-in' } },
   ACCESS_LINK_CREATE: {
     label: 'Zugangs-Links erstellt',

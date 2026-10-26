@@ -573,6 +573,62 @@ export async function sendShiftReminderEmail({
 }
 
 /**
+ * «Ersatz gefunden»: Die Person, die «Ersatz gesucht» gesetzt hat, ist nicht mehr eingetragen.
+ */
+export async function sendReplacementTakenEmail({
+  to,
+  name,
+  takenBy,
+  eventTitle,
+  shiftTitle,
+  timeRangeFormatted,
+  eventUrl,
+}: {
+  to: string;
+  name?: string | null;
+  takenBy: string;
+  eventTitle: string;
+  shiftTitle: string;
+  timeRangeFormatted: string;
+  eventUrl?: string;
+}): Promise<boolean> {
+  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
+  const subject = `Ersatz gefunden: «${shiftTitle}» (${eventTitle})`;
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hallo <strong>${escapeHtml(displayName)}</strong>,</p>
+    <p style="margin: 0 0 16px 0;"><strong>${escapeHtml(takenBy)}</strong> hat deine Schicht übernommen. Du bist dafür nicht mehr eingetragen.</p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin: 20px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14.5px;">
+        <tr>
+          <td style="padding: 4px 0; color: #64748b; width: 90px;"><strong>Anlass:</strong></td>
+          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${escapeHtml(eventTitle)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: #64748b;"><strong>Schicht:</strong></td>
+          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${escapeHtml(shiftTitle)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: #64748b;"><strong>Zeit:</strong></td>
+          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${escapeHtml(timeRangeFormatted)}</td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const html = renderEmailTemplate({
+    preheader: `${takenBy} hat deine Schicht «${shiftTitle}» übernommen.`,
+    eyebrow: 'Ersatz gefunden',
+    title: 'Deine Schicht ist übernommen',
+    contentHtml,
+    ctaText: eventUrl ? 'Zum Schichtplan' : undefined,
+    ctaUrl: eventUrl,
+  });
+
+  return sendEmail({ to, subject, html, kind: 'REPLACEMENT_TAKEN' });
+}
+
+/**
  * 4. Allgemeine Benachrichtigung / Info-Mail
  */
 export async function sendGenericEmail({
