@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CalendarSearch,
   Check,
+  Coffee,
   Crown,
   LayoutGrid,
   List,
@@ -19,6 +20,7 @@ import {
   UserPlus,
   Users,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   cancelDeadlineAt,
@@ -49,12 +51,13 @@ import { AccessNotice } from '@/components/event/AccessNotice';
 import { SignupCountdown } from '@/components/SignupCountdown';
 import { ParticipationDialog } from '@/components/event/ParticipationDialog';
 import { ShiftGrid } from '@/components/event/ShiftGrid';
-import { NeededShifts, ShiftRows, type ShiftActions } from '@/components/event/ShiftList';
+import { NeededShifts, ShiftRows, type ShiftActions, type ShiftPauseHint } from '@/components/event/ShiftList';
 import { shiftStats, shiftTasks } from '@/components/event/shift-utils';
 import { AssignHelperDialog, DayResponsiblesDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { ShiftDetailsDialog } from '@/components/ShiftDetailsDialog';
 import { ApiError, api, departmentSetupUrl, errorMessage, loginUrl, useLoginHref } from '@/lib/api';
 import {
+  businessDayKey,
   dayKeyToIso,
   fmtDateRange,
   fmtDayMonth,
@@ -326,6 +329,66 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     return null;
   };
 
+  const fmtBreakDuration = (mins: number) => {
+    if (mins < 60) return `${mins} Min.`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m === 0 ? `${h} Std.` : `${h} Std. ${m} Min.`;
+  };
+
+  const findPauseHint = (targetShift: ShiftDto): ShiftPauseHint | null => {
+    if (!user || !event?.shifts) return null;
+    const dayKey = businessDayKey(targetShift.startTime, event.dayCutoffTime);
+    const mySameDay = event.shifts
+      .filter(
+        (s) =>
+          s.id !== targetShift.id &&
+          isMine(s) &&
+          businessDayKey(s.startTime, event.dayCutoffTime) === dayKey
+      )
+      .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime));
+    if (mySameDay.length === 0) return null;
+
+    const sStart = new Date(targetShift.startTime).getTime();
+    const sEnd = new Date(targetShift.endTime).getTime();
+
+    if (isMine(targetShift)) {
+      const next = mySameDay.find((other) => new Date(other.startTime).getTime() >= sEnd);
+      if (!next) return null;
+      const diffMins = Math.round((new Date(next.startTime).getTime() - sEnd) / 60_000);
+      if (diffMins === 0) {
+        return {
+          kind: 'direct',
+          label: 'Direkter Anschluss',
+          title: `Direkter Anschluss an deine nächste Schicht «${next.title}» (${fmtTime(next.startTime)})`,
+        };
+      }
+      if (diffMins > 0) {
+        const dur = fmtBreakDuration(diffMins);
+        return {
+          kind: 'break',
+          label: `${dur} Pause danach`,
+          title: `${dur} Pause bis zu deiner nächsten Schicht «${next.title}» (${fmtTime(next.startTime)})`,
+        };
+      }
+      return null;
+    }
+
+    const adjacent = mySameDay.find((other) => {
+      const oStart = new Date(other.startTime).getTime();
+      const oEnd = new Date(other.endTime).getTime();
+      return oEnd === sStart || sEnd === oStart;
+    });
+    if (adjacent) {
+      return {
+        kind: 'direct',
+        label: 'Direkt im Anschluss',
+        title: `Schliesst nahtlos an deine Schicht «${adjacent.title}» (${fmtTimeRange(adjacent.startTime, adjacent.endTime)}) an`,
+      };
+    }
+    return null;
+  };
+
   const doSignup = async (shift: ShiftDto, task?: ShiftTaskDto, answers?: Record<string, string>) => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       toast({
@@ -486,6 +549,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     isMine,
     hasConflict: (shift) => Boolean(findConflictingShift(shift)),
     getHandover: (shift) => findShiftHandover(shift),
+    getPauseHint: (shift) => findPauseHint(shift),
     busyShiftId: busyShift,
     contactName: event?.contactUser?.displayName,
     dayResponsibles: event?.dayResponsibles,
@@ -802,6 +866,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
               const dayFilled = group.items.reduce((s, x) => s + shiftStats(x).filled, 0);
               const dayFree = dayTotal - dayFilled;
               const iso = dayKeyToIso(group.key);
+              const allDayItems = days.find((d) => d.key === group.key)?.items ?? group.items;
+              const myDayShifts = allDayItems
+                .filter(isMine)
+                .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime));
               return (
                 <section key={group.key} aria-labelledby={`day-${group.key}`}>
                   <header className="mb-3 flex flex-wrap items-end justify-between gap-4">
@@ -848,6 +916,57 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                       {dayFree === 0 ? 'Alles besetzt' : `${dayFree} frei`} · {dayFilled}/{dayTotal}
                     </span>
                   </header>
+
+                  {myDayShifts.length >= 2 && (
+                    <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-tile border border-accent/25 bg-accent/5 px-3 py-2 text-xs">
+                      <span className="mr-1 font-bold text-accent-ink">
+                        Deine {myDayShifts.length} Einsätze an diesem Tag:
+                      </span>
+                      {myDayShifts.map((s, idx) => {
+                        const prev = idx > 0 ? myDayShifts[idx - 1] : null;
+                        const diffMins = prev
+                          ? Math.round((new Date(s.startTime).getTime() - new Date(prev.endTime).getTime()) / 60_000)
+                          : null;
+                        return (
+                          <span key={s.id} className="inline-flex flex-wrap items-center gap-1.5">
+                            {diffMins !== null && (
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold',
+                                  diffMins <= 0
+                                    ? 'bg-accent/15 text-accent-ink'
+                                    : 'border border-line bg-surface text-fg-muted'
+                                )}
+                              >
+                                {diffMins === 0 ? (
+                                  <>
+                                    <Zap className="size-3 text-accent" /> Direkter Anschluss
+                                  </>
+                                ) : diffMins < 0 ? (
+                                  <>
+                                    <Zap className="size-3 text-accent" /> {Math.abs(diffMins)} Min. Übergabe
+                                  </>
+                                ) : (
+                                  <>
+                                    <Coffee className="size-3 text-fg-subtle" /> {fmtBreakDuration(diffMins)} Pause
+                                  </>
+                                )}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedShiftId(s.id)}
+                              className="tabular inline-flex items-center gap-1 rounded-full border border-success/30 bg-surface px-2.5 py-0.5 font-semibold text-fg transition hover:border-accent"
+                            >
+                              <Check className="size-3 text-success-ink" />
+                              <span>{fmtTimeRange(s.startTime, s.endTime)}</span>
+                              <span className="max-w-[140px] truncate text-fg-muted">{s.title}</span>
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                   {view === 'grid' ? (
                     <ShiftGrid shifts={group.items} isMine={isMine} onOpen={(s) => setSelectedShiftId(s.id)} />
                   ) : (

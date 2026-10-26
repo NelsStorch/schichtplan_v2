@@ -6,16 +6,25 @@ import {
   ArrowRight,
   CalendarPlus,
   CalendarSync,
+  ChevronDown,
+  ChevronUp,
   Clock,
+  Coffee,
   Download,
   ExternalLink,
+  FileText,
   HelpCircle,
   LogIn,
+  Mail,
+  Phone,
+  RefreshCw,
   Shield,
   Ticket,
   UserMinus,
+  Users,
+  Zap,
 } from 'lucide-react';
-import { cancelDeadlineAt, cancelDeadlineText } from '@schichtplan/shared';
+import { cancelDeadlineAt, cancelDeadlineText, type ResponsiblePersonDto } from '@schichtplan/shared';
 import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { CalendarSubscribeDialog } from '@/components/CalendarSubscribeDialog';
@@ -51,6 +60,7 @@ interface CalendarTokenData {
 const toCalendar = (s: MyShift): CalendarEntry => {
   const rolePrefix = s.isResponsible ? `[${s.responsibleRole || 'Leitung'}] ` : '';
   const taskSuffix = s.taskTitle && s.taskTitle !== s.title ? ` (${s.taskTitle})` : '';
+  const leaders = s.responsibles?.map((r) => r.displayName).join(', ');
   return {
     uid: s.signupId,
     title: `${rolePrefix}${s.title}${taskSuffix} (${s.eventTitle})`,
@@ -58,15 +68,29 @@ const toCalendar = (s: MyShift): CalendarEntry => {
       s.isResponsible ? `Rolle: ${s.responsibleRole || 'Leitung'}` : null,
       s.taskTitle && s.taskTitle !== s.title ? `Arbeit: ${s.taskTitle}` : null,
       s.category ? `Kategorie: ${s.category}` : null,
+      leaders ? `Schicht-/Tagesleitung: ${leaders}` : null,
+      s.coHelpers?.length ? `Mit dir eingeteilt: ${s.coHelpers.join(', ')}` : null,
       s.description,
       `Anlass: ${s.eventTitle}`,
       `Abteilung: ${s.departmentName}`,
-    ].filter(Boolean).join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     location: s.departmentName,
     start: s.startTime,
     end: s.endTime,
   };
 };
+
+/** Prüft, ob eine Schicht erweiterte Briefing-Infos (Beschreibung, Leitung, Team, Kontakt) besitzt */
+function hasBriefingDetails(s: MyShift): boolean {
+  return Boolean(
+    s.description?.trim() ||
+      (s.responsibles && s.responsibles.length > 0) ||
+      (s.coHelpers && s.coHelpers.length > 0) ||
+      s.contactUser
+  );
+}
 
 export default function MyShiftsPage() {
   const { user, loading: sessionLoading } = usePortal();
@@ -271,7 +295,7 @@ export default function MyShiftsPage() {
           />
         ) : (
           <>
-            {/* 1. Ganz oben: Als Nächstes (Hero-Karte) */}
+            {/* 1. Ganz oben: Als Nächstes (Hero-Karte inkl. Einsatz-Briefing) */}
             {next && (
               <Card variant="raised" className="relative mt-10 animate-fade-up overflow-hidden p-6 [animation-delay:80ms] sm:p-8">
                 <div aria-hidden className="absolute -right-20 -top-24 size-72 rounded-full bg-accent/25 blur-3xl" />
@@ -322,6 +346,13 @@ export default function MyShiftsPage() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Kompaktes Einsatz-Briefing direkt in der Hero-Karte */}
+                {hasBriefingDetails(next) && (
+                  <div className="relative mt-6 border-t border-line/70 pt-5">
+                    <ShiftBriefingPanel shift={next} />
+                  </div>
+                )}
               </Card>
             )}
 
@@ -438,7 +469,114 @@ export default function MyShiftsPage() {
   );
 }
 
-/** Vertikale Zeitachse, gruppiert nach Geschäftstag. */
+/** Kontakt-Pill für Schichtleitung, Tagesleitung oder Anlass-Kontakt (mit Direkt-Anruf / Mail) */
+function ContactPill({ person, roleLabel }: { person: ResponsiblePersonDto; roleLabel?: string }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs">
+      <Shield className="size-3 text-accent-ink shrink-0" />
+      {roleLabel && <span className="text-fg-subtle">{roleLabel}:</span>}
+      <span className="font-semibold text-fg">{person.displayName}</span>
+      {person.phone && (
+        <a
+          href={`tel:${person.phone.replace(/\s+/g, '')}`}
+          className="ml-1 inline-flex items-center gap-1 rounded-full bg-accent/12 px-2 py-0.5 font-mono text-2xs font-semibold text-accent-ink transition hover:bg-accent/20"
+          title={`${person.displayName} anrufen (${person.phone})`}
+        >
+          <Phone className="size-2.5" /> {person.phone}
+        </a>
+      )}
+      {person.email && (
+        <a
+          href={`mailto:${person.email}`}
+          className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-medium text-fg-muted transition hover:text-fg"
+          title={`E-Mail an ${person.displayName} (${person.email})`}
+        >
+          <Mail className="size-2.5" /> Mail
+        </a>
+      )}
+    </span>
+  );
+}
+
+/** Kompaktes Einsatz-Briefing (Beschreibung, Leitung mit Kontakt, eingeteiltes Team) – auch offline abrufbar */
+function ShiftBriefingPanel({ shift }: { shift: MyShift }) {
+  const responsibles = shift.responsibles ?? [];
+  const respIds = new Set(responsibles.map((r) => r.id));
+  const extraContact = shift.contactUser && !respIds.has(shift.contactUser.id) ? shift.contactUser : null;
+  const coHelpers = shift.coHelpers ?? [];
+
+  return (
+    <div className="space-y-3 text-xs">
+      {shift.description?.trim() && (
+        <div className="flex items-start gap-2.5 rounded-field border border-line/70 bg-surface-2/70 p-3 text-sm text-fg">
+          <FileText className="mt-0.5 size-4 shrink-0 text-accent-ink" />
+          <p className="whitespace-pre-line leading-relaxed">{shift.description.trim()}</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {responsibles.map((person) => (
+          <ContactPill key={person.id} person={person} roleLabel="Leitung" />
+        ))}
+        {extraContact && <ContactPill person={extraContact} roleLabel="OK-Kontakt" />}
+        {(coHelpers.length > 0 || shift.requiredSlots !== undefined) && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-fg-muted">
+            <Users className="size-3 shrink-0 text-fg-subtle" />
+            {coHelpers.length > 0 ? (
+              <span>
+                Mit dir dabei: <strong className="font-semibold text-fg">{coHelpers.join(', ')}</strong>
+              </span>
+            ) : (
+              <span>Noch niemand weiteres eingetragen</span>
+            )}
+            {shift.requiredSlots !== undefined && shift.filledSlots !== undefined && (
+              <span className="tabular text-fg-subtle">
+                ({shift.filledSlots}/{shift.requiredSlots})
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Berechnet die Pause oder den Übergang zwischen zwei aufeinanderfolgenden Schichten am selben Tag */
+function BreakIndicator({ prev, next }: { prev: MyShift; next: MyShift }) {
+  const prevEnd = new Date(prev.endTime).getTime();
+  const nextStart = new Date(next.startTime).getTime();
+  const diffMin = Math.round((nextStart - prevEnd) / 60000);
+
+  if (diffMin === 0) {
+    return (
+      <div className="my-2 flex items-center gap-2 py-1">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-ink">
+          <Zap className="size-3.5" /> Direkter Anschluss um {fmtTime(next.startTime)} Uhr (ohne Pause)
+        </span>
+      </div>
+    );
+  }
+
+  if (diffMin < 0) {
+    return (
+      <div className="my-2 flex items-center gap-2 py-1">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-ink">
+          <RefreshCw className="size-3.5" /> {Math.abs(diffMin)} Min. Übergabe / Überlappung ({fmtTime(next.startTime)}–{fmtTime(prev.endTime)})
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-2 flex items-center gap-2 py-1">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1 text-xs font-medium text-fg-muted">
+        <Coffee className="size-3.5 text-fg-subtle" /> {fmtDuration(prev.endTime, next.startTime)} Pause dazwischen ({fmtTime(prev.endTime)}–{fmtTime(next.startTime)})
+      </span>
+    </div>
+  );
+}
+
+/** Vertikale Zeitachse, gruppiert nach Geschäftstag (inkl. Pausen-Anzeige & Einsatz-Briefing). */
 function Timeline({
   shifts,
   muted,
@@ -450,94 +588,173 @@ function Timeline({
   busy?: string | null;
   onCancel?: (shift: MyShift) => void;
 }) {
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
+  const toggleBriefing = (id: string) => {
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
     <ol className="space-y-8">
       {groupByBusinessDay(shifts).map((group) => {
         const iso = dayKeyToIso(group.key);
+        const isMultiShiftDay = group.items.length > 1;
         return (
           <li key={group.key}>
-            <p className="mb-3 flex items-baseline gap-2">
-              <span className={cn('font-display text-lg font-bold', muted ? 'text-fg-muted' : 'text-fg')}>
-                {fmtWeekday(iso)}
-              </span>
-              <span className="text-sm text-fg-subtle">{fmtDayMonth(iso)}</span>
-            </p>
+            <div className="mb-3 flex flex-wrap items-center gap-2.5">
+              <p className="flex items-baseline gap-2">
+                <span className={cn('font-display text-lg font-bold', muted ? 'text-fg-muted' : 'text-fg')}>
+                  {fmtWeekday(iso)}
+                </span>
+                <span className="text-sm text-fg-subtle">{fmtDayMonth(iso)}</span>
+              </p>
+              {isMultiShiftDay && (
+                <Badge size="sm" tone={muted ? 'neutral' : 'accent'}>
+                  {group.items.length} Einsätze an diesem Tag
+                </Badge>
+              )}
+            </div>
             <ul className="relative space-y-3 border-l-2 border-dashed border-line-strong pl-5 sm:pl-6">
-              {group.items.map((s, i) => (
-                <li
-                  key={s.signupId}
-                  style={{ '--i': i } as React.CSSProperties}
-                  className={cn('relative animate-fade-up stagger', muted && 'opacity-70')}
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'absolute -left-[calc(1.25rem+7px)] top-6 size-3 rounded-full ring-4 ring-canvas sm:-left-[calc(1.5rem+7px)]',
-                      muted ? 'bg-line-strong' : 'bg-accent'
-                    )}
-                  />
-                  <div className="flex flex-col gap-4 rounded-card border border-line bg-surface p-4 sm:flex-row sm:items-center sm:p-5">
-                    <div className="tabular shrink-0 font-mono sm:w-28">
-                      <p className="text-xl font-semibold text-fg">{fmtTime(s.startTime)}</p>
-                      <p className="text-xs text-fg-subtle">bis {fmtTime(s.endTime)}</p>
-                      <p className="text-xs text-fg-subtle">{fmtDuration(s.startTime, s.endTime)}</p>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                        {s.category && <Badge>{s.category}</Badge>}
-                        {s.isResponsible && (
-                          <Badge tone="accent">
-                            <Shield className="size-3" /> {s.responsibleRole || 'Schichtleitung'}
-                          </Badge>
-                        )}
-                        {s.taskTitle && s.taskTitle !== s.title && (
-                          <Badge tone="neutral">{s.taskTitle}</Badge>
-                        )}
+              {group.items.map((s, i) => {
+                const prevShift = i > 0 ? group.items[i - 1] : null;
+                const hasBriefing = hasBriefingDetails(s);
+                const isExpanded = Boolean(expandedIds[s.signupId]);
+                const leaders = s.responsibles?.map((r) => r.displayName).join(', ');
+                const hasContactOrDesc = Boolean(
+                  s.description?.trim() ||
+                    s.responsibles?.some((r) => r.phone || r.email) ||
+                    s.contactUser?.phone ||
+                    s.contactUser?.email
+                );
+
+                return (
+                  <li
+                    key={s.signupId}
+                    style={{ '--i': i } as React.CSSProperties}
+                    className={cn('relative animate-fade-up stagger', muted && 'opacity-70')}
+                  >
+                    {/* Pausen- oder Anschluss-Anzeige zwischen zwei Schichten am selben Tag */}
+                    {prevShift && <BreakIndicator prev={prevShift} next={s} />}
+
+                    <span
+                      aria-hidden
+                      className={cn(
+                        'absolute -left-[calc(1.25rem+7px)] size-3 rounded-full ring-4 ring-canvas sm:-left-[calc(1.5rem+7px)]',
+                        prevShift ? 'top-14' : 'top-6',
+                        muted ? 'bg-line-strong' : 'bg-accent'
+                      )}
+                    />
+                    <div className="rounded-card border border-line bg-surface p-4 sm:p-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <div className="tabular shrink-0 font-mono sm:w-28">
+                          <p className="text-xl font-semibold text-fg">{fmtTime(s.startTime)}</p>
+                          <p className="text-xs text-fg-subtle">bis {fmtTime(s.endTime)}</p>
+                          <p className="text-xs text-fg-subtle">{fmtDuration(s.startTime, s.endTime)}</p>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                            {s.category && <Badge>{s.category}</Badge>}
+                            {s.isResponsible && (
+                              <Badge tone="accent">
+                                <Shield className="size-3" /> {s.responsibleRole || 'Schichtleitung'}
+                              </Badge>
+                            )}
+                            {s.taskTitle && s.taskTitle !== s.title && (
+                              <Badge tone="neutral">{s.taskTitle}</Badge>
+                            )}
+                          </div>
+                          <p className="font-bold text-fg">{s.title}</p>
+                          <Link href={`/events/${s.eventSlug}`} className="text-sm text-fg-muted hover:text-fg">
+                            {s.eventTitle}
+                          </Link>
+
+                          {/* Kompakte Kurz-Zusammenfassung (Leitung & Team) direkt sichtbar */}
+                          {hasBriefing && !isExpanded && (
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
+                              {leaders && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Shield className="size-3 text-accent-ink" /> Leitung:{' '}
+                                  <strong className="font-medium text-fg">{leaders}</strong>
+                                </span>
+                              )}
+                              {s.coHelpers && s.coHelpers.length > 0 && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Users className="size-3 text-fg-subtle" /> Mit:{' '}
+                                  <strong className="font-medium text-fg">{s.coHelpers.join(', ')}</strong>
+                                </span>
+                              )}
+                              {hasContactOrDesc && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleBriefing(s.signupId)}
+                                  className="inline-flex items-center gap-1 font-semibold text-accent-ink hover:underline"
+                                >
+                                  Briefing &amp; Kontakt <ChevronDown className="size-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                          {hasContactOrDesc && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleBriefing(s.signupId)}
+                              title="Einsatz-Briefing, Beschreibung und Kontakte ein-/ausblenden"
+                            >
+                              <FileText className="size-4" />
+                              <span className="hidden md:inline">Briefing</span>
+                              {isExpanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                            </Button>
+                          )}
+                          <a
+                            href={googleCalendarUrl(toCalendar(s))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={buttonClasses({ variant: 'ghost', size: 'icon-sm' })}
+                            title="Diesen Einzeleinsatz in Google Kalender eintragen"
+                          >
+                            <CalendarPlus className="size-4" />
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => downloadIcs(`schicht-${s.shiftId.slice(0, 8)}.ics`, [toCalendar(s)])}
+                            title="Diesen Einzeleinsatz als .ics-Datei herunterladen"
+                          >
+                            <Download className="size-4" />
+                          </Button>
+                          {s.isSignup !== false && onCancel ? (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              loading={busy === s.signupId}
+                              onClick={() => onCancel(s)}
+                            >
+                              <UserMinus /> Austragen
+                            </Button>
+                          ) : (
+                            <Link
+                              href={`/events/${s.eventSlug}`}
+                              className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+                            >
+                              Zum Anlass <ExternalLink className="size-3" />
+                            </Link>
+                          )}
+                        </div>
                       </div>
-                      <p className="font-bold text-fg">{s.title}</p>
-                      <Link href={`/events/${s.eventSlug}`} className="text-sm text-fg-muted hover:text-fg">
-                        {s.eventTitle}
-                      </Link>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-                      <a
-                        href={googleCalendarUrl(toCalendar(s))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={buttonClasses({ variant: 'ghost', size: 'icon-sm' })}
-                        title="Diesen Einzeleinsatz in Google Kalender eintragen"
-                      >
-                        <CalendarPlus className="size-4" />
-                      </a>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => downloadIcs(`schicht-${s.shiftId.slice(0, 8)}.ics`, [toCalendar(s)])}
-                        title="Diesen Einzeleinsatz als .ics-Datei herunterladen"
-                      >
-                        <Download className="size-4" />
-                      </Button>
-                      {s.isSignup !== false && onCancel ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          loading={busy === s.signupId}
-                          onClick={() => onCancel(s)}
-                        >
-                          <UserMinus /> Austragen
-                        </Button>
-                      ) : (
-                        <Link
-                          href={`/events/${s.eventSlug}`}
-                          className={buttonClasses({ variant: 'secondary', size: 'sm' })}
-                        >
-                          Zum Anlass <ExternalLink className="size-3" />
-                        </Link>
+
+                      {/* Aufgeklapptes Einsatz-Briefing */}
+                      {isExpanded && hasBriefing && (
+                        <div className="mt-4 border-t border-line/70 pt-3.5">
+                          <ShiftBriefingPanel shift={s} />
+                        </div>
                       )}
                     </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </li>
         );

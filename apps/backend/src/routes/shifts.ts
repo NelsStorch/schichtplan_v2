@@ -2,7 +2,9 @@ import { FastifyPluginAsync } from 'fastify';
 import {
   addZurichDays,
   ageAt,
+  businessDayKey,
   cancelDeadlineAt,
+  PLACEHOLDER_EMAIL_REGEX,
   cancelDeadlineText,
   formatZurichTimeRange,
   toZurichInput,
@@ -42,7 +44,7 @@ function toResponsiblePersonDto(
   contactVisibility: string = 'BOTH'
 ): ResponsiblePersonDto {
   const allowPhone = contactVisibility === 'BOTH' || contactVisibility === 'PHONE';
-  const allowEmail = contactVisibility === 'BOTH' || contactVisibility === 'EMAIL';
+  const allowEmail = (contactVisibility === 'BOTH' || contactVisibility === 'EMAIL') && Boolean(r.user.email && !PLACEHOLDER_EMAIL_REGEX.test(r.user.email));
   return {
     id: r.user.id,
     displayName: r.user.ceviName
@@ -1303,6 +1305,12 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         isSignup: boolean;
         isResponsible: boolean;
         responsibleRole: string | null;
+        responsibles?: ResponsiblePersonDto[];
+        contactUser?: ResponsiblePersonDto | null;
+        coHelpers?: string[];
+        filledSlots?: number;
+        requiredSlots?: number;
+        dayCutoffTime?: string;
       }
 
       const map = new Map<string, MyShiftItem>();
@@ -1398,6 +1406,86 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               });
             }
           }
+        }
+      }
+
+      if (map.size > 0) {
+        const shiftIds = [...map.keys()];
+        const detailedShifts = await fastify.prisma.shift.findMany({
+          where: { id: { in: shiftIds } },
+          include: {
+            responsibles: {
+              include: {
+                user: {
+                  select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+            signups: {
+              include: {
+                user: {
+                  select: { id: true, firstName: true, lastName: true, ceviName: true },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+            event: {
+              select: {
+                id: true,
+                responsibleMode: true,
+                dayCutoffTime: true,
+                contactVisibility: true,
+                contactUser: {
+                  select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                },
+                dayResponsibles: {
+                  include: {
+                    user: {
+                      select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                    },
+                  },
+                  orderBy: { createdAt: 'asc' },
+                },
+              },
+            },
+          },
+        });
+
+        for (const ds of detailedShifts) {
+          const item = map.get(ds.id);
+          if (!item) continue;
+          const visibility = ds.event.contactVisibility || 'BOTH';
+          const cutoff = ds.event.dayCutoffTime || '04:00';
+          const bDay = businessDayKey(ds.startTime.toISOString(), cutoff);
+          const shiftDate = toZurichInput(ds.startTime).slice(0, 10);
+
+          const shiftRespDtos = ds.responsibles.map((sr) => toResponsiblePersonDto(sr, visibility));
+          const dayRespDtos = ds.event.dayResponsibles
+            .filter((dr) => dr.dayDate === bDay || dr.dayDate === shiftDate)
+            .map((dr) => toResponsiblePersonDto(dr, visibility));
+
+          item.responsibles =
+            ds.event.responsibleMode === 'BY_DAY'
+              ? dayRespDtos.length > 0
+                ? dayRespDtos
+                : shiftRespDtos
+              : shiftRespDtos.length > 0
+                ? shiftRespDtos
+                : dayRespDtos;
+
+          item.contactUser = ds.event.contactUser
+            ? toResponsiblePersonDto({ user: ds.event.contactUser }, visibility)
+            : null;
+
+          item.coHelpers = ds.signups
+            .filter((su) => su.userId !== request.user.id)
+            .map((su) => (su.user ? su.user.ceviName || su.user.firstName : su.guestName || 'Gast'))
+            .filter(Boolean);
+
+          item.filledSlots = ds.signups.length;
+          item.requiredSlots = ds.requiredSlots;
+          item.dayCutoffTime = cutoff;
         }
       }
 

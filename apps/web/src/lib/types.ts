@@ -32,6 +32,15 @@ export interface MyShift {
   isSignup?: boolean;
   isResponsible?: boolean;
   responsibleRole?: string | null;
+  /** Schicht- oder Tagesleitung inkl. freigegebener Kontaktdaten (auch offline gecacht) */
+  responsibles?: ResponsiblePersonDto[];
+  /** Hauptkontaktperson des Anlasses inkl. freigegebener Kontaktdaten */
+  contactUser?: ResponsiblePersonDto | null;
+  /** Namen der anderen Helfer*innen in derselben Schicht */
+  coHelpers?: string[];
+  filledSlots?: number;
+  requiredSlots?: number;
+  dayCutoffTime?: string;
 }
 
 export interface EventOrganizer {

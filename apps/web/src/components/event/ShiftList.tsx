@@ -1,10 +1,16 @@
 'use client';
 
-import { AlertCircle, Check, ChevronRight, Hammer, Plus, Timer } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, Coffee, Hammer, Plus, Timer, Zap } from 'lucide-react';
 import type { ShiftDto } from '@schichtplan/shared';
 import { Badge, Button, cn } from '@schichtplan/ui';
 import { businessDayKey, fmtDayMonth, fmtShortWeekday, fmtTime } from '@/lib/format';
 import { STATUS_STYLES, freeLabel, shiftStats, shiftTasks } from './shift-utils';
+
+export interface ShiftPauseHint {
+  kind: 'direct' | 'break';
+  label: string;
+  title: string;
+}
 
 export interface ShiftActions {
   /** Kann sich die angemeldete Person selbst eintragen (Zugang ok oder Login möglich)? */
@@ -12,6 +18,7 @@ export interface ShiftActions {
   isMine: (shift: ShiftDto) => boolean;
   hasConflict?: (shift: ShiftDto) => boolean;
   getHandover?: (shift: ShiftDto) => { otherShift: ShiftDto; overlapMinutes: number } | null;
+  getPauseHint?: (shift: ShiftDto) => ShiftPauseHint | null;
   busyShiftId: string | null;
   contactName?: string | null;
   dayResponsibles?: Record<string, { id: string; displayName: string }[]>;
@@ -159,6 +166,7 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
         const style = STATUS_STYLES[stats.status];
         const isFull = stats.free === 0;
         const handover = !mine ? actions.getHandover?.(shift) : null;
+        const pauseHint = actions.getPauseHint?.(shift) ?? null;
         const dayKey = businessDayKey(shift.startTime, actions.dayCutoffTime);
         const responsibles =
           actions.responsibleMode === 'BY_DAY'
@@ -209,6 +217,24 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
                     <Badge size="sm" tone="success">
                       <Check className="size-3" /> Du
                     </Badge>
+                  )}
+                  {pauseHint && (
+                    <span
+                      title={pauseHint.title}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold',
+                        pauseHint.kind === 'direct'
+                          ? 'bg-accent/15 text-accent-ink'
+                          : 'border border-line bg-surface-2 text-fg-muted'
+                      )}
+                    >
+                      {pauseHint.kind === 'direct' ? (
+                        <Zap className="size-3 text-accent" />
+                      ) : (
+                        <Coffee className="size-3 text-fg-subtle" />
+                      )}
+                      {pauseHint.label}
+                    </span>
                   )}
                   {stats.urgent && (
                     <Badge size="sm" tone="warning">
