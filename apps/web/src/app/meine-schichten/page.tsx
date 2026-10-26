@@ -2,10 +2,28 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, CalendarPlus, CalendarSync, Check, Clock, Copy, Download, ExternalLink, LogIn, RefreshCw, Shield, Ticket, UserMinus } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarDays,
+  CalendarPlus,
+  CalendarSync,
+  Check,
+  Clock,
+  Copy,
+  Download,
+  ExternalLink,
+  HelpCircle,
+  LogIn,
+  RefreshCw,
+  Shield,
+  Smartphone,
+  Ticket,
+  UserMinus,
+} from 'lucide-react';
 import { cancelDeadlineAt, cancelDeadlineText } from '@schichtplan/shared';
 import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, useConfirm, useToast } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
+import { CalendarSubscribeDialog } from '@/components/CalendarSubscribeDialog';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
 import {
   dayKeyToIso,
@@ -18,7 +36,14 @@ import {
   groupByBusinessDay,
   hoursBetween,
 } from '@/lib/format';
-import { downloadIcs, googleCalendarUrl, type CalendarEntry } from '@/lib/ics';
+import {
+  detectClientDevice,
+  downloadIcs,
+  googleCalendarSubscribeUrl,
+  googleCalendarUrl,
+  type CalendarEntry,
+  type ClientDevice,
+} from '@/lib/ics';
 import { usePortal } from '@/lib/portal';
 import type { MyShift } from '@/lib/types';
 
@@ -58,6 +83,12 @@ export default function MyShiftsPage() {
   const [calData, setCalData] = useState<CalendarTokenData | null>(null);
   const [copied, setCopied] = useState(false);
   const [resettingToken, setResettingToken] = useState(false);
+  const [calDialogOpen, setCalDialogOpen] = useState(false);
+  const [clientDevice, setClientDevice] = useState<ClientDevice>('other');
+
+  useEffect(() => {
+    setClientDevice(detectClientDevice());
+  }, []);
 
   const loadCalToken = useCallback(async () => {
     try {
@@ -207,6 +238,8 @@ export default function MyShiftsPage() {
   const next = [...upcoming].sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime))[0];
   const hours = (shifts ?? []).reduce((sum, s) => sum + hoursBetween(s.startTime, s.endTime), 0);
 
+  const isApple = clientDevice === 'ios' || clientDevice === 'mac';
+
   return (
     <AppShell>
       <div className="mx-auto max-w-4xl px-4 pt-8 sm:px-6 sm:pt-14">
@@ -232,7 +265,7 @@ export default function MyShiftsPage() {
           )}
         </header>
 
-        {/* Live-Sync Kalender-Abo */}
+        {/* Live-Sync Kalender-Abo Kachel */}
         {calData && (
           <Card className="mt-8 border border-line bg-surface p-5 sm:p-6 animate-fade-up [animation-delay:50ms]">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -240,45 +273,78 @@ export default function MyShiftsPage() {
                 <div className="flex items-center gap-2">
                   <CalendarSync className="size-5 text-accent-ink shrink-0" />
                   <h2 className="font-display text-lg font-bold text-fg">Live-Kalender-Abo</h2>
-                  <Badge tone="accent">Neu</Badge>
+                  <Badge tone="accent">Automatischer Sync</Badge>
                 </div>
                 <p className="mt-1.5 text-sm text-fg-muted">
-                  Abonniere alle deine Schichten direkt in deiner Kalender-App (Apple Kalender, Outlook oder Google Kalender).
+                  Abonniere alle deine Schichten direkt in deiner Kalender-App (Google Kalender, Apple Kalender oder Outlook).
                   Zukünftige Einsätze, Verschiebungen und Abmeldungen werden vollautomatisch synchronisiert.
                 </p>
               </div>
+
+              {/* 1-Klick Aktionen je nach Gerät */}
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <a
-                  href={calData.webcalUrl}
-                  className={buttonClasses()}
-                  title="Direkt in Apple Kalender oder Outlook abonnieren"
-                >
-                  <CalendarSync className="size-4" /> 1-Klick Abonnieren
-                </a>
+                {isApple ? (
+                  <>
+                    <a
+                      href={calData.webcalUrl}
+                      className={buttonClasses({ variant: 'primary' })}
+                      title="Direkt in Apple Kalender auf deinem iPhone oder Mac abonnieren"
+                    >
+                      <CalendarSync className="size-4" /> In Apple Kalender abonnieren
+                    </a>
+                    <a
+                      href={googleCalendarSubscribeUrl(calData.webcalUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClasses({ variant: 'secondary' })}
+                      title="In Google Kalender abonnieren (1-Klick)"
+                    >
+                      <CalendarPlus className="size-4" /> Google Kalender
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <a
+                      href={googleCalendarSubscribeUrl(calData.webcalUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClasses({ variant: 'primary' })}
+                      title="In Google Kalender abonnieren (1-Klick)"
+                    >
+                      <CalendarPlus className="size-4" /> In Google Kalender abonnieren
+                    </a>
+                    <a
+                      href={calData.webcalUrl}
+                      className={buttonClasses({ variant: 'secondary' })}
+                      title="Direkt in Apple Kalender oder Outlook abonnieren"
+                    >
+                      <CalendarSync className="size-4" /> Apple Kalender
+                    </a>
+                  </>
+                )}
+
                 <Button
-                  variant="secondary"
-                  onClick={handleCopyUrl}
-                  title="Kalender-URL kopieren für Google Kalender oder andere Kalender-Apps"
+                  variant="ghost"
+                  onClick={() => setCalDialogOpen(true)}
+                  title="Wo hast du deinen Kalender? Alle Optionen & .ics"
                 >
-                  {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
-                  {copied ? 'Kopiert' : 'Link kopieren'}
+                  <HelpCircle className="size-4" /> Wo ist dein Kalender?
                 </Button>
               </div>
             </div>
 
             <div className="mt-4 pt-3 border-t border-line/60 flex flex-col gap-2 text-xs text-fg-subtle sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span><strong>Apple & Outlook:</strong> Klick auf «1-Klick Abonnieren».</span>
-                <span><strong>Google Kalender:</strong> Link kopieren ➜ «Weitere Kalender (+)" ➜ «Per URL hinzufügen».</span>
+                <span>
+                  <strong>1. Wahl:</strong> Klicke auf «In Google Kalender abonnieren» für Android/PC oder auf «Apple Kalender» für iPhone/Mac.
+                </span>
               </div>
               <button
                 type="button"
-                onClick={handleResetToken}
-                disabled={resettingToken}
-                className="inline-flex items-center gap-1.5 text-fg-subtle hover:text-fg underline underline-offset-2 transition"
+                onClick={() => setCalDialogOpen(true)}
+                className="inline-flex items-center gap-1 text-accent-ink hover:underline font-medium"
               >
-                <RefreshCw className={cn("size-3", resettingToken && "animate-spin")} />
-                Abo-Link erneuern
+                Weitere Kalender (Outlook, .ics, manuell) ➜
               </button>
             </div>
           </Card>
@@ -340,7 +406,7 @@ export default function MyShiftsPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className={buttonClasses({ variant: 'secondary' })}
-                      title="Direkt im Google Kalender eintragen"
+                      title="Diesen Einzeleinsatz in Google Kalender speichern"
                     >
                       <CalendarPlus className="size-4" /> Google Kalender
                     </a>
@@ -348,7 +414,7 @@ export default function MyShiftsPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => downloadIcs(`schicht-${next.shiftId.slice(0, 8)}.ics`, [toCalendar(next)])}
-                      title="Als .ics-Datei für Apple Kalender oder Outlook"
+                      title="Einzelschicht als .ics herunterladen"
                     >
                       <Download className="size-4" /> .ics
                     </Button>
@@ -361,15 +427,28 @@ export default function MyShiftsPage() {
               <section className="mt-12">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                   <h2 className="font-display text-2xl font-bold tracking-tight text-fg">Anstehend</h2>
-                  {upcoming.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => downloadIcs('meine-schichten.ics', upcoming.map(toCalendar))}
-                    >
-                      <Download className="size-4" /> Alle als .ics exportieren
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {calData && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCalDialogOpen(true)}
+                        title="Kalender synchronisieren & abonnieren"
+                      >
+                        <CalendarSync className="size-4" /> Im Kalender abonnieren
+                      </Button>
+                    )}
+                    {upcoming.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => downloadIcs('meine-schichten.ics', upcoming.map(toCalendar))}
+                        title="Alle kommenden Schichten als statische .ics-Datei herunterladen"
+                      >
+                        <Download className="size-4" /> Alle als .ics exportieren
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <Timeline shifts={upcoming} busy={busy} onCancel={cancel} />
               </section>
@@ -384,6 +463,19 @@ export default function MyShiftsPage() {
           </>
         )}
       </div>
+
+      {/* Pop-up Dialog: Wo hast du deinen Kalender? */}
+      {calData && (
+        <CalendarSubscribeDialog
+          open={calDialogOpen}
+          onClose={() => setCalDialogOpen(false)}
+          calData={calData}
+          shifts={(shifts ?? []).map(toCalendar)}
+          clientDevice={clientDevice}
+          onResetToken={handleResetToken}
+          resettingToken={resettingToken}
+        />
+      )}
     </AppShell>
   );
 }
@@ -455,7 +547,7 @@ function Timeline({
                         target="_blank"
                         rel="noopener noreferrer"
                         className={buttonClasses({ variant: 'ghost', size: 'icon-sm' })}
-                        title="In Google Kalender eintragen"
+                        title="Diesen Einzeleinsatz in Google Kalender eintragen"
                       >
                         <CalendarPlus className="size-4" />
                       </a>
@@ -463,7 +555,7 @@ function Timeline({
                         variant="ghost"
                         size="icon-sm"
                         onClick={() => downloadIcs(`schicht-${s.shiftId.slice(0, 8)}.ics`, [toCalendar(s)])}
-                        title=".ics herunterladen"
+                        title="Diesen Einzeleinsatz als .ics-Datei herunterladen"
                       >
                         <Download className="size-4" />
                       </Button>
@@ -479,9 +571,9 @@ function Timeline({
                       ) : (
                         <Link
                           href={`/events/${s.eventSlug}`}
-                          className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+                          className={buttonClasses({ variant: 'ghost', size: 'sm' })}
                         >
-                          Zum Anlass <ExternalLink className="size-3" />
+                          Zum Anlass
                         </Link>
                       )}
                     </div>

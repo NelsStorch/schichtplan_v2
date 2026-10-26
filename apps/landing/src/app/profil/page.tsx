@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpRight, Bell, Building2, CalendarDays, CalendarSync, Check, Copy, Database, LogOut, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Bell, Building2, CalendarDays, CalendarPlus, CalendarSync, Check, Copy, Database, LogOut, Trash2 } from 'lucide-react';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   PLACEHOLDER_LAST_NAME,
@@ -123,6 +123,10 @@ export default function ProfilePage() {
       });
       const shiftsRes = await fetch('/api/shifts/my', { cache: 'no-store' });
       setShifts(shiftsRes.ok ? await shiftsRes.json() : []);
+      fetch('/api/calendar/token', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => data && setCalData(data))
+        .catch(() => {});
     })().catch(() => setMessage({ tone: 'danger', text: 'Profil konnte nicht geladen werden.' }));
   }, []);
 
@@ -386,19 +390,28 @@ export default function ProfilePage() {
                   <CalendarDays className="size-4" /> Deine nächsten Schichten
                 </h2>
                 {calData && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <a
+                      href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calData.webcalUrl)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+                      title="In Google Kalender abonnieren (1-Klick)"
+                    >
+                      <CalendarPlus className="size-3.5" /> Google Kalender
+                    </a>
                     <a
                       href={calData.webcalUrl}
-                      className={buttonClasses({ variant: 'secondary', size: 'sm' })}
-                      title="In Kalender-App abonnieren (Live-Sync)"
+                      className={buttonClasses({ variant: 'ghost', size: 'sm' })}
+                      title="In Apple Kalender oder Outlook abonnieren"
                     >
-                      <CalendarSync className="size-3.5" /> Kalender abonnieren
+                      <CalendarSync className="size-3.5" /> Apple / Outlook
                     </a>
                     <Button
                       variant="ghost"
                       size="icon-sm"
                       onClick={handleCopyCalUrl}
-                      title="Abo-Link kopieren für Google Kalender"
+                      title="Abo-Link kopieren"
                     >
                       {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
                     </Button>

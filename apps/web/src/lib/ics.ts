@@ -11,7 +11,7 @@ const stamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').
 const escape = (text: string) => text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (m) => `\\${m}`);
 
 /**
- * Erzeugt eine direkte URL für Google Kalender mit Zeitzone Europe/Zurich.
+ * Erzeugt eine direkte URL für Google Kalender mit Zeitzone Europe/Zurich für einen Einzeleinsatz.
  * Start- und Endzeit werden in UTC formatiert (YYYYMMDDTHHmmssZ), Google rechnet mit ctz=Europe/Zurich.
  */
 export function googleCalendarUrl(entry: CalendarEntry): string {
@@ -26,6 +26,38 @@ export function googleCalendarUrl(entry: CalendarEntry): string {
   if (entry.description) params.set('details', entry.description);
   if (entry.location) params.set('location', entry.location);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/**
+ * Erzeugt den 1-Klick-Abonnement-Link für Google Kalender (Web & App).
+ * Öffnet Google Kalender direkt mit der Abfrage «Kalender hinzufügen?».
+ */
+export function googleCalendarSubscribeUrl(feedUrl: string): string {
+  // Google Calendar erwartet webcal:// im cid-Parameter für externen Feed-Sync
+  const webcalUrl = feedUrl.replace(/^https:\/\//i, 'webcal://').replace(/^http:\/\//i, 'webcal://');
+  return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
+}
+
+/**
+ * Erzeugt den 1-Klick-Abonnement-Link für Outlook Web / Microsoft 365.
+ */
+export function outlookCalendarSubscribeUrl(httpsUrl: string, name = 'Meine Cevi-Schichten'): string {
+  return `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(httpsUrl)}&name=${encodeURIComponent(name)}`;
+}
+
+export type ClientDevice = 'ios' | 'mac' | 'android' | 'windows' | 'other';
+
+/**
+ * Erkennt das Betriebssystem des Geräts (für gerätespezifische Kalender-Buttons).
+ */
+export function detectClientDevice(): ClientDevice {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent.toLowerCase();
+  if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+  if (/macintosh|mac os x/.test(ua)) return 'mac';
+  if (/android/.test(ua)) return 'android';
+  if (/windows/.test(ua)) return 'windows';
+  return 'other';
 }
 
 /** Erzeugt eine .ics-Datei und startet den Download (Kalender-Integration wie in der Legacy-App). */
