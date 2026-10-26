@@ -132,7 +132,8 @@ export default function MyShiftsPage() {
       return;
     }
     load();
-  }, [sessionLoading, user, load]);
+    loadCalToken();
+  }, [sessionLoading, user, load, loadCalToken]);
 
   const cancel = async (shift: MyShift) => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
