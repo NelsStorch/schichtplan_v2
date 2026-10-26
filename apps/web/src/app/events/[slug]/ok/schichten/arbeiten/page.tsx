@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Edit, Info, Plus, Trash2, Wrench } from 'lucide-react';
+import { Edit, Plus, Trash2, Wrench } from 'lucide-react';
 import type { TaskDefinitionDto } from '@schichtplan/shared';
 import { Badge, Button, Callout, Card, EmptyState, Skeleton, useConfirm, useToast } from '@schichtplan/ui';
 import { useOkEvent } from '@/components/ok/OkContext';
@@ -76,13 +76,8 @@ export default function TaskCatalogPage() {
       />
 
       <Callout tone="info" className="mb-6">
-        <div className="flex items-start gap-2">
-          <Info className="mt-0.5 size-4 shrink-0 text-accent-ink" />
-          <div className="text-xs leading-relaxed text-fg-muted">
-            Hier verwaltet ihr typische Aufgaben eurer Abteilung. Beim Anlegen von Schichten könnt ihr sie mit einem Klick übernehmen.
-            Arbeiten, die aktuell in Schichten verbaut sind, können zum Schutz vor Datenverlust nicht gelöscht werden.
-          </div>
-        </div>
+        Hier verwaltet ihr typische Aufgaben eurer Abteilung. Beim Anlegen von Schichten könnt ihr sie mit einem Klick übernehmen.
+        Arbeiten, die aktuell in Schichten verbaut sind, können zum Schutz vor Datenverlust nicht gelöscht werden.
       </Callout>
 
       {tasks === null ? (

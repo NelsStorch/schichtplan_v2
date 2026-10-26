@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronDown, ChevronUp, Clock, Filter, Info, Mail, Search, UserCheck, UserMinus, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, Filter, Mail, Search, UserCheck, UserMinus, Users, X } from 'lucide-react';
 import type { EventRosterResponseDto } from '@schichtplan/shared';
 import {
   Avatar,
@@ -283,12 +283,9 @@ function HelpersPage() {
       )}
 
       {roster && !roster.isRestricted && (
-        <Callout tone="info" className="mb-6 flex items-start gap-2">
-          <Info className="mt-0.5 size-4 shrink-0" />
-          <span>
-            Dieser Anlass ist offen für {roster.scopeDescription}. Hier stehen alle Eingetragenen sowie die Personen deiner
-            Abteilung. Ein festes Soll pro Person lohnt sich vor allem bei Anlässen nur für die Abteilung oder einzelne Stufen.
-          </span>
+        <Callout tone="info" className="mb-6">
+          Dieser Anlass ist offen für {roster.scopeDescription}. Hier stehen alle Eingetragenen sowie die Personen deiner
+          Abteilung. Ein festes Soll pro Person lohnt sich vor allem bei Anlässen nur für die Abteilung oder einzelne Stufen.
         </Callout>
       )}
 

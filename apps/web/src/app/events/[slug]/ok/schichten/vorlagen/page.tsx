@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Copy, FileText, Info, Plus, Trash2 } from 'lucide-react';
+import { Copy, FileText, Plus, Trash2 } from 'lucide-react';
 import type { EventTemplateDto } from '@schichtplan/shared';
 import { EVENT_ACCESS_TYPES } from '@schichtplan/shared';
 import { Button, Callout, Card, EmptyState, Skeleton, buttonClasses, useConfirm, useToast } from '@schichtplan/ui';
@@ -61,9 +61,8 @@ export default function TemplatesPage() {
         }
       />
 
-      <Callout tone="info" className="mb-6 flex items-start gap-2">
-        <Info className="mt-0.5 size-4 shrink-0" />
-        <span>Vorlagen gelten für die ganze Abteilung. Personen und Eintragungen werden nicht gespeichert.</span>
+      <Callout tone="info" className="mb-6">
+        Vorlagen gelten für die ganze Abteilung. Personen und Eintragungen werden nicht gespeichert.
       </Callout>
 
       {templates === null ? (
