@@ -158,6 +158,17 @@ export interface ShiftCollisionCheckResult {
   message?: string;
 }
 
+/** Kompakte Zusammenfassung des persönlichen Helfer-Stunden-Kontos für GET /api/shifts/my/summary */
+export interface MyHoursSummaryDto {
+  totalHours: number;
+  completedHours: number;
+  upcomingHours: number;
+  shiftCount: number;
+  leadCount: number;
+  eventCount: number;
+  departmentCount: number;
+}
+
 export interface ShiftSignupDto {
   id: string;
   shiftId: string;

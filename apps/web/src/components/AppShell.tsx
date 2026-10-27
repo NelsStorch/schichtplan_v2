@@ -1,9 +1,24 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, CalendarDays, Database, LifeBuoy, LogIn, LogOut, Smartphone, Ticket, Trash2, UserRound } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Database,
+  LifeBuoy,
+  LogIn,
+  LogOut,
+  Smartphone,
+  Sparkles,
+  Ticket,
+  Trash2,
+  UserRound,
+} from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -17,8 +32,8 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, departmentRoleLabel, getLandingUrl, helpUrl } from '@schichtplan/shared';
-import { departmentSetupUrl, useLoginHref } from '@/lib/api';
+import { PRIVACY_URL, departmentRoleLabel, getLandingUrl, helpUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
+import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { useInstallPrompt } from '@/lib/offline';
 import { OfflineBanner } from './OfflineBanner';
@@ -191,7 +206,33 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const confirm = useConfirm();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
-  const { canInstall, isInstalled, showIosGuide, setShowIosGuide, install } = useInstallPrompt();
+  const { canInstall, install } = useInstallPrompt();
+  const [showIosGuide, setShowIosGuide] = useState(false);
+
+  // Helfer-Stunden-Zusammenfassung direkt und leichtgewichtig vom Backend laden
+  const [stats, setStats] = useState<MyHoursSummaryDto | null>(null);
+  const [loadingHours, setLoadingHours] = useState(false);
+
+  useEffect(() => {
+    if (!open || !user) return;
+    let active = true;
+    setLoadingHours(true);
+
+    api<MyHoursSummaryDto>('/api/shifts/my/summary')
+      .then((data) => {
+        if (active) {
+          setStats(data);
+          setLoadingHours(false);
+        }
+      })
+      .catch(() => {
+        if (active) setLoadingHours(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [open, user]);
 
   if (!user) return null;
   const role =
@@ -240,75 +281,231 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} size="sm" title="Dein Konto">
-        <div className="flex items-center gap-4 rounded-card bg-surface-2 p-4">
-          <Avatar name={displayName(user)} size="lg" highlight />
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg font-bold text-fg">{displayName(user)}</p>
-            <p className="truncate text-sm text-fg-muted">
-              {user.firstName} {user.lastName}
-            </p>
-            <p className="truncate text-xs text-fg-subtle">
-              {user.homeDepartment ? user.homeDepartment.name : user.needsDepartmentSetup ? 'Abteilung fehlt' : 'Keine Abteilung'}
-              {user.stufen?.length ? ` · ${user.stufen.map((s) => s.name).join(', ')}` : ''}
-            </p>
-            <Badge tone="accent" className="mt-2">
-              {role}
-            </Badge>
+      <Dialog open={open} onClose={onClose} size="md" title="Dein Konto">
+        <div className="space-y-4">
+          {/* Benutzerprofil Kopfbereich */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-line bg-surface-2 p-4 shadow-2xs">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <Avatar name={displayName(user)} size="lg" highlight className="size-14 text-base shrink-0" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="truncate font-display text-lg font-bold text-fg">
+                    {displayName(user)}
+                  </h3>
+                  <Badge tone="accent">
+                    {role}
+                  </Badge>
+                </div>
+                <p className="truncate text-sm text-fg-muted">
+                  {user.firstName} {user.lastName}
+                </p>
+                <div className="flex items-center gap-1.5 flex-wrap text-xs text-fg-subtle mt-1">
+                  <span className="inline-flex items-center gap-1">
+                    <Building2 className="size-3 inline" />
+                    {user.homeDepartment ? user.homeDepartment.name : user.needsDepartmentSetup ? 'Abteilung fehlt' : 'Keine Abteilung'}
+                  </span>
+                  {user.stufen?.map((s) => (
+                    <span key={s.stufeId} className="rounded-full bg-surface-elevated border border-line px-2 py-0.5 text-[11px] font-medium text-fg-muted">
+                      {s.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-line/60">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-fg-subtle mb-1">
+                Design
+              </span>
+              <ThemeToggle />
+            </div>
           </div>
-        </div>
 
-        <div className="mt-4 flex items-center justify-between rounded-card border border-line px-4 py-2">
-          <span className="text-sm font-semibold text-fg">Farbschema</span>
-          <ThemeToggle />
-        </div>
+          {/* ⭐ Helfer-Stunden-Konto (Hero-Karte) */}
+          <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 via-surface to-surface-subtle p-4 shadow-2xs">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
+                  <Clock className="size-4" />
+                </span>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-fg flex items-center gap-1.5">
+                    Dein Helfer-Stunden-Konto
+                  </h4>
+                  <p className="text-[11px] text-fg-subtle">
+                    Über alle Anlässe &amp; Abteilungen (inkl. Schichtleitung)
+                  </p>
+                </div>
+              </div>
 
-        <div className="mt-4 rounded-card border border-line bg-surface-1 p-3.5">
-          <NotificationSettings user={user} onUserChange={(u) => setUser(u)} compact />
-        </div>
+              <Link
+                href="/meine-schichten"
+                onClick={onClose}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-accent-ink hover:underline shrink-0"
+              >
+                <span>Meine Schichten</span>
+                <ChevronRight className="size-3.5" />
+              </Link>
+            </div>
 
-        <div className="mt-4 grid gap-2">
-          {canInstall && (
-            <Button
-              variant="secondary"
-              onClick={async () => {
-                await install();
-              }}
-            >
-              <Smartphone className="size-4" /> App auf Home-Bildschirm
+            {loadingHours ? (
+              <div className="py-6 text-center">
+                <div className="inline-block size-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                <p className="text-xs text-fg-subtle mt-2">Helferstunden werden berechnet…</p>
+              </div>
+            ) : stats && stats.shiftCount > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2 text-center rounded-xl bg-surface border border-line/60 p-3 shadow-2xs">
+                  <div>
+                    <div className="font-mono text-2xl font-bold text-fg">
+                      {stats.totalHours} <span className="text-xs font-normal text-fg-muted">Std.</span>
+                    </div>
+                    <div className="text-[10px] uppercase font-semibold tracking-wider text-fg-subtle mt-0.5">
+                      Gesamtzeit
+                    </div>
+                  </div>
+
+                  <div className="border-x border-line/60 px-1">
+                    <div className="font-mono text-2xl font-bold text-fg">
+                      {stats.shiftCount}
+                    </div>
+                    <div className="text-[10px] uppercase font-semibold tracking-wider text-fg-subtle mt-0.5">
+                      {stats.shiftCount === 1 ? 'Einsatz' : 'Einsätze'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="font-mono text-2xl font-bold text-fg">
+                      {stats.eventCount}
+                    </div>
+                    <div className="text-[10px] uppercase font-semibold tracking-wider text-fg-subtle mt-0.5">
+                      {stats.eventCount === 1 ? 'Anlass' : 'Anlässe'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status-Balken: Abgeschlossen vs. Geplant */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-medium">
+                    <span className="flex items-center gap-1.5 text-success">
+                      <CheckCircle2 className="size-3.5 inline" />
+                      {stats.completedHours} Std. bereits geleistet
+                    </span>
+                    <span className="flex items-center gap-1.5 text-accent-ink">
+                      <Clock className="size-3.5 inline" />
+                      {stats.upcomingHours} Std. geplant
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-line/70 flex">
+                    {stats.totalHours > 0 ? (
+                      <>
+                        <div
+                          className="h-full bg-success transition-all duration-500"
+                          style={{
+                            width: `${Math.round((stats.completedHours / stats.totalHours) * 100)}%`,
+                          }}
+                        />
+                        <div
+                          className="h-full bg-accent transition-all duration-500"
+                          style={{
+                            width: `${Math.round((stats.upcomingHours / stats.totalHours) * 100)}%`,
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <div className="h-full w-full bg-line" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-surface border border-line/60 p-4 text-center">
+                <p className="text-xs text-fg-muted">
+                  Du hast bisher noch keine Schichten eingetragen.
+                </p>
+                <Link
+                  href="/"
+                  onClick={onClose}
+                  className={buttonClasses({ size: 'sm', variant: 'secondary', className: 'mt-2 text-xs' })}
+                >
+                  Anlässe durchstöbern & mithelfen
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Menügruppen */}
+          <div className="space-y-3">
+            {/* Gruppe 1: Einsätze & Abteilungen */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Link href="/meine-schichten" onClick={onClose} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
+                <Ticket className="size-4 text-accent" />
+                <span>Meine Schichten</span>
+              </Link>
+              <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
+                <Building2 className="size-4 text-accent" />
+                <span>Abteilung &amp; Stufen</span>
+              </a>
+            </div>
+
+            {/* Gruppe 2: Profil & Benachrichtigungen */}
+            <div className="rounded-2xl border border-line bg-surface p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
+                  Schicht-Erinnerungen
+                </span>
+                <Link href="/profil" onClick={onClose} className="text-xs font-semibold text-accent-ink hover:underline">
+                  Profil bearbeiten
+                </Link>
+              </div>
+              <NotificationSettings user={user} onUserChange={(u) => setUser(u)} compact />
+            </div>
+
+            {/* Gruppe 3: App-Tools & Hilfe */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {canInstall && (
+                <Button
+                  variant="secondary"
+                  className="justify-start"
+                  onClick={async () => {
+                    await install();
+                  }}
+                >
+                  <Smartphone className="size-4 text-accent" /> App installieren
+                </Button>
+              )}
+              <a href={helpUrl()} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
+                <LifeBuoy className="size-4 text-accent" /> Hilfe &amp; Anleitungen
+              </a>
+              {user.isGlobalAdmin && (
+                <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary', className: 'justify-start col-span-full' })}>
+                  <Database className="size-4 text-accent" /> Cevi.DB Daten &amp; Rollen
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Footer Aktionen: Abmelden & Konto löschen */}
+          <div className="pt-2 border-t border-line/70 flex items-center justify-between gap-2">
+            {user.canSelfDelete ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="text-danger-ink hover:bg-danger/10 hover:text-danger-ink text-xs"
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+                {deleting ? 'Löschen…' : 'Konto löschen'}
+              </Button>
+            ) : (
+              <span />
+            )}
+
+            <Button variant="ghost" size="sm" onClick={logout} disabled={deleting} className="text-xs">
+              <LogOut className="size-3.5" /> Abmelden
             </Button>
-          )}
-          <Link href="/meine-schichten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
-            <Ticket /> Meine Schichten
-          </Link>
-          <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary' })}>
-            <Building2 /> Abteilung &amp; Stufen
-          </a>
-          <Link href="/profil" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
-            <UserRound /> Profil &amp; Benachrichtigungen
-          </Link>
-          <a href={helpUrl()} className={buttonClasses({ variant: 'secondary' })}>
-            <LifeBuoy /> Hilfe &amp; Anleitungen
-          </a>
-          {user.isGlobalAdmin && (
-            <Link href="/cevidb-daten" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
-              <Database /> Cevi.DB Daten & Profil
-            </Link>
-          )}
-          <Button variant="ghost" onClick={logout} disabled={deleting}>
-            <LogOut /> Abmelden
-          </Button>
-          {user.canSelfDelete && (
-            <Button
-              variant="ghost"
-              onClick={handleDeleteAccount}
-              disabled={deleting}
-              className="text-danger-ink hover:bg-danger/10 hover:text-danger-ink"
-            >
-              <Trash2 className="size-4" aria-hidden />
-              {deleting ? 'Wird gelöscht …' : 'Konto löschen'}
-            </Button>
-          )}
+          </div>
         </div>
       </Dialog>
 

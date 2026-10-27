@@ -15,6 +15,7 @@ import {
   UpdateShiftSchema,
   SignupShiftSchema,
   type BulkShiftsResultDto,
+  type MyHoursSummaryDto,
   type ResponsiblePersonDto,
 } from '@schichtplan/shared';
 import {
@@ -1295,6 +1296,130 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       trackUsage('SIGNOFF', { dim: isSelf ? 'SELF' : 'OK', departmentId: event.departmentId });
 
       return { message: 'Erfolgreich aus der Schicht ausgetragen' };
+    }
+  );
+
+  // Kompakte Helfer-Stunden-Zusammenfassung abfragen (für «Dein Konto» Hero-Card)
+  fastify.get(
+    '/api/shifts/my/summary',
+    { preHandler: [fastify.authenticate] },
+    async (request): Promise<MyHoursSummaryDto> => {
+      const [signups, shiftResp] = await Promise.all([
+        fastify.prisma.shiftSignup.findMany({
+          where: { userId: request.user.id },
+          select: {
+            shift: {
+              select: {
+                id: true,
+                startTime: true,
+                endTime: true,
+                eventId: true,
+                event: {
+                  select: {
+                    id: true,
+                    departmentId: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+        fastify.prisma.shiftResponsible.findMany({
+          where: { userId: request.user.id },
+          select: {
+            shift: {
+              select: {
+                id: true,
+                startTime: true,
+                endTime: true,
+                eventId: true,
+                event: {
+                  select: {
+                    id: true,
+                    departmentId: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      const now = Date.now();
+      const shiftsMap = new Map<
+        string,
+        {
+          startTime: Date;
+          endTime: Date;
+          eventId: string;
+          departmentId: string | null;
+          isResponsible: boolean;
+        }
+      >();
+
+      for (const su of signups) {
+        if (!su.shift) continue;
+        shiftsMap.set(su.shift.id, {
+          startTime: su.shift.startTime,
+          endTime: su.shift.endTime,
+          eventId: su.shift.eventId,
+          departmentId: su.shift.event?.departmentId ?? null,
+          isResponsible: false,
+        });
+      }
+
+      for (const sr of shiftResp) {
+        if (!sr.shift) continue;
+        const existing = shiftsMap.get(sr.shift.id);
+        if (existing) {
+          existing.isResponsible = true;
+        } else {
+          shiftsMap.set(sr.shift.id, {
+            startTime: sr.shift.startTime,
+            endTime: sr.shift.endTime,
+            eventId: sr.shift.eventId,
+            departmentId: sr.shift.event?.departmentId ?? null,
+            isResponsible: true,
+          });
+        }
+      }
+
+      let completedMinutes = 0;
+      let upcomingMinutes = 0;
+      let leadCount = 0;
+      const eventIds = new Set<string>();
+      const departmentIds = new Set<string>();
+
+      for (const shift of shiftsMap.values()) {
+        if (shift.isResponsible) leadCount++;
+        eventIds.add(shift.eventId);
+        if (shift.departmentId) departmentIds.add(shift.departmentId);
+
+        const startMs = shift.startTime.getTime();
+        const endMs = shift.endTime.getTime();
+        const durMin = Math.max(0, Math.round((endMs - startMs) / 60_000));
+
+        if (endMs <= now) {
+          completedMinutes += durMin;
+        } else {
+          upcomingMinutes += durMin;
+        }
+      }
+
+      const totalMinutes = completedMinutes + upcomingMinutes;
+      const completedHours = Math.round((completedMinutes / 60) * 10) / 10;
+      const upcomingHours = Math.round((upcomingMinutes / 60) * 10) / 10;
+      const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+
+      return {
+        totalHours,
+        completedHours,
+        upcomingHours,
+        shiftCount: shiftsMap.size,
+        leadCount,
+        eventCount: eventIds.size,
+        departmentCount: departmentIds.size,
+      };
     }
   );
 

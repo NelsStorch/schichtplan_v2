@@ -72,6 +72,18 @@ export interface HelperStatsSummary {
   avgHoursPerHelper: number;
 }
 
+export interface HelperStufenStat {
+  name: string;
+  helperCount: number;
+  totalMinutes: number;
+  totalHours: number;
+  formattedTime: string;
+  shiftCount: number;
+  avgHoursPerHelper: number;
+  percentageOfTotal: number;
+  helpers: { displayName: string; hours: number; ceviName?: string | null; shiftCount: number }[];
+}
+
 /** Formatiert Minuten lesbar, z. B. "4h 30m" oder "2h" */
 export function formatMinutes(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60);
@@ -150,6 +162,60 @@ export function computeHelperStats(
         isSetupTeardown: Boolean(shift.isSetupTeardown),
         attendance: su.attendance ?? null,
       });
+    }
+
+    // 1b. Schichtleitungen einbeziehen (auch wenn ohne regulären Helfer-Slot eingeteilt)
+    for (const resp of shift.responsibles ?? []) {
+      const key = `user:${resp.id}`;
+      let helper = helpersMap.get(key);
+      if (!helper) {
+        helper = {
+          key,
+          userId: resp.id,
+          displayName: resp.displayName,
+          firstName: resp.firstName,
+          lastName: resp.lastName ?? undefined,
+          ceviName: resp.ceviName ?? null,
+          subName: resp.ceviName
+            ? `${resp.firstName} ${resp.lastName || ''}`.trim()
+            : null,
+          departmentName: null,
+          stufen: [],
+          age: null,
+          isGuest: false,
+          guestEmail: resp.email ?? null,
+          guestPhone: resp.phone ?? null,
+          shifts: [],
+          totalMinutes: 0,
+          totalHours: 0,
+          formattedTime: '0h',
+          eventMinutes: 0,
+          eventHours: 0,
+          setupMinutes: 0,
+          setupHours: 0,
+          attendedMinutes: 0,
+          attendedHours: 0,
+          attendedShiftCount: 0,
+          shiftCount: 0,
+        };
+        helpersMap.set(key, helper);
+      }
+
+      // Falls die Person nicht schon über ein reguläres Signup für diese Schicht erfasst ist
+      const alreadyHasShift = helper.shifts.some((s) => s.shiftId === shift.id);
+      if (!alreadyHasShift) {
+        helper.shifts.push({
+          shiftId: shift.id,
+          signupId: `lead-${shift.id}-${resp.id}`,
+          title: shift.title,
+          taskTitle: 'Schichtleitung',
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          durationMinutes,
+          isSetupTeardown: Boolean(shift.isSetupTeardown),
+          attendance: 'PRESENT',
+        });
+      }
     }
   }
 
@@ -252,6 +318,85 @@ export function computeHelperStats(
   return { helpers: helpersList, summary };
 }
 
+/** Berechnet die Stufen-Rangliste für einen Anlass */
+export function computeStufenStats(
+  helpers: HelperPersonStat[],
+  summary: HelperStatsSummary
+): HelperStufenStat[] {
+  const map = new Map<
+    string,
+    {
+      helperKeys: Set<string>;
+      totalMinutes: number;
+      shiftCount: number;
+      helpersMap: Map<string, { displayName: string; hours: number; ceviName?: string | null; shiftCount: number }>;
+    }
+  >();
+
+  for (const h of helpers) {
+    if (h.totalMinutes <= 0) continue;
+
+    // Wenn Person keine Stufe hat: unter "Ohne Stufe / Gäste" erfassen
+    const stufenNames = h.stufen.length > 0 ? h.stufen : ['Ohne Stufe / Gäste'];
+
+    for (const stufe of stufenNames) {
+      let entry = map.get(stufe);
+      if (!entry) {
+        entry = {
+          helperKeys: new Set(),
+          totalMinutes: 0,
+          shiftCount: 0,
+          helpersMap: new Map(),
+        };
+        map.set(stufe, entry);
+      }
+
+      entry.helperKeys.add(h.key);
+      entry.totalMinutes += h.totalMinutes;
+      entry.shiftCount += h.shiftCount;
+
+      const existingH = entry.helpersMap.get(h.key);
+      if (!existingH) {
+        entry.helpersMap.set(h.key, {
+          displayName: h.displayName,
+          hours: h.totalHours,
+          ceviName: h.ceviName,
+          shiftCount: h.shiftCount,
+        });
+      }
+    }
+  }
+
+  const result: HelperStufenStat[] = [];
+  const totalEventMinutes = Math.max(1, summary.totalMinutes);
+
+  for (const [name, data] of map.entries()) {
+    const totalHours = Math.round((data.totalMinutes / 60) * 10) / 10;
+    const helperCount = data.helperKeys.size;
+    const avgHours = helperCount > 0 ? Math.round((totalHours / helperCount) * 10) / 10 : 0;
+    const percentage = Math.min(100, Math.round((data.totalMinutes / totalEventMinutes) * 100));
+
+    const helperList = Array.from(data.helpersMap.values()).sort((a, b) => b.hours - a.hours);
+
+    result.push({
+      name,
+      helperCount,
+      totalMinutes: data.totalMinutes,
+      totalHours,
+      formattedTime: formatMinutes(data.totalMinutes),
+      shiftCount: data.shiftCount,
+      avgHoursPerHelper: avgHours,
+      percentageOfTotal: percentage,
+      helpers: helperList,
+    });
+  }
+
+  // Sortierung: Nach Gesamtstunden absteigend
+  result.sort((a, b) => b.totalMinutes - a.totalMinutes || a.name.localeCompare(b.name, 'de'));
+
+  return result;
+}
+
 /** Exportiert die Helferstunden-Statistik als Excel-CSV */
 export function exportHelperHoursCsv(
   eventSlug: string,
@@ -329,4 +474,58 @@ export function exportHelperHoursCsv(
   ]);
 
   downloadCsv(`helferstunden-${eventSlug}.csv`, rows);
+}
+
+/** Exportiert die Stufen-Rangliste als Excel-CSV */
+export function exportStufenRankingCsv(
+  eventSlug: string,
+  stufen: HelperStufenStat[],
+  summary: HelperStatsSummary
+) {
+  const rows: (string | number)[][] = [
+    [
+      'Rang',
+      'Stufe / Gruppe',
+      'Helfende Personen',
+      'Gesamtstunden (Dezimal)',
+      'Gesamtzeit',
+      'Anteil (%)',
+      'Schicht-Einsätze',
+      'Durchschnitt (Std./Person)',
+      'Helfende (mit Stunden)',
+    ],
+  ];
+
+  stufen.forEach((s, idx) => {
+    const helperListText = s.helpers
+      .map((h) => `${h.displayName}${h.ceviName ? ` (${h.ceviName})` : ''}: ${h.hours}h`)
+      .join(' | ');
+
+    rows.push([
+      idx + 1,
+      s.name,
+      s.helperCount,
+      s.totalHours,
+      s.formattedTime,
+      `${s.percentageOfTotal}%`,
+      s.shiftCount,
+      s.avgHoursPerHelper,
+      helperListText,
+    ]);
+  });
+
+  rows.push([]);
+  rows.push([
+    'TOTAL',
+    '',
+    summary.activeHelpers,
+    summary.totalHours,
+    formatMinutes(summary.totalMinutes),
+    '100%',
+    summary.totalShifts,
+    summary.avgHoursPerHelper,
+    '',
+  ]);
+
+  downloadCsv(`stufen-rangliste-${eventSlug}.csv`, rows);
 }
