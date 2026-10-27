@@ -52,4 +52,5 @@ export const BANNER_PRESETS = [
   { name: 'Lagerfeuer & Wald', url: '/images/banners/lagerfeuer.svg' },
   { name: 'Grill & Festwirtschaft', url: '/images/banners/grill.svg' },
   { name: 'Hütte & Berge', url: '/images/banners/huette.svg' },
+  { name: 'Waldweihnacht & Winter', url: '/images/banners/weihnachten.svg' },
 ];

@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
   <defs>
+    <!-- Sky Twilight over the Alps -->
     <linearGradient id="sky-alps" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#0f172a"/>
       <stop offset="35%" stop-color="#1e293b"/>
@@ -7,36 +8,141 @@
       <stop offset="85%" stop-color="#f472b6"/>
       <stop offset="100%" stop-color="#fed7aa"/>
     </linearGradient>
+
+    <!-- Alpenglow on Alpine Peaks (Matterhorn / Massif) -->
     <linearGradient id="peak-alpenglow" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#fecdd3"/>
       <stop offset="30%" stop-color="#fda4af"/>
       <stop offset="70%" stop-color="#64748b"/>
       <stop offset="100%" stop-color="#334155"/>
     </linearGradient>
+
     <linearGradient id="peak-shadow" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#94a3b8"/>
       <stop offset="40%" stop-color="#475569"/>
       <stop offset="100%" stop-color="#1e293b"/>
     </linearGradient>
+
     <linearGradient id="slope-front" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#15261d"/>
       <stop offset="100%" stop-color="#09140f"/>
     </linearGradient>
+
+    <!-- Warm Glowing Cabin Window Light -->
     <radialGradient id="window-glow" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#fef08a" stop-opacity="1"/>
-      <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.8"/>
+      <stop offset="55%" stop-color="#f59e0b" stop-opacity="0.8"/>
       <stop offset="100%" stop-color="#d97706" stop-opacity="0"/>
     </radialGradient>
+
+    <!-- Soft Valley Mist Gradient -->
+    <linearGradient id="mist-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fecdd3" stop-opacity="0"/>
+      <stop offset="25%" stop-color="#fecdd3" stop-opacity="0.25"/>
+      <stop offset="75%" stop-color="#fed7aa" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#fed7aa" stop-opacity="0"/>
+    </linearGradient>
+
+    <style><![CDATA[
+      /* Ruhig und stetig aufsteigender Kaminrauch der Berghütte */
+      .cabin-smoke {
+        animation: chimney-smoke-rise 8s ease-out infinite;
+      }
+      .csm-1 { animation-delay: 0s; }
+      .csm-2 { animation-delay: -2s; }
+      .csm-3 { animation-delay: -4s; }
+      .csm-4 { animation-delay: -6s; }
+
+      @keyframes chimney-smoke-rise {
+        0% {
+          transform: translateY(0) translateX(0);
+          opacity: 0;
+        }
+        18% {
+          opacity: 0.38;
+        }
+        70% {
+          opacity: 0.22;
+        }
+        100% {
+          transform: translateY(-95px) translateX(36px);
+          opacity: 0;
+        }
+      }
+
+      /* Gemütlicher Fensterschein (Kaminfeuer/Kerzenlicht in der Hütte) */
+      .cabin-light-pulse {
+        animation: cabin-glow-breathe 3.6s ease-in-out infinite;
+      }
+      .win-1 { animation-delay: 0s; }
+      .win-2 { animation-delay: -1.3s; }
+      .win-attic { animation-delay: -2.5s; }
+
+      @keyframes cabin-glow-breathe {
+        0%, 100% { opacity: 0.72; }
+        50% { opacity: 1; }
+      }
+
+      /* Sanftes Glitzern der Alpensterne am klaren Abendhimmel */
+      .alpine-star {
+        animation: star-twinkle-smooth 4.2s ease-in-out infinite;
+      }
+      .as-1 { animation-delay: 0s; }
+      .as-2 { animation-delay: -1.4s; }
+      .as-3 { animation-delay: -2.8s; }
+
+      @keyframes star-twinkle-smooth {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 0.95; }
+      }
+
+      /* Sanftes Alpenglühen an der majestätischen Bergspitze */
+      .peak-glow {
+        animation: alpenglow-breathe 9s ease-in-out infinite;
+      }
+      @keyframes alpenglow-breathe {
+        0%, 100% { opacity: 0.88; }
+        50% { opacity: 1; }
+      }
+
+      /* Ruhig ziehende alpine Nebelschwaden im Tal */
+      .valley-mist {
+        animation: mist-drift 26s ease-in-out infinite alternate;
+      }
+      @keyframes mist-drift {
+        0% { transform: translateX(-30px); opacity: 0.18; }
+        50% { opacity: 0.32; }
+        100% { transform: translateX(35px); opacity: 0.2; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .cabin-smoke,
+        .cabin-light-pulse,
+        .alpine-star,
+        .peak-glow,
+        .valley-mist {
+          animation: none !important;
+        }
+      }
+    ]]></style>
   </defs>
 
   <!-- Sky -->
   <rect width="1600" height="900" fill="url(#sky-alps)"/>
 
   <!-- Stars in Upper Sky -->
-  <g fill="#ffffff" opacity="0.6">
-    <circle cx="200" cy="70" r="1.5"/><circle cx="450" cy="110" r="1.2"/><circle cx="700" cy="50" r="1.8"/>
-    <circle cx="950" cy="90" r="1.3"/><circle cx="1200" cy="60" r="2"/><circle cx="1400" cy="120" r="1.5"/>
-    <circle cx="320" cy="140" r="1.2"/><circle cx="820" cy="130" r="1.4"/><circle cx="1080" cy="150" r="1.6"/>
+  <g fill="#ffffff">
+    <circle class="alpine-star as-1" cx="200" cy="70" r="1.5"/>
+    <circle class="alpine-star as-2" cx="450" cy="110" r="1.2"/>
+    <circle class="alpine-star as-3" cx="700" cy="50" r="1.8"/>
+    <circle class="alpine-star as-1" cx="950" cy="90" r="1.3"/>
+    <circle class="alpine-star as-2" cx="1200" cy="60" r="2.0"/>
+    <circle class="alpine-star as-3" cx="1400" cy="120" r="1.5"/>
+    <circle class="alpine-star as-2" cx="320" cy="140" r="1.2"/>
+    <circle class="alpine-star as-1" cx="820" cy="130" r="1.4"/>
+    <circle class="alpine-star as-3" cx="1080" cy="150" r="1.6"/>
+    <circle class="alpine-star as-2" cx="590" cy="85" r="1.4"/>
+    <circle class="alpine-star as-1" cx="1310" cy="80" r="1.3"/>
   </g>
 
   <!-- Far Alpine Peaks (Distant Massif) -->
@@ -44,14 +150,20 @@
   <polygon points="360,240 180,480 540,480" fill="url(#peak-alpenglow)"/>
   <polygon points="360,240 180,480 360,480" fill="url(#peak-shadow)" opacity="0.6"/>
 
-  <!-- Peak 2 Center Giant (Matterhorn / Alpine Horn shape) -->
-  <polygon points="820,180 560,510 1140,510" fill="url(#peak-alpenglow)"/>
+  <!-- Peak 2 Center Giant (Matterhorn / Alpine Horn shape with breathing Alpenglow) -->
+  <polygon class="peak-glow" points="820,180 560,510 1140,510" fill="url(#peak-alpenglow)"/>
   <!-- Ridge Shadow Face -->
   <polygon points="820,180 560,510 820,510" fill="url(#peak-shadow)" opacity="0.7"/>
 
   <!-- Peak 3 Right Massif -->
   <polygon points="1260,260 1020,490 1520,490" fill="url(#peak-alpenglow)"/>
   <polygon points="1260,260 1020,490 1260,490" fill="url(#peak-shadow)" opacity="0.6"/>
+
+  <!-- Gentle Alpine Valley Mist / Nebelschwaden im Tal -->
+  <g class="valley-mist">
+    <ellipse cx="450" cy="460" rx="420" ry="25" fill="url(#mist-grad)"/>
+    <ellipse cx="1150" cy="445" rx="480" ry="28" fill="url(#mist-grad)"/>
+  </g>
 
   <!-- Midground Mountain Slope & Pine Forest Layer -->
   <path d="M0,490 L380,430 L820,480 L1240,410 L1600,470 L1600,900 L0,900 Z" fill="#0f291e" opacity="0.7"/>
@@ -69,12 +181,17 @@
 
   <!-- Traditional Swiss Scout Cabin / Cevi-Hütte -->
   <g transform="translate(680, 500)">
-    <!-- Cabin Chimney & Smoke -->
+    <!-- Cabin Chimney (Stone/Slate) -->
     <rect x="70" y="20" width="22" height="60" fill="#475569"/>
-    <!-- Smoke puffs -->
-    <circle cx="81" cy="5" r="12" fill="#cbd5e1" opacity="0.3"/>
-    <circle cx="92" cy="-18" r="16" fill="#cbd5e1" opacity="0.25"/>
-    <circle cx="106" cy="-45" r="20" fill="#cbd5e1" opacity="0.2"/>
+    <!-- Chimney Rim Cap -->
+    <rect x="67" y="16" width="28" height="6" rx="1.5" fill="#334155"/>
+
+    <!-- Animated Smooth Chimney Smoke rising into alpine sky -->
+    <!-- Center top of chimney is at (81, 16) -->
+    <circle class="cabin-smoke csm-1" cx="81" cy="12" r="10" fill="#cbd5e1"/>
+    <circle class="cabin-smoke csm-2" cx="81" cy="12" r="13" fill="#cbd5e1"/>
+    <circle class="cabin-smoke csm-3" cx="81" cy="12" r="16" fill="#cbd5e1"/>
+    <circle class="cabin-smoke csm-4" cx="81" cy="12" r="19" fill="#cbd5e1"/>
 
     <!-- Cabin Roof (Overhanging Alpine Shingle Roof) -->
     <polygon points="160,50 -20,135 340,135" fill="#451a03"/>
@@ -100,8 +217,8 @@
     <!-- Warm Glowing Windows with Cross Mullions -->
     <!-- Window 1 (Right) -->
     <g transform="translate(145, 175)">
-      <!-- Window glow -->
-      <ellipse cx="30" cy="30" rx="60" ry="45" fill="url(#window-glow)"/>
+      <!-- Animated Window Glow -->
+      <ellipse class="cabin-light-pulse win-1" cx="30" cy="30" rx="65" ry="48" fill="url(#window-glow)"/>
       <rect x="0" y="0" width="60" height="60" rx="3" fill="#fef08a"/>
       <!-- Wooden mullions & frame -->
       <rect x="-4" y="-4" width="68" height="68" rx="4" fill="none" stroke="#451a03" stroke-width="5"/>
@@ -111,8 +228,8 @@
 
     <!-- Window 2 (Far Right Attic) -->
     <g transform="translate(230, 175)">
-      <!-- Window glow -->
-      <ellipse cx="25" cy="30" rx="55" ry="40" fill="url(#window-glow)"/>
+      <!-- Animated Window Glow -->
+      <ellipse class="cabin-light-pulse win-2" cx="25" cy="30" rx="60" ry="42" fill="url(#window-glow)"/>
       <rect x="0" y="0" width="50" height="60" rx="3" fill="#fef08a"/>
       <rect x="-4" y="-4" width="58" height="68" rx="4" fill="none" stroke="#451a03" stroke-width="5"/>
       <line x1="25" y1="0" x2="25" y2="60" stroke="#451a03" stroke-width="4"/>
@@ -120,8 +237,10 @@
     </g>
 
     <!-- Attic Small Triangular / Diamond Window -->
-    <polygon points="160,85 145,110 175,110" fill="#fef08a"/>
-    <polygon points="160,85 145,110 175,110" fill="none" stroke="#451a03" stroke-width="3"/>
+    <g class="cabin-light-pulse win-attic">
+      <polygon points="160,85 145,110 175,110" fill="#fef08a"/>
+      <polygon points="160,85 145,110 175,110" fill="none" stroke="#451a03" stroke-width="3"/>
+    </g>
   </g>
 
   <!-- Foreground Alpine Flora / Pine Branches Framing Left -->
