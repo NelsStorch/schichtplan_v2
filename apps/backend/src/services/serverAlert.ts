@@ -1,4 +1,4 @@
-import { sendEmail } from './email.js';
+import { escapeHtml, renderEmailTemplate, sendEmail } from './email.js';
 
 export type AlertCategory = 'SMTP' | 'DB_OVERLOAD' | 'SERVER_ERROR' | 'TEST';
 export type AlertLevel = 'CRITICAL' | 'WARNING' | 'INFO';
@@ -225,20 +225,50 @@ export async function sendServerAlert(
   // 2. E-Mail senden (nur wenn konfiguriert UND Kategorie != SMTP, um Endlosschleifen zu vermeiden)
   if (alertEmail && payload.category !== 'SMTP') {
     try {
+      const level = payload.level || 'CRITICAL';
       const errorDetails = extractErrorMessage(payload.error);
-      const emailHtml = `
-        <p><strong>[${payload.level || 'CRITICAL'}] ${payload.title}</strong></p>
-        <p><strong>Kategorie:</strong> ${payload.category}</p>
-        <p><strong>Umgebung:</strong> ${environment} (${domain})</p>
-        <p><strong>Meldung:</strong> ${payload.message}</p>
-        ${errorDetails ? `<pre style="background:#f1f5f9;padding:10px;border-radius:4px;overflow-x:auto;">${errorDetails}</pre>` : ''}
-        ${suppressedNote ? `<p style="color:#64748b;font-size:12px;">${suppressedNote}</p>` : ''}
+      const contentHtml = `
+        <p style="margin: 0 0 16px 0;">${escapeHtml(payload.message)}</p>
+        ${
+          errorDetails
+            ? `<pre class="email-link-box" style="background: #fafaf9; border: 1px solid #e4e1de; padding: 12px 14px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; line-height: 1.45; color: #1c1917; margin: 16px 0;">${escapeHtml(
+                errorDetails
+              )}</pre>`
+            : ''
+        }
+        ${suppressedNote ? `<p style="color: #716b66; font-size: 12.5px; margin: 12px 0 0 0;">${escapeHtml(suppressedNote)}</p>` : ''}
       `;
+
+      const html = renderEmailTemplate({
+        preheader: `[${level}] ${payload.title} (${environment})`,
+        eyebrow: `Server-Alarm · ${level}`,
+        title: payload.title,
+        headerSubtitle: `Monitoring · ${domain}`,
+        contentHtml,
+        details: [
+          { label: 'Kategorie', value: payload.category, highlight: true },
+          { label: 'Stufe', value: level },
+          { label: 'Umgebung', value: `${environment} (${domain})` },
+        ],
+        ctaText: 'Admin-Portal öffnen',
+        ctaUrl: `https://admin.${domain}/#statistik`,
+      });
+
+      const text = [
+        `[${level}] ${payload.title}`,
+        `Kategorie: ${payload.category}`,
+        `Umgebung: ${environment} (${domain})`,
+        '',
+        payload.message,
+        ...(errorDetails ? ['', `Fehler: ${errorDetails}`] : []),
+        ...(suppressedNote ? ['', suppressedNote] : []),
+      ].join('\n');
 
       emailSent = await sendEmail({
         to: alertEmail,
         subject: `[Cevi Schichtplan Alert] ${payload.title}`,
-        html: emailHtml,
+        html,
+        text,
         kind: 'SERVER_ALERT',
       });
     } catch (err) {

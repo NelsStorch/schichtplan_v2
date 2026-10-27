@@ -110,28 +110,35 @@ export function Field({ label, hint, error, required, className, children }: Fie
 export interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
-  label: ReactNode;
+  label?: ReactNode;
   description?: ReactNode;
+  disabled?: boolean;
   className?: string;
 }
 
-export function Switch({ checked, onChange, label, description, className }: SwitchProps) {
+export function Switch({ checked, onChange, label, description, disabled, className }: SwitchProps) {
   const id = useId();
   return (
     <div className={cn('flex items-start justify-between gap-4', className)}>
-      <label htmlFor={id} className="min-w-0 cursor-pointer">
-        <span className="block text-sm font-semibold text-fg">{label}</span>
-        {description && <span className="mt-0.5 block text-xs text-fg-subtle">{description}</span>}
-      </label>
+      {(label || description) && (
+        <label htmlFor={id} className={cn('min-w-0', disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer')}>
+          {label && <span className="block text-sm font-semibold text-fg">{label}</span>}
+          {description && <span className="mt-0.5 block text-xs text-fg-subtle">{description}</span>}
+        </label>
+      )}
       <button
         id={id}
         type="button"
         role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) onChange(!checked);
+        }}
         className={cn(
           'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200',
-          checked ? 'bg-accent' : 'bg-surface-3 ring-1 ring-inset ring-line-strong'
+          checked ? 'bg-accent' : 'bg-surface-3 ring-1 ring-inset ring-line-strong',
+          disabled && 'cursor-not-allowed opacity-50'
         )}
       >
         <span

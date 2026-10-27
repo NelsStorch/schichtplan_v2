@@ -187,6 +187,7 @@ async function loadUserDto(
       memberships: tenantId ? { where: { departmentId: tenantId } } : { take: 0 },
       homeDepartment: { select: { id: true, name: true, slug: true } },
       stufen: { include: { stufe: { select: { name: true, departmentId: true, sortOrder: true } } } },
+      _count: { select: { pushSubscriptions: true } },
     },
   });
   if (!user) return null;
@@ -216,6 +217,12 @@ async function loadUserDto(
     needsDepartmentSetup: user.departmentSetupAt === null,
     isCeviNameProfile: isCeviNameProfile(user),
     shiftReminders: user.shiftRemindersEnabled,
+    emailReminderMinutes: user.emailReminderMinutes ?? [1440],
+    pushReminders: user.pushRemindersEnabled ?? true,
+    pushReminderMinutes: user.pushReminderMinutes ?? [60, 1440],
+    pushNotifyReplacement: user.pushNotifyReplacement ?? true,
+    pushNotifyMessages: user.pushNotifyMessages ?? true,
+    pushSubscriptionCount: user._count?.pushSubscriptions ?? 0,
   };
 }
 

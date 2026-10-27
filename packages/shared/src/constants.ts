@@ -391,6 +391,37 @@ export const EVENT_QUESTION_PRESETS: EventQuestionPreset[] = [
 export const REPLACEMENT_CUTOFF_HOURS = [0, 1, 2, 6, 12, 24] as const;
 export type ReplacementCutoffHours = (typeof REPLACEMENT_CUTOFF_HOURS)[number];
 
+/** Wählbare Vorlaufzeiten (in Minuten vor Schichtbeginn) für E-Mail-Erinnerungen */
+export const EMAIL_REMINDER_MINUTES = [60, 120, 360, 720, 1440, 2880, 10080] as const;
+export type EmailReminderMinutes = (typeof EMAIL_REMINDER_MINUTES)[number];
+export const DEFAULT_EMAIL_REMINDER_MINUTES: readonly EmailReminderMinutes[] = [1440];
+
+/** Wählbare Vorlaufzeiten (in Minuten vor Schichtbeginn) für Browser-Push-Erinnerungen */
+export const PUSH_REMINDER_MINUTES = [15, 30, 60, 120, 360, 720, 1440, 2880, 10080] as const;
+export type PushReminderMinutes = (typeof PUSH_REMINDER_MINUTES)[number];
+export const DEFAULT_PUSH_REMINDER_MINUTES: readonly PushReminderMinutes[] = [60, 1440];
+
+/** Beschriftung einer Erinnerungs-Vorlaufzeit (für Auswahl-Chips & Texte) */
+export const REMINDER_MINUTE_LABELS: Record<number, { short: string; long: string; inText: string }> = {
+  15: { short: '15 Min.', long: '15 Minuten vorher', inText: 'in 15 Minuten' },
+  30: { short: '30 Min.', long: '30 Minuten vorher', inText: 'in 30 Minuten' },
+  60: { short: '1 Std.', long: '1 Stunde vorher', inText: 'in 1 Stunde' },
+  120: { short: '2 Std.', long: '2 Stunden vorher', inText: 'in 2 Stunden' },
+  360: { short: '6 Std.', long: '6 Stunden vorher', inText: 'in 6 Stunden' },
+  720: { short: '12 Std.', long: '12 Stunden vorher', inText: 'in 12 Stunden' },
+  1440: { short: '24 Std. (1 Tag)', long: '24 Stunden (1 Tag) vorher', inText: 'in 24 Stunden' },
+  2880: { short: '48 Std. (2 Tage)', long: '48 Stunden (2 Tage) vorher', inText: 'in 2 Tagen' },
+  10080: { short: '1 Woche (7 Tage)', long: '1 Woche (7 Tage) vorher', inText: 'in 1 Woche' },
+};
+
+export function formatReminderLeadTime(minutes: number, mode: 'short' | 'long' | 'inText' = 'long'): string {
+  const entry = REMINDER_MINUTE_LABELS[minutes];
+  if (entry) return entry[mode];
+  if (minutes < 60) return mode === 'inText' ? `in ${minutes} Minuten` : `${minutes} Min.`;
+  const hours = Math.round(minutes / 60);
+  return mode === 'inText' ? `in ${hours} Stunden` : `${hours} Std.`;
+}
+
 /** Bis wann «Ersatz gesucht» gesetzt und übernommen werden kann */
 export function replacementDeadline(shiftStart: Date | string, cutoffHours: number): Date {
   return new Date(new Date(shiftStart).getTime() - cutoffHours * 60 * 60 * 1000);

@@ -67,6 +67,7 @@ export interface EventDetails {
   title: string;
   slug: string;
   description?: string | null;
+  reminderNote?: string | null;
   logoUrl?: string | null;
   bannerUrl?: string | null;
   startDate: string;

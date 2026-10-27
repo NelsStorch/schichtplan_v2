@@ -25,6 +25,7 @@ export interface EventFormValues {
   title: string;
   slug: string;
   description: string;
+  reminderNote: string;
   logoUrl: string;
   bannerUrl: string;
   /** Nur beim Anlegen: Tag des Anlasses (YYYY-MM-DD). Danach ergibt sich der Zeitraum aus den Schichten. */
@@ -52,6 +53,7 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     title: event.title,
     slug: event.slug,
     description: event.description ?? '',
+    reminderNote: event.reminderNote ?? '',
     logoUrl: event.logoUrl ?? '',
     bannerUrl: event.bannerUrl ?? '',
     allowPublicSignup: event.allowPublicSignup,
@@ -103,6 +105,7 @@ const EMPTY: EventFormValues = {
   title: '',
   slug: '',
   description: '',
+  reminderNote: '',
   logoUrl: '',
   bannerUrl: BANNER_PRESETS[0].url,
   startDate: '',
@@ -261,6 +264,7 @@ export function EventForm({
         const shared = {
           title: form.title.trim(),
           description: form.description.trim() || undefined,
+          reminderNote: form.reminderNote.trim() || null,
           logoUrl: form.logoUrl.trim() || null,
           bannerUrl: form.bannerUrl.trim() || null,
           minShiftsPerPerson: form.minShiftsPerPerson ?? null,
@@ -414,6 +418,7 @@ export function EventForm({
       const shared = {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
+        reminderNote: form.reminderNote.trim() || null,
         logoUrl: form.logoUrl.trim() || null,
         bannerUrl: form.bannerUrl.trim() || null,
         minShiftsPerPerson: form.minShiftsPerPerson ?? null,
@@ -546,6 +551,7 @@ export function EventForm({
                         title: cleanTitle,
                         slug: slugify(cleanTitle),
                         description: found.description || '',
+                        reminderNote: found.data.reminderNote || '',
                         cancelDeadlineDays: found.cancelDeadlineDays ?? null,
                         overlapToleranceMinutes: found.overlapToleranceMinutes ?? 15,
                         allowReplacement: found.data.allowReplacement ?? true,
@@ -961,6 +967,18 @@ export function EventForm({
           />
         </Field>
 
+        <Field
+          label="Hinweis in der Schicht-Erinnerung (optional)"
+          hint="Wird automatisch in jede Schicht-Erinnerungs-Mail und Browser-Benachrichtigung vor Schichtbeginn eingefügt (z. B. Treffpunkt, Helfer-Check-in oder Kleidung)."
+        >
+          <Textarea
+            rows={3}
+            maxLength={1000}
+            value={form.reminderNote}
+            placeholder="z. B. Wir treffen uns 10 Minuten vor Schichtbeginn beim Helfer-Check-in hinter dem Festzelt. Denk bitte an wetterfeste Kleidung und dein Cevi-Hemd."
+            onChange={(e) => set('reminderNote', e.target.value)}
+          />
+        </Field>
       </S>
 
       <S id="zugang" title="Zugang & Angaben" description="Wer sich eintragen darf und was ihr von den Helfenden wissen müsst.">

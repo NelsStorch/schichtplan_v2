@@ -57,14 +57,33 @@ export function notifyAdminChange(
       where: { OR: [{ isGlobalAdmin: true }, { id: change.targetUserId }] },
       select: { email: true, emailVerified: true },
     });
-    const verb = change.granted ? 'ist neu globale Admin' : 'ist keine globale Admin mehr';
+    const verb = change.granted ? 'ist neu globale*r Admin' : 'ist kein*e globale*r Admin mehr';
     const subject = `Cevi Schichtplan: ${change.targetLabel} ${verb}`;
-    const messageHtml = `<p><strong>${escapeHtml(change.targetLabel)}</strong> ${verb}.</p>
-      <p>Geändert von ${escapeHtml(change.actorLabel)} am ${new Date().toLocaleString('de-CH', { timeZone: 'Europe/Zurich' })}.</p>
-      <p>Falls das nicht abgesprochen war, prüft bitte sofort das Protokoll im Admin-Portal.</p>`;
+    const timestamp = new Date().toLocaleString('de-CH', { timeZone: 'Europe/Zurich' });
+    const messageHtml = `
+      <p style="margin: 0 0 16px 0;"><strong class="email-signature" style="color: #1c1917;">${escapeHtml(change.targetLabel)}</strong> ${escapeHtml(verb)}.</p>
+      <p style="margin: 0;">Falls diese Änderung nicht abgesprochen war, prüft bitte sofort das Protokoll im Admin-Portal.</p>
+    `;
+    const details = [
+      { label: 'Person', value: change.targetLabel, highlight: true },
+      { label: 'Status', value: change.granted ? 'Globale Admin-Rechte vergeben' : 'Globale Admin-Rechte entzogen' },
+      { label: 'Geändert von', value: change.actorLabel },
+      { label: 'Zeitpunkt', value: timestamp },
+    ];
+    const domain = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+    const adminUrl = `https://admin.${domain}/#protokoll`;
     const emails = [...new Set(recipients.map(usableEmail).filter((e): e is string => Boolean(e)))];
     for (const to of emails) {
-      await sendGenericEmail({ to, subject, eyebrow: 'Admin-Portal', title: subject, messageHtml });
+      await sendGenericEmail({
+        to,
+        subject,
+        eyebrow: 'Admin-Portal · Sicherheit',
+        title: subject,
+        messageHtml,
+        details,
+        ctaText: 'Admin-Protokoll öffnen',
+        ctaUrl: adminUrl,
+      });
     }
   })().catch((err) => request.log.error({ err }, 'Mail zur Admin-Änderung fehlgeschlagen'));
 }

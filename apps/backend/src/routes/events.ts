@@ -386,6 +386,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         title: event.title,
         slug: event.slug,
         description: event.description,
+        reminderNote: event.reminderNote || null,
         logoUrl: event.logoUrl,
         bannerUrl: event.bannerUrl,
         startDate: event.startDate.toISOString(),
@@ -580,6 +581,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         title,
         slug,
         description,
+        reminderNote,
         logoUrl,
         bannerUrl,
         startDate,
@@ -698,6 +700,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             title,
             slug,
             description: description || null,
+            reminderNote: reminderNote?.trim() || null,
             logoUrl: logoUrl || null,
             bannerUrl: bannerUrl || null,
             // Bis es Schichten gibt, ist der Anlass ein Zeitpunkt; danach führt syncEventRange nach
@@ -824,6 +827,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             title: body.title,
             slug: newSlug,
             description: body.description,
+            reminderNote: body.reminderNote !== undefined ? (body.reminderNote?.trim() || null) : undefined,
             logoUrl: body.logoUrl,
             bannerUrl: body.bannerUrl,
             allowPublicSignup: body.allowPublicSignup,
@@ -1393,6 +1397,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             attendanceMode: event.attendanceMode,
             allowReplacement: event.allowReplacement,
             replacementCutoffHours: event.replacementCutoffHours,
+            reminderNote: event.reminderNote || null,
             questions: event.questions.map((q) => {
               const { id: _id, ...rest } = toQuestionDto(q);
               return rest;

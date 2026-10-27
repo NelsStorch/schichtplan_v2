@@ -27,6 +27,7 @@ import statsRoutes from './routes/stats.js';
 import { isDatabaseOverloadError, sendServerAlert } from './services/serverAlert.js';
 import eventTemplateRoutes from './routes/eventTemplates.js';
 import taskDefinitionRoutes from './routes/taskDefinitions.js';
+import pushRoutes from './routes/push.js';
 
 // pino-pretty ist optional: fehlt es (z. B. im Dev-Container), wird normal geloggt statt zu crashen.
 function hasPinoPretty(): boolean {
@@ -112,6 +113,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(uploadRoutes);
   await app.register(calendarRoutes);
   await app.register(statsRoutes);
+  await app.register(pushRoutes);
 
 
   // Zentraler Fehler-Handler für Server-Fehler & Admin-Webhook-Alarme

@@ -249,12 +249,16 @@ export default function MessagesPage() {
           <Field label="Betreff" required>
             <Input value={subject} maxLength={150} placeholder="z. B. Treffpunkt am Samstag" onChange={(e) => setSubject(e.target.value)} />
           </Field>
-          <Field label="Nachricht" required hint={`${body.length}/${MAX_BODY} Zeichen. Ein Link zum Schichtplan wird automatisch angefügt.`}>
+          <Field
+            label="Nachricht"
+            required
+            hint={`${body.length}/${MAX_BODY} Zeichen. Tipp: {name} setzt automatisch den Namen der Person ein. Ein Link zum Schichtplan wird unten angefügt.`}
+          >
             <Textarea
               rows={8}
               value={body}
               maxLength={MAX_BODY}
-              placeholder={'Hallo zusammen\n\nWir treffen uns um 17:30 beim Festzelt …'}
+              placeholder={'Hallo {name}\n\nWir treffen uns um 17:30 beim Festzelt …'}
               onChange={(e) => setBody(e.target.value)}
             />
           </Field>

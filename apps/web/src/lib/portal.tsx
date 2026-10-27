@@ -9,6 +9,7 @@ import { updateFavicon } from './favicon';
 interface PortalState {
   department: DepartmentDto | null;
   user: UserDto | null;
+  setUser: (user: UserDto | null) => void;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -71,7 +72,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
   return (
     <PortalContext.Provider
-      value={{ department, user, loading, error, refresh, logout, isDeptAdmin, permissions, can }}
+      value={{ department, user, setUser, loading, error, refresh, logout, isDeptAdmin, permissions, can }}
     >
       {children}
     </PortalContext.Provider>

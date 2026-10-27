@@ -19,7 +19,7 @@ import {
   Callout,
   Field,
   Input,
-  Switch,
+  NotificationSettings,
   ThemeToggle,
   buttonClasses,
   useConfirm,
@@ -368,20 +368,10 @@ export default function ProfilePage() {
             </form>
 
             <section className="rounded-card border border-line bg-surface p-5">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">
-                <Bell className="size-4" /> Benachrichtigungen
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-subtle">
+                <Bell className="size-4" /> Benachrichtigungen &amp; Erinnerungen
               </h2>
-              <Switch
-                className="mt-3"
-                checked={user.shiftReminders !== false}
-                onChange={toggleReminders}
-                label="Erinnerung vor meinen Schichten"
-                description={
-                  hasRealEmail && user.emailVerified
-                    ? `Etwa 24 Stunden vor jeder Schicht eine E-Mail an ${user.email}.`
-                    : 'Dafür braucht dein Konto eine bestätigte E-Mail-Adresse (siehe oben).'
-                }
-              />
+              <NotificationSettings user={user} onUserChange={setUser} />
             </section>
 
             <section className="rounded-card border border-line bg-surface p-5">

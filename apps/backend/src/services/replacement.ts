@@ -4,6 +4,7 @@ import { usableEmail } from '../routes/eventMessages.js';
 import { sendReplacementTakenEmail } from './email.js';
 import { evaluateEventAccess, type ManagerFlags } from './eventAccess.js';
 import { eventUrl } from './shiftReminders.js';
+import { sendPushToUser } from './webPush.js';
 
 type ReplacementEvent = { allowReplacement: boolean; replacementCutoffHours: number };
 
@@ -33,28 +34,55 @@ export function canTakeOver(
 }
 
 type ReplacedSignup = {
-  user: { firstName: string; email: string | null; emailVerified: boolean } | null;
+  user: {
+    id?: string;
+    firstName: string;
+    ceviName?: string | null;
+    email: string | null;
+    emailVerified: boolean;
+    pushNotifyReplacement?: boolean;
+  } | null;
 };
 
-/** Mail an die Person, deren Schicht übernommen wurde (nur bestätigte, echte Adresse) */
+/** Mail + optionale Push-Benachrichtigung an die Person, deren Schicht übernommen wurde */
 export async function notifyReplacementTaken(
-  prisma: Pick<PrismaClient, 'department'>,
+  prisma: Pick<PrismaClient, 'department'> & Partial<Pick<PrismaClient, 'pushSubscription'>>,
   replaced: ReplacedSignup,
   shift: { title: string; startTime: Date; endTime: Date },
   event: { title: string; slug: string; departmentId: string },
   takenBy: string,
   send: typeof sendReplacementTakenEmail = sendReplacementTakenEmail
 ): Promise<boolean> {
-  const to = replaced.user ? usableEmail(replaced.user) : null;
-  if (!replaced.user || !to) return false;
-  const department = await prisma.department.findUnique({ where: { id: event.departmentId }, select: { slug: true } });
+  if (!replaced.user) return false;
+  const department = await prisma.department.findUnique({
+    where: { id: event.departmentId },
+    select: { slug: true, name: true, primaryColor: true },
+  });
+  const timeRangeFormatted = `${formatZurichDate(shift.startTime)}, ${formatZurichTimeRange(shift.startTime, shift.endTime)}`;
+  const targetUrl = department ? eventUrl(department.slug, event.slug) : undefined;
+
+  // Web Push an alle registrierten Geräte (auch für Cevi-Name-Profile ohne E-Mail)
+  if (replaced.user.id && replaced.user.pushNotifyReplacement !== false && prisma.pushSubscription) {
+    void sendPushToUser(prisma as PrismaClient, replaced.user.id, {
+      title: `Ersatz gefunden: ${shift.title}`,
+      body: `${takenBy} hat deine Schicht bei ${event.title} (${timeRangeFormatted}) übernommen.`,
+      url: targetUrl,
+      tag: `replacement-taken-${event.slug}`,
+    }).catch(() => undefined);
+  }
+
+  const to = usableEmail(replaced.user);
+  if (!to) return false;
+
   return send({
     to,
-    name: replaced.user.firstName,
+    name: replaced.user.ceviName || replaced.user.firstName,
     takenBy,
     eventTitle: event.title,
     shiftTitle: shift.title,
-    timeRangeFormatted: `${formatZurichDate(shift.startTime)}, ${formatZurichTimeRange(shift.startTime, shift.endTime)}`,
-    eventUrl: department ? eventUrl(department.slug, event.slug) : undefined,
+    timeRangeFormatted,
+    eventUrl: targetUrl,
+    departmentName: department?.name,
+    accentColor: department?.primaryColor,
   });
 }

@@ -89,6 +89,8 @@ export interface EventDto {
   allowReplacement?: boolean;
   /** «Ersatz gesucht» bis so viele Stunden vor Schichtbeginn (0 = bis Schichtbeginn) */
   replacementCutoffHours?: number;
+  /** Optionaler Hinweis vom OK für die automatische Schicht-Erinnerung (z. B. Treffpunkt, Kleidung) */
+  reminderNote?: string | null;
   createdAt: string;
   shiftCount?: number;
   /** Summe der benötigten bzw. besetzten Plätze über alle Schichten */
@@ -215,6 +217,7 @@ export interface EventTemplateData {
   attendanceMode?: AttendanceMode;
   allowReplacement?: boolean;
   replacementCutoffHours?: number;
+  reminderNote?: string | null;
 }
 
 export interface EventTemplateDto {
@@ -266,6 +269,18 @@ export interface UserDto {
   isCeviNameProfile?: boolean;
   /** Möchte eine Erinnerungs-Mail vor den eigenen Schichten */
   shiftReminders?: boolean;
+  /** Gewählte Vorlaufzeiten (in Minuten vor Schichtbeginn) für E-Mail-Erinnerungen */
+  emailReminderMinutes?: number[];
+  /** Möchte Browser-Push-Erinnerungen vor den eigenen Schichten */
+  pushReminders?: boolean;
+  /** Gewählte Vorlaufzeiten (in Minuten vor Schichtbeginn) für Browser-Push-Erinnerungen */
+  pushReminderMinutes?: number[];
+  /** Browser-Push, wenn jemand die eigene angebotene Schicht übernimmt («Ersatz gefunden») */
+  pushNotifyReplacement?: boolean;
+  /** Browser-Push bei neuen Nachrichten vom OK */
+  pushNotifyMessages?: boolean;
+  /** Anzahl aktivierter Browser-Push-Geräte dieses Kontos */
+  pushSubscriptionCount?: number;
 }
 
 // ---------------------------------------------------------------------------

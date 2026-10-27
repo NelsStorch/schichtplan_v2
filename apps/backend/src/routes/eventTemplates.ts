@@ -199,6 +199,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             attendanceMode: instantiateAttendanceMode,
             allowReplacement: parse.data.allowReplacement ?? templateData?.allowReplacement ?? true,
             replacementCutoffHours: parse.data.replacementCutoffHours ?? templateData?.replacementCutoffHours ?? 0,
+            reminderNote: parse.data.reminderNote !== undefined ? (parse.data.reminderNote?.trim() || null) : (templateData?.reminderNote || null),
             checkinToken: instantiateAttendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
           },
         });

@@ -44,3 +44,4 @@ export {
 
 export { trackUi, usageOptedOut } from './stats/usage';
 export { UsageTracker } from './stats/UsageTracker';
+export { NotificationSettings, type NotificationSettingsProps } from './components/NotificationSettings';

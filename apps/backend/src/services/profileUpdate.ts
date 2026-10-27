@@ -31,6 +31,23 @@ export async function applyProfileUpdate(
   if (input.lastName !== undefined) data.lastName = input.lastName;
   if (input.phone !== undefined) data.phone = input.phone;
   if (input.shiftReminders !== undefined) data.shiftRemindersEnabled = input.shiftReminders;
+  if (input.emailReminderMinutes !== undefined) {
+    const sorted = [...new Set(input.emailReminderMinutes)].sort((a, b) => a - b);
+    data.emailReminderMinutes = sorted;
+    if (input.shiftReminders === undefined) {
+      data.shiftRemindersEnabled = sorted.length > 0;
+    }
+  }
+  if (input.pushReminders !== undefined) data.pushRemindersEnabled = input.pushReminders;
+  if (input.pushReminderMinutes !== undefined) {
+    const sorted = [...new Set(input.pushReminderMinutes)].sort((a, b) => a - b);
+    data.pushReminderMinutes = sorted;
+    if (input.pushReminders === undefined) {
+      data.pushRemindersEnabled = sorted.length > 0;
+    }
+  }
+  if (input.pushNotifyReplacement !== undefined) data.pushNotifyReplacement = input.pushNotifyReplacement;
+  if (input.pushNotifyMessages !== undefined) data.pushNotifyMessages = input.pushNotifyMessages;
   if (input.birthDate !== undefined) {
     const date = new Date(`${input.birthDate}T00:00:00Z`);
     if (isNaN(date.getTime()) || date > new Date()) return { error: 'Ungültiges Geburtsdatum', status: 400 };

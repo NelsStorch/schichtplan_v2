@@ -10,6 +10,7 @@ import {
   Button,
   CeviLogo,
   Dialog,
+  NotificationSettings,
   ThemeToggle,
   buttonClasses,
   cn,
@@ -186,7 +187,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
 }
 
 function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, department, logout } = usePortal();
+  const { user, setUser, department, logout } = usePortal();
   const confirm = useConfirm();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
@@ -262,6 +263,10 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <ThemeToggle />
         </div>
 
+        <div className="mt-4 rounded-card border border-line bg-surface-1 p-3.5">
+          <NotificationSettings user={user} onUserChange={(u) => setUser(u)} compact />
+        </div>
+
         <div className="mt-4 grid gap-2">
           {canInstall && (
             <Button
@@ -279,9 +284,9 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary' })}>
             <Building2 /> Abteilung &amp; Stufen
           </a>
-          <a href={getLandingUrl('/profil')} className={buttonClasses({ variant: 'secondary' })}>
-            <UserRound /> Profil &amp; Angaben
-          </a>
+          <Link href="/profil" onClick={onClose} className={buttonClasses({ variant: 'secondary' })}>
+            <UserRound /> Profil &amp; Benachrichtigungen
+          </Link>
           <a href={helpUrl()} className={buttonClasses({ variant: 'secondary' })}>
             <LifeBuoy /> Hilfe &amp; Anleitungen
           </a>

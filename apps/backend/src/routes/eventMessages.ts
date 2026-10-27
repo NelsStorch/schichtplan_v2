@@ -15,6 +15,7 @@ import { personLabel } from '../services/profile.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 import { eventUrl } from '../services/shiftReminders.js';
 import { trackUsage } from '../services/usageStats.js';
+import { sendPushToUser } from '../services/webPush.js';
 
 // Schutz vor versehentlichem Mehrfach-Versand und Missbrauch: pro Anlass und pro Person
 const eventLimiter = createRateLimiter(60 * 60 * 1000, 10);
@@ -22,7 +23,7 @@ const senderLimiter = createRateLimiter(60 * 60 * 1000, 20);
 
 export const MAX_MESSAGE_RECIPIENTS = 1000;
 
-type Recipient = { id: string; label: string; email: string | null };
+type Recipient = { id: string; label: string; email: string | null; pushNotifyMessages?: boolean };
 
 /** Nur bestätigte, echte Adressen (keine Platzhalter aus Cevi.DB, keine selbst eingetragenen unbestätigten) */
 export function usableEmail(u: { email: string | null; emailVerified: boolean }): string | null {
@@ -63,7 +64,15 @@ function toDto(m: {
   };
 }
 
-const userSelect = { id: true, firstName: true, lastName: true, ceviName: true, email: true, emailVerified: true } as const;
+const userSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  ceviName: true,
+  email: true,
+  emailVerified: true,
+  pushNotifyMessages: true,
+} as const;
 
 /** Nachrichten des OK an Helfende (E-Mail, jede Person bekommt eine eigene Mail) */
 const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
@@ -72,7 +81,8 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
       where: { departmentId_slug: { departmentId: tenantId, slug } },
       include: {
         ...accessEventInclude,
-        department: { select: { slug: true, name: true } },
+        department: { select: { slug: true, name: true, primaryColor: true } },
+        contactUser: { select: userSelect },
       },
     });
     if (!event) return { event: null, canView: false, canSend: false };
@@ -162,7 +172,12 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           },
           select: userSelect,
         });
-        recipients = users.map((u) => ({ id: u.id, label: personLabel(u), email: usableEmail(u) }));
+        recipients = users.map((u) => ({
+          id: u.id,
+          label: personLabel(u),
+          email: usableEmail(u),
+          pushNotifyMessages: u.pushNotifyMessages,
+        }));
         targetLabel = shiftIds
           ? `Eingetragene in ${shiftIds.length} Schicht${shiftIds.length === 1 ? '' : 'en'}`
           : 'Alle Eingetragenen';
@@ -171,7 +186,12 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           where: { organizedEvents: { some: { eventId: event.id } } },
           select: userSelect,
         });
-        recipients = users.map((u) => ({ id: u.id, label: personLabel(u), email: usableEmail(u) }));
+        recipients = users.map((u) => ({
+          id: u.id,
+          label: personLabel(u),
+          email: usableEmail(u),
+          pushNotifyMessages: u.pushNotifyMessages,
+        }));
         targetLabel = 'Das OK';
       } else if (target === 'OPEN') {
         const cfg = accessTypeConfig(event.accessType);
@@ -245,7 +265,12 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           return checkRules(event, accessUser, event.department.name).ok;
         });
 
-        recipients = matching.map((u) => ({ id: u.id, label: personLabel(u), email: usableEmail(u) }));
+        recipients = matching.map((u) => ({
+          id: u.id,
+          label: personLabel(u),
+          email: usableEmail(u),
+          pushNotifyMessages: u.pushNotifyMessages,
+        }));
         targetLabel = event.minShiftsPerPerson
           ? `Unter dem Soll (mind. ${event.minShiftsPerPerson} Schicht${event.minShiftsPerPerson === 1 ? '' : 'en'})`
           : 'Noch ohne Schicht';
@@ -272,7 +297,12 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         if (users.length !== userIds.length) {
           return reply.status(400).send({ error: 'Eine ausgewählte Person gehört nicht zu diesem Anlass' });
         }
-        recipients = users.map((u) => ({ id: u.id, label: personLabel(u), email: usableEmail(u) }));
+        recipients = users.map((u) => ({
+          id: u.id,
+          label: personLabel(u),
+          email: usableEmail(u),
+          pushNotifyMessages: u.pushNotifyMessages,
+        }));
         targetLabel = `${userIds.length} ausgewählte Person${userIds.length === 1 ? '' : 'en'}`;
       }
 
@@ -304,7 +334,10 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
 
       const sender = await fastify.prisma.user.findUnique({ where: { id: request.user.id }, select: userSelect });
       const senderName = sender ? personLabel(sender) : 'OK';
-      const replyTo = sender ? usableEmail(sender) ?? undefined : undefined;
+      const replyTo =
+        (sender ? usableEmail(sender) : null) ??
+        (event.contactUser ? usableEmail(event.contactUser) : null) ??
+        undefined;
 
       const message = await fastify.prisma.eventMessage.create({
         data: {
@@ -319,23 +352,69 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      const html = renderEmailTemplate({
-        preheader: subject,
-        eyebrow: event.title,
-        title: subject,
-        contentHtml: `${messageBodyHtml(body)}<p style="margin: 0; font-size: 13px; color: #64748b;">Nachricht von ${escapeHtml(senderName)} (OK ${escapeHtml(event.title)})${replyTo ? '. Du kannst direkt auf diese Mail antworten.' : '.'}</p>`,
-        ctaText: 'Zum Schichtplan',
-        ctaUrl: eventUrl(event.department.slug, event.slug),
-        footerNote: `Du bekommst diese Mail, weil du beim Anlass «${event.title}» von ${event.department.name} dabei bist.`,
-      });
-      const text = `${body.trim()}\n\nNachricht von ${senderName} (OK ${event.title})\n${eventUrl(event.department.slug, event.slug)}`;
+      const senderNoteHtml = `<p style="margin: 0; font-size: 13px; color: #716b66;">Nachricht von <strong class="email-signature" style="color: #1c1917;">${escapeHtml(senderName)}</strong> (OK ${escapeHtml(event.title)})${
+        replyTo
+          ? ` · Antworten gehen direkt an <a href="mailto:${escapeHtml(replyTo)}" style="text-decoration: underline;">${escapeHtml(replyTo)}</a>.`
+          : '.'
+      }</p>`;
+      const targetEventUrl = eventUrl(event.department.slug, event.slug);
+      const fromName = `${event.title} (${event.department.name})`;
+      const signatureName = `OK ${event.title} (${event.department.name})`;
 
       // Versand im Hintergrund, damit grosse Listen die Anfrage nicht blockieren. Fehlschläge landen im Verlauf.
       void (async () => {
         let failed = 0;
         for (const r of withEmail) {
-          const ok = await sendEmail({ to: r.email, subject: `${subject} – ${event.title}`, html, text, replyTo, kind: 'OK_MESSAGE' });
+          const greetingName = r.label?.trim() || 'Cevianer*in';
+          const personalizedBody = body.replace(/\{name\}/gi, greetingName);
+          const html = renderEmailTemplate({
+            preheader: `${subject} – Nachricht vom OK ${event.title}`,
+            eyebrow: event.title,
+            title: subject,
+            headerSubtitle: event.department.name,
+            signatureName,
+            accentColor: event.department.primaryColor,
+            contentHtml: `${messageBodyHtml(personalizedBody)}${senderNoteHtml}`,
+            ctaText: 'Zum Schichtplan',
+            ctaUrl: targetEventUrl,
+            footerNote: `Du erhältst diese Nachricht, weil du beim Anlass «${event.title}» von ${event.department.name} dabei bist.`,
+          });
+          const text = `${personalizedBody.trim()}\n\n--\nNachricht von ${senderName} (OK ${event.title})${
+            replyTo ? ` · Antworten gehen direkt an ${replyTo}.` : ''
+          }\nZum Schichtplan: ${targetEventUrl}`;
+
+          const ok = await sendEmail({
+            to: r.email,
+            subject: `${subject} – ${event.title}`,
+            html,
+            text,
+            replyTo,
+            fromName,
+            autoSubmitted: false,
+            kind: 'OK_MESSAGE',
+          });
           if (!ok) failed++;
+        }
+        // Zusätzlich Browser-Push an alle ausgewählten Empfänger*innen (auch ohne E-Mail), sofern aktiviert
+        for (const r of recipients) {
+          if (r.pushNotifyMessages === false) continue;
+          const greetingName = r.label?.trim() || 'Cevianer*in';
+          const previewText = body
+            .replace(/\{name\}/gi, greetingName)
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 140);
+          await sendPushToUser(
+            fastify.prisma,
+            r.id,
+            {
+              title: `${event.title}: ${subject}`,
+              body: previewText,
+              url: targetEventUrl,
+              tag: `ok-message-${message.id}`,
+            },
+            request.log
+          ).catch(() => undefined);
         }
         if (failed > 0) {
           await fastify.prisma.eventMessage

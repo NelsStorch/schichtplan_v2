@@ -122,6 +122,16 @@ model User {
   passwordChangedAt   DateTime?          @map("password_changed_at")
   /// Erinnerungs-Mail vor eigenen Schichten (im Profil abschaltbar)
   shiftRemindersEnabled Boolean          @default(true) @map("shift_reminders_enabled")
+  /// Vorlaufzeiten (in Minuten vor Schichtbeginn) für E-Mail-Erinnerungen
+  emailReminderMinutes  Int[]            @default([1440]) @map("email_reminder_minutes")
+  /// Browser-Push-Erinnerungen vor eigenen Schichten
+  pushRemindersEnabled  Boolean          @default(true) @map("push_reminders_enabled")
+  /// Vorlaufzeiten (in Minuten vor Schichtbeginn) für Browser-Push-Erinnerungen
+  pushReminderMinutes   Int[]            @default([60, 1440]) @map("push_reminder_minutes")
+  /// Browser-Push, wenn jemand eine zur Übernahme angebotene Schicht übernimmt
+  pushNotifyReplacement Boolean          @default(true) @map("push_notify_replacement")
+  /// Browser-Push bei neuen Nachrichten vom OK
+  pushNotifyMessages    Boolean          @default(true) @map("push_notify_messages")
   /// Geheimer Token für den persönlichen Webcal/iCal-Kalenderfeed
   calendarToken       String?            @unique @map("calendar_token")
   /// Letzter Tag mit Nutzung (nur das Datum, ohne Uhrzeit). Höchstens ein Schreibzugriff pro Person und Tag (plugins/jwt.ts)
@@ -145,6 +155,7 @@ model User {
   eventDayResponsibles    EventDayResponsible[]
   helperSignupLogs        ShiftSignupLog[]   @relation("HelperUser")
   performedSignupLogs     ShiftSignupLog[]   @relation("PerformedByUser")
+  pushSubscriptions       PushSubscription[]
 
   @@index([lastSeenOn])
   @@map("users")
@@ -210,6 +221,8 @@ model Event {
   allowReplacement  Boolean           @default(true) @map("allow_replacement")
   // Bis wie viele Stunden vor Schichtbeginn (0 = bis Schichtbeginn)
   replacementCutoffHours Int          @default(0) @map("replacement_cutoff_hours")
+  // Optionaler Zusatztext des OK für die automatische Schicht-Erinnerung (z. B. Treffpunkt, Kleidung)
+  reminderNote      String?           @map("reminder_note")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   department        Department        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -410,6 +423,10 @@ model ShiftSignup {
   notes       String?
   /// Erinnerungs-Mail verschickt (oder vergeben, siehe services/shiftReminders.ts)
   reminderSentAt DateTime? @map("reminder_sent_at")
+  /// Bereits verschickte E-Mail-Erinnerungs-Stufen (Minuten vor Schichtbeginn, z. B. [1440, 120])
+  sentEmailReminders Int[] @default([]) @map("sent_email_reminders")
+  /// Bereits verschickte Browser-Push-Erinnerungs-Stufen (Minuten vor Schichtbeginn, z. B. [60])
+  sentPushReminders  Int[] @default([]) @map("sent_push_reminders")
   /// Anwesenheit: null = offen, "PRESENT", "EXCUSED", "NO_SHOW"
   attendance       String?   @map("attendance")
   attendanceAt     DateTime? @map("attendance_at")
@@ -504,15 +521,31 @@ model PasswordResetToken {
 }
 
 model ShiftResponsible {
-  id        String   @id @default(uuid())
-  shiftId   String   @map("shift_id")
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  shift     Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(uuid())
+  shiftId            String   @map("shift_id")
+  userId             String   @map("user_id")
+  sentEmailReminders Int[]    @default([]) @map("sent_email_reminders")
+  sentPushReminders  Int[]    @default([]) @map("sent_push_reminders")
+  createdAt          DateTime @default(now()) @map("created_at")
+  shift              Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([shiftId, userId])
   @@map("shift_responsibles")
+}
+
+/// Web-Push-Subscription eines Geräts (Service Worker PushManager)
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model EventDayResponsible {

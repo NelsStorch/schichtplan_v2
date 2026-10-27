@@ -4,7 +4,9 @@ import {
   ATTENDANCE_STATUS_KEYS,
   DEFAULT_QUESTION_RETENTION_DAYS,
   DEPARTMENT_PERMISSION_KEYS,
+  EMAIL_REMINDER_MINUTES,
   EVENT_ACCESS_TYPE_KEYS,
+  PUSH_REMINDER_MINUTES,
   QUESTION_RETENTION_DAYS,
   REPLACEMENT_CUTOFF_HOURS,
   type DepartmentPermission,
@@ -195,6 +197,7 @@ export const CreateEventSchema = z.object({
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
+  reminderNote: z.string().trim().max(1000, 'Hinweis darf maximal 1000 Zeichen lang sein').optional().nullable(),
   organizers: z.array(CreateEventOrganizerItemSchema).max(50).optional(),
 });
 
@@ -224,6 +227,7 @@ export const UpdateEventSchema = z.object({
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
+  reminderNote: z.string().trim().max(1000, 'Hinweis darf maximal 1000 Zeichen lang sein').optional().nullable(),
   accessType: z.enum(EVENT_ACCESS_TYPE_KEYS).optional(),
   leadersOnly: z.boolean().optional(),
   requiredFields: RequiredFieldsSchema.optional(),
@@ -259,9 +263,52 @@ export const UpdateProfileSchema = z.object({
   birthDate: BirthDateSchema.optional(),
   /** Erinnerungs-Mail vor eigenen Schichten */
   shiftReminders: z.boolean().optional(),
+  /** Gewählte Vorlaufzeiten (Minuten) für E-Mail-Erinnerungen */
+  emailReminderMinutes: z
+    .array(
+      z
+        .number()
+        .int()
+        .refine((m) => (EMAIL_REMINDER_MINUTES as readonly number[]).includes(m), 'Ungültiger Zeitpunkt')
+    )
+    .max(15)
+    .optional(),
+  /** Browser-Push-Erinnerung vor eigenen Schichten */
+  pushReminders: z.boolean().optional(),
+  /** Gewählte Vorlaufzeiten (Minuten) für Browser-Push-Erinnerungen */
+  pushReminderMinutes: z
+    .array(
+      z
+        .number()
+        .int()
+        .refine((m) => (PUSH_REMINDER_MINUTES as readonly number[]).includes(m), 'Ungültiger Zeitpunkt')
+    )
+    .max(15)
+    .optional(),
+  /** Browser-Push bei «Ersatz gefunden» */
+  pushNotifyReplacement: z.boolean().optional(),
+  /** Browser-Push bei neuen Nachrichten vom OK */
+  pushNotifyMessages: z.boolean().optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
+
+/** Web-Push-Subscription eines Geräts (Service Worker PushManager.subscribe) */
+export const PushSubscribeSchema = z.object({
+  endpoint: z.string().trim().url('Ungültige Push-Endpoint-URL').max(2000),
+  keys: z.object({
+    p256dh: z.string().trim().min(10).max(300),
+    auth: z.string().trim().min(6).max(200),
+  }),
+});
+
+export type PushSubscribeInput = z.infer<typeof PushSubscribeSchema>;
+
+export const PushUnsubscribeSchema = z.object({
+  endpoint: z.string().trim().url('Ungültige Push-Endpoint-URL').max(2000),
+});
+
+export type PushUnsubscribeInput = z.infer<typeof PushUnsubscribeSchema>;
 
 export const EventParticipationSchema = z.object({
   profile: UpdateProfileSchema.optional(),
@@ -463,6 +510,7 @@ export const InstantiateTemplateSchema = z.object({
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
+  reminderNote: z.string().trim().max(1000, 'Hinweis darf maximal 1000 Zeichen lang sein').optional().nullable(),
 });
 
 export type InstantiateTemplateInput = z.infer<typeof InstantiateTemplateSchema>;

@@ -32,6 +32,12 @@ import { syncEventRange } from '../services/eventRange.js';
 import { trackUsage } from '../services/usageStats.js';
 import { personLabel } from '../services/attendance.js';
 import { notifyReplacementTaken, replacementOpen } from '../services/replacement.js';
+import { EMAIL_REMINDER_MINUTES, PUSH_REMINDER_MINUTES } from '@schichtplan/shared';
+
+function pastReminderMinutes(shiftStartTime: Date, pool: readonly number[], now = new Date()): number[] {
+  const diffMs = shiftStartTime.getTime() - now.getTime();
+  return pool.filter((m) => diffMs < m * 60_000);
+}
 
 function toResponsiblePersonDto(
   r: {
@@ -143,7 +149,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           responsibles:
             responsibleUserIds && responsibleUserIds.length > 0
               ? {
-                  create: responsibleUserIds.map((userId) => ({ userId })),
+                  create: responsibleUserIds.map((userId) => ({
+                    userId,
+                    sentEmailReminders: pastReminderMinutes(new Date(startTime), EMAIL_REMINDER_MINUTES),
+                    sentPushReminders: pastReminderMinutes(new Date(startTime), PUSH_REMINDER_MINUTES),
+                  })),
                 }
               : undefined,
           tasks: {
@@ -284,7 +294,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               responsibles:
                 responsibleUserIds && responsibleUserIds.length > 0
                   ? {
-                      create: responsibleUserIds.map((userId) => ({ userId })),
+                      create: responsibleUserIds.map((userId) => ({
+                    userId,
+                    sentEmailReminders: pastReminderMinutes(new Date(startTime), EMAIL_REMINDER_MINUTES),
+                    sentPushReminders: pastReminderMinutes(new Date(startTime), PUSH_REMINDER_MINUTES),
+                  })),
                     }
                   : undefined,
               tasks: {
@@ -452,7 +466,12 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         await fastify.prisma.shiftResponsible.deleteMany({ where: { shiftId } });
         if (responsibleUserIds.length > 0) {
           await fastify.prisma.shiftResponsible.createMany({
-            data: responsibleUserIds.map((userId) => ({ shiftId, userId })),
+            data: responsibleUserIds.map((userId) => ({
+              shiftId,
+              userId,
+              sentEmailReminders: pastReminderMinutes(startTime ? new Date(startTime) : shift.startTime, EMAIL_REMINDER_MINUTES),
+              sentPushReminders: pastReminderMinutes(startTime ? new Date(startTime) : shift.startTime, PUSH_REMINDER_MINUTES),
+            })),
           });
         }
       }
@@ -567,7 +586,11 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           responsibles:
             shift.responsibles.length > 0
               ? {
-                  create: shift.responsibles.map((r) => ({ userId: r.userId })),
+                  create: shift.responsibles.map((r) => ({
+                    userId: r.userId,
+                    sentEmailReminders: pastReminderMinutes(newStartTime, EMAIL_REMINDER_MINUTES),
+                    sentPushReminders: pastReminderMinutes(newStartTime, PUSH_REMINDER_MINUTES),
+                  })),
                 }
               : undefined,
           tasks: {
@@ -1062,6 +1085,8 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             guestName,
             guestEmail,
             guestPhone,
+            sentEmailReminders: pastReminderMinutes(shift.startTime, EMAIL_REMINDER_MINUTES),
+            sentPushReminders: pastReminderMinutes(shift.startTime, PUSH_REMINDER_MINUTES),
             answers: {
               create: Object.entries(signupAnswers).map(([questionId, value]) => ({ questionId, value })),
             },
@@ -1605,6 +1630,14 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             await tx.shift.update({
               where: { id: shift.id },
               data: { startTime: move(shift.startTime), endTime: move(shift.endTime) },
+            });
+            await tx.shiftSignup.updateMany({
+              where: { shiftId: shift.id },
+              data: { reminderSentAt: null, sentEmailReminders: [], sentPushReminders: [] },
+            });
+            await tx.shiftResponsible.updateMany({
+              where: { shiftId: shift.id },
+              data: { sentEmailReminders: [], sentPushReminders: [] },
             });
             updated++;
           }
