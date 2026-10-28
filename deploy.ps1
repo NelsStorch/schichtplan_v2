@@ -1,10 +1,14 @@
-param (
+﻿param (
     [ValidateSet('prod', 'dev')]
     [string]$Environment = 'prod',
 
     # Ueberspringt das Datenbank-Dump vor dem Deployment
     [switch]$SkipBackup
 )
+
+# Zeichensatz auf UTF-8 festlegen fuer saubere Konsolen- und Webhook-Ausgaben
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Deployst den Schichtplan V2 auf den Server:
 #   1. Packt das Projekt (ohne node_modules, build-output und .env-Dateien)
@@ -64,7 +68,8 @@ function Send-DiscordNotification($title, $description, $color = 14753096) {
     } | ConvertTo-Json -Depth 5
 
     try {
-        Invoke-RestMethod -Uri $webhook -Method Post -Body $payload -ContentType "application/json; charset=utf-8" -TimeoutSec 5 | Out-Null
+        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+        Invoke-RestMethod -Uri $webhook -Method Post -Body $bodyBytes -ContentType "application/json; charset=utf-8" -UserAgent "CeviSchichtplanDeploy/1.0" -TimeoutSec 5 | Out-Null
     } catch {
         # Ein Discord-Fehler soll den Deploy niemals abbrechen
     }
