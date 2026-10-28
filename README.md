@@ -1,115 +1,266 @@
 # Cevi Schichtplan V2 🏕️📋
 
-Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Webanwendung zur Organisation von Schichtplänen für Cevi-Abteilungen.
+[![CI](https://github.com/NelsStorch/schichtplan_v2/actions/workflows/ci.yml/badge.svg)](https://github.com/NelsStorch/schichtplan_v2/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15%20%7C%2016-black.svg)](https://nextjs.org/)
+[![Fastify](https://img.shields.io/badge/Fastify-5.x-black.svg)](https://fastify.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x%20%2F%207.x-blue.svg)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-7.x-1B222D.svg)](https://www.prisma.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38bdf8.svg)](https://tailwindcss.com/)
 
-Basiert auf der bewährten Architektur von `laden_v2`:
-* **Frontend (App):** Next.js 15 (App Router, Tailwind CSS, Lucide Icons) – läuft auf den Abteilungs-Subdomains `*.cevi-schichtplan.ch`
-* **Frontend (Landing/Hauptseite):** Next.js 15 – läuft als separater Container auf `cevi-schichtplan.ch`
-* **Backend:** Fastify 5 + TypeScript (stateless, hochperformant, Zod-Validierung)
-* **Datenbank:** PostgreSQL 17 mit Prisma ORM
-* **Hilfe-Center:** Astro Starlight in `hilfe/` (statisch, nginx) auf `hilfe.cevi-schichtplan.ch`
-* **Status-Portal:** Uptime Kuma auf `status.cevi-schichtplan.ch` (im Projekt `status-schichtplan`)
-* **Shared Types:** `@schichtplan/shared` im Monorepo
-* **Reverse Proxy:** Traefik mit automatischem Wildcard-SSL & Zero-Downtime Healthchecks
+Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Web-Plattform zur Organisation von Schichtplänen, Einsätzen und Helferteams für Cevi-Abteilungen in der Schweiz.
 
 ---
 
-## 🏗️ Architektur & Mandantenfähigkeit
+## ✨ Hauptfunktionen
+
+* 🏰 **Mandantenfähig via Subdomains:** Jede Cevi-Abteilung erhält eine eigene Web-Präsenz (z. B. `https://<abteilung>.cevi-schichtplan.ch`) mit individueller Farbgebung, eigenem Logo und eigener Stufenstruktur.
+* 🔑 **Cevi.DB (Hitobito) Single Sign-On:** Nahtlose OAuth-2.0-Integration mit der zentralen Verbandsdatenbank `db.cevi.ch`. Synchronisation von Cevi-Namen, Geburtsdatum, Stufen und automatischer Vergabe von Leitungsrechten für Abteilungsleitungen.
+* ⛺ **Multi-Event-Architektur:** Parallele Verwaltung beliebig vieler Anlässe pro Abteilung (z. B. *Chilbi*, *Sommerlager*, *Pfingstlager*, *Suppentag*, *Sponsorenlauf*).
+* 🛠️ **Mächtiger OK-Bereich (Verwaltung):**
+  * Wiederverwendbarer Katalog an Aufgaben und Einsatzbereichen mit Jugendschutz-Regeln (Mindestalter, J+S-Leitungsanforderungen).
+  * Schichten-Seriengenerator für wiederkehrende Zeitblöcke.
+  * Helfer-Pool & Soll-Roster zur Überwachung der Abdeckung.
+  * Granulares Rollen- und Rechtesystem für OK-Mitglieder und Abteilungsleitungen.
+  * Integriertes Nachrichtensystem für gezielte Helfer-Kommunikation per Mail.
+  * PDF-Druckexport im professionellen Cevi-Design sowie CSV/Excel-Export.
+* 🙋 **Intuitive Helfer*innen-Experience:**
+  * Schichtanmeldung mit 1-Klick oder Gast-Eintragung.
+  * **«Ersatz gesucht»:** Helfer*innen können Schichten bei Verhinderung ausschreiben und unkompliziert abgeben.
+  * **PWA & Offline-Briefing:** Schichtdetails, Standorte, Notfallkontakte und Check-in-QR-Code bleiben auch bei schlechtem Mobilfunknetz auf dem Festgelände offline verfügbar.
+  * **Kalender-Integration:** Webcal Live-Feed (Abonnement mit automatischer Aktualisierung) sowie 1-Klick-Export für Google Kalender und Apple iCal.
+  * **QR-Check-in & Anwesenheit:** Kontaktloses Einchecken vor Ort am Stand per QR-Code oder digitales Abhaken durch das OK.
+* 🔔 **Benachrichtigungen & Monitoring:**
+  * E-Mail-Bestätigung, Passwort-Reset und konfigurierbare Schicht-Erinnerungen (z. B. 24h vor Schichtbeginn).
+  * Web Push Benachrichtigungen für kurzfristige Änderungen.
+  * Automatische Server-Alarme (DB-Pool, SMTP, 500er-Fehler) via Discord/Slack-Webhook.
+* 🔒 **Datenschutz & Schweizer Recht (nDSG):**
+  * Konsequenter Verzicht auf unnötige Adresserfassung.
+  * Einstellbare automatische Löschfristen für anlassbezogene Zusatzfragen (z. B. T-Shirt-Grössen, Essenspräferenzen).
+  * Konfigurierbare «Nur für Mitglieder»-Absicherung für interne Anlässe.
+* 📚 **Integriertes Hilfe-Center:** Umfangreiche Wissensdatenbank und Schritt-für-Schritt-Anleitungen auf `hilfe.cevi-schichtplan.ch`.
+
+---
+
+## 🏗️ System-Architektur
+
+Das Monorepo besteht aus fünf Next.js-/Fastify-Diensten, einer statischen Dokumentation und gemeinsamen Bibliotheken:
 
 ```
-                                  [ Internet ]
-                                       |
-                   *.cevi-schichtplan.ch (Wildcard DNS)
-                                       |
-                                       v
-                    +------------------------------------+
-                    |        Traefik Reverse Proxy       |
-                    +------------------------------------+
-                      /                |               \
-        Host: cevi-schichtplan.ch      |      Host: *.cevi-schichtplan.ch
-                    /                  |                 \
-                   v                   v                  v
-         +------------------+  +---------------+  +-------------------+
-         |  apps/landing    |  |  apps/backend |  |     apps/web      |
-         |  (Hauptportal)   |  | (Fastify API) |  | (Schichtplan-App) |
-         |   Port 3001      |  |   Port 4000   |  |    Port 3000      |
-         +------------------+  +---------------+  +-------------------+
-                                       |
-                                       v
-                               +---------------+
-                               |  PostgreSQL   |
-                               +---------------+
+                                      [ Internet ]
+                                           |
+                       *.cevi-schichtplan.ch (Wildcard DNS)
+                                           |
+                                           v
+                        +------------------------------------+
+                        |        Traefik Reverse Proxy       |
+                        +------------------------------------+
+                          /        |         |        \       \
+   cevi-schichtplan.ch   /         |         |         \       \  hilfe.cevi-schichtplan.ch
+                        v          v         v          v       v
+               +------------+ +--------+ +-------+ +-------+ +---------+
+               |apps/landing| |apps/web| | apps/ | | apps/ | |  hilfe  |
+               | (Marketing)| |(Schicht| | login | | admin | |(Starlight|
+               |  Port 3001 | |  plan) | | (SSO) | |(Portal)| |  Nginx) |
+               +------------+ |Port 3000| |  3002 | |  3003 | |  3004   |
+                              +--------+ +-------+ +-------+ +---------+
+                                  \          |         /
+                           /api/*  \         |        /  /api/*
+                                    v        v       v
+                                +------------------------+
+                                |      apps/backend      |
+                                | (Fastify 5 + Prisma 7) |
+                                |       Port 4000        |
+                                +------------------------+
+                                             |
+                                             v
+                                +------------------------+
+                                |     PostgreSQL 17      |
+                                +------------------------+
 ```
 
-### 1. Eigene Subdomains pro Abteilung
-* Jede Abteilung erhält eine eigene Subdomain (z. B. `<abteilung>.cevi-schichtplan.ch`).
-* Traefik routet alle Subdomains an den `apps/web`-Container weiter.
-* Der `apps/web`-Container und das Backend erkennen die Abteilung automatisch anhand des `Host`-Headers.
+### Routing & Portale
 
-### 2. Multi-Events
-* Eine Abteilung kann beliebig viele Events parallel verwalten (z. B. *Chilbi 2026*, *Sommerlager*, *Cevi-Tag*).
-* Keine Code-Duplikate oder getrennte Datenbanken mehr nötig!
+| Domain | Pfad / Dienst | Container-Port | Zweck |
+|---|---|---|---|
+| `cevi-schichtplan.ch` | `apps/landing` | 3001 | Öffentliche Startseite, Leistungsübersicht, Marketing & Profil |
+| `login.cevi-schichtplan.ch` | `apps/login` | 3002 | Zentrales SSO (Cevi.DB OAuth, E-Mail/Passwort, Cevi-Name) |
+| `<abteilung>.cevi-schichtplan.ch` | `apps/web` | 3000 | Mandanten-Portal: Anlässe, Schichten & OK-Bereich |
+| `admin.cevi-schichtplan.ch` | `apps/admin` | 3003 | Zentrales Administrations-Portal für globale Admins |
+| `*.cevi-schichtplan.ch/api/*` | `apps/backend` | 4000 | Fastify REST API & Webcal/ICS-Feeds |
+| `hilfe.cevi-schichtplan.ch` | `hilfe/` | 3004 | Statisches Hilfe-Center (Astro Starlight + Nginx) |
+| `status.cevi-schichtplan.ch` | `status-schichtplan` | 3001 | Öffentliches Verfügbarkeits-Portal (Uptime Kuma) |
 
-### 3. Unterbruchfreier Neustart (Zero-Downtime)
-* Traefik prüft kontinuierlich den Healthcheck (`/health` und `/`).
-* Beim Rollout startet zuerst der neue Container. Erst wenn er HTTP 200 meldet, leitet Traefik den Traffic um.
+---
+
+## 📁 Repository-Struktur
+
+```
+schichtplan_v2/
+├── apps/
+│   ├── admin/          # Admin-Portal für globale Administratoren (Next.js 15)
+│   ├── backend/        # REST-API mit Fastify 5, Prisma 7 & TypeScript
+│   ├── landing/        # Hauptseite & Marketing-Portal (Next.js 15)
+│   ├── login/          # Zentrales Single Sign-On Portal (Next.js 15)
+│   └── web/            # Mandantenfähige Schichtplan-App für Abteilungen (Next.js 15)
+├── packages/
+│   ├── shared/         # Gemeinsame Zod-Schemas, TypeScript-Typen & Hilfsfunktionen
+│   └── ui/             # Gemeinsames Design-System (@schichtplan/ui mit Tailwind CSS v4)
+├── hilfe/              # Hilfe-Center Dokumentation (Astro Starlight, unabhängig gebaut)
+├── docker-compose.dev.yml      # Lokale Docker-Entwicklungsumgebung
+├── docker-compose.yml          # Produktions-Deployment mit Traefik
+├── docker-compose.staging.yml  # Staging-Deployment (dev.cevi-schichtplan.ch)
+└── deploy.ps1                  # PowerShell Zero-Downtime Deployment-Skript
+```
 
 ---
 
 ## 💻 Lokale Entwicklung
 
+### Voraussetzungen
+
+* **Node.js** `>= 22.0.0` und **npm** `>= 10.x`
+* **Docker** & **Docker Compose**
+
+### 1. Repository klonen & Abhängigkeiten installieren
+
 ```bash
-# 1. Repository-Root
+git clone https://github.com/NelsStorch/schichtplan_v2.git
 cd schichtplan_v2
 
-# 2. Lokale Container starten (Hot-Reload)
-docker compose -f docker-compose.dev.yml up --build
+# Abhängigkeiten für alle Workspaces installieren
+npm ci
 
-# 3. Zugriff
-# Backend API:    http://localhost:4000
-# Schichtplan:    http://localhost:3000
-# Hauptseite:     http://localhost:3001
-# PostgreSQL:     localhost:5432
+# Gemeinsame Pakete kompilieren
+npm run build --workspace=packages/shared
 ```
 
-### Hilfe-Center (`hilfe/`)
+### 2. Entwicklungsumgebung mit Docker starten
 
-Eigenes Node-Projekt ausserhalb der Workspaces (eigene `package-lock.json`), damit Astro nicht in die
-Images der anderen Apps gelangt. Inhalte sind Markdown/MDX in `hilfe/src/content/docs/`, die Seitenleiste
-steht in `hilfe/astro.config.mjs`.
+Am einfachsten startet man den vollständigen Stack inklusive PostgreSQL über Docker Compose:
 
 ```bash
-npm --prefix hilfe install
-npm run hilfe:dev       # http://localhost:3004 mit Hot-Reload (Suche nur im Build)
-npm run hilfe:build     # statischer Build nach hilfe/dist, inkl. Suchindex
-npm run hilfe:preview   # Build lokal ansehen, mit Suche
+# Lokale Container starten (Hot-Reload aktiviert)
+npm run dev:docker
+# oder: docker compose -f docker-compose.dev.yml up --build
 ```
 
-Aus den Apps verlinkt `helpUrl('/pfad/')` aus `@schichtplan/shared` auf eine Hilfeseite.
+Nach dem Start stehen folgende Dienste lokal zur Verfügung:
 
-### Tests (Backend, Vitest)
+| Dienst | Lokale URL |
+|---|---|
+| **Hauptportal (Landing):** | [http://localhost:3001](http://localhost:3001) |
+| **Schichtplan-App (Web):** | [http://localhost:3000](http://localhost:3000) |
+| **Login-Portal (SSO):** | [http://localhost:3002](http://localhost:3002) |
+| **Admin-Portal:** | [http://localhost:3003](http://localhost:3003) |
+| **Backend API:** | [http://localhost:4000](http://localhost:4000) |
+| **PostgreSQL DB:** | `127.0.0.1:5432` |
 
-Unit-Tests liegen neben dem Code (`apps/backend/src/**/*.test.ts`) und brauchen keine Datenbank.
-Die API-Tests in `apps/backend/test/` laufen gegen eine eigene, leere Test-Datenbank
-(`TEST_DATABASE_URL`, alle Tabellen werden vor jedem Test geleert) und werden ohne sie übersprungen.
+> [!TIP]
+> **Mandanten lokal testen:** Das Backend unterstützt den Header `x-tenant-slug: <slug>` oder Hostnamen wie `demo.localhost:3000`, um Abteilungen lokal ohne DNS-Konfiguration anzusprechen.
+
+### 3. Datenbank initialisieren & Seeden
 
 ```bash
-# Einmalig: Wegwerf-Postgres nur für Tests (nicht die Entwicklungs-DB!)
-docker run -d --name schichtplan-test-db -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=schichtplan_test -p 127.0.0.1:54329:5432 postgres:17-alpine
+# Prisma-Migrationen anwenden
+npm run db:migrate
+
+# Neutrale Demo-Daten (Demo-Abteilung, Beispiel-Events & Schichten) einspielen
+npm run db:seed
+
+# Optional: Prisma Studio zur visuellen Datenprüfung öffnen
+npm run db:studio
+```
+
+*Der Seed legt neutrale Beispieldaten an (`admin@example.com` mit generiertem oder per `SEED_PASSWORD` gesetztem Kennwort).*
+
+---
+
+## 🧪 Tests & Qualitätssicherung
+
+Die Test-Suite basiert auf **Vitest** und umfasst Unit- und Integrationsprüfungen.
+
+```bash
+# 1. Typecheck über alle Apps und Packages
+npm run typecheck
+
+# 2. Backend Unit-Tests ausführen (ohne DB-Abhängigkeit)
+npm run test
+
+# 3. Vollständige API-Integrationstests gegen eine temporäre Test-Datenbank
+docker run -d --name schichtplan-test-db \
+  -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=schichtplan_test \
+  -p 127.0.0.1:54329:5432 postgres:17-alpine
+
 (cd apps/backend && DATABASE_URL=postgresql://test:test@127.0.0.1:54329/schichtplan_test npx prisma migrate deploy)
 
-# Tests (shared vorher bauen: npm run build --workspace=packages/shared)
 TEST_DATABASE_URL=postgresql://test:test@127.0.0.1:54329/schichtplan_test npm test
 ```
 
 ---
 
-## 🚀 Deployment (Server)
+## 📖 Hilfe-Center (`hilfe/`)
 
-```powershell
-# Deploy nach Staging / Dev
-.\deploy.ps1 -Environment dev
+Das Hilfe-Center ist ein eigenständiges Projekt auf Basis von **Astro Starlight**. Es erzeugt statisches HTML und wird im produktiven Docker-Setup von Nginx ausgeliefert.
 
-# Deploy nach Produktion (mit automatischem DB-Backup und Healthcheck)
-.\deploy.ps1 -Environment prod
+```bash
+# Lokaler Entwicklungsmodus mit Hot-Reload
+npm run hilfe:dev       # http://localhost:3004
+
+# Statischen Produktions-Build erstellen (inkl. Pagefind-Suchindex)
+npm run hilfe:build
+
+# Statischen Build lokal vorprüfen
+npm run hilfe:preview
 ```
+
+---
+
+## ⚙️ Konfiguration (`.env`)
+
+Kopiere für eigene Umgebungen die Beispiel-Konfiguration:
+
+```bash
+cp .env.example .env
+```
+
+Wichtige Parameter:
+* `DATABASE_URL`: Verbindungszeichenfolge für PostgreSQL.
+* `JWT_SECRET`: Mindestens 32 Zeichen langes Secret zur Signierung der SSO-Cookies.
+* `CEVIDB_CLIENT_ID` / `CEVIDB_CLIENT_SECRET`: OAuth 2.0 Zugangsdaten aus der Cevi.DB (Hitobito).
+* `GLOBAL_ADMIN_CEVIDB_IDS`: Kommagetrennte Cevi.DB-Personen-IDs für den Zugriff auf `admin.<domain>`.
+* `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: Mail-Server für Bestätigungsmails & Erinnerungen.
+* `ADMIN_ALERT_WEBHOOK_URL`: Discord- oder Slack-Webhook für automatische Server-Alarme.
+
+---
+
+## 🚀 Deployment & Betrieb
+
+Das Projekt ist für unterbruchfreies Deployment (**Zero-Downtime**) auf Linux-Servern mit **Traefik** als Reverse Proxy optimiert:
+
+1. **Konfiguration:** `deploy.config.example.ps1` nach `deploy.config.ps1` kopieren und Serverdaten hinterlegen.
+2. **Deploy ausführen:**
+   ```powershell
+   # Staging-System
+   .\deploy.ps1 -Environment dev
+
+   # Produktions-System (erstellt vorab automatisches DB-Backup)
+   .\deploy.ps1 -Environment prod
+   ```
+3. **Rollout-Ablauf:**
+   * Erstellt auf dem Server automatisch ein komprimiertes PostgreSQL-Backup (`pg_dump | gzip`).
+   * Baut die neuen Docker-Images im Hintergrund und startet sie parallel.
+   * Traefik Healthchecks (`/health` und `/`) stellen sicher, dass Traffic erst umgeleitet wird, wenn neue Container fehlerfrei laufen.
+   * Führt Prisma-Migrationen unterbrechungsfrei aus.
+
+---
+
+## 🔒 Sicherheit & Datenschutz
+
+* **Keine Speicherung unnötiger persönlicher Daten:** Es werden keine Wohnadressen oder sensible Daten erfasst, die für einen Helfereinsatz irrelevant sind.
+* **Sichere Session-Cookies:** Wildcard-Cookie (`Domain=.cevi-schichtplan.ch`) mit `HttpOnly`, `SameSite=Lax` und `Secure`.
+* **Schutz administrativer Schnittstellen:** `admin.<domain>` erfordert Re-Authentifizierung, Cevi.DB-Herkunftsnachweis, Herkunftsüberprüfung (`Sec-Fetch-Site`) und automatische Rate-Limits.
+* Sicherheitsrelevante Schwachstellen können vertraulich gemeldet werden (siehe [SECURITY.md](SECURITY.md)).
+
+

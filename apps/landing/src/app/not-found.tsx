@@ -1,6 +1,7 @@
 'use client';
 
-import { LogIn, Search } from 'lucide-react';
+import { LifeBuoy, LogIn } from 'lucide-react';
+import { helpUrl } from '@schichtplan/shared';
 import { NotFoundView } from '@schichtplan/ui';
 
 export default function NotFound() {
@@ -10,9 +11,10 @@ export default function NotFound() {
       homeLabel="Zurück zur Startseite"
       secondaryActions={[
         {
-          label: 'Abteilungen durchsuchen',
-          href: '/#abteilungen',
-          icon: <Search className="size-3.5" />,
+          label: 'Hilfe-Center',
+          href: helpUrl(),
+          external: true,
+          icon: <LifeBuoy className="size-3.5" />,
         },
         {
           label: 'Zentrales Login',

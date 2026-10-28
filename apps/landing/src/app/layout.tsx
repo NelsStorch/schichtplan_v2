@@ -1,7 +1,7 @@
 import './globals.css';
 import { fontVariables } from '@schichtplan/ui/fonts';
-import { FeedbackProvider, UsageTracker } from '@schichtplan/ui';
-import type { Metadata } from 'next';
+import { FeedbackProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
+import type { Metadata, Viewport } from 'next';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 
 const TITLE = 'Cevi Schichtplan · Ehrenamtliche Schichtplanung für Cevi-Abteilungen';
@@ -27,20 +27,26 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#e11d48',
+};
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="de" className={`dark ${fontVariables}`} data-theme="dark">
+    <html lang="de-CH" className={fontVariables} suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <ThemeScript />
       </head>
       <body className="min-h-[100dvh] bg-canvas text-fg antialiased flex flex-col selection:bg-accent selection:text-white grain">
         <FeedbackProvider>{children}</FeedbackProvider>
-        {/* Immer dunkel: hell/dunkel zu zählen bringt hier nichts */}
-        <UsageTracker app="landing" reportTheme={false} />
+        <UsageTracker app="landing" />
       </body>
     </html>
   );

@@ -27,6 +27,10 @@ export function Campfire3DCanvas() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
     let animationFrameId: number;
     let width = (canvas.width = canvas.parentElement?.clientWidth || window.innerWidth);
     let height = (canvas.height = canvas.parentElement?.clientHeight || window.innerHeight);
@@ -48,7 +52,7 @@ export function Campfire3DCanvas() {
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
 
     // Spawn initial particles
-    const particleCount = 65;
+    const particleCount = 55;
     const particles: Particle[] = [];
 
     const createParticle = (spawnRandomY = false): Particle => {
@@ -73,14 +77,43 @@ export function Campfire3DCanvas() {
     }
 
     let isVisible = true;
+    let isRunning = false;
+
+    const startLoop = () => {
+      if (!isRunning) {
+        isRunning = true;
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+
+    const stopLoop = () => {
+      isRunning = false;
+      cancelAnimationFrame(animationFrameId);
+    };
+
     const observer = new IntersectionObserver(([entry]) => {
-      isVisible = entry.isIntersecting;
+      isVisible = entry.isIntersecting && !document.hidden;
+      if (isVisible) {
+        startLoop();
+      } else {
+        stopLoop();
+      }
     });
     observer.observe(canvas);
 
+    const handleVisibilityChange = () => {
+      isVisible = !document.hidden;
+      if (isVisible) {
+        startLoop();
+      } else {
+        stopLoop();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const render = () => {
       if (!isVisible) {
-        animationFrameId = requestAnimationFrame(render);
+        isRunning = false;
         return;
       }
 
@@ -147,6 +180,7 @@ export function Campfire3DCanvas() {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       observer.disconnect();
     };
   }, []);

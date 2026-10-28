@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LogIn, Search } from 'lucide-react';
+import { LifeBuoy, LogIn } from 'lucide-react';
+import { helpUrl } from '@schichtplan/shared';
 import { ErrorView } from '@schichtplan/ui';
 
 export default function ErrorPage({
@@ -23,9 +24,10 @@ export default function ErrorPage({
       homeLabel="Zurück zur Startseite"
       secondaryActions={[
         {
-          label: 'Abteilungen durchsuchen',
-          href: '/#abteilungen',
-          icon: <Search className="size-3.5" />,
+          label: 'Hilfe-Center',
+          href: helpUrl(),
+          external: true,
+          icon: <LifeBuoy className="size-3.5" />,
         },
         {
           label: 'Zentrales Login',

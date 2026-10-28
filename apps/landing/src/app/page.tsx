@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Plus,
   LogIn,
   Flame,
   ExternalLink,
@@ -13,24 +12,29 @@ import {
   CalendarPlus,
   Share2,
   UserCheck,
+  ShieldCheck,
+  ChevronDown,
+  ArrowRight,
+  Heart,
+  Users,
 } from 'lucide-react';
 import {
   getLoginUrl,
   getLandingUrl,
+  getDepartmentUrl,
   helpUrl,
   statusUrl,
   type UserDto,
 } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
-import { Avatar, Button, buttonClasses } from '@schichtplan/ui';
+import { Avatar, Button, ThemeToggle, buttonClasses } from '@schichtplan/ui';
 import { Campfire3DCanvas } from '@/components/Campfire3DCanvas';
-import { Card3DTilt } from '@/components/Card3DTilt';
 import { Hero3DStage } from '@/components/Hero3DStage';
+import { ComparisonTable } from '@/components/ComparisonTable';
 import { CeviDbIsometricGraphic } from '@/components/CeviDbIsometricGraphic';
 import { SubdomainIsometricGraphic } from '@/components/SubdomainIsometricGraphic';
 import { MultiEventIsometricGraphic } from '@/components/MultiEventIsometricGraphic';
 import { MobilePwaIsometricGraphic } from '@/components/MobilePwaIsometricGraphic';
-import { CampsiteNightGraphic } from '@/components/CampsiteNightGraphic';
 
 export default function LandingPage() {
   // Angemeldete Person (Cookie gilt für alle Subdomains): Name statt «Anmelden» im Kopf
@@ -50,7 +54,7 @@ export default function LandingPage() {
 
   return (
     <div className="relative min-h-[100dvh] flex flex-col bg-canvas text-fg selection:bg-accent selection:text-white overflow-x-hidden">
-      {/* 3D Atmospheric Canvas (Interactive Rising Campfire Embers & Parallax) */}
+      {/* 3D Atmospheric Canvas (Interactive Rising Campfire Embers) */}
       <Campfire3DCanvas />
 
       {/* Campfire Warmth Atmosphere Glow */}
@@ -72,6 +76,8 @@ export default function LandingPage() {
           </Link>
 
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <ThemeToggle className="size-8 sm:size-9" />
+
             <a
               href={helpUrl()}
               className={buttonClasses({
@@ -83,46 +89,51 @@ export default function LandingPage() {
               <LifeBuoy className="size-3.5 text-fg-muted" />
               <span>Hilfe</span>
             </a>
+
             {me ? (
-              <Link
-                href="/profil"
-                className="flex items-center gap-1.5 sm:gap-2 rounded-full py-1 pl-1 pr-2.5 sm:pr-3 text-xs font-semibold text-fg transition hover:bg-surface-2"
-                aria-label="Dein Profil"
-              >
-                <Avatar name={me.ceviName || me.firstName} size="sm" highlight className="size-7 text-[10px]" />
-                <span className="max-w-20 sm:max-w-28 truncate">{me.ceviName || me.firstName}</span>
-              </Link>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {me.homeDepartment && (
+                  <a
+                    href={getDepartmentUrl(me.homeDepartment.slug)}
+                    className={buttonClasses({
+                      variant: 'secondary',
+                      size: 'sm',
+                      className: 'hidden sm:inline-flex text-xs font-semibold gap-1.5 px-3',
+                    })}
+                  >
+                    <span>{me.homeDepartment.name}</span>
+                    <ArrowRight className="size-3 text-fg-subtle" />
+                  </a>
+                )}
+                <Link
+                  href="/profil"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-full py-1 pl-1 pr-2.5 sm:pr-3 text-xs font-semibold text-fg transition hover:bg-surface-2"
+                  aria-label="Dein Profil und Schichten"
+                >
+                  <Avatar name={me.ceviName || me.firstName} size="sm" highlight className="size-7 text-[10px]" />
+                  <span className="max-w-20 sm:max-w-28 truncate">{me.ceviName || me.firstName}</span>
+                </Link>
+              </div>
             ) : (
               <Link
                 href="/login"
                 className={buttonClasses({
-                  variant: 'ghost',
+                  variant: 'primary',
                   size: 'sm',
-                  className: 'gap-1.5 text-xs font-semibold px-2.5 sm:px-3',
+                  className: 'gap-1.5 text-xs font-semibold px-3 sm:px-4',
                 })}
               >
-                <LogIn className="size-3.5 text-fg-muted" />
-                <span className="hidden sm:inline">Anmelden</span>
+                <LogIn className="size-3.5" />
+                <span>Anmelden</span>
               </Link>
             )}
-
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={goCreateDepartment}
-              className="text-xs font-semibold px-2.5 sm:px-3.5"
-            >
-              <Plus className="size-3.5" />
-              <span className="hidden xs:inline sm:inline">Abteilung anlegen</span>
-              <span className="xs:hidden sm:hidden">Anlegen</span>
-            </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 relative z-10">
-        {/* Hero Section: Asymmetric Split (Left Content + Right 3D Interactive Stage) */}
+        {/* Hero Section */}
         <section className="relative pt-12 pb-20 md:pt-20 md:pb-32 overflow-hidden">
           <div className="mx-auto max-w-6xl px-4">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
@@ -130,47 +141,101 @@ export default function LandingPage() {
               <div className="lg:col-span-7 flex flex-col items-start text-left">
                 <div className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-2xs font-bold uppercase tracking-[0.16em] bg-accent/12 text-accent-ink border border-accent/25 mb-6 shadow-sm">
                   <Flame className="size-3 text-accent animate-pulse" />
-                  <span>Für Chilbi, Lager & Anlässe</span>
+                  <span>Für Chilbi, Lager &amp; Anlässe • 100% ehrenamtlich</span>
                 </div>
 
                 <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-fg leading-[1.08] text-balance">
-                  Genug Helfer*innen für jede Schicht, ohne Telefonkette.
+                  Genug Helfer*innen für jede Schicht.{' '}
+                  <span className="bg-gradient-to-r from-accent via-rose-500 to-amber-500 bg-clip-text text-transparent">
+                    Ohne WhatsApp-Chaos.
+                  </span>
                 </h1>
 
                 <p className="mt-5 text-base sm:text-lg text-fg-muted max-w-[54ch] leading-relaxed">
                   Ihr stellt die Schichten online, teilt einen Link, und alle tragen sich selbst ein.
-                  Das OK sieht jederzeit, wo noch Leute fehlen. Schluss mit Excel-Listen, Zetteln und
-                  WhatsApp-Umfragen.
+                  Das OK sieht jederzeit, wer wo eingeteilt ist. Schluss mit mühsamen Excel-Listen,
+                  Versions-Chaos und stundenlangem Hinterherrennen.
                 </p>
 
                 {/* CTAs */}
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={goCreateDepartment}
-                    className="justify-center text-sm font-semibold h-12"
-                  >
-                    <span>Neue Abteilung anlegen</span>
-                  </Button>
+                  {me ? (
+                    me.homeDepartment ? (
+                      <a
+                        href={getDepartmentUrl(me.homeDepartment.slug)}
+                        className={buttonClasses({
+                          variant: 'primary',
+                          size: 'md',
+                          className: 'justify-center text-sm font-semibold h-12 px-6 gap-2 shadow-glow',
+                        })}
+                      >
+                        <span>Zu deiner Abteilung ({me.homeDepartment.name})</span>
+                        <ArrowRight className="size-4" />
+                      </a>
+                    ) : (
+                      <Link
+                        href="/profil"
+                        className={buttonClasses({
+                          variant: 'primary',
+                          size: 'md',
+                          className: 'justify-center text-sm font-semibold h-12 px-6 gap-2 shadow-glow',
+                        })}
+                      >
+                        <span>Zu deinen Schichten ({me.ceviName || me.firstName})</span>
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    )
+                  ) : (
+                    <Link
+                      href="/login"
+                      className={buttonClasses({
+                        variant: 'primary',
+                        size: 'md',
+                        className: 'justify-center text-sm font-semibold h-12 px-6 gap-2 shadow-glow',
+                      })}
+                    >
+                      <LogIn className="size-4" />
+                      <span>Schichtplan öffnen / Anmelden</span>
+                    </Link>
+                  )}
+
                   <a
-                    href={helpUrl()}
+                    href="#so-funktionierts"
                     className={buttonClasses({
                       variant: 'secondary',
                       size: 'md',
-                      className: 'justify-center text-sm font-semibold h-12',
+                      className: 'justify-center text-sm font-semibold h-12 gap-1.5',
                     })}
                   >
-                    <LifeBuoy className="size-4" />
                     <span>So funktioniert's</span>
+                    <ChevronDown className="size-4 text-fg-subtle" />
                   </a>
                 </div>
-                <p className="mt-3 text-xs text-fg-subtle">
-                  Helfen statt planen? Öffne einfach den Link, den du von deiner Abteilung bekommen hast.
-                </p>
 
-                {/* Proof Points Strip (Accurate & Zero False Claims) */}
-                <div className="mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-line/60 w-full grid grid-cols-3 gap-2 sm:gap-4 text-left">
+                {/* Security & Access Guidance */}
+                <div className="mt-6 pt-4 border-t border-line/60 w-full max-w-xl space-y-2 text-xs">
+                  <div className="flex items-start gap-2 text-fg-muted leading-relaxed">
+                    <ShieldCheck className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-fg font-semibold">Schichtpläne sind geschützt:</strong> Um Helferdaten
+                      vor unbefugten Zugriffen zu schützen, sind Schichtpläne nicht öffentlich aufgelistet. Den Link zu deinem Anlass
+                      erhältst du direkt von deinem Leitungsteam per Mail oder WhatsApp.
+                    </span>
+                  </div>
+                  <div className="text-fg-subtle pt-1">
+                    Du leitest eine Cevi-Abteilung?{' '}
+                    <button
+                      type="button"
+                      onClick={goCreateDepartment}
+                      className="font-semibold text-accent hover:underline inline-flex items-center gap-0.5"
+                    >
+                      Schichtplan für deine Abteilung einrichten <ArrowRight className="size-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Proof Points Strip */}
+                <div className="mt-8 pt-6 border-t border-line/60 w-full grid grid-cols-3 gap-2 sm:gap-4 text-left">
                   <div>
                     <div className="font-display text-lg sm:text-xl md:text-2xl font-extrabold text-fg tabular">
                       1 Link
@@ -198,7 +263,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Right Column: The Epic 3D Interactive Stage */}
+              {/* Right Column: Live Interactive Shift Stage */}
               <div className="lg:col-span-5">
                 <Hero3DStage />
               </div>
@@ -207,7 +272,7 @@ export default function LandingPage() {
         </section>
 
         {/* So funktioniert's: drei Schritte aus Sicht des OK */}
-        <section className="py-16 md:py-20 border-t border-line/60 relative">
+        <section id="so-funktionierts" className="scroll-mt-24 py-16 md:py-20 border-t border-line/60 relative">
           <div className="mx-auto max-w-6xl px-4">
             <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">
               In drei Schritten zum vollen Schichtplan.
@@ -245,7 +310,10 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Section 2: Bento Grid with Bespoke 3D Isometric Graphics & Tilt Physics */}
+        {/* Comparison Table: Cevi Schichtplan vs. Excel vs. WhatsApp */}
+        <ComparisonTable />
+
+        {/* Section 3: Zielgruppen & Was es euch bringt */}
         <section className="py-20 md:py-28 border-t border-line/60 bg-surface/30 relative">
           <div className="mx-auto max-w-6xl px-4">
             <div className="max-w-2xl mb-12 sm:mb-16">
@@ -257,186 +325,246 @@ export default function LandingPage() {
                 Gebaut für den Cevi-Alltag.
               </h2>
               <p className="mt-3 text-base text-fg-muted leading-relaxed">
-                Weniger Organisationsaufwand für das OK, weniger Nachfragen von Helfer*innen.
-                Keine verschollenen Tabellen, keine Doppelbelegungen, keine unbesetzten Posten.
+                Ob du am Grill stehst, den Anlass organisierst oder die ganze Abteilung leitest – der Schichtplan
+                nimmt euch die mühsame Organisation ab.
               </p>
             </div>
 
-            {/* Asymmetrical Bento Grid */}
+            {/* Zielgruppen-Gliederung */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+              <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
+                  <Heart className="size-3.5" />
+                  <span>Für Helfer*innen</span>
+                </div>
+                <h3 className="font-display text-base font-bold text-fg mt-2">
+                  In 10 Sekunden eingetragen
+                </h3>
+                <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
+                  Schicht direkt im Chat-Browser auswählen. Kein neues Passwort nötig und automatische Kalender-Erinnerung vor dem Einsatz.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-500">
+                  <Users className="size-3.5" />
+                  <span>Für das Anlass-OK</span>
+                </div>
+                <h3 className="font-display text-base font-bold text-fg mt-2">
+                  Immer wissen, wer noch fehlt
+                </h3>
+                <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
+                  Live-Übersicht über alle Schichten, automatische Altersprüfung (z.&nbsp;B. Bar ab 18) und Vorlagen vom Vorjahr mit einem Klick.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-500">
+                  <ShieldCheck className="size-3.5" />
+                  <span>Für die Abteilungsleitung</span>
+                </div>
+                <h3 className="font-display text-base font-bold text-fg mt-2">
+                  Eigene Adresse, Cevi.DB synchron
+                </h3>
+                <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
+                  Feste Subdomain mit Logo und Farbe eurer Abteilung. Leitungsrechte werden direkt aus der Cevi.DB übernommen.
+                </p>
+              </div>
+            </div>
+
+            {/* Asymmetrical Feature Bento Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6">
-              {/* Tile 1: Cevi.DB Single Sign-On (Large 7-cols) with 3D Isometric Graphic */}
+              {/* Tile 1: Cevi.DB Single Sign-On (Large 7-cols) */}
               <div className="md:col-span-7">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
-                        Anmelden ohne neues Passwort
-                      </h3>
-                      <p className="mt-2 text-sm text-fg-muted leading-relaxed max-w-[50ch]">
-                        Leitende melden sich mit ihrem Cevi.DB-Konto an, Name und Abteilung sind schon da.
-                        Eltern, Ehemalige und Freund*innen brauchen nur ihren Cevi-Namen und ihr Geburtsdatum.
-                      </p>
-                    </div>
-
-                    {/* Bespoke 3D Isometric Illustration */}
-                    <div className="my-4">
-                      <CeviDbIsometricGraphic className="max-h-[200px] sm:max-h-[220px]" />
-                    </div>
-
-                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
-                      <span className="text-2xs text-emerald-400 font-semibold flex items-center gap-1.5 shrink-0">
-                        <span className="size-2 rounded-full bg-emerald-400" />
-                        Mit Cevi.DB oder Cevi-Name
-                      </span>
-                      <span className="text-2xs text-fg-subtle">Einmal anmelden, überall drin</span>
-                    </div>
+                <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
+                      Anmelden ohne neues Passwort
+                    </h3>
+                    <p className="mt-2 text-sm text-fg-muted leading-relaxed max-w-[50ch]">
+                      Leitende melden sich mit ihrem gewohnten Cevi.DB-Konto an – Name, Abteilung und Stufen sind sofort da.
+                      Eltern, Ehemalige und Helfer*innen tragen sich einfach mit Cevi-Namen und Geburtsdatum ein.
+                    </p>
                   </div>
-                </Card3DTilt>
-              </div>
 
-              {/* Tile 2: Eigene Subdomain (5-cols) with 3D Isometric Graphic */}
-              <div className="md:col-span-5">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
-                        Eure eigene Adresse
-                      </h3>
-                      <p className="mt-2 text-sm text-fg-muted leading-relaxed">
-                        Eure Abteilung bekommt eine feste Webadresse mit Logo und Farbe. Einmal teilen, alle
-                        Anlässe sind dort zu finden, Jahr für Jahr.
-                      </p>
-                    </div>
-
-                    {/* Bespoke 3D Isometric Server & DNS Graphic */}
-                    <div className="my-4">
-                      <SubdomainIsometricGraphic className="max-h-[190px] sm:max-h-[200px]" />
-                    </div>
-
-                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-subtle">
-                      <span className="font-mono text-accent-ink font-bold break-all sm:break-normal text-2xs sm:text-xs">eure-abteilung.cevi-schichtplan.ch</span>
-                    </div>
+                  {/* Clean Visual */}
+                  <div className="my-5">
+                    <CeviDbIsometricGraphic />
                   </div>
-                </Card3DTilt>
-              </div>
 
-              {/* Tile 3: Multi-Event Unterstützung (5-cols) with 3D Isometric Graphic */}
-              <div className="md:col-span-5">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
-                        Alle Anlässe an einem Ort
-                      </h3>
-                      <p className="mt-2 text-sm text-fg-muted leading-relaxed">
-                        Chilbi, PfiLa, Sommerlager oder Jubiläum gleichzeitig planen. Jeder Anlass hat sein eigenes
-                        OK, und nächstes Jahr startet ihr mit der Vorlage von heute.
-                      </p>
-                    </div>
-
-                    {/* Bespoke 3D Isometric Architecture Graphic (Festzelt, Campfire, Jurte) */}
-                    <div className="my-4">
-                      <MultiEventIsometricGraphic className="max-h-[190px] sm:max-h-[200px]" />
-                    </div>
-
-                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
-                      <span className="font-semibold text-fg text-2xs sm:text-xs">Beliebig viele Anlässe</span>
-                      <span className="text-2xs text-fg-subtle">Jedes OK sieht seinen Anlass</span>
-                    </div>
+                  <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
+                    <span className="text-2xs text-emerald-500 font-semibold flex items-center gap-1.5 shrink-0">
+                      <span className="size-2 rounded-full bg-emerald-500" />
+                      Mit Cevi.DB oder Cevi-Name
+                    </span>
+                    <span className="text-2xs text-fg-subtle">Einmal anmelden, auf allen Abteilungsseiten drin</span>
                   </div>
-                </Card3DTilt>
-              </div>
-
-              {/* Tile 4: Mobil optimiert & PWA (7-cols) with 3D Isometric Smartphone Mockup */}
-              <div className="md:col-span-7">
-                <Card3DTilt className="h-full rounded-card border border-line/80 bg-surface/80 p-1.5 sm:p-2 shadow-soft hover:border-line-strong transition-colors">
-                  <div className="rounded-[calc(1.5rem-0.375rem)] border border-line bg-surface p-5 sm:p-8 h-full flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
-                        Gemacht fürs Handy
-                      </h3>
-                      <p className="mt-2 text-sm text-fg-muted leading-relaxed max-w-[50ch]">
-                        Eintragen dauert wenige Sekunden, direkt aus dem Chat heraus. Und das OK teilt auch am
-                        Festzelt oder am Grill noch schnell jemanden ein. Auf iPhone und Android, ohne App.
-                      </p>
-                    </div>
-
-                    {/* Bespoke 3D Isometric Smartphone Mockup */}
-                    <div className="my-4">
-                      <MobilePwaIsometricGraphic className="max-h-[200px] sm:max-h-[220px]" />
-                    </div>
-
-                    <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
-                      <span className="flex items-center gap-1.5 sm:gap-2 text-emerald-400 font-semibold text-2xs sm:text-xs">
-                        <CheckCircle2 className="size-3.5 sm:size-4 shrink-0" />
-                        Mindestalter wird automatisch geprüft
-                      </span>
-                      <span className="text-2xs text-fg-subtle">z. B. Bar ab 18</span>
-                    </div>
-                  </div>
-                </Card3DTilt>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 3: Epic Panoramic Campsite Night Visual */}
-        <section className="relative w-full min-h-[360px] sm:min-h-[420px] md:min-h-[480px] border-y border-line/60 bg-canvas overflow-hidden">
-          {/* Panoramic Campsite Graphic background (edge-to-edge) */}
-          <div className="absolute inset-0 w-full h-full pointer-events-none">
-            <CampsiteNightGraphic className="w-full h-full" />
-          </div>
-
-          {/* Vignette gradients for atmospheric depth & text legibility */}
-          <div className="absolute inset-0 bg-gradient-to-t from-canvas via-transparent to-canvas/80 pointer-events-none" />
-          <div className="absolute inset-0 bg-canvas/20 pointer-events-none" />
-
-          {/* Centered Glass Quote Card */}
-          <div className="relative z-10 mx-auto max-w-6xl px-4 min-h-[360px] sm:min-h-[420px] md:min-h-[480px] flex items-center justify-center py-10 pointer-events-none">
-            <div className="max-w-xl backdrop-blur-md bg-surface/65 p-6 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-line/70 shadow-lift text-center pointer-events-auto">
-              <span className="font-mono text-2xs tracking-widest text-accent uppercase font-bold">
-                Cevi Lager- & Festkultur
-              </span>
-              <p className="font-display text-lg sm:text-xl md:text-2xl font-bold text-fg mt-2 leading-snug">
-                «Vom ersten Zeltaufbau bis zur letzten Schicht am Sonntagmorgen.»
-              </p>
-              <p className="text-xs sm:text-sm text-fg-subtle mt-2">
-                Entwickelt mit Herzblut für Cevi-Leitende und Freiwillige.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Hilfe: gut sichtbar vor dem Footer */}
-        <section className="py-16 md:py-20">
-          <div className="mx-auto max-w-6xl px-4">
-            <div className="flex flex-col gap-6 rounded-card border border-line bg-surface/80 p-6 sm:p-10 shadow-soft md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-4">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-accent/12 text-accent-ink">
-                  <LifeBuoy className="size-6" />
-                </span>
-                <div>
-                  <h2 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-fg">
-                    Fragen? Das Hilfe-Center erklärt alles.
-                  </h2>
-                  <p className="mt-2 max-w-[60ch] text-sm text-fg-muted leading-relaxed">
-                    Schritt für Schritt: Anmelden, in Schichten eintragen, einen Anlass planen oder die
-                    Abteilung einrichten. Für Helfer*innen, OK und Abteilungsleitung.
-                  </p>
                 </div>
               </div>
-              <a
-                href={helpUrl()}
-                className={buttonClasses({ variant: 'primary', size: 'md', className: 'h-12 w-full sm:w-auto shrink-0 justify-center font-semibold' })}
-              >
-                Zum Hilfe-Center
-                <ExternalLink className="size-4" />
-              </a>
+
+              {/* Tile 2: Eigene Subdomain (5-cols) */}
+              <div className="md:col-span-5">
+                <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
+                      Eure eigene Adresse
+                    </h3>
+                    <p className="mt-2 text-sm text-fg-muted leading-relaxed">
+                      Eure Abteilung bekommt eine feste Webadresse mit Logo und Farbe. Einmal teilen, alle
+                      Anlässe sind dort zu finden, Jahr für Jahr.
+                    </p>
+                  </div>
+
+                  {/* Clean Visual */}
+                  <div className="my-5">
+                    <SubdomainIsometricGraphic />
+                  </div>
+
+                  <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-subtle">
+                    <span className="font-mono text-accent font-bold break-all sm:break-normal text-2xs sm:text-xs">
+                      eure-abteilung.cevi-schichtplan.ch
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tile 3: Multi-Event Unterstützung (5-cols) */}
+              <div className="md:col-span-5">
+                <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
+                      Alle Anlässe an einem Ort
+                    </h3>
+                    <p className="mt-2 text-sm text-fg-muted leading-relaxed">
+                      Chilbi, PfiLa, Sommerlager oder Jubiläum gleichzeitig planen. Jedes OK hat Zugriff auf seinen Anlass,
+                      und fürs nächste Jahr startet ihr mit der Vorlage von heute.
+                    </p>
+                  </div>
+
+                  {/* Bespoke Architecture Graphic (Festzelt, Campfire, Jurte) */}
+                  <div className="my-5">
+                    <MultiEventIsometricGraphic className="max-h-[190px] sm:max-h-[200px]" />
+                  </div>
+
+                  <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
+                    <span className="font-semibold text-fg text-2xs sm:text-xs">Beliebig viele Anlässe</span>
+                    <span className="text-2xs text-fg-subtle">Jedes OK sieht seinen Bereich</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tile 4: Mobil optimiert & PWA (7-cols) */}
+              <div className="md:col-span-7">
+                <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
+                      Gemacht fürs Handy
+                    </h3>
+                    <p className="mt-2 text-sm text-fg-muted leading-relaxed max-w-[50ch]">
+                      Eintragen dauert wenige Sekunden, direkt aus dem Chat heraus. Und das OK teilt auch am
+                      Festzelt oder am Grill noch schnell jemanden ein. Auf iPhone und Android, ohne Installation.
+                    </p>
+                  </div>
+
+                  {/* Smartphone Graphic */}
+                  <div className="my-5">
+                    <MobilePwaIsometricGraphic className="max-h-[200px] sm:max-h-[220px]" />
+                  </div>
+
+                  <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
+                    <span className="flex items-center gap-1.5 sm:gap-2 text-emerald-500 font-semibold text-2xs sm:text-xs">
+                      <CheckCircle2 className="size-3.5 sm:size-4 shrink-0" />
+                      Mindestalter wird automatisch geprüft
+                    </span>
+                    <span className="text-2xs text-fg-subtle">z. B. Barbetrieb ab 18</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Strong Final Conversion & Help Section before Footer */}
+        <section className="py-16 md:py-24 border-t border-line/60">
+          <div className="mx-auto max-w-6xl px-4">
+            <div className="rounded-card border border-line bg-surface/90 p-8 sm:p-12 shadow-soft relative overflow-hidden">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-2xs font-bold uppercase tracking-wider bg-accent/12 text-accent-ink border border-accent/25 mb-4">
+                  <Flame className="size-3 text-accent" />
+                  <span>Bereit für den nächsten Anlass?</span>
+                </div>
+                <h2 className="font-display text-2xl sm:text-4xl font-extrabold tracking-tight text-fg">
+                  Schluss mit Excel-Chaos und unbesetzten Schichten.
+                </h2>
+                <p className="mt-3 text-sm sm:text-base text-fg-muted leading-relaxed">
+                  Egal ob Chilbi, Sommerlager oder Jubiläum: Startet jetzt mit dem Cevi Schichtplan.
+                  Fragen zur Bedienung oder Einrichtung beantwortet das Hilfe-Center Schritt für Schritt.
+                </p>
+
+                {/* Dynamic Bottom Button: Shows home department if present, or profile, or login if not */}
+                <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  {me ? (
+                    me.homeDepartment ? (
+                      <a
+                        href={getDepartmentUrl(me.homeDepartment.slug)}
+                        className={buttonClasses({
+                          variant: 'primary',
+                          size: 'md',
+                          className: 'h-12 justify-center font-semibold text-sm px-6 gap-2 shadow-glow',
+                        })}
+                      >
+                        <span>Zu deiner Abteilung ({me.homeDepartment.name})</span>
+                        <ArrowRight className="size-4" />
+                      </a>
+                    ) : (
+                      <Link
+                        href="/profil"
+                        className={buttonClasses({
+                          variant: 'primary',
+                          size: 'md',
+                          className: 'h-12 justify-center font-semibold text-sm px-6 gap-2 shadow-glow',
+                        })}
+                      >
+                        <span>Zu deinen Schichten ({me.ceviName || me.firstName})</span>
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    )
+                  ) : (
+                    <Link
+                      href="/login"
+                      className={buttonClasses({
+                        variant: 'primary',
+                        size: 'md',
+                        className: 'h-12 justify-center font-semibold text-sm px-6 gap-2 shadow-glow',
+                      })}
+                    >
+                      <LogIn className="size-4" />
+                      <span>Jetzt anmelden</span>
+                    </Link>
+                  )}
+
+                  <a
+                    href={helpUrl()}
+                    className={buttonClasses({
+                      variant: 'secondary',
+                      size: 'md',
+                      className: 'h-12 justify-center font-semibold text-sm px-6 gap-2',
+                    })}
+                  >
+                    <LifeBuoy className="size-4" />
+                    <span>Zum Hilfe-Center</span>
+                    <ExternalLink className="size-3.5 text-fg-subtle" />
+                  </a>
+                </div>
+
+                <p className="mt-4 text-xs text-fg-subtle">
+                  Ein ehrenamtliches Projekt · Kostenlos für alle Abteilungen des Cevi Schweiz.
+                </p>
+              </div>
             </div>
           </div>
         </section>
       </main>
-
 
       {/* Footer */}
       <footer className="border-t border-line/60 bg-surface/50 py-10 text-xs text-fg-subtle relative z-10">
