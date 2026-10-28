@@ -18,6 +18,7 @@ import {
   getLoginUrl,
   getLandingUrl,
   helpUrl,
+  statusUrl,
   type UserDto,
 } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
@@ -450,6 +451,9 @@ export default function LandingPage() {
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-5">
             <a href={helpUrl()} className="hover:text-fg transition">
               Hilfe
+            </a>
+            <a href={statusUrl()} className="hover:text-fg transition">
+              Status
             </a>
             <Link href="/datenschutz" className="hover:text-fg transition">
               Datenschutz

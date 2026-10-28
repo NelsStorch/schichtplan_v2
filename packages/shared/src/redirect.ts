@@ -117,6 +117,15 @@ export function helpUrl(path = '/'): string {
   return `${HELP_URL}${path}`;
 }
 
+/**
+ * Link zum Status-Portal (Uptime Kuma). Wie Hilfe und Datenschutz fest auf Produktion.
+ */
+export const STATUS_URL = 'https://status.cevi-schichtplan.ch';
+
+export function statusUrl(path = '/'): string {
+  return `${STATUS_URL}${path}`;
+}
+
 /** Datenschutzerklärung auf der Landingpage, wie die Hilfe fest auf Produktion (gilt für alle Subdomains) */
 export const PRIVACY_URL = 'https://cevi-schichtplan.ch/datenschutz';
 

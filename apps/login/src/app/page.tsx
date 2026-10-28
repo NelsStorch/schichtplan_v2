@@ -14,7 +14,7 @@ import {
   buttonClasses,
   cn,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, getLandingUrl, helpUrl } from '@schichtplan/shared/redirect';
+import { PRIVACY_URL, getLandingUrl, helpUrl, statusUrl } from '@schichtplan/shared/redirect';
 import type { CeviNameLoginErrorCode, DepartmentDirectoryItemDto, StufeRole } from '@schichtplan/shared';
 import { afterLogin, cleanReturnTo, departmentSlugFromReturnTo, withReturnTo } from '@/lib/destination';
 
@@ -787,6 +787,9 @@ function LoginContent() {
       <footer className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-fg-subtle sm:px-8">
         <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
         <div className="flex items-center gap-5">
+          <a href={statusUrl()} className="font-medium text-fg-muted transition hover:text-fg">
+            Status
+          </a>
           <a href={helpUrl('/start/anmelden/')} className="font-medium text-fg-muted transition hover:text-fg">
             Hilfe zum Anmelden
           </a>

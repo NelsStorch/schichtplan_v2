@@ -61,8 +61,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_prod_proxy"
-      # API Endpunkte haben Vorrang auf allen Domains, Login und Subdomains
-      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`login.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`)) && (PathPrefix(`/api`) || Path(`/health`))"
+      # API Endpunkte haben Vorrang auf allen Domains, Login und Subdomains (status.* hat eigene Uptime-Kuma-API)
+      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`login.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`)) && !Host(`status.${DOMAIN:-cevi-schichtplan.ch}`) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-api.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-api.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-api.priority=100"

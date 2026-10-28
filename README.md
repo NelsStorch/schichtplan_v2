@@ -8,6 +8,7 @@ Basiert auf der bewährten Architektur von `laden_v2`:
 * **Backend:** Fastify 5 + TypeScript (stateless, hochperformant, Zod-Validierung)
 * **Datenbank:** PostgreSQL 17 mit Prisma ORM
 * **Hilfe-Center:** Astro Starlight in `hilfe/` (statisch, nginx) auf `hilfe.cevi-schichtplan.ch`
+* **Status-Portal:** Uptime Kuma auf `status.cevi-schichtplan.ch` (im Projekt `status-schichtplan`)
 * **Shared Types:** `@schichtplan/shared` im Monorepo
 * **Reverse Proxy:** Traefik mit automatischem Wildcard-SSL & Zero-Downtime Healthchecks
 

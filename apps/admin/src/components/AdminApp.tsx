@@ -16,6 +16,7 @@ import {
 import { Button, Callout, CeviLogo, ThemeToggle, buttonClasses, cn } from '@schichtplan/ui';
 import {
   PRIVACY_URL,
+  STATUS_URL,
   type AdminDepartmentListItemDto,
   type AdminOverviewDto,
   type AdminSessionDto,
@@ -88,9 +89,14 @@ function Shell({
       <footer className="border-t border-line/70">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-6 text-xs text-fg-subtle sm:px-6">
           <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
-          <a href={PRIVACY_URL} className="transition hover:text-fg">
-            Datenschutz
-          </a>
+          <div className="flex items-center gap-5">
+            <a href={STATUS_URL} className="transition hover:text-fg">
+              Status
+            </a>
+            <a href={PRIVACY_URL} className="transition hover:text-fg">
+              Datenschutz
+            </a>
+          </div>
         </div>
       </footer>
     </div>

@@ -39,11 +39,42 @@ if ($Environment -eq 'dev') {
 }
 # Eigenes Proxy-Netz pro Umgebung (nur Traefik + diese Umgebung), siehe AGENTS.md Abschnitt 2a
 $ProxyNetwork = "schichtplan_${Environment}_proxy"
+$StartTime = Get-Date
 
 function Step($text) { Write-Host "`n$text" -ForegroundColor Cyan }
 
+function Send-DiscordNotification($title, $description, $color = 14753096) {
+    $webhook = if ($DiscordWebhookUrl) { $DiscordWebhookUrl } else { $env:DISCORD_WEBHOOK_URL }
+    if (-not $webhook) { return }
+
+    $payload = @{
+        username = "Cevi Schichtplan Deploy"
+        avatar_url = "https://status.cevi-schichtplan.ch/upload/logo.png"
+        embeds = @(
+            @{
+                title = $title
+                description = $description
+                color = $color
+                timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+                footer = @{
+                    text = "Cevi Schichtplan V2 · $Environment"
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 5
+
+    try {
+        Invoke-RestMethod -Uri $webhook -Method Post -Body $payload -ContentType "application/json; charset=utf-8" -TimeoutSec 5 | Out-Null
+    } catch {
+        # Ein Discord-Fehler soll den Deploy niemals abbrechen
+    }
+}
+
 function Stop-Deploy($text) {
     Write-Host "`nDEPLOY FEHLGESCHLAGEN: $text" -ForegroundColor Red
+    $info = "**Grund:** $text`n**Server:** $Server"
+    if ($commit) { $info += "`n**Stand:** $commit" }
+    Send-DiscordNotification -title "❌ Deployment fehlgeschlagen ($Environment)" -description $info -color 15158332
     Remove-Item $ArchiveName, $RemoteScript -ErrorAction SilentlyContinue
     exit 1
 }
@@ -225,4 +256,13 @@ if ($result -ne 0) {
     Stop-Deploy "Siehe Ausgabe oben. Der vorherige Stand der DB liegt unter $RemoteDir/backups."
 }
 
+$duration = [Math]::Round(((Get-Date) - $StartTime).TotalSeconds)
 Write-Host "`nDeploy nach $Environment erfolgreich abgeschlossen! Services laufen unterbruchfrei." -ForegroundColor Green
+
+$deployInfo = "**Umgebung:** `$Environment` (https://$DefaultDomain)`n**Stand:** $commit"
+if ($dirty.Count -gt 0) {
+    $deployInfo += "`n**Uncommittete Dateien:** $($dirty.Count)"
+}
+$deployInfo += "`n**Dauer:** ${duration}s · **Status:** Unterbruchfrei online"
+
+Send-DiscordNotification -title "🚀 Deployment erfolgreich ($Environment)" -description $deployInfo -color 3066993

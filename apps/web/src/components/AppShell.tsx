@@ -32,7 +32,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, departmentRoleLabel, getLandingUrl, helpUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
+import { PRIVACY_URL, departmentRoleLabel, getLandingUrl, helpUrl, statusUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
 import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { useInstallPrompt } from '@/lib/offline';
@@ -132,6 +132,9 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
           <div className="flex items-center gap-5">
             <a href={helpUrl()} className="transition hover:text-fg">
               Hilfe
+            </a>
+            <a href={statusUrl()} className="transition hover:text-fg">
+              Status
             </a>
             <a href={PRIVACY_URL} className="transition hover:text-fg">
               Datenschutz
