@@ -198,6 +198,8 @@ export const USAGE_METRICS = {
   // --- Hilfe-Center -------------------------------------------------------------------------
   HELP_PAGE: { label: 'Hilfeseiten gelesen', group: 'HILFE', source: 'ui', openDim: true },
   HELP_SEARCH_EMPTY: { label: 'Suchen ohne Treffer', group: 'HILFE', source: 'ui' },
+  HELP_FEEDBACK_YES: { label: 'Hilfeseite hilfreich', group: 'HILFE', source: 'ui', openDim: true },
+  HELP_FEEDBACK_NO: { label: 'Hilfeseite nicht hilfreich', group: 'HILFE', source: 'ui', openDim: true },
 } as const satisfies Record<string, UsageMetricDef>;
 
 export type UsageMetricKey = keyof typeof USAGE_METRICS;

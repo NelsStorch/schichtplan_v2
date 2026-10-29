@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { ArrowUpRight, Building2, Plus, Search, ShieldCheck, Trash2, UserPlus, X } from 'lucide-react';
+import { ArrowUpRight, Building2, Download, FileText, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, X } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -31,13 +31,14 @@ import {
   type DepartmentPermission,
 } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
+import { downloadCsv } from '../lib/csv';
 import { ACCESS_OPTIONS, CUSTOM_ACCESS, accessLabel, accessPayload, accessValue } from '../lib/access';
 import { formatDate, formatDateTime, fullName } from '../lib/format';
 import { EventRows } from './EventsPanel';
 import { PersonPicker } from './PersonPicker';
 import { TypedConfirmDialog } from './TypedConfirmDialog';
 
-type Tab = 'personen' | 'anlaesse' | 'einstellungen' | 'stufen' | 'protokoll';
+type Tab = 'personen' | 'anlaesse' | 'stufen' | 'vorlagen' | 'einstellungen' | 'protokoll';
 type PeopleFilter = 'all' | 'ADMIN' | 'RIGHTS' | 'HELPER' | 'home';
 
 export function DepartmentLogo({
@@ -636,10 +637,12 @@ export function DepartmentDialog({
   onChanged: () => void;
   onOpenUser?: (userId: string) => void;
 }) {
+  const toast = useToast();
   const [detail, setDetail] = useState<AdminDepartmentDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('personen');
   const [reload, setReload] = useState(0);
+  const [syncingStufen, setSyncingStufen] = useState(false);
 
   useEffect(() => {
     if (!departmentId) return;
@@ -666,10 +669,35 @@ export function DepartmentDialog({
     onChanged();
   };
 
+  const syncStufen = async () => {
+    if (!loaded?.id) return;
+    setSyncingStufen(true);
+    try {
+      const res = await api<{ message: string; created: number }>(`/api/admin/departments/${loaded.id}/sync-stufen`, {
+        method: 'POST',
+      });
+      toast({
+        tone: 'success',
+        title: 'Stufen synchronisiert',
+        description: `${res.created} Stufen aus Cevi.DB angelegt oder aktualisiert.`,
+      });
+      refresh();
+    } catch (err) {
+      toast({
+        tone: 'error',
+        title: 'Synchronisation fehlgeschlagen',
+        description: errorMessage(err),
+      });
+    } finally {
+      setSyncingStufen(false);
+    }
+  };
+
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'personen', label: 'Personen', count: loaded?.people.length },
     { id: 'anlaesse', label: 'Anlässe', count: loaded?.eventCount },
     { id: 'stufen', label: 'Stufen', count: loaded?.stufen.length },
+    { id: 'vorlagen', label: 'Vorlagen', count: loaded?.templates?.length },
     { id: 'einstellungen', label: 'Einstellungen' },
     { id: 'protokoll', label: 'Protokoll', count: loaded?.audit.length },
   ];
@@ -762,28 +790,69 @@ export function DepartmentDialog({
               ) : (
                 <EventRows items={loaded.events} showDepartment={false} onChanged={refresh} />
               ))}
-            {tab === 'stufen' &&
-              (loaded.stufen.length === 0 ? (
+            {tab === 'stufen' && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-fg-subtle">
+                    Stufen verknüpfen Helfer automatisch über Cevi.DB oder können von der Leitung gepflegt werden.
+                  </p>
+                  {loaded.ceviDbGroupId && (
+                    <Button size="sm" variant="secondary" onClick={syncStufen} disabled={syncingStufen}>
+                      <RefreshCw className={cn('size-3.5', syncingStufen && 'animate-spin')} />
+                      {syncingStufen ? 'Wird abgeglichen …' : 'Mit Cevi.DB abgleichen'}
+                    </Button>
+                  )}
+                </div>
+                {loaded.stufen.length === 0 ? (
+                  <EmptyState
+                    title="Keine Stufen"
+                    description="Stufen entstehen beim Cevi.DB-Login oder können hier synchronisiert werden."
+                    className="py-8"
+                  />
+                ) : (
+                  <ul className="divide-y divide-line overflow-hidden rounded-card border border-line">
+                    {loaded.stufen.map((s) => (
+                      <li key={s.id} className="flex items-center gap-3 px-4 py-3">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-fg">{s.name}</span>
+                          <span className="block text-xs text-fg-subtle">
+                            {s.ceviDbGroupId !== null ? `Cevi.DB-Gruppe ${s.ceviDbGroupId}` : 'Ohne Cevi.DB'}
+                          </span>
+                        </span>
+                        <Badge>{s.memberCount} Personen</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {tab === 'vorlagen' && (
+              !loaded.templates || loaded.templates.length === 0 ? (
                 <EmptyState
-                  title="Keine Stufen"
-                  description="Stufen legt die Abteilungsleitung in der Abteilung an, oder sie entstehen beim Cevi.DB-Login."
+                  icon={<FileText />}
+                  title="Keine Vorlagen"
+                  description="Diese Abteilung hat noch keine Schicht-Vorlagen angelegt."
                   className="py-8"
                 />
               ) : (
                 <ul className="divide-y divide-line overflow-hidden rounded-card border border-line">
-                  {loaded.stufen.map((s) => (
-                    <li key={s.id} className="flex items-center gap-3 px-4 py-3">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-fg">{s.name}</span>
-                        <span className="block text-xs text-fg-subtle">
-                          {s.ceviDbGroupId !== null ? `Cevi.DB-Gruppe ${s.ceviDbGroupId}` : 'Ohne Cevi.DB'}
-                        </span>
+                  {loaded.templates.map((tpl) => (
+                    <li key={tpl.id} className="flex items-center gap-3 px-4 py-3">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted">
+                        <FileText className="size-4" aria-hidden />
                       </span>
-                      <Badge>{s.memberCount} Personen</Badge>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-fg">{tpl.name}</span>
+                        {tpl.description && (
+                          <span className="block truncate text-xs text-fg-subtle">{tpl.description}</span>
+                        )}
+                      </span>
+                      <Badge>{tpl.shiftCount} {tpl.shiftCount === 1 ? 'Schicht' : 'Schichten'}</Badge>
                     </li>
                   ))}
                 </ul>
-              ))}
+              )
+            )}
             {tab === 'protokoll' && <DepartmentAuditTab detail={loaded} />}
             {tab === 'einstellungen' && (
               <SettingsTab

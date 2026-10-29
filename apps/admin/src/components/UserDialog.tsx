@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Building2, CalendarClock, GitMerge, History, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowUpRight, Building2, CalendarClock, Copy, GitMerge, History, KeyRound, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -195,6 +195,33 @@ export function UserDialog({
   const [detail, setDetail] = useState<AdminUserDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [resetModalUrl, setResetModalUrl] = useState<string | null>(null);
+  const [generatingReset, setGeneratingReset] = useState(false);
+
+  const handleGenerateReset = async () => {
+    if (!user?.id) return;
+    setGeneratingReset(true);
+    try {
+      const res = await api<{ message: string; token: string; resetUrl: string; expiresAt: string }>(
+        `/api/admin/users/${user.id}/reset-token`,
+        { method: 'POST' }
+      );
+      setResetModalUrl(res.resetUrl);
+      toast({
+        tone: 'success',
+        title: 'Reset-Link erstellt',
+        description: 'Der Link ist 24 Stunden gültig.',
+      });
+    } catch (err) {
+      toast({
+        tone: 'error',
+        title: 'Erstellung fehlgeschlagen',
+        description: errorMessage(err),
+      });
+    } finally {
+      setGeneratingReset(false);
+    }
+  };
   const [saving, setSaving] = useState(false);
   const [merging, setMerging] = useState(false);
   const [mergeTarget, setMergeTarget] = useState<AdminUserListItemDto | null>(null);
@@ -460,6 +487,47 @@ export function UserDialog({
           </div>
 
           <div className="mt-6">
+            {user.potentialDuplicateOf && (
+              <Callout tone="warning" className="mb-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-fg">Mögliche Dublette gefunden</p>
+                    <p className="mt-0.5 text-xs text-fg-muted">
+                      Für diese Person wurde ein sehr ähnliches Zweitkonto gefunden ({user.potentialDuplicateOf.name}).
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        const res = await api<{ items: AdminUserListItemDto[] }>(
+                          `/api/admin/users?q=${encodeURIComponent(user.potentialDuplicateOf!.id)}`
+                        );
+                        if (res.items.length > 0) {
+                          setMergeTarget(res.items[0]);
+                          toast({
+                            tone: 'info',
+                            title: 'Ziel-Konto ausgewählt',
+                            description: `${fullName(res.items[0])} wurde im Zusammenführen-Bereich ausgewählt.`,
+                          });
+                        }
+                      } catch (err) {
+                        toast({
+                          tone: 'error',
+                          title: 'Laden fehlgeschlagen',
+                          description: errorMessage(err),
+                        });
+                      }
+                    }}
+                  >
+                    <GitMerge className="size-3.5" aria-hidden />
+                    Zusammenführung vorbereiten
+                  </Button>
+                </div>
+              </Callout>
+            )}
+
             <Section title="Kontakt">
               <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                 <Fact label="E-Mail">
@@ -562,6 +630,22 @@ export function UserDialog({
                     </Fact>
                   </>
                 )}
+                <Fact label="Notfall-Passwort-Reset" wide>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleGenerateReset}
+                      disabled={generatingReset}
+                    >
+                      <KeyRound className="size-3.5" aria-hidden />
+                      {generatingReset ? 'Wird erstellt …' : 'Reset-Link generieren (24h)'}
+                    </Button>
+                    <span className="text-xs text-fg-subtle">
+                      Erstellt einen Notfall-Einmallink zur direkten Neuvergabe des Passworts.
+                    </span>
+                  </div>
+                </Fact>
                 <Fact label="Registriert">{formatDateTime(user.createdAt)}</Fact>
                 <Fact label="Zuletzt aktiv">{formatLastSeen(user.lastSeenOn)}</Fact>
                 <Fact label="Zuletzt geändert">{formatDateTime(user.updatedAt)}</Fact>

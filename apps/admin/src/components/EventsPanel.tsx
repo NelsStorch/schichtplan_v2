@@ -6,6 +6,7 @@ import {
   CalendarX2,
   ChevronLeft,
   ChevronRight,
+  Download,
   Eye,
   EyeOff,
   Lock,
@@ -37,10 +38,11 @@ import {
   type AdminEventListItemDto,
 } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
+import { downloadCsv } from '../lib/csv';
 import { formatEventRange } from '../lib/format';
 import { TypedConfirmDialog } from './TypedConfirmDialog';
 
-type When = 'upcoming' | 'past' | 'all';
+type When = 'upcoming' | 'drafts' | 'urgent' | 'signup_closed' | 'past' | 'all';
 
 const PAGE_SIZE = 25;
 
@@ -338,6 +340,29 @@ export function EventsPanel({
   const items = data?.items ?? [];
   const filtered = Boolean(query || departmentId);
 
+  const handleExport = () => {
+    if (!items.length) return;
+    const rows = items.map((e) => {
+      const pct = e.slotCount > 0 ? Math.round((Math.min(e.signupCount, e.slotCount) / e.slotCount) * 100) : 0;
+      return {
+        'Titel': e.title,
+        'Abteilung': e.departmentName,
+        'Kürzel': e.slug,
+        'Start': e.startDate,
+        'Ende': e.endDate,
+        'Status': !e.isPublished ? 'Entwurf' : new Date(e.endDate).getTime() < Date.now() ? 'Vorbei' : 'Aktiv',
+        'Eintragen offen': e.allowPublicSignup ? 'Ja' : 'Nein',
+        'Zugang': accessLabel(e.accessType),
+        'Schichten': e.shiftCount,
+        'Plätze total': e.slotCount,
+        'Eintragungen': e.signupCount,
+        'Belegung (%)': pct,
+        'OK-Mitglieder': e.organizerCount,
+      };
+    });
+    downloadCsv(rows, `anlaesse_${when}_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -385,26 +410,41 @@ export function EventsPanel({
             </Select>
           </div>
         </div>
-        <ChipRow>
-          {(
-            [
-              ['upcoming', 'Kommend & laufend'],
-              ['past', 'Vorbei'],
-              ['all', 'Alle'],
-            ] as const
-          ).map(([id, label]) => (
-            <Chip
-              key={id}
-              selected={when === id}
-              onClick={() => {
-                setWhen(id);
-                setPage(1);
-              }}
-            >
-              {label}
-            </Chip>
-          ))}
-        </ChipRow>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ChipRow>
+            {(
+              [
+                ['upcoming', 'Kommend & laufend'],
+                ['drafts', 'Entwürfe'],
+                ['urgent', 'Dringend (< 50%)'],
+                ['signup_closed', 'Eintragen zu'],
+                ['past', 'Vorbei'],
+                ['all', 'Alle'],
+              ] as const
+            ).map(([id, label]) => (
+              <Chip
+                key={id}
+                selected={when === id}
+                onClick={() => {
+                  setWhen(id);
+                  setPage(1);
+                }}
+              >
+                {label}
+              </Chip>
+            ))}
+          </ChipRow>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleExport}
+            disabled={items.length === 0}
+            title="Angezeigte Anlässe als CSV herunterladen"
+          >
+            <Download className="size-3.5" aria-hidden />
+            Export (CSV)
+          </Button>
+        </div>
       </div>
 
       {error && (

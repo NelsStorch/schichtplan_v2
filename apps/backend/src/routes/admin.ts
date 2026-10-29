@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { FastifyPluginAsync } from 'fastify';
 import { Prisma } from '../db.js';
 import { z } from 'zod';
@@ -8,13 +9,15 @@ import type {
   AdminUserListItemDto,
   LoginMethod,
 } from '@schichtplan/shared';
-import { normalizePermissions } from '@schichtplan/shared';
+import { AdminBatchDeleteUsersSchema, normalizePermissions } from '@schichtplan/shared';
+import { hashResetToken } from './passwordReset.js';
+import { getLoginPortalBaseUrl } from './auth.js';
 import { toCeviDbStufeDto } from '../services/homeDepartment.js';
 import { recordAdminAction } from '../services/adminAudit.js';
 
 const ListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
-  method: z.enum(['cevidb', 'password', 'ceviname', 'stale_ceviname']).optional(),
+  method: z.enum(['cevidb', 'password', 'ceviname', 'stale_ceviname', 'duplicate']).optional(),
   role: z.enum(['admin']).optional(),
   departmentId: z.union([z.string().uuid(), z.literal('none')]).optional(),
   sort: z.enum(['created', 'name', 'email', 'seen']).default('created'),
@@ -67,7 +70,10 @@ export function loginMethods(user: Pick<UserRow, 'ceviDbId' | 'passwordHash'>): 
   return methods;
 }
 
-export function toListItem(user: UserRow): AdminUserListItemDto {
+export function toListItem(
+  user: UserRow,
+  potentialDuplicateOf: { id: string; name: string; ceviName: string | null; email: string | null } | null = null
+): AdminUserListItemDto {
   return {
     id: user.id,
     email: user.email,
@@ -97,9 +103,53 @@ export function toListItem(user: UserRow): AdminUserListItemDto {
     ceviDbDepartmentLeader: user.ceviDbDepartmentLeader,
     ceviDbLeaderGroupName: user.ceviDbLeaderGroupName,
     lastSeenOn: user.lastSeenOn ? user.lastSeenOn.toISOString().slice(0, 10) : null,
+    potentialDuplicateOf: potentialDuplicateOf ?? null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };
+}
+
+
+export interface DuplicateUserRow {
+  id: string;
+  duplicateId: string;
+  duplicateName: string;
+  duplicateCeviName: string | null;
+  duplicateEmail: string | null;
+}
+
+export async function findDuplicateUsers(prisma: any) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT DISTINCT 
+        u1."id", 
+        u2."id" as "duplicateId", 
+        TRIM(CONCAT(u2."firstName", ' ', COALESCE(NULLIF(u2."lastName", '(Helfer)'), ''))) as "duplicateName",
+        u2."ceviName" as "duplicateCeviName",
+        u2."email" as "duplicateEmail"
+      FROM "users" u1
+      JOIN "users" u2 ON u1."id" != u2."id" AND (
+        (u1."ceviName" IS NOT NULL AND u1."ceviName" != '' AND u1."birthDate" IS NOT NULL 
+         AND LOWER(u1."ceviName") = LOWER(u2."ceviName") AND u1."birthDate" = u2."birthDate")
+        OR
+        (u1."email" IS NOT NULL AND u1."email" != '' AND LOWER(u1."email") = LOWER(u2."email"))
+      )
+    `;
+    const map = new Map<string, { id: string; name: string; ceviName: string | null; email: string | null }>();
+    for (const r of rows) {
+      if (!map.has(r.id)) {
+        map.set(r.id, {
+          id: r.duplicateId,
+          name: r.duplicateName,
+          ceviName: r.duplicateCeviName,
+          email: r.duplicateEmail,
+        });
+      }
+    }
+    return map;
+  } catch {
+    return new Map<string, { id: string; name: string; ceviName: string | null; email: string | null }>();
+  }
 }
 
 /** Jeder Suchbegriff muss in mindestens einem Feld vorkommen ("nels storch" findet Vor- und Nachname). */
@@ -177,12 +227,14 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.prisma.shiftSignup.count(),
     ]);
 
+    const duplicateMap = await findDuplicateUsers(fastify.prisma);
     const overview: AdminOverviewDto = {
       users,
       cevidbUsers,
       passwordUsers,
       guestUsers,
       staleGuestUsers,
+      duplicateUsers: duplicateMap.size,
       globalAdmins,
       newUsers7d,
       departments,
@@ -198,12 +250,14 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: parse.error.issues[0].message });
     }
     const { q, method, role, departmentId, sort, page, pageSize } = parse.data;
+    const duplicateMap = await findDuplicateUsers(fastify.prisma);
+    const duplicateIds = Array.from(duplicateMap.keys());
     const dir = parse.data.dir ?? (sort === 'created' ? 'desc' : 'asc');
 
     const where: Prisma.UserWhereInput = {
       AND: [
         ...searchFilter(q),
-        ...methodFilter(method),
+...(method === 'duplicate' ? [{ id: { in: duplicateIds } }] : methodFilter(method as any)),
         ...departmentFilter(departmentId),
         ...(role === 'admin' ? [{ isGlobalAdmin: true }] : []),
       ],
@@ -232,7 +286,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     request.log.info({ adminId: request.user.id, q: q || undefined, total }, 'Admin: Userliste abgerufen');
 
     const result: AdminUserListDto = {
-      items: rows.map(toListItem),
+      items: rows.map((r) => toListItem(r, duplicateMap.get(r.id))),
       total,
       page,
       pageSize,
@@ -402,6 +456,102 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       return { success: true };
     }
   );
+  // Passwort-Reset-Link als Notfall-Hilfe durch globale Admins generieren
+  fastify.post<{ Params: { id: string } }>(
+    '/api/admin/users/:id/reset-token',
+    { preHandler: [fastify.requireGlobalAdmin] },
+    async (request, reply) => {
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, email: true, firstName: true, lastName: true, ceviName: true, passwordHash: true },
+      });
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+      if (!user.email && !user.passwordHash) {
+        return reply.status(400).send({ error: 'Person hat weder E-Mail noch Passwort hinterlegt.' });
+      }
+
+      const token = crypto.randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h gültig bei manueller Generierung
+      await fastify.prisma.$transaction([
+        fastify.prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
+        fastify.prisma.passwordResetToken.create({
+          data: {
+            userId: user.id,
+            tokenHash: hashResetToken(token),
+            expiresAt,
+          },
+        }),
+      ]);
+
+      const resetUrl = `${getLoginPortalBaseUrl(request.headers.host)}/passwort-zuruecksetzen?token=${token}`;
+      const name = user.ceviName ? `${user.ceviName} (${user.firstName} ${user.lastName})` : `${user.firstName} ${user.lastName}`;
+
+      await recordAdminAction(fastify.prisma, request, {
+        action: 'USER_PASSWORD_RESET_LINK_GENERATE',
+        targetType: 'USER',
+        targetId: user.id,
+        targetLabel: name,
+        details: { email: user.email },
+      });
+
+      return { resetUrl, expiresAt: expiresAt.toISOString() };
+    }
+  );
+
+  // Mehrere verwaiste oder gewählte Personen im Stapel löschen
+  fastify.post(
+    '/api/admin/users/batch-delete',
+    { preHandler: [fastify.requireGlobalAdmin] },
+    async (request, reply) => {
+      const parse = AdminBatchDeleteUsersSchema.safeParse(request.body);
+      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+      const rawIds = parse.data.userIds;
+      const filteredIds = rawIds.filter((id) => id !== request.user.id);
+      if (filteredIds.length === 0) {
+        return reply.status(400).send({ error: 'Das eigene Admin-Konto kann nicht gelöscht werden.' });
+      }
+
+      const users = await fastify.prisma.user.findMany({
+        where: { id: { in: filteredIds } },
+        select: { id: true, firstName: true, lastName: true, ceviName: true, isGlobalAdmin: true },
+      });
+
+      if (users.some((u) => u.isGlobalAdmin)) {
+        return reply.status(400).send({ error: 'Konten mit globalen Admin-Rechten können nicht im Stapel gelöscht werden.' });
+      }
+
+      const idsToDelete = users.map((u) => u.id);
+
+      await fastify.prisma.$transaction(async (tx) => {
+        await tx.eventAccessLink.updateMany({
+          where: { boundUserId: { in: idsToDelete } },
+          data: { boundUserId: null },
+        });
+        await tx.eventDeregistration.updateMany({
+          where: { createdById: { in: idsToDelete } },
+          data: { createdById: null },
+        });
+        await tx.eventAccessLink.updateMany({
+          where: { createdById: { in: idsToDelete } },
+          data: { createdById: null },
+        });
+        await tx.user.deleteMany({
+          where: { id: { in: idsToDelete } },
+        });
+      });
+
+      await recordAdminAction(fastify.prisma, request, {
+        action: 'USER_BATCH_DELETE',
+        targetType: 'USER',
+        targetId: null,
+        targetLabel: `${idsToDelete.length} Personen gelöscht`,
+        details: { count: idsToDelete.length, userIds: idsToDelete },
+      });
+
+      return { success: true, count: idsToDelete.length };
+    }
+  );
+
 };
 
 export default adminRoutes;

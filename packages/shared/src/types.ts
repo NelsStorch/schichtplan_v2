@@ -606,6 +606,7 @@ export interface AdminUserMembershipDto {
 }
 
 export interface AdminUserListItemDto {
+  potentialDuplicateOf?: { id: string; name: string; ceviName: string | null; email: string | null } | null;
   id: string;
   email: string | null;
   emailVerified?: boolean;
@@ -693,6 +694,7 @@ export interface AdminOverviewDto {
   guestUsers: number;
   /** Verwaiste Cevi-Name-Profile (0 Eintragungen, älter als 30 Tage) */
   staleGuestUsers?: number;
+  duplicateUsers?: number;
   globalAdmins: number;
   newUsers7d: number;
   departments: number;
@@ -758,6 +760,7 @@ export interface AdminDepartmentDetailDto extends AdminDepartmentListItemDto {
   /** Die neusten Einträge im Protokoll der Abteilung */
   audit: DepartmentAuditEntryDto[];
   events: AdminEventListItemDto[];
+  templates?: { id: string; name: string; description: string | null; shiftCount: number }[];
 }
 
 export interface AdminEventListItemDto {
@@ -818,6 +821,22 @@ export interface AdminAuditListDto {
 }
 
 /** Startseite des Admin-Portals: Kennzahlen, Hinweise und was als Nächstes ansteht */
+export interface AdminDashboardCriticalEventDto {
+  id: string;
+  title: string;
+  slug: string;
+  departmentId: string;
+  departmentName: string;
+  departmentSlug: string;
+  startDate: string;
+  endDate: string;
+  isPublished: boolean;
+  slotCount: number;
+  signupCount: number;
+  fillPct: number;
+  reason: 'UNDERSTAFFED' | 'UNPUBLISHED_SOON';
+}
+
 export interface AdminDashboardDto {
   upcomingEvents: AdminEventListItemDto[];
   recentUsers: AdminUserListItemDto[];
@@ -825,6 +844,14 @@ export interface AdminDashboardDto {
   departmentsWithoutLeader: { id: string; name: string; slug: string }[];
   /** Inaktive Abteilungen (keine Anlässe in den letzten 6 Monaten oder älter als 30 Tage ohne Anlass) */
   inactiveDepartments?: { id: string; name: string; slug: string; lastEventDate: string | null }[];
+  departmentsWithoutContact?: { id: string; name: string; slug: string }[];
+  criticalEvents?: AdminDashboardCriticalEventDto[];
+  failedMessages7d?: number;
+  potentialDuplicatesCount?: number;
+  systemHealth?: {
+    databaseOk: boolean;
+    uptimeSeconds: number;
+  };
   signups7d: number;
 }
 

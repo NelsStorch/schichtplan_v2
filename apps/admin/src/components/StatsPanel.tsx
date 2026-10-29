@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
-import { Callout, Chip, ChipRow, Select, Skeleton } from '@schichtplan/ui';
+import { Download, RefreshCw, ShieldCheck, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Button, Callout, Chip, ChipRow, Select, Skeleton, cn } from '@schichtplan/ui';
 import {
   STATS_RANGES,
   STATS_RETENTION,
@@ -19,6 +19,7 @@ import {
   type UsageMetricKey,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
+import { downloadCsv } from '../lib/csv';
 import { formatDateTime } from '../lib/format';
 import { Breakdown, ChartCard, DailyBars, StatGrid, StatTile, fmtNumber, formatBytes } from './stats/Charts';
 
@@ -170,6 +171,129 @@ function UsageView({ usage, days }: { usage: AdminStatsUsageDto; days: StatsRang
   );
 }
 
+function HelpSection({ usage }: { usage: AdminStatsUsageDto }) {
+  const pageMetric = usage.metrics.find((m) => m.metric === 'HELP_PAGE');
+  const searchEmptyMetric = usage.metrics.find((m) => m.metric === 'HELP_SEARCH_EMPTY');
+  const otherUsed = [pageMetric, searchEmptyMetric].filter((m): m is AdminStatsMetricDto => Boolean(m && m.total > 0));
+  const otherUnused = [pageMetric, searchEmptyMetric].filter((m): m is AdminStatsMetricDto => Boolean(m && m.total === 0));
+  const yesMetric = usage.metrics.find((m) => m.metric === 'HELP_FEEDBACK_YES');
+  const noMetric = usage.metrics.find((m) => m.metric === 'HELP_FEEDBACK_NO');
+  const yesCount = yesMetric?.total ?? 0;
+  const noCount = noMetric?.total ?? 0;
+  const totalVotes = yesCount + noCount;
+  const satisfactionPct = totalVotes > 0 ? Math.round((yesCount / totalVotes) * 100) : null;
+
+  const negativePages = (noMetric?.byDim ?? []).map((d) => ({
+    key: d.dim || 'index',
+    label: d.dim ? `/${d.dim}/` : '/ (Startseite)',
+    count: d.total,
+  }));
+
+  const positivePages = (yesMetric?.byDim ?? []).map((d) => ({
+    key: d.dim || 'index',
+    label: d.dim ? `/${d.dim}/` : '/ (Startseite)',
+    count: d.total,
+  }));
+
+  return (
+    <section>
+      <h2 className="mb-3 font-display text-lg font-semibold tracking-tight text-fg">Hilfe-Center</h2>
+      <div className="space-y-4">
+      <ChartCard
+        title="Hilfeseiten-Bewertung"
+        description="Rückmeldungen der Lesenden («War diese Anleitung hilfreich?») am Ende der Hilfeseiten."
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-y-2">
+            <div className="flex items-baseline gap-3">
+              <span className="font-display text-3xl font-bold tracking-tight text-fg tabular">
+                {satisfactionPct !== null ? `${satisfactionPct}%` : '–'}
+              </span>
+              <span className="text-sm font-medium text-fg-muted">
+                {satisfactionPct !== null ? 'Zufriedenheit' : 'Noch keine Stimmen'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-xs tabular text-fg-muted">
+              <span className="inline-flex items-center gap-1.5 font-medium text-fg">
+                <ThumbsUp size={14} className="text-accent" aria-hidden="true" />
+                <span>{fmtNumber(yesCount)} hilfreich</span>
+              </span>
+              <span className="text-line-strong">·</span>
+              <span className="inline-flex items-center gap-1.5 font-medium text-fg">
+                <ThumbsDown size={14} className="text-danger" aria-hidden="true" />
+                <span>{fmtNumber(noCount)} nicht hilfreich</span>
+              </span>
+              <span className="text-line-strong">·</span>
+              <span>Gesamt {fmtNumber(totalVotes)} {totalVotes === 1 ? 'Stimme' : 'Stimmen'}</span>
+            </div>
+          </div>
+
+          {totalVotes > 0 && (
+            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
+              {yesCount > 0 && (
+                <div
+                  className="h-full bg-accent transition-all"
+                  style={{ width: `${(yesCount / totalVotes) * 100}%` }}
+                  title={`${satisfactionPct}% hilfreich`}
+                />
+              )}
+              {noCount > 0 && (
+                <div
+                  className="h-full bg-danger transition-all"
+                  style={{ width: `${(noCount / totalVotes) * 100}%` }}
+                  title={`${100 - (satisfactionPct ?? 0)}% nicht hilfreich`}
+                />
+              )}
+            </div>
+          )}
+
+          {totalVotes === 0 ? (
+            <p className="text-xs text-fg-subtle">
+              Im gewählten Zeitraum wurden noch keine Rückmeldungen abgegeben. Lesende können am Ende jeder Hilfeseite mit «Ja» oder «Nein» abstimmen.
+            </p>
+          ) : (
+            <div className="grid gap-6 pt-2 md:grid-cols-2">
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-danger">Seiten mit Verbesserungsbedarf (Nein)</h4>
+                <Breakdown
+                  items={negativePages}
+                  total={noCount}
+                  empty="Keine negativen Stimmen im Zeitraum."
+                  limit={6}
+                />
+              </div>
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-accent">Hilfreichste Seiten (Ja)</h4>
+                <Breakdown
+                  items={positivePages}
+                  total={yesCount}
+                  empty="Keine positiven Stimmen im Zeitraum."
+                  limit={6}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </ChartCard>
+
+        {otherUsed.length > 0 && (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {otherUsed.map((m) => (
+              <MetricCard key={m.metric} m={m} />
+            ))}
+          </div>
+        )}
+
+        {otherUnused.length > 0 && (
+          <p className="text-xs text-fg-subtle">
+            Im Zeitraum nicht benutzt: {otherUnused.map((m) => def(m.metric).label).join(' · ')}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function FunctionsView({ usage }: { usage: AdminStatsUsageDto }) {
   const signups = usage.metrics.find((m) => m.metric === 'SIGNUP');
   return (
@@ -179,7 +303,8 @@ function FunctionsView({ usage }: { usage: AdminStatsUsageDto }) {
       </ChartCard>
       <MetricGroup usage={usage} group="ANLAESSE" />
       <MetricGroup usage={usage} group="BROWSER" />
-      <MetricGroup usage={usage} group="HILFE" />
+      <HelpSection usage={usage} />
+
       <p className="text-xs leading-relaxed text-fg-subtle">
         Browser-Meldungen fehlen von Personen, die «nicht verfolgen» (GPC/DNT) eingestellt haben. Die Zahlen sind
         deshalb eher zu tief.
@@ -261,7 +386,15 @@ function EventsView({ data }: { data: AdminStatsFeaturesDto }) {
 
 type RouteSort = 'count' | 'p95Ms' | 'errors5xx';
 
-function SystemView({ system, usage }: { system: AdminStatsSystemDto; usage: AdminStatsUsageDto | null }) {
+function SystemView({
+  system,
+  usage,
+  onOpenAudit,
+}: {
+  system: AdminStatsSystemDto;
+  usage: AdminStatsUsageDto | null;
+  onOpenAudit?: (query: string) => void;
+}) {
   const [sort, setSort] = useState<RouteSort>('count');
   const { requests } = system;
   const routes = useMemo(
@@ -414,7 +547,27 @@ function SystemView({ system, usage }: { system: AdminStatsSystemDto; usage: Adm
   );
 }
 
-export function StatsPanel({ departments }: { departments: AdminDepartmentListItemDto[] }) {
+export function StatsPanel({
+  departments,
+  onOpenAudit,
+}: {
+  departments: AdminDepartmentListItemDto[];
+  onOpenAudit?: (query: string) => void;
+}) {
+  const [reload, setReload] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<string>(() =>
+    new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  );
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setReload((n) => n + 1);
+    setLastRefreshed(
+      new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    );
+    setTimeout(() => setRefreshing(false), 600);
+  };
   const [view, setView] = useState<View>('nutzung');
   const [days, setDays] = useState<StatsRange>(30);
   const [departmentId, setDepartmentId] = useState('');
@@ -437,7 +590,7 @@ export function StatsPanel({ departments }: { departments: AdminDepartmentListIt
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, reload]);
 
   useEffect(() => {
     if (view !== 'anlaesse') return;
@@ -449,7 +602,7 @@ export function StatsPanel({ departments }: { departments: AdminDepartmentListIt
     return () => {
       cancelled = true;
     };
-  }, [view, query]);
+  }, [view, query, reload]);
 
   useEffect(() => {
     if (view !== 'betrieb') return;
@@ -461,7 +614,7 @@ export function StatsPanel({ departments }: { departments: AdminDepartmentListIt
     return () => {
       cancelled = true;
     };
-  }, [view, days]);
+  }, [view, days, reload]);
 
   const sortedDepartments = useMemo(
     () => [...departments].sort((a, b) => a.name.localeCompare(b.name, 'de')),
@@ -479,6 +632,17 @@ export function StatsPanel({ departments }: { departments: AdminDepartmentListIt
           ))}
         </ChipRow>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Statistikdaten jetzt aktualisieren"
+          >
+            <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} aria-hidden />
+            Aktualisieren
+          </Button>
+          <span className="hidden text-xs text-fg-subtle sm:inline-block">Stand: {lastRefreshed}</span>
           <div className="w-36">
             <Select value={days} onChange={(e) => setDays(Number(e.target.value) as StatsRange)} aria-label="Zeitraum">
               {STATS_RANGES.map((r) => (
@@ -512,7 +676,7 @@ export function StatsPanel({ departments }: { departments: AdminDepartmentListIt
       {view === 'nutzung' && (usage ? <UsageView usage={usage} days={days} /> : !error && <LoadingCards />)}
       {view === 'funktionen' && (usage ? <FunctionsView usage={usage} /> : !error && <LoadingCards />)}
       {view === 'anlaesse' && (features ? <EventsView data={features} /> : !error && <LoadingCards />)}
-      {view === 'betrieb' && (system ? <SystemView system={system} usage={usage} /> : !error && <LoadingCards />)}
+      {view === 'betrieb' && (system ? <SystemView system={system} usage={usage} onOpenAudit={onOpenAudit} /> : !error && <LoadingCards />)}
 
       <p className="flex items-start gap-2 border-t border-line pt-5 text-xs leading-relaxed text-fg-subtle">
         <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden />

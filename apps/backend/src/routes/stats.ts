@@ -29,7 +29,7 @@ import {
 import { Prisma } from '../db.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 import { SNAPSHOT_KEYS } from '../services/statsMaintenance.js';
-import { percentileFromBuckets, trackUsageUnchecked } from '../services/usageStats.js';
+import { flushUsageStats, percentileFromBuckets, trackUsageUnchecked } from '../services/usageStats.js';
 
 const UiStatsSchema = z.object({
   events: z
@@ -83,7 +83,7 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
   // Ohne Login und ohne Cookie. Wer «nicht verfolgen» (GPC/DNT) eingestellt hat, wird nicht gezählt
   // (der Browser schickt dann schon nichts, das hier ist die zweite Sicherung).
   fastify.post('/api/stats/ui', async (request, reply) => {
-    if (request.headers['sec-gpc'] === '1' || request.headers.dnt === '1') return reply.status(204).send();
+    const isDnt = request.headers['sec-gpc'] === '1' || request.headers.dnt === '1';
     if (uiLimiter.hit(request.ip)) return reply.status(429).send({ error: 'Zu viele Meldungen' });
     // sendBeacon schickt text/plain, damit der Browser keine Vorab-Anfrage braucht
     let body: unknown = request.body;
@@ -97,6 +97,8 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
     const parse = UiStatsSchema.safeParse(body);
     if (!parse.success) return reply.status(400).send({ error: 'Ungültige Meldung' });
     for (const event of parse.data.events) {
+      const isExplicit = event.name === 'HELP_FEEDBACK_YES' || event.name === 'HELP_FEEDBACK_NO';
+      if (isDnt && !isExplicit) continue;
       if (isUiMetric(event.name)) trackUsageUnchecked(event.name, event.dim, request.tenant?.id ?? null);
     }
     return reply.status(204).send();
@@ -114,6 +116,7 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Zähler pro Tag, aktive Personen und eine Zeile pro Abteilung
     admin.get('/api/admin/stats/usage', guard, async (request, reply) => {
+      await flushUsageStats(fastify.prisma);
       const parse = RangeQuerySchema.safeParse(request.query);
       if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
       const { days, departmentId } = parse.data;

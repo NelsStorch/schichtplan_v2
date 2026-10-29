@@ -1,7 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, ArrowUpRight, BellRing, CalendarDays, ShieldCheck, Users } from 'lucide-react';
+import {
+  Activity,
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
+  BellRing,
+  CalendarDays,
+  CheckCircle2,
+  GitMerge,
+  MailWarning,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { Avatar, Badge, Button, Callout, Card, EmptyState, Skeleton, useToast } from '@schichtplan/ui';
 import type { AdminDashboardDto, AdminOverviewDto, AdminUserListItemDto } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
@@ -38,6 +51,16 @@ function SectionHeader({ title, action }: { title: string; action?: { label: str
       )}
     </div>
   );
+}
+
+function formatUptime(seconds?: number): string {
+  if (!seconds) return '';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days} T. ${hours} Std.`;
+  if (hours > 0) return `${hours} Std. ${minutes} Min.`;
+  return `${minutes} Min.`;
 }
 
 export function DashboardPanel({
@@ -95,8 +118,17 @@ export function DashboardPanel({
     }
   };
 
+  const hasActionableItems =
+    data &&
+    ((data.criticalEvents && data.criticalEvents.length > 0) ||
+      (data.departmentsWithoutLeader && data.departmentsWithoutLeader.length > 0) ||
+      (data.departmentsWithoutContact && data.departmentsWithoutContact.length > 0) ||
+      (data.failedMessages7d !== undefined && data.failedMessages7d > 0) ||
+      (data.potentialDuplicatesCount !== undefined && data.potentialDuplicatesCount > 0));
+
   return (
     <div className="space-y-8">
+      {/* Kennzahlen */}
       <Card className="overflow-hidden">
         <dl className="grid grid-cols-2 gap-px bg-line md:grid-cols-3 lg:grid-cols-6 [&>div]:bg-surface">
           <Stat label="Personen" value={overview?.users} />
@@ -108,12 +140,22 @@ export function DashboardPanel({
         </dl>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-5 py-3.5">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-fg">Server-Überwachung & Alarme</p>
-          <p className="text-xs text-fg-muted">
-            Prüft, ob kritische Server-Alarme (Datenbank-Überlastung, SMTP-Ausfall, 500-Fehler) per Webhook oder E-Mail ankommen.
-          </p>
+      {/* System-Health & Alarme */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-line bg-surface px-5 py-3.5">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="flex items-center gap-2 text-sm font-semibold text-fg">
+            <Activity className="size-4 text-accent-ink" aria-hidden />
+            System-Status
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+            <CheckCircle2 className="size-3.5 text-success-ink" />
+            Datenbank verbunden
+          </span>
+          {data?.systemHealth?.uptimeSeconds && (
+            <span className="text-xs text-fg-subtle">
+              Uptime: {formatUptime(data.systemHealth.uptimeSeconds)}
+            </span>
+          )}
         </div>
         <Button size="sm" variant="secondary" onClick={testServerAlert} disabled={testingAlert}>
           <BellRing className="size-4" aria-hidden />
@@ -123,24 +165,147 @@ export function DashboardPanel({
 
       {error && <Callout tone="danger">{error}</Callout>}
 
-      {data && data.departmentsWithoutLeader.length > 0 && (
-        <Callout tone="warning" title="Abteilungen ohne Abteilungsleitung">
-          <span className="mt-1 flex flex-wrap gap-2">
-            {data.departmentsWithoutLeader.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => onOpenDepartment(d.id)}
-                className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-surface px-3 py-1 text-xs font-semibold text-fg hover:border-warning"
+      {/* Akuter Handlungsbedarf */}
+      {hasActionableItems && (
+        <section className="space-y-3 rounded-card border border-warning/30 bg-warning/5 p-5">
+          <div className="flex items-center gap-2 text-sm font-bold text-fg">
+            <AlertCircle className="size-4 text-warning-ink" aria-hidden />
+            <h3>Akuter Handlungsbedarf</h3>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Kritische Anlässe */}
+            {data?.criticalEvents?.map((ce) => (
+              <div
+                key={ce.id}
+                className="flex flex-col justify-between rounded-field border border-warning/30 bg-surface p-3"
               >
-                <AlertTriangle className="size-3.5 text-warning-ink" aria-hidden />
-                {d.name}
-              </button>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge tone={ce.reason === 'UNPUBLISHED_SOON' ? 'danger' : 'warning'}>
+                      {ce.reason === 'UNPUBLISHED_SOON' ? 'Entwurf kurz vor Start' : 'Unterbelegt (< 30%)'}
+                    </Badge>
+                    <span className="tabular text-2xs text-fg-subtle">{formatDate(ce.startDate)}</span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-fg truncate" title={ce.title}>
+                    {ce.title}
+                  </p>
+                  <p className="text-xs text-fg-muted truncate">{ce.departmentName}</p>
+                  {ce.slotCount > 0 && (
+                    <p className="mt-1 text-2xs text-fg-subtle tabular">
+                      {ce.signupCount} von {ce.slotCount} Schichten belegt ({ce.fillPct}%)
+                    </p>
+                  )}
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-line/50 pt-2">
+                  <a
+                    href={departmentUrl(ce.departmentSlug, `/events/${ce.slug}/ok`)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-accent-ink hover:underline"
+                  >
+                    OK-Bereich
+                    <ArrowUpRight className="size-3" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => onOpenDepartment(ce.departmentId)}
+                    className="text-2xs text-fg-muted hover:underline"
+                  >
+                    Abteilung öffnen
+                  </button>
+                </div>
+              </div>
             ))}
-          </span>
-        </Callout>
+
+            {/* Mögliche Dubletten */}
+            {data?.potentialDuplicatesCount !== undefined && data.potentialDuplicatesCount > 0 && (
+              <div className="flex flex-col justify-between rounded-field border border-accent/30 bg-surface p-3">
+                <div>
+                  <Badge tone="accent">
+                    <GitMerge className="size-3" />
+                    Datenqualität
+                  </Badge>
+                  <p className="mt-2 text-sm font-semibold text-fg">
+                    {data.potentialDuplicatesCount} mögliche Dubletten gefunden
+                  </p>
+                  <p className="text-xs text-fg-muted">
+                    Gleicher Cevi-Name + Geburtsdatum oder E-Mail bei unterschiedlichen Konten.
+                  </p>
+                </div>
+                <div className="mt-3 border-t border-line/50 pt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('personen')}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-accent-ink hover:underline"
+                  >
+                    Dubletten prüfen
+                    <ArrowRight className="size-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Fehlgeschlagene E-Mails */}
+            {data?.failedMessages7d !== undefined && data.failedMessages7d > 0 && (
+              <div className="flex flex-col justify-between rounded-field border border-danger/30 bg-surface p-3">
+                <div>
+                  <Badge tone="danger">
+                    <MailWarning className="size-3" />
+                    Zustellung
+                  </Badge>
+                  <p className="mt-2 text-sm font-semibold text-fg">
+                    {data.failedMessages7d} E-Mails fehlgeschlagen
+                  </p>
+                  <p className="text-xs text-fg-muted">
+                    In den letzten 7 Tagen konnten OK-Nachrichten nicht zugestellt werden.
+                  </p>
+                </div>
+                <div className="mt-3 border-t border-line/50 pt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('statistik')}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-accent-ink hover:underline"
+                  >
+                    Statistik öffnen
+                    <ArrowRight className="size-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Abteilungen ohne Leitung oder ohne Kontakt */}
+          {((data?.departmentsWithoutLeader && data.departmentsWithoutLeader.length > 0) ||
+            (data?.departmentsWithoutContact && data.departmentsWithoutContact.length > 0)) && (
+            <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-warning/20">
+              {data?.departmentsWithoutLeader.map((d) => (
+                <button
+                  key={`no-lead-${d.id}`}
+                  type="button"
+                  onClick={() => onOpenDepartment(d.id)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-surface px-3 py-1 text-xs font-semibold text-fg hover:border-warning"
+                >
+                  <AlertTriangle className="size-3 text-warning-ink" aria-hidden />
+                  <span>{d.name}: Keine Leitung</span>
+                </button>
+              ))}
+              {data?.departmentsWithoutContact?.map((d) => (
+                <button
+                  key={`no-contact-${d.id}`}
+                  type="button"
+                  onClick={() => onOpenDepartment(d.id)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-fg hover:border-line-strong"
+                >
+                  <span>{d.name}: Keine Kontaktperson</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
+      {/* Inaktive Abteilungen */}
       {data && data.inactiveDepartments && data.inactiveDepartments.length > 0 && (
         <Callout tone="info" title="Inaktive Abteilungen">
           <p className="mt-1 text-xs text-fg-muted">

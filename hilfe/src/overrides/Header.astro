@@ -14,13 +14,52 @@ import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
     <Search />
   </div>
   <div class="hx-right print:hidden">
-    <a class="hx-app" href="https://cevi-schichtplan.ch">
-      <span>Zum Schichtplan</span>
+    <a class="hx-app" href="https://cevi-schichtplan.ch" data-app-link>
+      <span data-app-label>Zum Schichtplan</span>
       <ArrowUpRight size={15} strokeWidth={2} aria-hidden="true" />
     </a>
     <ThemeSelect />
   </div>
 </div>
+
+<script>
+  // Intelligenter Rücksprung: Merkt sich, von welcher Abteilung der Besucher kam
+  try {
+    const params = new URLSearchParams(window.location.search);
+    let fromUrl = params.get('from');
+
+    if (!fromUrl && document.referrer) {
+      const ref = new URL(document.referrer);
+      if (ref.hostname.endsWith('cevi-schichtplan.ch') && !ref.hostname.startsWith('hilfe.')) {
+        fromUrl = ref.origin;
+      }
+    }
+
+    if (fromUrl) {
+      sessionStorage.setItem('schichtplan_return_url', fromUrl);
+    }
+
+    const returnUrl = sessionStorage.getItem('schichtplan_return_url');
+    if (returnUrl) {
+      const url = new URL(returnUrl, window.location.origin);
+      const hostParts = url.hostname.split('.');
+      const sub = hostParts.length >= 3 ? hostParts[0] : null;
+
+      document.querySelectorAll<HTMLAnchorElement>('[data-app-link]').forEach((a) => {
+        a.href = returnUrl;
+      });
+      document.querySelectorAll('[data-app-label]').forEach((span) => {
+        if (sub && sub !== 'www' && sub !== 'login') {
+          span.textContent = `Zurück zu ${sub}`;
+        } else {
+          span.textContent = 'Zurück zum Schichtplan';
+        }
+      });
+    }
+  } catch {
+    // Fehlerfrei weiterlaufen
+  }
+</script>
 
 <style>
   .hx {

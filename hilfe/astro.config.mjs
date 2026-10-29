@@ -7,6 +7,16 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
   site: 'https://hilfe.cevi-schichtplan.ch',
   trailingSlash: 'ignore',
+  vite: {
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:4000',
+          changeOrigin: true,
+        },
+      },
+    },
+  },
   integrations: [
     starlight({
       title: 'Cevi Schichtplan Hilfe',
@@ -63,21 +73,39 @@ export default defineConfig({
           label: 'Im OK',
           items: [
             'ok/ok-bereich',
+            {
+              label: 'Planung & Schichten',
+              collapsed: false,
+              items: [
+                'ok/anlass-erstellen',
+                'ok/schichten-planen',
+                'ok/arbeiten-katalog',
+                'ok/vorlagen',
+                'ok/design',
+              ],
+            },
+            {
+              label: 'Helfende & Zugang',
+              collapsed: false,
+              items: [
+                'ok/zugang',
+                'ok/zugangs-links',
+                'ok/fragen',
+                'ok/helfer-pool',
+                'ok/einteilen',
+                'ok/nachrichten',
+              ],
+            },
+            {
+              label: 'Am Anlass & Auswertung',
+              collapsed: false,
+              items: [
+                'ok/anwesenheit',
+                'ok/export',
+                'ok/auswertung',
+              ],
+            },
             'ok/rollen',
-            'ok/anlass-erstellen',
-            'ok/schichten-planen',
-            'ok/arbeiten-katalog',
-            'ok/zugang',
-            'ok/fragen',
-            'ok/zugangs-links',
-            'ok/einteilen',
-            'ok/helfer-pool',
-            'ok/nachrichten',
-            'ok/anwesenheit',
-            'ok/export',
-            'ok/auswertung',
-            'ok/vorlagen',
-            'ok/design',
           ],
         },
         {

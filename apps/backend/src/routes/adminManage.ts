@@ -29,12 +29,12 @@ import { notifyAdminChange, recordAdminAction } from '../services/adminAudit.js'
 import { sendServerAlert } from '../services/serverAlert.js';
 import { recordDepartmentAction, toDepartmentAuditDto } from '../services/departmentAudit.js';
 import { contactCandidateWhere } from './departments.js';
-import { loginMethods, toListItem, userSelect } from './admin.js';
+import { findDuplicateUsers, loginMethods, toListItem, userSelect } from './admin.js';
 
 const EventListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   departmentId: z.string().uuid().optional(),
-  when: z.enum(['upcoming', 'past', 'all']).default('upcoming'),
+  when: z.enum(['upcoming', 'drafts', 'urgent', 'signup_closed', 'past', 'all']).default('upcoming'),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
@@ -43,6 +43,8 @@ const AuditQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   targetType: z.enum(['USER', 'DEPARTMENT', 'EVENT']).optional(),
   targetId: z.string().max(100).optional(),
+  since: z.string().optional(),
+  until: z.string().optional(),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -310,7 +312,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
 
     const dashboard: AdminDashboardDto = {
       upcomingEvents: await toEventItems(fastify.prisma, upcomingRows),
-      recentUsers: recentUsers.map(toListItem),
+      recentUsers: recentUsers.map((u) => toListItem(u)),
       departmentsWithoutLeader: withoutLeader,
       inactiveDepartments,
       signups7d,
@@ -350,7 +352,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
 
     await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, departmentId);
 
-    const [[item], members, homeUsers, stufen, eventRows, auditRows] = await Promise.all([
+    const [[item], members, homeUsers, stufen, eventRows, auditRows, templates] = await Promise.all([
       toDepartmentItems(fastify.prisma, [row]),
       fastify.prisma.departmentMember.findMany({
         where: { departmentId },
@@ -371,6 +373,11 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
         where: { departmentId },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         take: 100,
+      }),
+      fastify.prisma.eventTemplate.findMany({
+        where: { departmentId },
+        orderBy: { title: 'asc' },
+        select: { id: true, title: true, description: true, data: true },
       }),
     ]);
 
@@ -760,7 +767,17 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
           ],
         })),
         ...(departmentId ? [{ departmentId }] : []),
-        ...(when === 'upcoming' ? [{ endDate: { gte: now } }] : when === 'past' ? [{ endDate: { lt: now } }] : []),
+        ...(when === 'upcoming'
+          ? [{ endDate: { gte: now } }]
+          : when === 'past'
+            ? [{ endDate: { lt: now } }]
+            : when === 'drafts'
+              ? [{ isPublished: false }]
+              : when === 'signup_closed'
+                ? [{ allowPublicSignup: false }]
+                : when === 'urgent'
+                  ? [{ endDate: { gte: now }, isPublished: true }]
+                  : []),
       ],
     };
 
@@ -1027,12 +1044,14 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/api/admin/audit', guard, async (request, reply) => {
     const parse = AuditQuerySchema.safeParse(request.query);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const { q, targetType, targetId, page, pageSize } = parse.data;
+    const { q, targetType, targetId, since, until, page, pageSize } = parse.data;
     const terms = (q ?? '').split(/\s+/).filter(Boolean).slice(0, 5);
     const where: Prisma.AdminAuditLogWhereInput = {
       AND: [
         ...(targetType ? [{ targetType }] : []),
         ...(targetId ? [{ targetId }] : []),
+        ...(since ? [{ createdAt: { gte: new Date(since) } }] : []),
+        ...(until ? [{ createdAt: { lte: new Date(until) } }] : []),
         ...terms.map((term) => ({
           OR: [
             { targetLabel: { contains: term, mode: 'insensitive' as const } },

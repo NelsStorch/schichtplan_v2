@@ -1,0 +1,208 @@
+---
+/**
+ * Visueller Ablauf der Schicht-Tauschbörse («Ersatz gesucht»).
+ * Zeigt Helfenden auf einen Blick, wie das Anbieten und Übernehmen funktioniert.
+ */
+import CalendarX from '@lucide/astro/icons/calendar-x';
+import UserCheck from '@lucide/astro/icons/user-check';
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import CircleCheck from '@lucide/astro/icons/circle-check';
+import Clock from '@lucide/astro/icons/clock';
+
+const steps = [
+  {
+    step: '1',
+    icon: CalendarX,
+    title: 'Ersatz anbieten',
+    desc: 'Unter «Meine Schichten» bei der Schicht «Ersatz suchen» wählen.',
+    tone: 'ember',
+  },
+  {
+    step: '2',
+    icon: Clock,
+    title: 'Im Plan gelb markiert',
+    desc: 'Schicht ist öffentlich als «Ersatz gesucht» sichtbar. Du bleibst eingetragen!',
+    tone: 'ember',
+  },
+  {
+    step: '3',
+    icon: UserCheck,
+    title: 'Andere Person übernimmt',
+    desc: 'Wer Zeit hat, öffnet die Schicht und tippt auf «Übernehmen».',
+    tone: 'accent',
+  },
+  {
+    step: '4',
+    icon: CircleCheck,
+    title: 'Automatische Abmeldung',
+    desc: 'Du wirst sofort ausgetragen und per E-Mail benachrichtigt.',
+    tone: 'success',
+  },
+];
+---
+
+<div class="ssf not-content">
+  <div class="ssf-head">
+    <span class="ssf-kicker">Ablauf</span>
+    <h3 class="ssf-title">Wie die Schicht-Tauschbörse funktioniert</h3>
+  </div>
+
+  <ol class="ssf-grid">
+    {
+      steps.map((s, i) => {
+        const Icon = s.icon;
+        return (
+          <li class={`ssf-step ssf-step--${s.tone}`}>
+            <div class="ssf-step-top">
+              <span class="ssf-badge">{s.step}</span>
+              <span class="ssf-icon">
+                <Icon size={18} strokeWidth={2.2} aria-hidden="true" />
+              </span>
+            </div>
+            <h4>{s.title}</h4>
+            <p>{s.desc}</p>
+            {i < steps.length - 1 && (
+              <span class="ssf-arrow" aria-hidden="true">
+                <ArrowRight size={16} strokeWidth={2.5} />
+              </span>
+            )}
+          </li>
+        );
+      })
+    }
+  </ol>
+</div>
+
+<style>
+  .ssf {
+    margin-block: 2rem;
+    padding: clamp(1.25rem, 1rem + 1.5vw, 1.75rem);
+    border-radius: var(--radius-card);
+    border: 1px solid rgb(var(--line));
+    background:
+      radial-gradient(70% 100% at 0% 0%, rgb(var(--ember) / 0.06), transparent 70%),
+      rgb(var(--surface));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .ssf-kicker {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgb(var(--ember-ink));
+  }
+
+  .ssf-title {
+    margin-top: 0.35rem;
+    margin-bottom: 1.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: rgb(var(--fg));
+  }
+
+  .ssf-grid {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ssf-step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1.125rem;
+    border-radius: 1rem;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface-2) / 0.5);
+  }
+
+  .ssf-step-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.625rem;
+  }
+
+  .ssf-badge {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--line));
+    color: rgb(var(--fg));
+  }
+
+  .ssf-icon {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.625rem;
+    background: rgb(var(--surface));
+  }
+
+  .ssf-step--ember .ssf-icon {
+    color: rgb(var(--ember-ink));
+  }
+  .ssf-step--accent .ssf-icon {
+    color: rgb(var(--accent-ink));
+  }
+  .ssf-step--success .ssf-icon {
+    color: rgb(var(--success-ink));
+  }
+
+  .ssf-step h4 {
+    margin: 0 0 0.25rem;
+    font-family: var(--font-display);
+    font-size: 0.9688rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: rgb(var(--fg));
+    line-height: 1.25;
+  }
+
+  .ssf-step p {
+    margin: 0;
+    font-size: 0.8438rem;
+    line-height: 1.45;
+    color: rgb(var(--fg-muted));
+  }
+
+  .ssf-arrow {
+    display: none;
+  }
+
+  @media (min-width: 50rem) {
+    .ssf-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .ssf-arrow {
+      position: absolute;
+      top: 50%;
+      right: -0.625rem;
+      transform: translateY(-50%);
+      display: grid;
+      place-items: center;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 999px;
+      background: rgb(var(--surface));
+      border: 1px solid rgb(var(--line));
+      color: rgb(var(--fg-subtle));
+      z-index: 2;
+    }
+  }
+</style>

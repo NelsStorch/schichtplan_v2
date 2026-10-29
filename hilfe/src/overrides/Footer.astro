@@ -2,6 +2,8 @@
 // Unter jeder Seite: Weiter/Zurück und ein ruhiger Kontakt-Streifen statt «Built with Starlight».
 import Pagination from 'virtual:starlight/components/Pagination';
 import LifeBuoy from '@lucide/astro/icons/life-buoy';
+import ThumbsUp from '@lucide/astro/icons/thumbs-up';
+import ThumbsDown from '@lucide/astro/icons/thumbs-down';
 import UsageStats from '../components/UsageStats.astro';
 
 const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
@@ -9,6 +11,27 @@ const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
 
 <footer class="ft">
   {!isSplash && <Pagination />}
+
+  {
+    !isSplash && (
+      <div class="ft-feedback not-content print:hidden" data-feedback-wrap>
+        <span class="ft-feedback-label">War diese Anleitung hilfreich?</span>
+        <div class="ft-feedback-actions" data-feedback-actions>
+          <button type="button" class="ft-feedback-btn" data-feedback-val="yes" aria-label="Ja, diese Anleitung war hilfreich">
+            <ThumbsUp size={15} strokeWidth={2.2} aria-hidden="true" />
+            <span>Ja</span>
+          </button>
+          <button type="button" class="ft-feedback-btn" data-feedback-val="no" aria-label="Nein, diese Anleitung war nicht hilfreich">
+            <ThumbsDown size={15} strokeWidth={2.2} aria-hidden="true" />
+            <span>Nein</span>
+          </button>
+        </div>
+        <p class="ft-feedback-done" data-feedback-done hidden>
+          Danke für deine Rückmeldung!
+        </p>
+      </div>
+    )
+  }
 
   <div class="ft-help print:hidden">
     <span class="ft-icon" aria-hidden="true"><LifeBuoy size={20} strokeWidth={1.9} /></span>
@@ -24,7 +47,7 @@ const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
   <div class="ft-bottom">
     <span>© {new Date().getFullYear()} Cevi Schichtplan · ehrenamtlich &amp; Open Source</span>
     <nav aria-label="Weitere Seiten des Schichtplans">
-      <a href="https://cevi-schichtplan.ch">cevi-schichtplan.ch</a>
+      <a href="https://cevi-schichtplan.ch" data-app-link>cevi-schichtplan.ch</a>
       <a href="https://login.cevi-schichtplan.ch">Login</a>
       <a href="https://github.com/NelsStorch/schichtplan_v2" rel="noopener">GitHub</a>
     </nav>
@@ -32,12 +55,98 @@ const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
   <UsageStats />
 </footer>
 
+<script>
+  const wrap = document.querySelector('[data-feedback-wrap]');
+  if (wrap) {
+    const actions = wrap.querySelector('[data-feedback-actions]');
+    const done = wrap.querySelector('[data-feedback-done]');
+
+    wrap.querySelectorAll<HTMLButtonElement>('[data-feedback-val]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-feedback-val');
+        if (val) {
+          const metric = val === 'yes' ? 'HELP_FEEDBACK_YES' : 'HELP_FEEDBACK_NO';
+          fetch('/api/stats/ui', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ events: [{ name: metric, dim: location.pathname }] }),
+            credentials: 'omit',
+            keepalive: true,
+          }).catch(() => undefined);
+        }
+        if (actions) actions.setAttribute('hidden', '');
+        if (done) done.removeAttribute('hidden');
+      });
+    });
+  }
+</script>
+
 <style>
   .ft {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
     margin-top: 4rem;
+  }
+
+  .ft-feedback {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.875rem 1.5rem;
+    padding: 0.875rem 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--surface));
+    font-size: 0.875rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .ft-feedback-label {
+    font-weight: 600;
+    color: rgb(var(--fg));
+  }
+
+  .ft-feedback-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .ft-feedback-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line-strong));
+    background: rgb(var(--surface-2) / 0.6);
+    color: rgb(var(--fg));
+    font-size: 0.8125rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      transform 0.15s ease;
+  }
+
+  .ft-feedback-btn:hover {
+    border-color: rgb(var(--accent) / 0.5);
+    background: rgb(var(--surface));
+    transform: translateY(-1px);
+  }
+
+  .ft-feedback-btn:active {
+    transform: translateY(0);
+  }
+
+  .ft-feedback-done {
+    margin: 0;
+    font-size: 0.8438rem;
+    font-weight: 650;
+    color: rgb(var(--success-ink));
   }
 
   .ft-help {

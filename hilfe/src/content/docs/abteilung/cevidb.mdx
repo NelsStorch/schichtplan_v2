@@ -23,6 +23,10 @@ Der Schichtplan liest nur. Er schreibt nie etwas in die Cevi.DB zurück.
 
 Bei **jedem Login mit Cevi.DB**. Ändert sich etwas in der Cevi.DB, zum Beispiel ein Stufenwechsel oder eine abgegebene Leitung, gilt das im Schichtplan erst nach dem nächsten Login der Person. Was in der Cevi.DB steht, gewinnt: Name, E-Mail und Geburtsdatum werden dabei überschrieben. Fehlt etwas in der Cevi.DB, bleibt die im Schichtplan erfasste Angabe.
 
+:::tip[Rolle oder Stufe in der Cevi.DB (Hitobito) geändert?]
+Wenn jemand in der Cevi.DB neu zur Abteilungsleitung ernannt oder einer Leitungsrolle zugewiesen wurde, muss sich die betroffene Person im Schichtplan **einmal abmelden und wieder neu mit Cevi.DB anmelden**. Berechtigungen sind im Anmelde-Token gespeichert und werden erst bei der Neuanmeldung aufgefrischt.
+:::
+
 Die **Adresse** übernimmt der Schichtplan bewusst nicht (Datensparsamkeit). Braucht ein OK sie, stellt es beim Anlass die [Frage «Adresse»](/ok/fragen/).
 
 Die Handynummer kommt nicht aus der Cevi.DB, die gibt sie dem Schichtplan nicht heraus. Jede Person erfasst sie selbst im Profil oder beim Eintragen.

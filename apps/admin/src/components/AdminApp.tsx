@@ -10,6 +10,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Search,
   ShieldAlert,
   Users,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ import {
 } from '@schichtplan/shared';
 import { ApiError, REAUTH_EVENT, api, errorMessage, isReauthCode, loginUrl } from '../lib/api';
 import { AuditPanel } from './AuditPanel';
+import { CommandPalette } from './CommandPalette';
 import { DashboardPanel, type AdminTab } from './DashboardPanel';
 import { DepartmentDialog } from './DepartmentDialog';
 import { DepartmentsPanel } from './DepartmentsPanel';
@@ -47,11 +49,13 @@ function Shell({
   children,
   user,
   onLogout,
+  onOpenCommandPalette,
   nav,
 }: {
   children: React.ReactNode;
   user?: UserDto;
   onLogout?: () => void;
+  onOpenCommandPalette?: () => void;
   nav?: React.ReactNode;
 }) {
   return (
@@ -311,6 +315,42 @@ function AdminHome({
   const [auditTarget, setAuditTarget] = useState<{ id: string; label: string } | null>(null);
   const [usersReload, setUsersReload] = useState(0);
   const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Globale Tastenkombinationen (⌘K, Zahlentasten 1-6 für Tabs, / für Suche)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        activeEl instanceof HTMLSelectElement ||
+        activeEl?.getAttribute('contenteditable') === 'true';
+
+      if (isInput) return;
+
+      if (e.key === '/') {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+        return;
+      }
+
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= TABS.length) {
+        e.preventDefault();
+        navigate(TABS[num - 1].id);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Ablauf-Countdown für die Admin-Sitzung (prüft alle 30 Sekunden)
   useEffect(() => {
@@ -436,7 +476,7 @@ function AdminHome({
   );
 
   return (
-    <Shell user={user} onLogout={logout} nav={nav}>
+    <Shell user={user} onLogout={logout} onOpenCommandPalette={() => setCommandPaletteOpen(true)} nav={nav}>
       {adminSession.expiresAt && (
         <p className="mb-4 text-xs text-fg-subtle">
           Admin-Sitzung gültig bis {timeFmt.format(new Date(adminSession.expiresAt))}
@@ -482,7 +522,15 @@ function AdminHome({
         />
       )}
       {tab === 'anlaesse' && <EventsPanel departments={departments ?? []} onOpenDepartment={handleOpenDepartment} />}
-      {tab === 'statistik' && <StatsPanel departments={departments ?? []} />}
+      {tab === 'statistik' && (
+        <StatsPanel
+          departments={departments ?? []}
+          onOpenAudit={(query: string) => {
+            setAuditTarget({ id: '', label: query });
+            navigate('protokoll');
+          }}
+        />
+      )}
       {tab === 'protokoll' && (
         <AuditPanel
           targetFilter={auditTarget}
@@ -502,6 +550,15 @@ function AdminHome({
           onChanged={refresh}
         />
       )}
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        departments={departments ?? []}
+        onNavigate={navigate}
+        onOpenDepartment={handleOpenDepartment}
+        onOpenUser={handleOpenUser}
+      />
 
       <DepartmentDialog
         departmentId={openDepartment}

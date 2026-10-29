@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { AlertTriangle, ChevronRight, Plus, Search, SearchX, X } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Download, Plus, Search, SearchX, X } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -19,6 +19,7 @@ import {
 } from '@schichtplan/ui';
 import { SUBDOMAIN_REGEX, type AdminDepartmentListItemDto, type AdminUserListItemDto } from '@schichtplan/shared';
 import { send, errorMessage } from '../lib/api';
+import { downloadCsv } from '../lib/csv';
 import { DepartmentLogo } from './DepartmentDialog';
 import { PersonPicker } from './PersonPicker';
 
@@ -205,15 +206,25 @@ export function DepartmentsPanel({
   loading,
   onOpen,
   onChanged,
+  creating = false,
+  onCloseCreating,
 }: {
   departments: AdminDepartmentListItemDto[] | null;
   loading: boolean;
   onOpen: (id: string) => void;
   onChanged: () => void;
+  creating?: boolean;
+  onCloseCreating?: () => void;
 }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const [creating, setCreating] = useState(false);
+  const [internalCreating, setInternalCreating] = useState(false);
+
+  const isCreating = creating || internalCreating;
+  const setCreating = (val: boolean) => {
+    setInternalCreating(val);
+    if (!val && onCloseCreating) onCloseCreating();
+  };
 
   const all = departments ?? [];
   const matches = (d: AdminDepartmentListItemDto, f: Filter) =>
@@ -228,6 +239,32 @@ export function DepartmentsPanel({
         String(d.ceviDbGroupId ?? '').includes(q) ||
         d.leaders.some((l) => l.name.toLowerCase().includes(q)))
   );
+
+  const exportCsv = () => {
+    const headers = [
+      'Name',
+      'Subdomain',
+      'Cevi.DB-Gruppe',
+      'Leitung',
+      'Heimabteilung Nutzer',
+      'Mitglieder mit Rolle',
+      'Anlässe total',
+      'Kommende Anlässe',
+      'Eintragungen',
+    ];
+    const rows = visible.map((d) => [
+      d.name,
+      d.slug,
+      d.ceviDbGroupId ?? '',
+      d.leaders.map((l) => l.name).join(', '),
+      d.homeUserCount,
+      d.memberCount,
+      d.eventCount,
+      d.upcomingEventCount,
+      d.signupCount,
+    ]);
+    downloadCsv(`abteilungen-${new Date().toISOString().slice(0, 10)}`, headers, rows);
+  };
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'Alle' },
@@ -264,10 +301,16 @@ export function DepartmentsPanel({
             </button>
           )}
         </div>
-        <Button size="lg" onClick={() => setCreating(true)}>
-          <Plus aria-hidden />
-          Neue Abteilung
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="lg" onClick={exportCsv} disabled={visible.length === 0} title="Gefilterte Liste exportieren">
+            <Download className="size-4" aria-hidden />
+            Export (CSV)
+          </Button>
+          <Button size="lg" onClick={() => setCreating(true)}>
+            <Plus aria-hidden />
+            Neue Abteilung
+          </Button>
+        </div>
       </div>
 
       <ChipRow>
@@ -347,7 +390,7 @@ export function DepartmentsPanel({
       )}
 
       <CreateDepartmentDialog
-        open={creating}
+        open={isCreating}
         onClose={() => setCreating(false)}
         onCreated={(id) => {
           setCreating(false);

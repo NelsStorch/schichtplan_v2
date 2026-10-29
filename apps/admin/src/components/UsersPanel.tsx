@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, RotateCw, Search, SearchX, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Download, RotateCw, Search, SearchX, ShieldCheck, Trash2, X } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -24,10 +24,11 @@ import type {
   AdminUserListItemDto,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
+import { downloadCsv } from '../lib/csv';
 import { formatDate, formatLastSeen, fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
-type Filter = 'all' | 'cevidb' | 'password' | 'ceviname' | 'stale_ceviname' | 'admin';
+type Filter = 'all' | 'duplicates' | 'cevidb' | 'password' | 'ceviname' | 'stale_ceviname' | 'admin';
 
 const PAGE_SIZE = 25;
 
@@ -162,6 +163,68 @@ export function UsersPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleBatchDelete = async () => {
+    const ids = Array.from(selectedIds).filter((id) => id !== currentUserId);
+    if (ids.length === 0) return;
+
+    const confirmed = await confirm({
+      title: `${ids.length} Personen wirklich löschen?`,
+      description: `Möchtest du diese ${ids.length} Konten unwiderruflich löschen? Alle Schichteintragungen und Mitgliedschaften werden entfernt.`,
+      confirmLabel: `${ids.length} Personen löschen`,
+      cancelLabel: 'Abbrechen',
+      tone: 'danger',
+      countdownSeconds: 5,
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const res = await api<{ message: string; deleted: number; notDeleted?: { id: string; reason: string }[] }>(
+        '/api/admin/users/batch-delete',
+        {
+          method: 'POST',
+          body: JSON.stringify({ userIds: ids }),
+        }
+      );
+      toast({
+        title: 'Stapelverarbeitung abgeschlossen',
+        description: `${res.deleted} von ${ids.length} Personen wurden gelöscht.`,
+        tone: 'success',
+      });
+      setSelectedIds(new Set());
+      setReload((n) => n + 1);
+      onChanged();
+    } catch (err) {
+      toast({
+        title: 'Fehler beim Löschen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    }
+  };
+
+  const handleExport = () => {
+    if (!items.length) return;
+    const rows = items.map((u) => ({
+      ID: u.id,
+      Vorname: u.firstName,
+      Nachname: u.lastName,
+      'Cevi-Name': u.ceviName ?? '',
+      'E-Mail': u.email ?? '',
+      Telefon: u.phone ?? '',
+      'Cevi.DB-ID': u.ceviDbId ?? '',
+      Anmeldearten: u.loginMethods.join(', '),
+      'Globale Admin': u.isGlobalAdmin ? 'Ja' : 'Nein',
+      Heimabteilung: u.homeDepartmentName ?? '',
+      Eintragungen: u.signupCount,
+      'Zuletzt aktiv': u.lastSeenOn ? formatDate(u.lastSeenOn) : '',
+      Registriert: formatDate(u.createdAt),
+      'Mögliche Dublette': u.potentialDuplicateOf ? `Ja (${u.potentialDuplicateOf.name}, ID: ${u.potentialDuplicateOf.id})` : 'Nein',
+    }));
+    downloadCsv(rows, `personen_${filter}_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
 
   const handleDeleteUser = async (target: AdminUserListItemDto) => {
     if (target.id === currentUserId) {
@@ -248,6 +311,7 @@ export function UsersPanel({
 
   const filters: { id: Filter; label: string; count?: number }[] = [
     { id: 'all', label: 'Alle', count: chipCount('all', overview?.users) },
+    { id: 'duplicates', label: 'Mögliche Dubletten', count: chipCount('duplicates', overview?.duplicateUsers) },
     { id: 'cevidb', label: 'Cevi.DB', count: chipCount('cevidb', overview?.cevidbUsers) },
     { id: 'password', label: 'Passwort', count: chipCount('password', overview?.passwordUsers) },
     { id: 'ceviname', label: 'Nur Cevi-Name', count: chipCount('ceviname', overview?.guestUsers) },
@@ -382,11 +446,52 @@ export function UsersPanel({
         />
       ) : (
         <div className={cn('transition-opacity duration-200', loading && 'opacity-60')} aria-busy={loading}>
+          {/* Sammelaktionen-Leiste */
+          selectedIds.size > 0 && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-accent/30 bg-accent/5 p-3.5">
+              <div className="flex items-center gap-2">
+                <Badge tone="accent">{selectedIds.size} ausgewählt</Badge>
+                <span className="text-xs text-fg-muted">Ausgewählte Personen für Stapelaktionen</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+                  Auswahl aufheben
+                </Button>
+                <Button size="sm" variant="danger" onClick={handleBatchDelete}>
+                  <Trash2 className="size-3.5" aria-hidden />
+                  {selectedIds.size} {selectedIds.size === 1 ? 'Person' : 'Personen'} löschen
+                </Button>
+              </div>
+            </div>
+          )}
           {/* Ab md als Tabelle */}
           <Card className="hidden overflow-hidden md:block">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-line bg-surface-2/60 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
                 <tr>
+                  <th scope="col" className="w-10 px-3 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label="Alle auf dieser Seite auswählen"
+                      checked={
+                        items.length > 0 &&
+                        items.filter((u) => u.id !== currentUserId).every((u) => selectedIds.has(u.id))
+                      }
+                      onChange={(e) => {
+                        const selectable = items.filter((u) => u.id !== currentUserId).map((u) => u.id);
+                        if (e.target.checked) {
+                          setSelectedIds((prev) => new Set([...prev, ...selectable]));
+                        } else {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            selectable.forEach((id) => next.delete(id));
+                            return next;
+                          });
+                        }
+                      }}
+                      className="size-4 rounded border-line"
+                    />
+                  </th>
                   <th scope="col" className="px-5 py-3 font-semibold">Person</th>
                   <th scope="col" className="px-3 py-3 font-semibold">E-Mail</th>
                   <th scope="col" className="px-3 py-3 font-semibold">Anmeldung</th>

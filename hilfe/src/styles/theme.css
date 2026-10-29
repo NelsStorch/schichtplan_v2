@@ -15,7 +15,7 @@
   --line-strong: 208 204 200;
   --fg: 28 25 23;
   --fg-muted: 87 83 78;
-  --fg-subtle: 113 107 102;
+  --fg-subtle: 98 92 87;
   --accent: 225 29 72;
   --accent-ink: 190 18 60;
   --accent-fg: 255 255 255;
@@ -284,6 +284,22 @@ button.sl-menu-button {
   margin-inline-start: 0;
   border-inline-start: 0;
   padding-inline-start: 0;
+}
+
+/* Untergruppen in der Seitenleiste (z. B. im OK-Bereich) */
+.sidebar-content ul ul details {
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.sidebar-content ul ul summary {
+  padding: 0.25rem 0.75rem 0.25rem;
+  font-family: var(--sl-font);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--fg-muted));
 }
 
 .sidebar-content a {

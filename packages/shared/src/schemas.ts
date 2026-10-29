@@ -677,6 +677,11 @@ export const AdminUpdateUserSchema = z.object({
   homeDepartmentId: z.string().uuid().nullable().optional(),
 });
 
+export const AdminBatchDeleteUsersSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1, 'Mindestens eine Person muss ausgewählt sein').max(200),
+});
+export type AdminBatchDeleteUsersInput = z.infer<typeof AdminBatchDeleteUsersSchema>;
+
 export const AdminMergeUserSchema = z.object({
   targetUserId: z.string().uuid('Ungültige Ziel-Personen-ID'),
 });

@@ -72,7 +72,11 @@ const quick = [
     document.querySelector<HTMLButtonElement>('site-search button[data-open-modal]')?.click();
   });
   const kbd = document.querySelector('.hero-kbd');
-  if (kbd && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) kbd.textContent = '⌘ K';
+  const isApple = /(Mac|iPhone|iPod|iPad)/i.test(
+    // @ts-ignore - navigator.userAgentData platform fallback
+    navigator.userAgentData?.platform || navigator.userAgent || ''
+  );
+  if (kbd && isApple) kbd.textContent = '⌘ K';
 </script>
 
 <style>

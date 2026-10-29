@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import {
   Building2,
+  ChevronDown,
+  ChevronUp,
+  Download,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -24,6 +27,7 @@ import {
   type AdminAuditListDto,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
+import { downloadCsv } from '../lib/csv';
 import { departmentRoleLabels, formatDateTime } from '../lib/format';
 
 type Filter = 'all' | 'USER' | 'DEPARTMENT' | 'EVENT';
@@ -41,6 +45,9 @@ const actionLabels: Record<string, string> = {
   USER_HOME_DEPARTMENT_SET: 'Heimabteilung geändert',
   USER_MERGE: 'Konten zusammengeführt',
   USER_DELETE: 'Konto gelöscht',
+  USER_BATCH_DELETE: 'Stapellöschung von Konten',
+  USER_PASSWORD_RESET_LINK_GENERATE: 'Notfall-Reset-Link erstellt',
+  DEPARTMENT_STUFEN_SYNC: 'Stufen mit Cevi.DB abgeglichen',
 };
 
 function ActionIcon({ action }: { action: string }) {
@@ -120,6 +127,12 @@ function summary(entry: AdminAuditEntryDto): string | null {
       return `Übernommen aus: ${d.sourceLabel ?? d.sourceId}${d.sourceEmail ? ` (${d.sourceEmail})` : ''}`;
     case 'USER_DELETE':
       return typeof d.email === 'string' ? d.email : null;
+    case 'USER_BATCH_DELETE':
+      return `${d.deletedCount ?? 0} Konten gelöscht`;
+    case 'USER_PASSWORD_RESET_LINK_GENERATE':
+      return `Reset-Link für ${d.targetEmail ?? 'Konto'} erstellt`;
+    case 'DEPARTMENT_STUFEN_SYNC':
+      return `${d.createdCount ?? 0} Stufen synchronisiert`;
     default:
       return null;
   }
@@ -139,6 +152,36 @@ export function AuditPanel({
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (targetFilter && !targetFilter.id && targetFilter.label) {
+      setSearch(targetFilter.label);
+    }
+  }, [targetFilter]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleExport = () => {
+    if (!items.length) return;
+    const rows = items.map((entry) => ({
+      Zeitpunkt: formatDateTime(entry.createdAt),
+      Aktion: actionLabels[entry.action] ?? entry.action,
+      'Ziel-Typ': entry.targetType,
+      Ziel: entry.targetLabel,
+      Admin: entry.adminName,
+      Details: summary(entry) ?? (entry.details ? JSON.stringify(entry.details) : ''),
+    }));
+    downloadCsv(rows, `audit_protokoll_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
   const [page, setPage] = useState(1);
   const [data, setData] = useState<AdminAuditListDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,6 +202,15 @@ export function AuditPanel({
     if (filter !== 'all') params.set('targetType', filter);
     if (targetFilter?.id) params.set('targetId', targetFilter.id);
     if (query) params.set('q', query);
+    if (timeFilter === 'today') {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      params.set('since', startOfDay.toISOString());
+    } else if (timeFilter === '7d') {
+      params.set('since', new Date(Date.now() - 7 * 86400000).toISOString());
+    } else if (timeFilter === '30d') {
+      params.set('since', new Date(Date.now() - 30 * 86400000).toISOString());
+    }
     setLoading(true);
     api<AdminAuditListDto>(`/api/admin/audit?${params}`, { signal: controller.signal })
       .then((result) => {
@@ -172,7 +224,7 @@ export function AuditPanel({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [filter, targetFilter?.id, query, page, reload]);
+  }, [filter, targetFilter?.id, query, timeFilter, page, reload]);
 
   const items = data?.items ?? [];
 
@@ -205,44 +257,55 @@ export function AuditPanel({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <ChipRow>
-            {(
-              [
-                ['all', 'Alle'],
-                ['USER', 'Personen & Rollen'],
-                ['DEPARTMENT', 'Abteilungen'],
-                ['EVENT', 'Anlässe'],
-              ] as const
-            ).map(([id, label]) => (
-              <Chip
-                key={id}
-                selected={filter === id}
-                onClick={() => {
-                  setFilter(id);
-                  setPage(1);
-                }}
-              >
-                {label}
-              </Chip>
-            ))}
-          </ChipRow>
-
-          {targetFilter && (
-            <Badge tone="accent" className="gap-1.5 pl-2.5 pr-1.5 py-1">
-              <span>Gefiltert nach: {targetFilter.label}</span>
-              {onClearTargetFilter && (
-                <button
-                  type="button"
-                  onClick={onClearTargetFilter}
-                  aria-label="Filter aufheben"
-                  className="rounded-full p-0.5 hover:bg-black/10"
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <ChipRow>
+              {(
+                [
+                  ['all', 'Alle'],
+                  ['USER', 'Personen & Rollen'],
+                  ['DEPARTMENT', 'Abteilungen'],
+                  ['EVENT', 'Anlässe'],
+                ] as const
+              ).map(([id, label]) => (
+                <Chip
+                  key={id}
+                  selected={filter === id}
+                  onClick={() => {
+                    setFilter(id);
+                    setPage(1);
+                  }}
                 >
-                  <X className="size-3" aria-hidden />
-                </button>
-              )}
-            </Badge>
-          )}
+                  {label}
+                </Chip>
+              ))}
+            </ChipRow>
+            {targetFilter && (
+              <Badge tone="accent" className="gap-1.5 pl-2.5 pr-1.5 py-1">
+                <span>Gefiltert nach: {targetFilter.label}</span>
+                {onClearTargetFilter && (
+                  <button
+                    type="button"
+                    onClick={onClearTargetFilter}
+                    aria-label="Filter aufheben"
+                    className="rounded-full p-0.5 hover:bg-black/10"
+                  >
+                    <X className="size-3" aria-hidden />
+                  </button>
+                )}
+              </Badge>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleExport}
+            disabled={items.length === 0}
+            title="Gefiltertes Protokoll als CSV herunterladen"
+          >
+            <Download className="size-3.5" aria-hidden />
+            Export (CSV)
+          </Button>
         </div>
       </div>
 
@@ -295,34 +358,64 @@ export function AuditPanel({
                 ((entry.targetType === 'DEPARTMENT' && Boolean(onOpenDepartment)) ||
                   (entry.targetType === 'USER' && Boolean(onOpenUserById)));
               return (
-                <li key={entry.id} className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
-                  <ActionIcon action={entry.action} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm text-fg">
-                      <span className="font-semibold">{actionLabels[entry.action] ?? entry.action}</span>
-                      {': '}
-                      {canOpenTarget ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!entry.targetId) return;
-                            if (entry.targetType === 'DEPARTMENT') onOpenDepartment?.(entry.targetId);
-                            else if (entry.targetType === 'USER') onOpenUserById?.(entry.targetId);
-                          }}
-                          className="font-medium text-accent-ink hover:underline"
-                        >
-                          {entry.targetLabel}
-                        </button>
-                      ) : (
-                        entry.targetLabel
-                      )}
+                <li key={entry.id} className="flex flex-col gap-2 px-4 py-3.5 sm:px-5">
+                  <div className="flex items-start gap-3">
+                    <ActionIcon action={entry.action} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm text-fg">
+                        <span className="font-semibold">{actionLabels[entry.action] ?? entry.action}</span>
+                        {': '}
+                        {canOpenTarget ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!entry.targetId) return;
+                              if (entry.targetType === 'DEPARTMENT') onOpenDepartment?.(entry.targetId);
+                              else if (entry.targetType === 'USER') onOpenUserById?.(entry.targetId);
+                            }}
+                            className="font-medium text-accent-ink hover:underline"
+                          >
+                            {entry.targetLabel}
+                          </button>
+                        ) : (
+                          entry.targetLabel
+                        )}
+                      </span>
+                      {detail && <span className="block truncate text-xs text-fg-muted">{detail}</span>}
+                      <span className="block text-xs text-fg-subtle">von {entry.adminName}</span>
                     </span>
-                    {detail && <span className="block truncate text-xs text-fg-muted">{detail}</span>}
-                    <span className="block text-xs text-fg-subtle">von {entry.adminName}</span>
-                  </span>
-                  <span className="tabular shrink-0 text-right font-mono text-xs text-fg-subtle">
-                    {formatDateTime(entry.createdAt)}
-                  </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="tabular font-mono text-xs text-fg-subtle">
+                        {formatDateTime(entry.createdAt)}
+                      </span>
+                      {entry.details && Object.keys(entry.details).length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleExpand(entry.id)}
+                          aria-label={expandedIds.has(entry.id) ? 'Details ausblenden' : 'Details anzeigen'}
+                          title={expandedIds.has(entry.id) ? 'Details ausblenden' : 'Details anzeigen'}
+                          className="size-7 text-fg-subtle hover:text-fg"
+                        >
+                          {expandedIds.has(entry.id) ? (
+                            <ChevronUp className="size-3.5" aria-hidden />
+                          ) : (
+                            <ChevronDown className="size-3.5" aria-hidden />
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {expandedIds.has(entry.id) && entry.details && (
+                    <div className="mt-2 rounded-field border border-line bg-surface-2/60 p-3">
+                      <p className="mb-1.5 text-2xs font-semibold uppercase tracking-wider text-fg-subtle">
+                        Gespeicherte Rohdaten & Änderungen:
+                      </p>
+                      <pre className="max-h-60 overflow-x-auto text-2xs font-mono text-fg leading-relaxed">
+                        {JSON.stringify(entry.details, null, 2)}
+                      </pre>
+                    </div>
+                  )}
                 </li>
               );
             })}
