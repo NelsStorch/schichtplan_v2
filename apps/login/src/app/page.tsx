@@ -848,26 +848,37 @@ function LoginContent() {
                   {feedback}
 
                   {authMode === 'register' && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Vorname" required>
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Vorname" required>
+                          <Input
+                            type="text"
+                            value={regFirstName}
+                            onChange={(e) => setRegFirstName(e.target.value)}
+                            autoComplete="given-name"
+                            minLength={2}
+                            required
+                          />
+                        </Field>
+                        <Field label="Nachname (freiwillig)" hint="Freiwillig">
+                          <Input
+                            type="text"
+                            value={regLastName}
+                            onChange={(e) => setRegLastName(e.target.value)}
+                            autoComplete="family-name"
+                          />
+                        </Field>
+                      </div>
+
+                      <Field label="Cevi-Name (freiwillig)" hint="Dein Pfadiname oder Spitzname, falls vorhanden">
                         <Input
                           type="text"
-                          value={regFirstName}
-                          onChange={(e) => setRegFirstName(e.target.value)}
-                          autoComplete="given-name"
-                          minLength={2}
-                          required
+                          value={regCeviName}
+                          onChange={(e) => setRegCeviName(e.target.value)}
+                          autoComplete="nickname"
                         />
                       </Field>
-                      <Field label="Nachname (freiwillig)" hint="Freiwillig">
-                        <Input
-                          type="text"
-                          value={regLastName}
-                          onChange={(e) => setRegLastName(e.target.value)}
-                          autoComplete="family-name"
-                        />
-                      </Field>
-                    </div>
+                    </>
                   )}
 
                   <Field label="E-Mail" required>
@@ -876,7 +887,7 @@ function LoginContent() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       autoComplete="email"
-                      autoFocus
+                      autoFocus={authMode === 'login'}
                       required
                     />
                   </Field>
@@ -954,17 +965,6 @@ function LoginContent() {
                         Passwort vergessen?
                       </a>
                     </p>
-                  )}
-
-                  {authMode === 'register' && (
-                    <Field label="Cevi-Name">
-                      <Input
-                        type="text"
-                        value={regCeviName}
-                        onChange={(e) => setRegCeviName(e.target.value)}
-                        autoComplete="nickname"
-                      />
-                    </Field>
                   )}
 
                   <Button
