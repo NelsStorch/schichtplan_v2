@@ -36,6 +36,7 @@ import { PRIVACY_URL, departmentRoleLabel, getLandingUrl, helpUrl, statusUrl, ty
 import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { useInstallPrompt } from '@/lib/offline';
+import { CommandPaletteButton } from './command';
 import { OfflineBanner } from './OfflineBanner';
 
 const NAV = [
@@ -83,6 +84,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
           </nav>
 
           <div className="ml-auto flex items-center gap-1.5">
+            <CommandPaletteButton />
             {actions}
             <ThemeToggle className="hidden md:flex" />
             {user ? (

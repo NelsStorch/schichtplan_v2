@@ -25,14 +25,27 @@ export default function DepartmentHomePage() {
   const [nextShift, setNextShift] = useState<MyShift | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [showDeptForm, setShowDeptForm] = useState(false);
+  const [initialDeptTab, setInitialDeptTab] = useState<'general' | 'stufen' | 'people'>('general');
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.search.includes('createEvent=1')) {
-      if (canCreate) {
-        setShowEventForm(true);
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('createEvent') && canCreate) {
+      setShowEventForm(true);
+    }
+    if (canOpenDepartment) {
+      if (params.has('stufen')) {
+        setInitialDeptTab('stufen');
+        setShowDeptForm(true);
+      } else if (params.has('people')) {
+        setInitialDeptTab('people');
+        setShowDeptForm(true);
+      } else if (params.has('settings')) {
+        setInitialDeptTab('general');
+        setShowDeptForm(true);
       }
     }
-  }, [canCreate]);
+  }, [canCreate, canOpenDepartment]);
 
   const lockedOut = Boolean(department?.membersOnly && !department.viewerIsMember);
 
@@ -180,7 +193,7 @@ export default function DepartmentHomePage() {
         onClose={() => setShowEventForm(false)}
         onSaved={(slug) => router.push(`/events/${slug}`)}
       />
-      {canOpenDepartment && <DepartmentSettingsDialog open={showDeptForm} onClose={() => setShowDeptForm(false)} />}
+      {canOpenDepartment && <DepartmentSettingsDialog open={showDeptForm} onClose={() => setShowDeptForm(false)} initialTab={initialDeptTab} />}
     </AppShell>
   );
 }

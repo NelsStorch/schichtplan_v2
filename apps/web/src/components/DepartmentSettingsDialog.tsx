@@ -24,10 +24,24 @@ const TABS: { key: 'general' | 'stufen' | 'people' | 'audit'; label: string; per
 
 type TabKey = (typeof TABS)[number]['key'];
 
-export function DepartmentSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function DepartmentSettingsDialog({
+  open,
+  onClose,
+  initialTab,
+}: {
+  open: boolean;
+  onClose: () => void;
+  initialTab?: TabKey;
+}) {
   const { department, can } = usePortal();
   const tabs = TABS.filter((t) => can(t.permission));
-  const [tab, setTab] = useState<TabKey>(tabs[0]?.key ?? 'general');
+  const [tab, setTab] = useState<TabKey>(initialTab ?? tabs[0]?.key ?? 'general');
+
+  useEffect(() => {
+    if (initialTab && tabs.some((t) => t.key === initialTab)) {
+      setTab(initialTab);
+    }
+  }, [initialTab, open]);
   const activeTab = tabs.some((t) => t.key === tab) ? tab : (tabs[0]?.key ?? 'general');
   const close = () => {
     applyAccent(department?.primaryColor); // Live-Vorschau zurücksetzen

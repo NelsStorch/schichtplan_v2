@@ -48,6 +48,7 @@ import {
   useToast,
 } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
+import { useCommandPalette } from '@/components/command';
 import { AccessTypeBadge } from '@/components/event-meta';
 import { AccessNotice } from '@/components/event/AccessNotice';
 import { SignupCountdown } from '@/components/SignupCountdown';
@@ -83,6 +84,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const toast = useToast();
   const confirm = useConfirm();
   const loginHref = useLoginHref();
+  const { registerContextData } = useCommandPalette();
 
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +150,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   // Favicon: Event-Logo (falls vorhanden), sonst Abteilungs-Logo
   useDynamicFavicon(event?.logoUrl || department?.logoUrl, department?.logoUrl);
+
+  // Kontext für Befehlsmenü (Command Palette) registrieren
+  useEffect(() => {
+    if (!event) return;
+    return registerContextData({
+      event,
+      slug,
+      isOkArea: false,
+      onOpenShiftForm: () => setShowShiftForm(true),
+      onOpenAssignModal: () => {
+        if (event.shifts && event.shifts.length > 0) {
+          setAssigningShift(event.shifts[0]);
+        }
+      },
+    });
+  }, [event, slug, registerContextData]);
 
   const load = useCallback(async () => {
     try {

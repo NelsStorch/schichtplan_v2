@@ -1,4 +1,4 @@
-﻿param (
+param (
     [ValidateSet('prod', 'dev')]
     [string]$Environment = 'prod',
 
@@ -41,7 +41,7 @@ if ($Environment -eq 'dev') {
     $DefaultDomain = "cevi-schichtplan.ch"
     $LegacyNetwork = "schichtplan-prod_schichtplan_network"
 }
-# Eigenes Proxy-Netz pro Umgebung (nur Traefik + diese Umgebung), siehe AGENTS.md Abschnitt 2a
+# Eigenes Proxy-Netz pro Umgebung (nur Traefik + diese Umgebung), siehe docs/internal/infrastructure.md Abschnitt 3
 $ProxyNetwork = "schichtplan_${Environment}_proxy"
 $StartTime = Get-Date
 
@@ -111,7 +111,7 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 
 # Netz-Voraussetzung: eigenes Proxy-Netz, an dem der zentrale Traefik haengt (sonst bricht der Deploy hier ab, bevor etwas angefasst wird)
 if ! docker network inspect "$ProxyNetwork" > /dev/null 2>&1; then
-  echo "Docker-Netz $ProxyNetwork fehlt. Anlegen: docker network create $ProxyNetwork (und Traefik damit verbinden, siehe AGENTS.md 2a)"
+  echo "Docker-Netz $ProxyNetwork fehlt. Anlegen: docker network create $ProxyNetwork (und Traefik damit verbinden, siehe docs/internal/infrastructure.md)"
   exit 1
 fi
 if ! docker network inspect "$ProxyNetwork" --format '{{range .Containers}}{{.Name}}{{println}}{{end}}' | grep -qx traefik; then
@@ -137,7 +137,7 @@ else
 fi
 
 rm -rf apps packages hilfe
-tar -xzf "$ArchiveName"
+tar --warning=no-unknown-keyword -xzf "$ArchiveName"
 rm -f "$ArchiveName"
 
 if [ ! -f .env ]; then

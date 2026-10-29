@@ -26,6 +26,7 @@ import {
 import { helpUrl, type EventCapability, type OK_PAGES } from '@schichtplan/shared';
 import { Badge, Dialog, EmptyState, Skeleton, buttonClasses, cn, trackUi } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
+import { useCommandPalette } from '@/components/command';
 import { fmtDateRange } from '@/lib/format';
 import { OkProvider, useOk } from './OkContext';
 
@@ -163,6 +164,7 @@ function useCurrentItem() {
 
 function OkFrame({ children }: { children: ReactNode }) {
   const { event, loading, error, permissions } = useOk();
+  const { registerContextData } = useCommandPalette();
   const [menuOpen, setMenuOpen] = useState(false);
   const currentItem = useCurrentItem();
   const currentLabel = currentItem?.label ?? 'Übersicht';
@@ -172,6 +174,15 @@ function OkFrame({ children }: { children: ReactNode }) {
   useEffect(() => {
     trackUi('UI_OK_PAGE', (currentPath || 'uebersicht') as keyof typeof OK_PAGES);
   }, [currentPath]);
+
+  useEffect(() => {
+    if (!event) return;
+    return registerContextData({
+      event,
+      slug: event.slug,
+      isOkArea: true,
+    });
+  }, [event, registerContextData]);
 
   if (loading) {
     return (

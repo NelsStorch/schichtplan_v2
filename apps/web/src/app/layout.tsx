@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { FeedbackProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
+import { CommandPalette, CommandPaletteProvider } from '@/components/command';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { getDepartmentPreview } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
@@ -57,7 +58,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-[100dvh]">
         <FeedbackProvider>
-          <PortalProvider>{children}</PortalProvider>
+          <PortalProvider>
+            <CommandPaletteProvider>
+              {children}
+              <CommandPalette />
+            </CommandPaletteProvider>
+          </PortalProvider>
           <ServiceWorkerRegister />
         </FeedbackProvider>
         <UsageTracker app="web" />
