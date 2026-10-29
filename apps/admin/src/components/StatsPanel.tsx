@@ -396,11 +396,15 @@ function SystemView({
   onOpenAudit?: (query: string) => void;
 }) {
   const [sort, setSort] = useState<RouteSort>('count');
+  const [filterScanners, setFilterScanners] = useState(false);
   const { requests } = system;
-  const routes = useMemo(
-    () => [...requests.routes].sort((a, b) => (b[sort] ?? 0) - (a[sort] ?? 0) || b.count - a.count).slice(0, 25),
-    [requests.routes, sort]
-  );
+  const routes = useMemo(() => {
+    let list = requests.routes;
+    if (filterScanners) {
+      list = list.filter((r) => r.route !== '(unbekannt)' && !r.route.includes('(unbekannt'));
+    }
+    return [...list].sort((a, b) => (b[sort] ?? 0) - (a[sort] ?? 0) || b.count - a.count).slice(0, 25);
+  }, [requests.routes, sort, filterScanners]);
   const snapshotRows = system.snapshots.series
     .map((s) => {
       const values = s.values.filter((v): v is number => v !== null);
@@ -437,7 +441,18 @@ function SystemView({
 
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-lg font-semibold tracking-tight text-fg">Routen</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="font-display text-lg font-semibold tracking-tight text-fg">Routen</h2>
+            <label className="flex items-center gap-1.5 text-xs text-fg-subtle cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterScanners}
+                onChange={(e) => setFilterScanners(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-line accent-accent text-accent"
+              />
+              <span>Bots / Scanner (404) ausblenden</span>
+            </label>
+          </div>
           <div className="w-52">
             <Select value={sort} onChange={(e) => setSort(e.target.value as RouteSort)} aria-label="Routen sortieren">
               <option value="count">Meiste Anfragen</option>
@@ -468,7 +483,15 @@ function SystemView({
                   <tr key={`${r.method} ${r.route}`}>
                     <td className="max-w-[24rem] truncate px-5 py-2.5 font-mono text-xs text-fg" title={r.route}>
                       <span className="mr-2 text-fg-subtle">{r.method}</span>
-                      {r.route}
+                      <span>{r.route}</span>
+                      {(r.route === '(unbekannt)' || r.route.includes('(unbekannt')) && (
+                        <span
+                          className="ml-2 inline-flex items-center rounded border border-line bg-surface-subtle px-1.5 py-0.5 text-[10px] font-sans font-medium text-fg-muted"
+                          title="Anfragen an nicht existierende Pfade (typischerweise automatisierte Web-Crawler / 404-Scans)"
+                        >
+                          Bot / Scanner
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-right text-fg">{fmtNumber(r.count)}</td>
                     <td className="px-3 py-2.5 text-right text-fg-muted">{fmtNumber(r.avgMs)}</td>
@@ -485,9 +508,10 @@ function SystemView({
             </table>
           </div>
         )}
-        <p className="mt-2 text-xs text-fg-subtle">
-          p95 ist eine Schätzung (obere Grenze der Laufzeit-Stufe, in die 95% der Anfragen fallen).
-        </p>
+        <div className="mt-2 space-y-1 text-xs text-fg-subtle">
+          <p>p95 ist eine Schätzung (obere Grenze der Laufzeit-Stufe, in die 95% der Anfragen fallen).</p>
+          <p>«(unbekannt)» erfasst Anfragen an URLs ohne passendes Backend-Muster (z. B. automatisierte Internet-Scans auf <code className="font-mono text-[11px]">.env</code> oder <code className="font-mono text-[11px]">wp-login</code>).</p>
+        </div>
       </section>
 
       {usage ? <MetricGroup usage={usage} group="BETRIEB" /> : <LoadingCards />}

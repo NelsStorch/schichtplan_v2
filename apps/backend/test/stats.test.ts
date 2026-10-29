@@ -110,12 +110,13 @@ describe.skipIf(!hasTestDb)('Nutzungsstatistik', () => {
   it('hält Anfragen nur als Route-Muster fest, nie die echte URL', async () => {
     await inject(app, { method: 'GET', url: '/api/events/geheimer-anlass?zugang=TOKEN123' });
     await inject(app, { method: 'GET', url: '/health' });
+    await inject(app, { method: 'GET', url: '/api/health' });
     await flushUsageStats(app.prisma);
     const rows = await app.prisma.requestStat.findMany();
     expect(rows.map((r) => r.route)).toContain('/api/events/:slug');
     expect(JSON.stringify(rows)).not.toContain('geheimer-anlass');
     expect(JSON.stringify(rows)).not.toContain('TOKEN123');
-    expect(rows.some((r) => r.route === '/health')).toBe(false);
+    expect(rows.some((r) => r.route === '/health' || r.route === '/api/health')).toBe(false);
   });
 
   it('fasst alte Stundenwerte zu Tageswerten zusammen und schreibt die Momentaufnahme nur einmal', async () => {

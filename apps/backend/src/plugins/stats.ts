@@ -9,7 +9,7 @@ import {
 } from '../services/usageStats.js';
 
 /** Routen, die nicht in die Anfrage-Statistik gehören (Traefik prüft /health alle paar Sekunden) */
-const IGNORED_ROUTES = new Set(['/health']);
+const IGNORED_ROUTES = new Set(['/health', '/api/health']);
 
 const bodyField = (request: FastifyRequest, field: string): string | undefined => {
   const value = (request.body as Record<string, unknown> | undefined)?.[field];

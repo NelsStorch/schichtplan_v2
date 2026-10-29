@@ -130,7 +130,7 @@ services:
       - "traefik.http.routers.schichtplan-dev-landing.priority=20"
       - "traefik.http.routers.schichtplan-dev-landing.service=schichtplan-dev-landing"
       - "traefik.http.services.schichtplan-dev-landing.loadbalancer.server.port=3001"
-      - "traefik.http.services.schichtplan-dev-landing.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-dev-landing.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.schichtplan-dev-landing.loadbalancer.healthcheck.interval=3s"
 
   login:
@@ -156,7 +156,7 @@ services:
       - "traefik.http.routers.schichtplan-dev-login.priority=30"
       - "traefik.http.routers.schichtplan-dev-login.service=schichtplan-dev-login"
       - "traefik.http.services.schichtplan-dev-login.loadbalancer.server.port=3002"
-      - "traefik.http.services.schichtplan-dev-login.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-dev-login.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.schichtplan-dev-login.loadbalancer.healthcheck.interval=2s"
       - "traefik.http.services.schichtplan-dev-login.loadbalancer.healthcheck.timeout=1s"
 
@@ -184,7 +184,7 @@ services:
       - "traefik.http.routers.schichtplan-dev-admin.priority=30"
       - "traefik.http.routers.schichtplan-dev-admin.service=schichtplan-dev-admin"
       - "traefik.http.services.schichtplan-dev-admin.loadbalancer.server.port=3003"
-      - "traefik.http.services.schichtplan-dev-admin.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-dev-admin.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.schichtplan-dev-admin.loadbalancer.healthcheck.interval=3s"
 
   hilfe:
@@ -204,7 +204,7 @@ services:
       - "traefik.http.routers.schichtplan-dev-hilfe.priority=30"
       - "traefik.http.routers.schichtplan-dev-hilfe.service=schichtplan-dev-hilfe"
       - "traefik.http.services.schichtplan-dev-hilfe.loadbalancer.server.port=3004"
-      - "traefik.http.services.schichtplan-dev-hilfe.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-dev-hilfe.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.schichtplan-dev-hilfe.loadbalancer.healthcheck.interval=5s"
 
 # Netzwerk-Segmentierung (Dev/Staging). Prod läuft in docker-compose.yml in komplett getrennten Netzen:

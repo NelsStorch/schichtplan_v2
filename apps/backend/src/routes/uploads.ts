@@ -29,7 +29,10 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     if (!upload) {
-      return reply.status(404).send({ error: 'Bild nicht gefunden' });
+      return reply
+        .header('Cache-Control', 'public, max-age=60')
+        .status(404)
+        .send({ error: 'Bild nicht gefunden' });
     }
 
     // Bilder liegen auf der eigenen Domain: Ein SVG darf beim direkten Öffnen kein Skript ausführen

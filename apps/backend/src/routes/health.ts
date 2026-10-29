@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 
 const healthRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/health', async (_request, reply) => {
+  const handler = async (_request: unknown, reply: any) => {
     try {
       // Test DB connection
       await fastify.prisma.$queryRaw`SELECT 1`;
@@ -20,7 +20,10 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
         database: false,
       });
     }
-  });
+  };
+
+  fastify.get('/health', handler);
+  fastify.get('/api/health', handler);
 };
 
 export default healthRoutes;

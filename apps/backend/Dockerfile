@@ -60,7 +60,7 @@ COPY --from=builder /app/apps/backend/prisma.config.ts ./apps/backend/prisma.con
 WORKDIR /app/apps/backend
 EXPOSE 4000
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
   CMD node -e "fetch('http://localhost:4000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
 # Node direkt (nicht über npm), damit SIGTERM beim Deploy beim Server ankommt

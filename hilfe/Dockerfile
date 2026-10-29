@@ -15,5 +15,5 @@ FROM nginx:1.29-alpine AS runner
 COPY hilfe/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/hilfe/dist /usr/share/nginx/html
 EXPOSE 3004
-HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
-  CMD wget -q -O /dev/null http://127.0.0.1:3004/ || exit 1
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
+  CMD wget -q -O /dev/null http://127.0.0.1:3004/api/health || exit 1
