@@ -141,20 +141,20 @@ export default function LandingPage() {
               <div className="lg:col-span-7 flex flex-col items-start text-left">
                 <div className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-2xs font-bold uppercase tracking-[0.16em] bg-accent/12 text-accent-ink border border-accent/25 mb-6 shadow-sm">
                   <Flame className="size-3 text-accent animate-pulse" />
-                  <span>Für Chilbi, Lager &amp; Anlässe • 100% ehrenamtlich</span>
+                  <span>Cevi Schichtplan • Helferplanung für Chilbi, Lager &amp; Vereine</span>
                 </div>
 
                 <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-fg leading-[1.08] text-balance">
                   Genug Helfer*innen für jede Schicht.{' '}
                   <span className="bg-gradient-to-r from-accent via-rose-500 to-amber-500 bg-clip-text text-transparent">
-                    Ohne WhatsApp-Chaos.
+                    Ohne Excel- und WhatsApp-Chaos.
                   </span>
                 </h1>
 
                 <p className="mt-5 text-base sm:text-lg text-fg-muted max-w-[54ch] leading-relaxed">
-                  Ihr stellt die Schichten online, teilt einen Link, und alle tragen sich selbst ein.
-                  Das OK sieht jederzeit, wer wo eingeteilt ist. Schluss mit mühsamen Excel-Listen,
-                  Versions-Chaos und stundenlangem Hinterherrennen.
+                  Schichten online erfassen, Direktlink teilen und Helfer*innen tragen sich in Sekunden selbst ein.
+                  Das OK sieht jederzeit live alle Einteilungen. Die kostenlose Schweizer Lösung für Cevi-Abteilungen,
+                  Pfadi, Jubla und Vereine – mit Cevi.DB-Login und ohne mühsame Excel-Tabellen.
                 </p>
 
                 {/* CTAs */}
@@ -586,6 +586,15 @@ export default function LandingPage() {
             <Link href="/datenschutz" className="hover:text-fg transition">
               Datenschutz
             </Link>
+            <a
+              href="/llms.txt"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-fg transition font-mono text-[11px]"
+              title="Kontextdatei für KI-Agenten & Sprachmodelle"
+            >
+              llms.txt
+            </a>
             <a
               href="https://github.com/NelsStorch/schichtplan_v2"
               target="_blank"

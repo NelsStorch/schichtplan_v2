@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Clock,
   Check,
@@ -23,24 +23,30 @@ interface ConfettiPiece {
 }
 
 export function Hero3DStage() {
+  const cardRef = useRef<HTMLDivElement>(null);
+
   // Interactive state
   const [barEnrolled, setBarEnrolled] = useState(false);
   const [nightEnrolled, setNightEnrolled] = useState(false);
   const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
 
   const triggerConfetti = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+    if (!cardRef.current) return;
+    const cardRect = cardRef.current.getBoundingClientRect();
+    const originX = e.clientX - cardRect.left;
+    const originY = e.clientY - cardRect.top;
+
     const colors = ['#e11d48', '#f59e0b', '#10b981', '#38bdf8', '#fbbf24'];
-    const pieces: ConfettiPiece[] = Array.from({ length: 16 }).map((_, i) => ({
+    const pieces: ConfettiPiece[] = Array.from({ length: 20 }).map((_, i) => ({
       id: Date.now() + i,
-      x: rect.width / 2 + (Math.random() - 0.5) * 40,
-      y: rect.height / 2 + (Math.random() - 0.5) * 20,
+      x: originX + (Math.random() - 0.5) * 50,
+      y: originY + (Math.random() - 0.5) * 25,
       color: colors[Math.floor(Math.random() * colors.length)],
       size: 4 + Math.random() * 5,
       angle: Math.random() * 360,
     }));
     setConfetti(pieces);
-    setTimeout(() => setConfetti([]), 1200);
+    setTimeout(() => setConfetti([]), 1100);
   };
 
   const handleBarClick = (e: React.MouseEvent) => {
@@ -87,7 +93,10 @@ export function Hero3DStage() {
         </div>
 
         {/* Inner Card Core */}
-        <div className="rounded-[calc(2rem-0.5rem)] border border-line bg-surface p-4 sm:p-7 shadow-soft relative overflow-hidden">
+        <div
+          ref={cardRef}
+          className="rounded-[calc(2rem-0.5rem)] border border-line bg-surface p-4 sm:p-7 shadow-soft relative overflow-hidden"
+        >
           {/* Header Row */}
           <div className="flex items-center justify-between pb-4 border-b border-line gap-3">
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -185,13 +194,19 @@ export function Hero3DStage() {
                   <Clock className="size-3 shrink-0" />
                   <span className="shrink-0">21:00 · 00:00</span>
                   <span>•</span>
-                  <span className="font-medium truncate">
-                    {barEnrolled ? (
-                      <span className="text-emerald-500 font-bold">✓ Du eingetragen!</span>
-                    ) : (
-                      '1 Platz frei'
-                    )}
-                  </span>
+                  {barEnrolled ? (
+                    <span className="flex items-center gap-1 min-w-0">
+                      <span className="truncate">Falk, Remo,</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.2 text-[10px] font-bold text-emerald-500 shrink-0">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Du!
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="font-medium text-accent truncate">
+                      1 Platz frei
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -236,13 +251,17 @@ export function Hero3DStage() {
                   <Clock className="size-3 shrink-0" />
                   <span className="shrink-0">02:00 · 06:00</span>
                   <span>•</span>
-                  <span className="truncate">
-                    {nightEnrolled ? (
-                      <span className="text-emerald-500 font-bold">✓ Du eingetragen!</span>
-                    ) : (
-                      '0/2 belegt'
-                    )}
-                  </span>
+                  {nightEnrolled ? (
+                    <span className="flex items-center gap-1 min-w-0">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.2 text-[10px] font-bold text-emerald-500 shrink-0">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Du!
+                      </span>
+                      <span className="text-fg-subtle truncate">+ 1 frei</span>
+                    </span>
+                  ) : (
+                    <span className="text-warning-ink font-semibold truncate">0/2 belegt</span>
+                  )}
                 </div>
               </div>
 
@@ -272,7 +291,7 @@ export function Hero3DStage() {
             </span>
           </div>
 
-          {/* Confetti Particle Burst Animation */}
+          {/* Confetti Particle Burst Animation (Spawned at exact click coordinates) */}
           {confetti.length > 0 && (
             <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
               {confetti.map((c) => (

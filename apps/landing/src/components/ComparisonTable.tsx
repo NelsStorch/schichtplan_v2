@@ -87,21 +87,27 @@ export function ComparisonTable() {
             <span>Der direkte Vergleich</span>
           </div>
           <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">
-            Warum nicht einfach Excel oder WhatsApp?
+            Warum nicht einfach Excel, WhatsApp oder Doodle?
           </h2>
           <p className="mt-3 text-base text-fg-muted leading-relaxed">
-            Wie sich der Cevi Schichtplan gegenüber den typischen Notlösungen schlägt:
+            Wie sich der Cevi Schichtplan gegenüber typischen Notlösungen und Bezahl-Tools schlägt:
           </p>
         </div>
 
         {/* Comparison Table Container */}
         <div className="rounded-2xl sm:rounded-card border border-line bg-surface shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[640px]">
+            <table className="w-full text-left border-collapse min-w-[620px]">
               <thead>
-                <tr className="border-b border-line bg-surface-2/60">
-                  <th className="py-4 px-4 sm:px-6 text-xs font-bold uppercase tracking-wider text-fg-subtle w-2/5">
-                    Funktion / Kriterium
+                <tr className="border-b border-line bg-surface-2/70">
+                  {/* Sticky First Column Header on Mobile */}
+                  <th className="sticky left-0 z-20 py-4 px-4 sm:px-6 text-xs font-bold uppercase tracking-wider text-fg-subtle w-2/5 bg-surface-2 border-r border-line sm:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Funktion / Kriterium</span>
+                      <span className="sm:hidden text-[10px] font-normal normal-case text-fg-subtle">
+                        ← Wischen →
+                      </span>
+                    </div>
                   </th>
                   <th className="py-4 px-3 sm:px-4 text-xs font-bold text-fg-muted text-center w-1/5">
                     Excel / Sheets
@@ -125,8 +131,12 @@ export function ComparisonTable() {
                       idx % 2 === 1 ? 'bg-surface-2/20' : ''
                     }`}
                   >
-                    {/* Feature Title & Description */}
-                    <td className="py-3.5 sm:py-4 px-4 sm:px-6">
+                    {/* Sticky Feature Title on Mobile */}
+                    <td
+                      className={`sticky left-0 z-10 py-3.5 sm:py-4 px-4 sm:px-6 border-r border-line sm:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] ${
+                        idx % 2 === 1 ? 'bg-surface-2' : 'bg-surface'
+                      }`}
+                    >
                       <div className="font-semibold text-fg text-xs sm:text-sm">{row.title}</div>
                       {row.desc && (
                         <div className="text-2xs text-fg-subtle mt-0.5 leading-snug hidden sm:block">
@@ -139,9 +149,9 @@ export function ComparisonTable() {
                     <td className="py-3.5 sm:py-4 px-3 sm:px-4 text-center">
                       <div className="flex flex-col items-center justify-center gap-1">
                         {row.excel.state === 'no' ? (
-                          <X className="size-4 text-rose-500/80 shrink-0" />
+                          <X className="size-4 text-danger-ink shrink-0" />
                         ) : (
-                          <AlertCircle className="size-4 text-amber-500/80 shrink-0" />
+                          <AlertCircle className="size-4 text-warning-ink shrink-0" />
                         )}
                         <span className="text-2xs text-fg-muted font-medium text-center">
                           {row.excel.text}
@@ -153,9 +163,9 @@ export function ComparisonTable() {
                     <td className="py-3.5 sm:py-4 px-3 sm:px-4 text-center">
                       <div className="flex flex-col items-center justify-center gap-1">
                         {row.chat.state === 'no' ? (
-                          <X className="size-4 text-rose-500/80 shrink-0" />
+                          <X className="size-4 text-danger-ink shrink-0" />
                         ) : (
-                          <AlertCircle className="size-4 text-amber-500/80 shrink-0" />
+                          <AlertCircle className="size-4 text-warning-ink shrink-0" />
                         )}
                         <span className="text-2xs text-fg-muted font-medium text-center">
                           {row.chat.text}
