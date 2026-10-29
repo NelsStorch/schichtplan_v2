@@ -41,7 +41,7 @@ import {
   Wrench,
   XCircle,
 } from 'lucide-react';
-import type { EventDto, ShiftDto, ShiftSignupDto } from '@schichtplan/shared';
+import { getCeviDbDataUrl, type EventDto, type ShiftDto, type ShiftSignupDto } from '@schichtplan/shared';
 import { useToast, type BadgeTone } from '@schichtplan/ui';
 import { api, useLoginHref } from '@/lib/api';
 import { eventStatus } from '@/components/EventTile';
@@ -1178,19 +1178,21 @@ export function useCommandItems(query: string) {
         },
       });
 
-      list.push({
-        id: 'nav-cevidb',
-        title: 'Cevi.DB Synchronisation',
-        subtitle: 'Verknüpfte Hitobito-Daten und Stufen anzeigen',
-        section: 'NAVIGATION',
-        icon: <Sparkles className="size-4" />,
-        keywords: ['cevidb', 'hitobito', 'daten', 'sync', 'abgleich'],
-        onSelect: () => {
-          recordRecentCommand('nav-cevidb');
-          router.push('/cevidb-daten');
-          close();
-        },
-      });
+      if (user.isGlobalAdmin) {
+        list.push({
+          id: 'nav-cevidb',
+          title: 'Cevi.DB Synchronisation',
+          subtitle: 'Verknüpfte Hitobito-Daten und Stufen anzeigen',
+          section: 'NAVIGATION',
+          icon: <Sparkles className="size-4" />,
+          keywords: ['cevidb', 'hitobito', 'daten', 'sync', 'abgleich'],
+          onSelect: () => {
+            recordRecentCommand('nav-cevidb');
+            window.location.href = getCeviDbDataUrl();
+            close();
+          },
+        });
+      }
     }
 
     list.push({

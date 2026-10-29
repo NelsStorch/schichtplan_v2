@@ -113,7 +113,7 @@ function defaultDestination(homeDepartmentSlug: string | null): string {
 function bootstrapAdminCeviDbIds(): Set<number> {
   const ids = (process.env.GLOBAL_ADMIN_CEVIDB_IDS || '')
     .split(',')
-    .map((part) => Number(part.trim()))
+    .map((part) => Number(part.replace(/['"]/g, '').trim()))
     .filter((id) => Number.isInteger(id) && id > 0);
   return new Set(ids);
 }

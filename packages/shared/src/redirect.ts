@@ -85,6 +85,21 @@ export function getDepartmentSetupUrl(targetUrl?: string): string {
 }
 
 /**
+ * URL zum zentralen Cevi.DB-Dateninspektor (login.<rootDomain>/cevidb-daten).
+ * Streng geschützt: Nur auf login.<domain> zulässig, da Admin-APIs auf Abteilungs-Subdomains gesperrt sind.
+ */
+export function getCeviDbDataUrl(userId?: string): string {
+  if (typeof window === 'undefined') return '/cevidb-daten';
+  const { hostname, protocol } = window.location;
+  const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) {
+    return `http://localhost:3002/cevidb-daten${query}`;
+  }
+  const root = getRootDomain(hostname);
+  return `${protocol}//login.${root}/cevidb-daten${query}`;
+}
+
+/**
  * Link auf eine Abteilungs-Subdomain (z. B. illnau.cevi-schichtplan.ch oder illnau.dev.cevi-schichtplan.ch).
  */
 export function getDepartmentUrl(slug: string, path = '/'): string {

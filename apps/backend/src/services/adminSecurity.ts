@@ -82,3 +82,15 @@ export function adminSessionProblem(
   if (token.iat === undefined || nowSeconds - token.iat > config.maxSessionAgeSeconds) return 'STALE';
   return null;
 }
+
+/**
+ * Cevi.DB-Personen-IDs (kommagetrennt, z. B. "12211,3456"), die als globale Admins berechtigt sind.
+ * Bereinigt Anführungszeichen und Whitespace sicher. Befördert nur, entzieht die Rolle nie wieder.
+ */
+export function bootstrapAdminCeviDbIds(env: NodeJS.ProcessEnv = process.env): Set<number> {
+  const ids = (env.GLOBAL_ADMIN_CEVIDB_IDS || '')
+    .split(',')
+    .map((part) => Number(part.replace(/['"]/g, '').trim()))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  return new Set(ids);
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adminRequestProblem, adminSecurityConfig, adminSessionProblem } from './adminSecurity.js';
+import { adminRequestProblem, adminSecurityConfig, adminSessionProblem, bootstrapAdminCeviDbIds } from './adminSecurity.js';
 
 const prod = { rootDomain: 'cevi-schichtplan.ch', allowLocalhost: false };
 
@@ -68,5 +68,20 @@ describe('adminSecurityConfig', () => {
     expect(adminSecurityConfig({ NODE_ENV: 'development' }).requireCeviDbLogin).toBe(false);
     expect(adminSecurityConfig({ NODE_ENV: 'production' }).allowLocalhost).toBe(false);
     expect(adminSecurityConfig({ ADMIN_SESSION_MAX_HOURS: '2' }).maxSessionAgeSeconds).toBe(7200);
+  });
+});
+
+describe('bootstrapAdminCeviDbIds', () => {
+  it('parst IDs korrekt auch mit Anführungszeichen, Leerzeichen und ungültigen Einträgen', () => {
+    const ids = bootstrapAdminCeviDbIds({ GLOBAL_ADMIN_CEVIDB_IDS: ' 12211, "3456", \'7890\', invalid, -5, 0 ' });
+    expect(ids.has(12211)).toBe(true);
+    expect(ids.has(3456)).toBe(true);
+    expect(ids.has(7890)).toBe(true);
+    expect(ids.size).toBe(3);
+  });
+
+  it('gibt leeres Set zurück wenn keine IDs definiert sind', () => {
+    expect(bootstrapAdminCeviDbIds({}).size).toBe(0);
+    expect(bootstrapAdminCeviDbIds({ GLOBAL_ADMIN_CEVIDB_IDS: '' }).size).toBe(0);
   });
 });

@@ -7,6 +7,7 @@ import {
   adminRequestProblem,
   adminSecurityConfig,
   adminSessionProblem,
+  bootstrapAdminCeviDbIds,
   type LoginMethodClaim,
 } from '../services/adminSecurity.js';
 import { createRateLimiter } from '../services/rateLimit.js';
@@ -114,6 +115,7 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
           id: true,
           email: true,
           isGlobalAdmin: true,
+          ceviDbId: true,
           passwordChangedAt: true,
           lastSeenOn: true,
           homeDepartmentId: true,
@@ -128,6 +130,14 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     tokenClaims.set(request, { iat: issuedAt, amr: (request.user as { amr?: string }).amr });
     if (user.passwordChangedAt && issuedAt !== undefined && (issuedAt + 1) * 1000 <= user.passwordChangedAt.getTime()) {
       return false;
+    }
+    if (!user.isGlobalAdmin && user.ceviDbId && bootstrapAdminCeviDbIds().has(user.ceviDbId)) {
+      await fastify.prisma.user.update({
+        where: { id: user.id },
+        data: { isGlobalAdmin: true },
+      });
+      user.isGlobalAdmin = true;
+      fastify.log.info({ userId: user.id, ceviDbId: user.ceviDbId }, 'Cevi.DB-Person on-demand zum globalen Admin befördert');
     }
     request.user = {
       id: user.id,
