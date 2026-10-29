@@ -14,12 +14,17 @@ export default defineConfig({
       defaultLocale: 'root',
       // «de» statt «de-CH»: nur so findet die Suche (Pagefind) ihre deutschen Texte
       locales: { root: { label: 'Deutsch', lang: 'de' } },
-      favicon: '/favicon.svg',
+      favicon: '/favicon.ico',
       credits: false,
       lastUpdated: false,
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
       customCss: ['./src/styles/fonts.css', './src/styles/theme.css', './src/styles/content.css'],
       head: [
+        { tag: 'link', attrs: { rel: 'icon', href: '/favicon.ico', sizes: '48x48' } },
+        { tag: 'link', attrs: { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' } },
+        { tag: 'link', attrs: { rel: 'icon', href: '/favicon-48x48.png', type: 'image/png', sizes: '48x48' } },
+        { tag: 'link', attrs: { rel: 'icon', href: '/icon-192.png', type: 'image/png', sizes: '192x192' } },
+        { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
         { tag: 'meta', attrs: { name: 'theme-color', content: '#0c0a09', media: '(prefers-color-scheme: dark)' } },
         { tag: 'meta', attrs: { name: 'theme-color', content: '#fafaf9', media: '(prefers-color-scheme: light)' } },
       ],
