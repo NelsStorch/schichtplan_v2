@@ -508,62 +508,179 @@ export function CommandPalette() {
           {/* =========================================================================
               DETAIL-VORSCHAU-PANEL (NUR DESKTOP: >= LG)
           ========================================================================= */}
-          {!activeSubActionItem && currentItem && (
-            <aside className="hidden lg:flex w-80 shrink-0 flex-col justify-between border-l border-line bg-surface-2/30 p-5">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent-ink">
-                    {currentItem.section}
-                  </span>
-                  {currentItem.badge && (
-                    <Badge tone={currentItem.badgeTone || 'neutral'} size="sm">
-                      {currentItem.badge}
-                    </Badge>
-                  )}
-                </div>
+          {(() => {
+            const previewTargetItem = activeSubActionItem || currentItem;
+            if (!previewTargetItem) return null;
 
-                <div className="space-y-1">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-accent/12 text-accent-ink mb-2">
-                    {currentItem.icon}
+            return (
+              <aside className="hidden lg:flex w-80 shrink-0 flex-col justify-between border-l border-line bg-surface-2/30 p-5">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent-ink">
+                      {previewTargetItem.section}
+                    </span>
+                    {previewTargetItem.badge && (
+                      <Badge tone={previewTargetItem.badgeTone || 'neutral'} size="sm">
+                        {previewTargetItem.badge}
+                      </Badge>
+                    )}
                   </div>
-                  <h3 className="font-display text-base font-bold text-fg leading-snug">{currentItem.title}</h3>
-                  {currentItem.subtitle && <p className="text-xs text-fg-muted">{currentItem.subtitle}</p>}
-                </div>
 
-                {/* Spezifische Detail-Inhalte je nach Typ */}
-                {currentItem.preview?.type === 'SHIFT' && currentItem.preview.shift && (
-                  <div className="space-y-3 rounded-xl border border-line bg-surface p-3.5 text-xs">
-                    <div>
-                      <div className="text-2xs font-semibold text-fg-subtle uppercase tracking-wider mb-1">
-                        Besetzung
-                      </div>
-                      <SlotMeter
-                        filled={currentItem.preview.shift.signups?.length || 0}
-                        total={currentItem.preview.shift.requiredSlots}
-                      />
+                  <div className="space-y-1">
+                    <div className="flex size-11 items-center justify-center rounded-xl bg-accent/12 text-accent-ink mb-2">
+                      {previewTargetItem.icon}
                     </div>
+                    <h3 className="font-display text-base font-bold text-fg leading-snug">{previewTargetItem.title}</h3>
+                    {previewTargetItem.subtitle && <p className="text-xs text-fg-muted">{previewTargetItem.subtitle}</p>}
                   </div>
-                )}
 
-                {currentItem.preview?.type === 'PERSON' && currentItem.preview.person && (
-                  <div className="space-y-3 rounded-xl border border-line bg-surface p-3.5 text-xs">
-                    <div className="flex items-center gap-3">
-                      <Avatar name={currentItem.preview.person.name} size="md" />
+                  {/* Spezifische Detail-Inhalte je nach Typ */}
+                  {previewTargetItem.preview?.type === 'SHIFT' && previewTargetItem.preview.shift && (
+                    <div className="space-y-3 rounded-xl border border-line bg-surface p-3.5 text-xs">
                       <div>
-                        <div className="font-semibold text-fg">{currentItem.preview.person.name}</div>
-                        {currentItem.preview.person.ceviName && (
-                          <div className="text-2xs text-accent-ink font-bold">
-                            «{currentItem.preview.person.ceviName}»
+                        <div className="text-2xs font-semibold text-fg-subtle uppercase tracking-wider mb-1.5 flex justify-between">
+                          <span>Besetzung</span>
+                          <span className="font-mono font-bold text-fg">
+                            {previewTargetItem.preview.shift.signups?.length || 0} / {previewTargetItem.preview.shift.requiredSlots}
+                          </span>
+                        </div>
+                        <SlotMeter
+                          filled={previewTargetItem.preview.shift.signups?.length || 0}
+                          total={previewTargetItem.preview.shift.requiredSlots}
+                        />
+                      </div>
+
+                      {previewTargetItem.preview.shift.signups && previewTargetItem.preview.shift.signups.length > 0 && (
+                        <div className="pt-2 border-t border-line/60 space-y-1">
+                          <span className="text-2xs font-semibold text-fg-subtle uppercase tracking-wider block mb-1">
+                            Eingeteilte Helfende ({previewTargetItem.preview.shift.signups.length})
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {previewTargetItem.preview.shift.signups.map((su, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-2xs font-medium text-fg"
+                              >
+                                <UserRound className="size-2.5 text-accent-ink" />
+                                <span>{su.displayName}</span>
+                                {su.attendance === 'PRESENT' && (
+                                  <Check className="size-2.5 text-success-ink" />
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {previewTargetItem.preview.shift.description && (
+                        <div className="pt-2 border-t border-line/60">
+                          <span className="text-2xs font-semibold text-fg-subtle uppercase tracking-wider block mb-0.5">
+                            Beschreibung
+                          </span>
+                          <p className="text-2xs text-fg-muted line-clamp-3">
+                            {previewTargetItem.preview.shift.description}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {previewTargetItem.preview?.type === 'PERSON' && previewTargetItem.preview.person && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-line bg-surface p-3.5 text-xs space-y-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar name={previewTargetItem.preview.person.name} size="md" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-fg truncate text-sm">
+                              {previewTargetItem.preview.person.name}
+                            </div>
+                            {previewTargetItem.preview.person.ceviName && (
+                              <div className="text-2xs text-accent-ink font-bold">
+                                «{previewTargetItem.preview.person.ceviName}»
+                              </div>
+                            )}
+                            {previewTargetItem.preview.person.role && (
+                              <div className="text-2xs text-fg-subtle truncate mt-0.5">
+                                {previewTargetItem.preview.person.role}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {previewTargetItem.preview.person.stufen && previewTargetItem.preview.person.stufen.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1 border-t border-line/60">
+                            {previewTargetItem.preview.person.stufen.map((st, i) => (
+                              <Badge key={i} size="sm" tone="neutral">
+                                {st}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        {(previewTargetItem.preview.person.email || previewTargetItem.preview.person.phone) && (
+                          <div className="space-y-1.5 pt-1 border-t border-line/60 text-2xs">
+                            {previewTargetItem.preview.person.email && (
+                              <div className="flex items-center gap-1.5 text-fg-subtle truncate">
+                                <Mail className="size-3 shrink-0" />
+                                <span className="truncate">{previewTargetItem.preview.person.email}</span>
+                              </div>
+                            )}
+                            {previewTargetItem.preview.person.phone && (
+                              <div className="flex items-center gap-1.5 text-fg-subtle truncate">
+                                <Phone className="size-3 shrink-0" />
+                                <span className="truncate">{previewTargetItem.preview.person.phone}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
+
+                      {/* Übernommene Schichten der Person */}
+                      <div className="rounded-xl border border-line bg-surface p-3.5 text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xs font-bold uppercase tracking-wider text-fg-subtle">
+                            Übernommene Schichten ({previewTargetItem.preview.person.shifts?.length || 0})
+                          </span>
+                        </div>
+
+                        {previewTargetItem.preview.person.shifts && previewTargetItem.preview.person.shifts.length > 0 ? (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                            {previewTargetItem.preview.person.shifts.map((s, idx) => (
+                              <div
+                                key={idx}
+                                className="rounded-lg border border-line/70 bg-surface-2/40 p-2 text-xs transition hover:bg-surface-2"
+                              >
+                                <div className="flex items-center justify-between gap-1.5">
+                                <span className="font-semibold text-fg truncate">{s.title}</span>
+                                {s.attendance === 'PRESENT' ? (
+                                  <Badge size="sm" tone="success" className="text-[9px] px-1 py-0 shrink-0">
+                                    Eingecheckt
+                                  </Badge>
+                                ) : (
+                                  <Badge size="sm" tone="neutral" className="text-[9px] px-1 py-0 shrink-0">
+                                    Offen
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 text-[11px] text-fg-subtle mt-0.5">
+                                <Clock className="size-3 shrink-0" />
+                                <span>{s.time}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-2 text-center text-2xs text-fg-muted">
+                          Keine Schichten in diesem Anlass übernommen.
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {currentItem.preview?.details && currentItem.preview.details.length > 0 && (
+                {previewTargetItem.preview?.details && previewTargetItem.preview.details.length > 0 && (
                   <div className="space-y-2 rounded-xl border border-line bg-surface p-3.5 text-xs">
-                    {currentItem.preview.details.map((d, i) => (
+                    {previewTargetItem.preview.details.map((d, i) => (
                       <div key={i} className="flex justify-between gap-2">
                         <span className="text-fg-subtle">{d.label}:</span>
                         <span className="font-semibold text-fg text-right truncate max-w-[150px]">{d.value}</span>
@@ -575,28 +692,58 @@ export function CommandPalette() {
 
               {/* Vorschau-Footer Aktionen */}
               <div className="space-y-2 border-t border-line/70 pt-3">
-                <button
-                  type="button"
-                  onClick={() => currentItem.onSelect()}
-                  className="flex w-full items-center justify-between rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-white shadow-soft transition hover:bg-accent/90"
-                >
-                  <span>Ausführen</span>
-                  <CornerDownLeft className="size-3.5" />
-                </button>
+                {activeSubActionItem ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const act = filteredSubActions[selectedSubIndex];
+                        if (act) {
+                          act.onSelect();
+                          close();
+                        }
+                      }}
+                      className="flex w-full items-center justify-between rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-white shadow-soft transition hover:bg-accent/90"
+                    >
+                      <span>Ausgewählte Aktion ausführen</span>
+                      <CornerDownLeft className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubActionItem(null)}
+                      className="flex w-full items-center justify-between rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface-2"
+                    >
+                      <span>Zurück zur Übersicht</span>
+                      <span className="font-mono text-[10px] text-fg-subtle">Esc</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => currentItem.onSelect()}
+                      className="flex w-full items-center justify-between rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-white shadow-soft transition hover:bg-accent/90"
+                    >
+                      <span>Ausführen</span>
+                      <CornerDownLeft className="size-3.5" />
+                    </button>
 
-                {hasSubActions && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubActionItem(currentItem)}
-                    className="flex w-full items-center justify-between rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface-2"
-                  >
-                    <span>Unteraktionen ({currentItem.subActions?.length})</span>
-                    <span className="font-mono text-[10px] text-accent-ink font-bold">⇥ Tab</span>
-                  </button>
+                    {hasSubActions && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubActionItem(currentItem)}
+                        className="flex w-full items-center justify-between rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface-2"
+                      >
+                        <span>Unteraktionen ({currentItem.subActions?.length})</span>
+                        <span className="font-mono text-[10px] text-accent-ink font-bold">⇥ Tab</span>
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </aside>
-          )}
+          );
+        })()}
         </div>
 
         {/* =========================================================================

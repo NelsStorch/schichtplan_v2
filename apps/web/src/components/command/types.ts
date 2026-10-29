@@ -31,12 +31,20 @@ export interface CommandPreviewData {
   event?: EventDetails | EventDto | null;
   shift?: ShiftDto | null;
   person?: {
+    id?: string;
     name: string;
     ceviName?: string | null;
     email?: string | null;
     phone?: string | null;
     role?: string | null;
     stufen?: string[];
+    shifts?: {
+      id: string;
+      title: string;
+      time: string;
+      category?: string | null;
+      attendance?: 'PRESENT' | null;
+    }[];
   } | null;
   details?: { label: string; value: string | ReactNode }[];
 }
@@ -62,5 +70,6 @@ export interface CommandContextData {
   shifts?: MyShift[];
   onOpenShiftForm?: () => void;
   onOpenAssignModal?: () => void;
+  onSelectShift?: (shiftId: string) => void;
   onPrintPlan?: () => void;
 }
