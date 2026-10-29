@@ -4,8 +4,9 @@ import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, KeyRound } from 'lucide-react';
-import { Button, Callout, Field, Input } from '@schichtplan/ui';
+import { Button, Callout, Field } from '@schichtplan/ui';
 import { AuthShell } from '@/components/AuthShell';
+import { PasswordInput } from '@/components/PasswordInput';
 
 /** Link aus der E-Mail «Passwort zurücksetzen»: neues Passwort zweimal eingeben. */
 function ResetPassword() {
@@ -106,8 +107,7 @@ function ResetPassword() {
         <div className="mt-8 space-y-5">
           {error && <Callout tone="danger">{error}</Callout>}
           <Field label="Neues Passwort" required hint="Mindestens 8 Zeichen.">
-            <Input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
@@ -117,8 +117,7 @@ function ResetPassword() {
             />
           </Field>
           <Field label="Nochmals" required>
-            <Input
-              type="password"
+            <PasswordInput
               value={repeat}
               onChange={(e) => setRepeat(e.target.value)}
               autoComplete="new-password"
@@ -127,7 +126,7 @@ function ResetPassword() {
             />
           </Field>
           <Button type="submit" size="lg" className="w-full" loading={saving} disabled={!password || !repeat}>
-            Passwort speichern
+            {saving ? 'Wird gespeichert …' : 'Passwort speichern'}
           </Button>
           <p className="text-center text-sm">
             <Link href="/" className="font-medium text-accent-ink underline-offset-4 hover:underline">

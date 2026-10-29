@@ -3,17 +3,16 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, AlertCircle, Mail, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import {
   Button,
   Callout,
-  CeviLogo,
   Field,
   Input,
-  ThemeToggle,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, getLandingUrl } from '@schichtplan/shared/redirect';
+import { getLandingUrl } from '@schichtplan/shared/redirect';
 import { cleanReturnTo, withReturnTo } from '@/lib/destination';
+import { AuthShell } from '@/components/AuthShell';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -52,21 +51,17 @@ function VerifyEmailContent() {
         });
 
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data.error || 'Die Bestätigung ist fehlgeschlagen.');
-        }
 
-        if (isMounted) {
-          const name = data.name || '';
-          setSuccess(
-            name
-              ? `Danke, ${name}! Deine E-Mail-Adresse ist bestätigt. Melde dich jetzt mit E-Mail und Passwort an.`
-              : 'Deine E-Mail-Adresse ist bestätigt. Melde dich jetzt mit E-Mail und Passwort an.'
-          );
+        if (!isMounted) return;
+
+        if (res.ok) {
+          setSuccess(data.message || 'Deine E-Mail-Adresse wurde erfolgreich bestätigt.');
+        } else {
+          setError(data.error || 'Der Bestätigungslink ist ungültig oder abgelaufen.');
         }
-      } catch (err: any) {
+      } catch {
         if (isMounted) {
-          setError(err.message || 'Die Bestätigung ist fehlgeschlagen.');
+          setError('Verbindung zum Server fehlgeschlagen. Bitte versuche es später nochmals.');
         }
       } finally {
         if (isMounted) {
@@ -80,7 +75,7 @@ function VerifyEmailContent() {
     return () => {
       isMounted = false;
     };
-  }, [token, returnTo]);
+  }, [token]);
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,8 +90,13 @@ function VerifyEmailContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: resendEmail.trim() }),
       });
+
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Link konnte nicht gesendet werden.');
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Fehler beim Senden des Bestätigungslinks.');
+      }
+
       setResendMessage({
         tone: 'success',
         text: data.message || 'Neuer Bestätigungslink wurde gesendet.',
@@ -112,118 +112,86 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="grain flex min-h-[100dvh] flex-col">
-      <div aria-hidden className="bg-campfire pointer-events-none fixed inset-x-0 top-0 h-[60vh] opacity-70" />
+    <AuthShell returnTo={returnTo} landingHref={landingHref} showBackLink={true}>
+      <div className="animate-fade-up">
+        {loading && (
+          <div className="text-center">
+            <Loader2 className="mx-auto size-10 animate-spin text-accent-ink" />
+            <h1 className="mt-4 font-display text-[1.5rem] font-semibold tracking-tight text-fg">
+              E-Mail-Adresse wird bestätigt …
+            </h1>
+            <p className="mt-2 text-sm text-fg-muted">Einen kleinen Moment bitte.</p>
+          </div>
+        )}
 
-      <header className="relative mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
-        <span className="flex items-center gap-2.5">
-          <CeviLogo className="size-8" alt="" />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">
-            Cevi Schichtplan
-          </span>
-        </span>
-        <ThemeToggle />
-      </header>
-
-      <main
-        id="inhalt"
-        className="relative mx-auto flex w-full max-w-[25rem] flex-1 flex-col justify-center px-5 pb-16 pt-6 sm:pt-0"
-      >
-        <div className="animate-fade-up">
-          {loading && (
-            <div className="text-center">
-              <Loader2 className="mx-auto size-10 animate-spin text-accent-ink" />
-              <h1 className="mt-4 font-display text-[1.5rem] font-semibold tracking-tight text-fg">
-                E-Mail-Adresse wird bestätigt …
-              </h1>
-              <p className="mt-2 text-sm text-fg-muted">Einen kleinen Moment bitte.</p>
+        {!loading && success && (
+          <div className="text-center">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-8" />
             </div>
-          )}
+            <h1 className="mt-4 font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
+              E-Mail bestätigt!
+            </h1>
+            <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">{success}</p>
+            <Button size="lg" className="mt-8 w-full" onClick={() => (window.location.href = withReturnTo('/', returnTo))}>
+              Zur Anmeldung
+            </Button>
+          </div>
+        )}
 
-          {!loading && success && (
-            <div className="text-center">
-              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="size-8" />
-              </div>
-              <h1 className="mt-4 font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
-                E-Mail bestätigt!
-              </h1>
-              <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">{success}</p>
-              <Button size="lg" className="mt-8 w-full" onClick={() => (window.location.href = withReturnTo('/', returnTo))}>
-                Zur Anmeldung
-              </Button>
+        {!loading && error && (
+          <div>
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <AlertCircle className="size-6" />
             </div>
-          )}
-
-          {!loading && error && (
-            <div>
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                <AlertCircle className="size-6" />
-              </div>
-              <h1 className="mt-4 font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
-                Bestätigung fehlgeschlagen
-              </h1>
-              <div className="mt-3">
-                <Callout tone="danger">{error}</Callout>
-              </div>
-
-              <div className="mt-8 rounded-card border border-line bg-surface p-5">
-                <h2 className="text-sm font-semibold text-fg">Neuen Link anfordern</h2>
-                <p className="mt-1 text-xs text-fg-muted">
-                  Gib deine registrierte E-Mail-Adresse ein, um einen neuen Bestätigungslink zu erhalten.
-                </p>
-
-                {resendMessage && (
-                  <div className="mt-3">
-                    <Callout tone={resendMessage.tone}>{resendMessage.text}</Callout>
-                  </div>
-                )}
-
-                <form onSubmit={handleResend} className="mt-4 space-y-3">
-                  <Field label="E-Mail" required>
-                    <Input
-                      type="email"
-                      value={resendEmail}
-                      onChange={(e) => setResendEmail(e.target.value)}
-                      placeholder="deine.email@beispiel.ch"
-                      autoComplete="email"
-                    />
-                  </Field>
-                  <Button type="submit" loading={resending} className="w-full">
-                    Bestätigungslink senden
-                  </Button>
-                </form>
-              </div>
-
-              <div className="mt-6 text-center">
-                <Link
-                  href="/"
-                  className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
-                >
-                  Zurück zur Anmeldung
-                </Link>
-              </div>
+            <h1 className="mt-4 font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
+              Bestätigung fehlgeschlagen
+            </h1>
+            <div className="mt-3">
+              <Callout tone="danger">{error}</Callout>
             </div>
-          )}
-        </div>
-      </main>
 
-      <footer className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-fg-subtle sm:px-8">
-        <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
-        <div className="flex items-center gap-5">
-          <a href={PRIVACY_URL} className="font-medium text-fg-muted transition hover:text-fg">
-            Datenschutz
-          </a>
-          <a
-            href={returnTo ?? landingHref}
-            className="inline-flex items-center gap-1.5 font-medium text-fg-muted transition hover:text-fg"
-          >
-            <ArrowLeft className="size-3.5" />
-            Ohne Anmeldung zurück
-          </a>
-        </div>
-      </footer>
-    </div>
+            <div className="mt-8 rounded-card border border-line bg-surface p-5">
+              <h2 className="text-sm font-semibold text-fg">Neuen Link anfordern</h2>
+              <p className="mt-1 text-xs text-fg-muted">
+                Gib deine registrierte E-Mail-Adresse ein, um einen neuen Bestätigungslink zu erhalten.
+              </p>
+
+              {resendMessage && (
+                <div className="mt-3">
+                  <Callout tone={resendMessage.tone}>{resendMessage.text}</Callout>
+                </div>
+              )}
+
+              <form onSubmit={handleResend} className="mt-4 space-y-3">
+                <Field label="E-Mail" required>
+                  <Input
+                    type="email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="deine.email@beispiel.ch"
+                    autoComplete="email"
+                    required
+                  />
+                </Field>
+                <Button type="submit" loading={resending} className="w-full">
+                  {resending ? 'Wird gesendet …' : 'Bestätigungslink senden'}
+                </Button>
+              </form>
+            </div>
+
+            <div className="mt-6 text-center">
+              <Link
+                href="/"
+                className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
+              >
+                Zurück zur Anmeldung
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </AuthShell>
   );
 }
 

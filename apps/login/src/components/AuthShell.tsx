@@ -1,9 +1,20 @@
 import type { ReactNode } from 'react';
-import { CeviLogo, ThemeToggle } from '@schichtplan/ui';
-import { AuthFooter } from './AuthFooter';
+import { CeviLogo, ThemeToggle, cn } from '@schichtplan/ui';
+import { AuthFooter, type AuthFooterProps } from './AuthFooter';
 
-/** Rahmen der kleinen Login-Seiten (Kopf mit Logo, schmale Mitte) wie bei «Konto verknüpfen» */
-export function AuthShell({ children }: { children: ReactNode }) {
+export interface AuthShellProps extends AuthFooterProps {
+  children: ReactNode;
+  contentClassName?: string;
+}
+
+/** Einheitlicher Rahmen für alle Login-Seiten (Kopf mit Logo, zentrierter Inhaltsbereich, Fusszeile) */
+export function AuthShell({
+  children,
+  returnTo,
+  landingHref,
+  showBackLink,
+  contentClassName,
+}: AuthShellProps) {
   return (
     <div className="grain flex min-h-[100dvh] flex-col">
       <div aria-hidden className="bg-campfire pointer-events-none fixed inset-x-0 top-0 h-[60vh] opacity-70" />
@@ -16,11 +27,17 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <ThemeToggle />
       </header>
 
-      <main id="inhalt" className="relative mx-auto flex w-full max-w-[25rem] flex-1 flex-col justify-center px-5 pb-16">
+      <main
+        id="inhalt"
+        className={cn(
+          'relative mx-auto flex w-full max-w-[25rem] flex-1 flex-col justify-center px-5 pb-16 pt-6 sm:pt-0',
+          contentClassName
+        )}
+      >
         {children}
       </main>
 
-      <AuthFooter />
+      <AuthFooter returnTo={returnTo} landingHref={landingHref} showBackLink={showBackLink} />
     </div>
   );
 }
