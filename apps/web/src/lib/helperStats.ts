@@ -6,7 +6,7 @@ import type { EventDetails } from '@/lib/types';
 export interface HelperShiftInfo {
   shiftId: string;
   signupId: string;
-  title: string;
+  title: string | null;
   taskTitle: string | null;
   startTime: string;
   endTime: string;

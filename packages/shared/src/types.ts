@@ -128,7 +128,7 @@ export interface ShiftTaskDto {
 export interface ShiftDto {
   id: string;
   eventId: string;
-  title: string;
+  title: string | null;
   category?: string | null;
   isSetupTeardown?: boolean;
   startTime: string;
@@ -145,7 +145,7 @@ export interface ShiftDto {
 export interface ShiftTimeCollision {
   signupId: string;
   shiftId: string;
-  shiftTitle: string;
+  shiftTitle: string | null;
   taskTitle?: string | null;
   startTime: string;
   endTime: string;
@@ -466,12 +466,12 @@ export interface EventParticipantDto {
   /** Antworten auf Fragen mit scope ONCE */
   answers: Record<string, string>;
   /** Antworten auf Fragen mit scope PER_SIGNUP, pro Eintragung */
-  signupAnswers: { shiftTitle: string; startTime: string; answers: Record<string, string> }[];
+  signupAnswers: { shiftTitle: string | null; startTime: string; answers: Record<string, string> }[];
 }
 
 export interface EventRosterShiftDto {
   id: string;
-  title: string;
+  title: string | null;
   startTime: string;
   endTime: string;
   taskTitle?: string | null;
@@ -653,7 +653,7 @@ export interface AdminUserOrganizerDto {
 
 export interface AdminUserSignupDto {
   id: string;
-  shiftTitle: string;
+  shiftTitle: string | null;
   shiftCategory?: string | null;
   startTime: string;
   endTime: string;
@@ -870,9 +870,9 @@ export type ShiftSignupLogAction = 'SIGNUP' | 'SIGNOFF' | 'REPLACE' | 'ATTENDANC
 export interface CheckinResultDto {
   eventTitle: string;
   /** Eben (oder schon vorher) als anwesend markierte Schichten */
-  checkedIn: Array<{ signupId: string; shiftTitle: string; taskTitle: string | null; startTime: string; endTime: string; alreadyPresent: boolean }>;
+  checkedIn: Array<{ signupId: string; shiftTitle: string | null; taskTitle: string | null; startTime: string; endTime: string; alreadyPresent: boolean }>;
   /** Nächste eigene Schicht, falls gerade keine im Check-in-Fenster liegt */
-  nextShift: { shiftTitle: string; startTime: string; endTime: string } | null;
+  nextShift: { shiftTitle: string | null; startTime: string; endTime: string } | null;
 }
 
 export type EventMessageTarget = 'ALL' | 'SHIFTS' | 'PEOPLE' | 'OK' | 'OPEN';
@@ -904,5 +904,5 @@ export interface EventMessageResultDto {
 export interface BulkShiftsResultDto {
   updated: number;
   /** Schichten, die nicht geändert wurden, mit Grund */
-  skipped: { id: string; title: string; reason: string }[];
+  skipped: { id: string; title: string | null; reason: string }[];
 }

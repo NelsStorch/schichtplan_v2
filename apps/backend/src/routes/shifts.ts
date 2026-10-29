@@ -120,12 +120,17 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
+      const hasValidTask = tasks && tasks.length > 0 && tasks.some((t) => t.title?.trim().length > 0);
+      if (!title?.trim() && !hasValidTask) {
+        return reply.status(400).send({ error: 'Bitte gib entweder einen Schichttitel oder mindestens eine Arbeit an.' });
+      }
+
       const resolvedTasks =
         tasks && tasks.length > 0
           ? tasks
           : [
               {
-                title,
+                title: title?.trim() || 'Schicht',
                 description: description || null,
                 requiredSlots: reqSlots || 1,
                 minAge: minAge || null,
@@ -139,7 +144,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       const shift = await fastify.prisma.shift.create({
         data: {
           eventId,
-          title,
+          title: title?.trim() || null,
           category: category || null,
           isSetupTeardown: isSetupTeardown ?? false,
           startTime: new Date(startTime),
@@ -263,12 +268,17 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Maximal 50 Schichten pro Serie erlaubt.' });
       }
 
+      const hasValidTask = tasks && tasks.length > 0 && tasks.some((t) => t.title?.trim().length > 0);
+      if (!title?.trim() && !hasValidTask) {
+        return reply.status(400).send({ error: 'Bitte gib entweder einen Schichttitel oder mindestens eine Arbeit an.' });
+      }
+
       const resolvedTasks =
         tasks && tasks.length > 0
           ? tasks
           : [
               {
-                title,
+                title: title?.trim() || 'Schicht',
                 description: description || null,
                 requiredSlots: 1,
                 minAge: minAge || null,
@@ -284,7 +294,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           fastify.prisma.shift.create({
             data: {
               eventId,
-              title,
+              title: title?.trim() || null,
               category: category || null,
               isSetupTeardown: isSetupTeardown ?? false,
               startTime: interval.startTime,
@@ -432,7 +442,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           await tx.shift.update({
             where: { id: shiftId },
             data: {
-              title: title !== undefined ? title : undefined,
+              title: title !== undefined ? (title?.trim() || null) : undefined,
               category: category !== undefined ? (category || null) : undefined,
               isSetupTeardown: isSetupTeardown !== undefined ? isSetupTeardown : undefined,
               startTime: startTime ? new Date(startTime) : undefined,
@@ -447,7 +457,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         await fastify.prisma.shift.update({
           where: { id: shiftId },
           data: {
-            title: title !== undefined ? title : undefined,
+            title: title !== undefined ? (title?.trim() || null) : undefined,
             category: category !== undefined ? (category || null) : undefined,
             isSetupTeardown: isSetupTeardown !== undefined ? isSetupTeardown : undefined,
             startTime: startTime ? new Date(startTime) : undefined,
@@ -576,7 +586,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       const duplicated = await fastify.prisma.shift.create({
         data: {
           eventId: shift.eventId,
-          title: body.title || `${shift.title} (Kopie)`,
+          title: body.title !== undefined ? body.title : (shift.title ? `${shift.title} (Kopie)` : ''),
           category: shift.category,
           isSetupTeardown: shift.isSetupTeardown,
           startTime: newStartTime,
@@ -975,7 +985,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       // 1) Mindestalter der Schicht selbst
       if (shift.minAge && userAge !== null && userAge < shift.minAge) {
         return reply.status(403).send({
-          error: `Für diese Schicht (${shift.title}) ist ein Mindestalter von ${shift.minAge} Jahren erforderlich. Alter: ${userAge} Jahre.`,
+          error: `Für diese Schicht ${shift.title ? `(${shift.title}) ` : ''}ist ein Mindestalter von ${shift.minAge} Jahren erforderlich. Alter: ${userAge} Jahre.`,
         });
       }
 
@@ -1047,7 +1057,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               return {
                 error: isSame
                   ? 'Diese Person ist für diese Schicht bereits eingetragen'
-                  : `Zur gleichen Zeit besteht bereits eine Eintragung für «${overlapping.shift.title}»`,
+                  : `Zur gleichen Zeit besteht bereits eine Eintragung für «${overlapping.shift.title || 'eine andere Schicht'}»`,
               } as const;
             }
           } else if (guestName) {
@@ -1153,7 +1163,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             performedByName: replaced
               ? personLabel(replaced.user, replaced.guestName)
               : isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
-            shiftTitle: shift.title,
+            shiftTitle: shift.title || signup.task?.title || 'Schicht',
             shiftStartTime: shift.startTime,
             shiftEndTime: shift.endTime,
             taskTitle: signup.task?.title || null,
@@ -1280,7 +1290,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             helperName,
             performedByUserId: request.user?.id || null,
             performedByName: isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
-            shiftTitle: existingSignup.shift.title,
+            shiftTitle: existingSignup.shift.title || existingSignup.task?.title || 'Schicht',
             shiftStartTime: existingSignup.shift.startTime,
             shiftEndTime: existingSignup.shift.endTime,
             taskTitle: existingSignup.task?.title || null,
@@ -1493,7 +1503,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         shiftId: string;
         taskId: string | null;
         taskTitle: string | null;
-        title: string;
+        title: string | null;
         category: string | null;
         description: string | null;
         startTime: string;

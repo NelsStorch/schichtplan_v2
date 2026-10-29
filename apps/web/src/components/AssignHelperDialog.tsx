@@ -50,7 +50,7 @@ export function AssignHelperDialog({
       onClose={onClose}
       icon={<UserCheck />}
       title="Person einteilen"
-      description={shift ? `${shift.title} · ${fmtWeekday(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}` : ''}
+      description={shift ? `${shift.title?.trim() ? `${shift.title} · ` : ''}${fmtWeekday(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}` : ''}
       size="lg"
     >
       {shift && (
@@ -261,7 +261,7 @@ function AssignHelperForm({
 
       toast({
         title: `${mode === 'member' ? selected?.displayName || 'Person' : guestName} eingeteilt!`,
-        description: `${shift.title} ${chosenTask ? `(${chosenTask.title})` : ''}`,
+        description: `${shift.title?.trim() || chosenTask?.title || fmtTimeRange(shift.startTime, shift.endTime)}${chosenTask && shift.title?.trim() ? ` (${chosenTask.title})` : ''}`,
       });
       onAssigned();
     } catch (err) {

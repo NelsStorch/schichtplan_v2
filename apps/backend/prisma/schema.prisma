@@ -359,7 +359,7 @@ model EventOrganizer {
 model Shift {
   id              String        @id @default(uuid())
   eventId         String
-  title           String
+  title           String?
   category        String?
   isSetupTeardown Boolean       @default(false) @map("is_setup_teardown")
   description     String?

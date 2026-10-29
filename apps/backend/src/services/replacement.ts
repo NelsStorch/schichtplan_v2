@@ -48,7 +48,7 @@ type ReplacedSignup = {
 export async function notifyReplacementTaken(
   prisma: Pick<PrismaClient, 'department'> & Partial<Pick<PrismaClient, 'pushSubscription'>>,
   replaced: ReplacedSignup,
-  shift: { title: string; startTime: Date; endTime: Date },
+  shift: { title: string | null; startTime: Date; endTime: Date },
   event: { title: string; slug: string; departmentId: string },
   takenBy: string,
   send: typeof sendReplacementTakenEmail = sendReplacementTakenEmail
@@ -64,7 +64,7 @@ export async function notifyReplacementTaken(
   // Web Push an alle registrierten Geräte (auch für Cevi-Name-Profile ohne E-Mail)
   if (replaced.user.id && replaced.user.pushNotifyReplacement !== false && prisma.pushSubscription) {
     void sendPushToUser(prisma as PrismaClient, replaced.user.id, {
-      title: `Ersatz gefunden: ${shift.title}`,
+      title: `Ersatz gefunden: ${shift.title?.trim() || 'Schicht'}`,
       body: `${takenBy} hat deine Schicht bei ${event.title} (${timeRangeFormatted}) übernommen.`,
       url: targetUrl,
       tag: `replacement-taken-${event.slug}`,
@@ -79,7 +79,7 @@ export async function notifyReplacementTaken(
     name: replaced.user.ceviName || replaced.user.firstName,
     takenBy,
     eventTitle: event.title,
-    shiftTitle: shift.title,
+    shiftTitle: shift.title?.trim() || 'Schicht',
     timeRangeFormatted,
     eventUrl: targetUrl,
     departmentName: department?.name,

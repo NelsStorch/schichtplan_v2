@@ -14,7 +14,7 @@ import { ShiftSeriesDialog } from '@/components/ok/ShiftSeriesDialog';
 import { ShiftTimeline } from '@/components/ok/ShiftTimeline';
 import { AssignHelperDialog, DayResponsiblesDialog, DuplicateShiftDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { api, errorMessage } from '@/lib/api';
-import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtWeekday, groupByBusinessDay } from '@/lib/format';
+import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTimeRange, fmtWeekday, groupByBusinessDay } from '@/lib/format';
 
 type View = 'list' | 'plan';
 const VIEW_KEY = 'ok-shift-view';
@@ -97,7 +97,7 @@ function ShiftsPage() {
         if (onlyWarning && !warningShiftIds.has(s.id)) return false;
         if (
           q &&
-          !s.title.toLowerCase().includes(q) &&
+          !(s.title && s.title.toLowerCase().includes(q)) &&
           !(s.category?.toLowerCase().includes(q) ?? false) &&
           !s.tasks?.some((t) => t.title.toLowerCase().includes(q)) &&
           !s.signups?.some((su) => su.displayName.toLowerCase().includes(q))
@@ -148,7 +148,7 @@ function ShiftsPage() {
   const deleteShift = async (shift: ShiftDto) => {
     const count = shift.signups?.length ?? 0;
     const ok = await confirm({
-      title: `Schicht «${shift.title}» löschen?`,
+      title: `Schicht «${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}» löschen?`,
       description: count
         ? `Dabei werden auch ${count} Eintragung${count === 1 ? '' : 'en'} gelöscht.`
         : 'Das lässt sich nicht rückgängig machen.',
@@ -158,7 +158,7 @@ function ShiftsPage() {
     if (!ok) return;
     try {
       await api(`/api/shifts/${shift.id}`, { method: 'DELETE' });
-      toast({ title: 'Schicht gelöscht', description: shift.title });
+      toast({ title: 'Schicht gelöscht', description: shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime) });
       await reload();
     } catch (err) {
       toast({ title: 'Löschen fehlgeschlagen', description: errorMessage(err), tone: 'error' });
@@ -168,7 +168,7 @@ function ShiftsPage() {
   const removeSignup = async (shift: ShiftDto, signupId: string, name: string) => {
     const ok = await confirm({
       title: `${name} austragen?`,
-      description: `Aus der Schicht «${shift.title}».`,
+      description: `Aus der Schicht «${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}».`,
       confirmLabel: 'Austragen',
       tone: 'danger',
     });

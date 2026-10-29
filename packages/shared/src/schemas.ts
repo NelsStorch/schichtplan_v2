@@ -400,7 +400,7 @@ export type CreateShiftTaskInput = z.infer<typeof CreateShiftTaskSchema>;
 
 export const CreateShiftSchema = z.object({
   eventId: z.string().uuid(),
-  title: z.string().trim().min(2, 'Titel erforderlich').max(120),
+  title: z.string().trim().max(120).nullish().transform((v) => v?.trim() || null).default(null),
   category: z.string().max(80).optional().nullable(),
   isSetupTeardown: z.boolean().optional().default(false),
   startTime: z.string().datetime(),
@@ -416,7 +416,7 @@ export type CreateShiftInput = z.infer<typeof CreateShiftSchema>;
 
 export const CreateShiftSeriesSchema = z.object({
   eventId: z.string().uuid(),
-  title: z.string().trim().min(2, 'Titel erforderlich').max(120),
+  title: z.string().trim().max(120).nullish().transform((v) => v?.trim() || null).default(null),
   category: z.string().max(80).optional().nullable(),
   isSetupTeardown: z.boolean().optional().default(false),
   startTime: z.string().datetime(),
@@ -433,7 +433,7 @@ export const CreateShiftSeriesSchema = z.object({
 export type CreateShiftSeriesInput = z.infer<typeof CreateShiftSeriesSchema>;
 
 export const UpdateShiftSchema = z.object({
-  title: z.string().trim().min(2).max(120).optional(),
+  title: z.string().trim().max(120).nullish().transform((v) => v?.trim() || null).optional(),
   category: z.string().max(80).optional().nullable(),
   isSetupTeardown: z.boolean().optional(),
   startTime: z.string().datetime().optional(),

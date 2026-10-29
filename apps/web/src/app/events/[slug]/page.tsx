@@ -164,6 +164,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           setAssigningShift(event.shifts[0]);
         }
       },
+      onSelectShift: (shiftId: string) => setSelectedShiftId(shiftId),
     });
   }, [event, slug, registerContextData]);
 
@@ -504,7 +505,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const takeOver = async (shift: ShiftDto, offer: ShiftSignupDto, task?: ShiftTaskDto) => {
     const ok = await confirm({
       title: 'Schicht übernehmen?',
-      description: `Du übernimmst «${shift.title}» (${fmtWeekday(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}) von ${offer.displayName}. Danach bist du eingetragen und ${offer.displayName} nicht mehr.`,
+      description: `Du übernimmst «${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}» (${fmtWeekday(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}) von ${offer.displayName}. Danach bist du eingetragen und ${offer.displayName} nicht mehr.`,
       confirmLabel: 'Übernehmen',
     });
     if (!ok) return;
@@ -1114,7 +1115,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         personName={replacementFor?.personName}
         shiftLabel={
           replacementFor
-            ? `${replacementFor.shift.title}, ${fmtShortWeekday(replacementFor.shift.startTime)} ${fmtTimeRange(replacementFor.shift.startTime, replacementFor.shift.endTime)}`
+            ? `${replacementFor.shift.title?.trim() ? `${replacementFor.shift.title}, ` : ""}${fmtShortWeekday(replacementFor.shift.startTime)} ${fmtTimeRange(replacementFor.shift.startTime, replacementFor.shift.endTime)}`
             : undefined
         }
         busy={Boolean(replacementFor && busyShift === replacementFor.shift.id)}
@@ -1129,7 +1130,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         extraMissingFields={participationFor?.extraFields}
         shiftLabel={
           participationFor
-            ? `${participationFor.shift.title}, ${fmtShortWeekday(participationFor.shift.startTime)} ${fmtTime(participationFor.shift.startTime)}`
+            ? `${participationFor.shift.title?.trim() ? `${participationFor.shift.title}, ` : ""}${fmtShortWeekday(participationFor.shift.startTime)} ${fmtTime(participationFor.shift.startTime)}`
             : undefined
         }
         onClose={() => setParticipationFor(null)}

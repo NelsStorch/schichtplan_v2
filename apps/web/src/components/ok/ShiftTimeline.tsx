@@ -24,7 +24,7 @@ export function ShiftTimeline({
   onOpen: (shift: ShiftDto) => void;
 }) {
   const sorted = [...shifts].sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime() || a.title.localeCompare(b.title, 'de')
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime() || (a.title || '').localeCompare(b.title || '', 'de')
   );
   const start = Math.floor(Math.min(...sorted.map((s) => new Date(s.startTime).getTime())) / HOUR) * HOUR;
   const end = Math.ceil(Math.max(...sorted.map((s) => new Date(s.endTime).getTime())) / HOUR) * HOUR;
@@ -73,14 +73,16 @@ export function ShiftTimeline({
                     selected && 'bg-accent/10'
                   )}
                   aria-pressed={selecting ? selected : undefined}
-                  title={`${shift.title}: ${fmtTimeRange(shift.startTime, shift.endTime)}, ${filled}/${shift.requiredSlots} besetzt`}
+                  title={`${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}: ${fmtTimeRange(shift.startTime, shift.endTime)}, ${filled}/${shift.requiredSlots} besetzt`}
                 >
                   <span className="flex min-w-0 items-center gap-2 px-3 py-2">
                     {selecting && (
                       <input type="checkbox" readOnly checked={selected} tabIndex={-1} className="size-4 shrink-0 accent-accent" />
                     )}
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-fg">{shift.title}</span>
+                      {shift.title?.trim() ? (
+                        <span className="block truncate text-sm font-semibold text-fg">{shift.title}</span>
+                      ) : null}
                       <span className="block font-mono text-2xs text-fg-muted">
                         {fmtTimeRange(shift.startTime, shift.endTime)}
                       </span>

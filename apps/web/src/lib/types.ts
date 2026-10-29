@@ -16,7 +16,7 @@ export interface MyShift {
   shiftId: string;
   taskId?: string | null;
   taskTitle?: string | null;
-  title: string;
+  title: string | null;
   category: string;
   description?: string;
   startTime: string;

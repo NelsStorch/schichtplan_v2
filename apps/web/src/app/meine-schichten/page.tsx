@@ -212,7 +212,7 @@ export default function MyShiftsPage() {
     }
     const ok = await confirm({
       title: 'Aus Schicht austragen?',
-      description: `Du wirst aus "${shift.title}" ausgetragen. Der Platz wird für andere frei.`,
+      description: `Du wirst aus "${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}" ausgetragen. Der Platz wird für andere frei.`,
       confirmLabel: 'Austragen',
       tone: 'danger',
     });
@@ -220,7 +220,7 @@ export default function MyShiftsPage() {
     setBusy(shift.signupId);
     try {
       await api(`/api/shifts/${shift.shiftId}/signup`, { method: 'DELETE' });
-      toast({ title: 'Du bist ausgetragen', description: shift.title });
+      toast({ title: 'Du bist ausgetragen', description: shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime) });
       await load();
     } catch (err) {
       toast({ title: 'Austragen hat nicht geklappt', description: errorMessage(err), tone: 'error' });

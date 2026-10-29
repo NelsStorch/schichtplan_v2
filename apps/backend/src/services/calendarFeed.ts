@@ -5,7 +5,7 @@ import { toZurichInput } from '@schichtplan/shared';
 export interface CalendarShiftItem {
   uid: string;
   shiftId: string;
-  title: string;
+  title: string | null;
   category: string | null;
   description: string | null;
   taskTitle: string | null;
@@ -293,8 +293,10 @@ export function buildIcsFeed(options: BuildFeedOptions): string {
 
   for (const s of shifts) {
     const rolePrefix = s.isResponsible ? `[${s.responsibleRole || 'Leitung'}] ` : '';
-    const taskSuffix = s.taskTitle && s.taskTitle !== s.title ? ` (${s.taskTitle})` : '';
-    const summary = `${rolePrefix}${s.title}${taskSuffix} · ${s.eventTitle}`;
+    const titlePart = s.title?.trim()
+      ? `${s.title}${s.taskTitle && s.taskTitle !== s.title ? ` (${s.taskTitle})` : ''}`
+      : (s.taskTitle || 'Schicht');
+    const summary = `${rolePrefix}${titlePart} · ${s.eventTitle}`;
 
     const hostDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
     const isLocal = hostDomain.includes('localhost') || /^\d+\.\d+\.\d+\.\d+/.test(hostDomain);

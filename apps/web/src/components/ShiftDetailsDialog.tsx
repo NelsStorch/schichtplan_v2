@@ -126,7 +126,7 @@ export function ShiftDetailsDialog({
           {
             id: 'default',
             shiftId: shift.id,
-            title: shift.title,
+            title: shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime),
             description: shift.description,
             requiredSlots: shift.requiredSlots,
             minAge: shift.minAge,
@@ -149,7 +149,7 @@ export function ShiftDetailsDialog({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-display text-xl font-extrabold tracking-tight text-fg text-balance sm:text-2xl">
-              {shift.title}
+              {shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">

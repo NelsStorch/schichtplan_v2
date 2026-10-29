@@ -44,7 +44,7 @@ export function shiftTasks(shift: ShiftDto): (ShiftTaskDto & { filled: number })
       {
         id: 'default',
         shiftId: shift.id,
-        title: shift.title,
+        title: shift.title || 'Schicht',
         description: shift.description,
         requiredSlots: shift.requiredSlots,
         minAge: shift.minAge,

@@ -206,7 +206,9 @@ function NextShiftCard({ shift }: { shift: MyShift }) {
       <p className="mt-2 font-display text-4xl font-extrabold tracking-tight text-accent-ink">
         {fmtRelativeDay(shift.startTime)}
       </p>
-      <p className="mt-4 text-lg font-bold leading-snug text-fg">{shift.title}</p>
+      {shift.title ? (
+        <p className="mt-4 text-lg font-bold leading-snug text-fg">{shift.title}</p>
+      ) : null}
       <p className="text-sm text-fg-muted">{shift.eventTitle}</p>
       <p className="mt-3 inline-flex items-center gap-2 font-mono text-[13px] text-fg-muted">
         <Clock className="size-4" />

@@ -210,7 +210,7 @@ function ShiftRow({ shift, doc }: { shift: PlanShift; doc: PlanDocument }) {
         <Text style={s.small}>{shift.duration}</Text>
       </View>
       <View style={[s.shiftCell, { width: col.shift }]}>
-        <Text style={s.shiftTitle}>{shift.title}</Text>
+        {shift.title ? <Text style={s.shiftTitle}>{shift.title}</Text> : null}
         {(shift.category || shift.tags.length > 0) && (
           <View style={s.tags}>
             {shift.category && (

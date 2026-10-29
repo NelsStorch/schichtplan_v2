@@ -18,6 +18,8 @@ service-account*.json
 
 # Agent & Server Internals (Local Only - Never in Git)
 AGENTS.md
+CLAUDE.md
+docs/internal/
 temp_*
 *.zone
 .claude/

@@ -98,7 +98,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
             helperName: personLabel(signup.user, signup.guestName),
             performedByUserId: request.user.id,
             performedByName: byName,
-            shiftTitle: signup.shift.title,
+            shiftTitle: signup.shift.title || signup.task?.title || 'Schicht',
             shiftStartTime: signup.shift.startTime,
             shiftEndTime: signup.shift.endTime,
             taskTitle: signup.task?.title || null,
@@ -182,7 +182,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
               // performedByName leer = selbstständig (per QR-Code)
               performedByUserId: request.user.id,
               performedByName: null,
-              shiftTitle: s.shift.title,
+              shiftTitle: s.shift.title || s.task?.title || 'Schicht',
               shiftStartTime: s.shift.startTime,
               shiftEndTime: s.shift.endTime,
               taskTitle: s.task?.title || null,

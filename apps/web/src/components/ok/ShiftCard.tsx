@@ -47,7 +47,7 @@ export function ShiftCard({
               checked={selected}
               onChange={onToggleSelect}
               onClick={(e) => e.stopPropagation()}
-              aria-label={`${shift.title} auswählen`}
+              aria-label={`${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)} auswählen`}
               className="mt-1 size-4 shrink-0 accent-accent"
             />
           )}
@@ -69,8 +69,15 @@ export function ShiftCard({
               {shift.category ? <Badge size="sm">{shift.category}</Badge> : null}
               {shift.minAge ? <Badge tone="warning" size="sm">ab {shift.minAge} J.</Badge> : null}
             </div>
-            <h3 className="text-lg font-bold text-fg">{shift.title}</h3>
-            <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-fg-muted">
+            {shift.title?.trim() ? (
+              <h3 className="text-lg font-bold text-fg">{shift.title}</h3>
+            ) : null}
+            <p
+              className={cn(
+                'flex items-center gap-1.5 font-mono text-fg-muted',
+                shift.title?.trim() ? 'mt-1 text-xs' : 'text-base font-bold text-fg'
+              )}
+            >
               <Clock className="size-3.5" />
               {fmtTimeRange(shift.startTime, shift.endTime)} ({fmtDuration(shift.startTime, shift.endTime)})
             </p>

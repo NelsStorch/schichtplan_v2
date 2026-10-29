@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { calculateShiftSeriesIntervals } from '@schichtplan/shared';
+import {
+  calculateShiftSeriesIntervals,
+  CreateShiftSeriesSchema,
+  CreateShiftSchema,
+} from '@schichtplan/shared';
 
 describe('calculateShiftSeriesIntervals', () => {
   it('generiert gleichmässige Schichten ohne Überlappung (z.B. 10:00 bis 22:00 à 2h)', () => {
@@ -84,5 +88,76 @@ describe('calculateShiftSeriesIntervals', () => {
         durationMinutes: 120,
       })
     ).toEqual([]);
+  });
+});
+
+describe('CreateShiftSeriesSchema & CreateShiftSchema optional title', () => {
+  it('erlaubt leeren Schichttitel und setzt Standardwert null', () => {
+    const parsedSeries = CreateShiftSeriesSchema.parse({
+      eventId: '11111111-1111-4111-8111-111111111111',
+      startTime: '2026-10-24T10:00:00.000Z',
+      endTime: '2026-10-24T18:00:00.000Z',
+      durationMinutes: 120,
+      tasks: [
+        {
+          title: 'Grillieren',
+          requiredSlots: 2,
+        },
+      ],
+    });
+
+    expect(parsedSeries.title).toBe(null);
+    expect(parsedSeries.tasks).toHaveLength(1);
+    expect(parsedSeries.tasks![0].title).toBe('Grillieren');
+    expect(parsedSeries.tasks![0].requiredSlots).toBe(2);
+
+    const parsedShift = CreateShiftSchema.parse({
+      eventId: '11111111-1111-4111-8111-111111111111',
+      startTime: '2026-10-24T10:00:00.000Z',
+      endTime: '2026-10-24T12:00:00.000Z',
+      tasks: [
+        {
+          title: 'Kasse',
+          requiredSlots: 1,
+        },
+      ],
+    });
+
+    expect(parsedShift.title).toBe(null);
+    expect(parsedShift.tasks![0].title).toBe('Kasse');
+  });
+
+  it('unterstützt mehrere Arbeiten in der Schicht-Serie', () => {
+    const parsed = CreateShiftSeriesSchema.parse({
+      eventId: '11111111-1111-4111-8111-111111111111',
+      title: 'Grillstand',
+      startTime: '2026-10-24T10:00:00.000Z',
+      endTime: '2026-10-24T18:00:00.000Z',
+      durationMinutes: 120,
+      overlapMinutes: 15,
+      tasks: [
+        {
+          title: 'Grillieren',
+          requiredSlots: 2,
+          minAge: 16,
+          description: 'Grill bedienen und Würste braten',
+        },
+        {
+          title: 'Kasse',
+          requiredSlots: 1,
+          minAge: 18,
+          description: 'Kassieren und Abrechnen',
+        },
+      ],
+    });
+
+    expect(parsed.title).toBe('Grillstand');
+    expect(parsed.tasks).toHaveLength(2);
+    expect(parsed.tasks![0].title).toBe('Grillieren');
+    expect(parsed.tasks![0].requiredSlots).toBe(2);
+    expect(parsed.tasks![0].minAge).toBe(16);
+    expect(parsed.tasks![1].title).toBe('Kasse');
+    expect(parsed.tasks![1].requiredSlots).toBe(1);
+    expect(parsed.tasks![1].minAge).toBe(18);
   });
 });

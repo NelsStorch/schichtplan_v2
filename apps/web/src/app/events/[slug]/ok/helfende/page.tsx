@@ -35,7 +35,7 @@ type Status = 'ALL' | 'WITH' | 'WITHOUT' | 'UNDER' | 'DEREGISTERED';
 interface PersonShift {
   shiftId: string;
   signupId: string;
-  title: string;
+  title: string | null;
   taskTitle: string | null;
   startTime: string;
   endTime: string;
@@ -470,12 +470,12 @@ function HelpersPage() {
                           .map((s) => (
                             <li key={s.signupId} className="flex items-center justify-between gap-2 rounded-field bg-surface-2/60 px-3 py-1.5">
                               <Link
-                                href={`${base}/schichten?suche=${encodeURIComponent(s.title)}`}
+                                href={`${base}/schichten?suche=${encodeURIComponent(s.title || s.taskTitle || '')}`}
                                 className="min-w-0 truncate text-fg hover:underline"
                                 title="Schicht im Plan öffnen"
                               >
-                                <strong>{s.title}</strong>
-                                {s.taskTitle && s.taskTitle !== s.title ? ` (${s.taskTitle})` : ''}
+                                <strong>{s.title || s.taskTitle || 'Schicht'}</strong>
+                                {s.taskTitle && s.title && s.taskTitle !== s.title ? ` (${s.taskTitle})` : ''}
                                 <span className="text-fg-muted">
                                   {' '}
                                   · {fmtShortWeekday(s.startTime)} {fmtTime(s.startTime)}
@@ -714,7 +714,7 @@ function AssignPersonToShiftDialog({
           if (onlyOpen && filled >= s.requiredSlots) return false;
           if (
             q &&
-            !s.title.toLowerCase().includes(q) &&
+            !(s.title && s.title.toLowerCase().includes(q)) &&
             !(s.category?.toLowerCase().includes(q) ?? false) &&
             !s.tasks?.some((t) => t.title.toLowerCase().includes(q))
           )

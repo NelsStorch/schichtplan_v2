@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
-  AlertCircle,
   CalendarDays,
   Clock,
-  Info,
   Layers,
   LifeBuoy,
+  Minus,
+  Plus,
   Sparkles,
+  Trash2,
   Users,
 } from 'lucide-react';
 import {
@@ -23,12 +24,9 @@ import {
   Badge,
   Button,
   Callout,
-  Chip,
   Dialog,
   Field,
   Input,
-  Select,
-  Textarea,
   cn,
   useToast,
 } from '@schichtplan/ui';
@@ -52,6 +50,15 @@ const OVERLAP_PRESETS = [
   { label: '20 Min.', minutes: 20 },
   { label: '30 Min.', minutes: 30 },
 ];
+
+interface SeriesTaskItem {
+  taskDefinitionId: string | null;
+  title: string;
+  requiredSlots: number;
+  minAge: number | '';
+  ageRequirementType: 'ALL' | 'AT_LEAST_ONE';
+  description: string;
+}
 
 export function ShiftSeriesDialog({
   open,
@@ -81,12 +88,22 @@ export function ShiftSeriesDialog({
     return `${datePart}T22:00`;
   }, [event.startDate]);
 
-  const [title, setTitle] = useState('Grill');
+  const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [isSetupTeardown, setIsSetupTeardown] = useState(false);
   const [description, setDescription] = useState('');
   const [minAge, setMinAge] = useState<number | ''>('');
-  const [requiredSlots, setRequiredSlots] = useState(2);
+
+  const [tasks, setTasks] = useState<SeriesTaskItem[]>([
+    {
+      taskDefinitionId: null,
+      title: '',
+      requiredSlots: 1,
+      minAge: '',
+      ageRequirementType: 'ALL',
+      description: '',
+    },
+  ]);
 
   const [startInput, setStartInput] = useState(defaultStart);
   const [endInput, setEndInput] = useState(defaultEnd);
@@ -103,13 +120,88 @@ export function ShiftSeriesDialog({
       .catch(() => {});
   }, [open, defaultStart, defaultEnd]);
 
-  const handleSelectTaskDefinition = (taskId: string) => {
-    const def = availableTasks.find((t) => t.id === taskId);
-    if (!def) return;
-    setTitle(def.title);
-    if (def.description) setDescription(def.description);
-    if (def.minAge) setMinAge(def.minAge);
+  const addFromCatalog = (catalogItem: TaskDefinitionDto) => {
+    // Falls nur 1 Task vorhanden ist und dieser noch leer ist, direkt belegen
+    if (tasks.length === 1 && !tasks[0].title.trim()) {
+      setTasks([
+        {
+          taskDefinitionId: catalogItem.id,
+          title: catalogItem.title,
+          requiredSlots: 1,
+          minAge: catalogItem.minAge ?? '',
+          ageRequirementType: (catalogItem.ageRequirementType as 'ALL' | 'AT_LEAST_ONE') || 'ALL',
+          description: catalogItem.description || '',
+        },
+      ]);
+      return;
+    }
+
+    // Prüfen, ob die Arbeit schon in der Liste ist -> Plätze erhöhen
+    const existingIdx = tasks.findIndex(
+      (t) =>
+        (t.taskDefinitionId && t.taskDefinitionId === catalogItem.id) ||
+        t.title.toLowerCase() === catalogItem.title.toLowerCase()
+    );
+
+    if (existingIdx >= 0) {
+      const nextSlots = tasks[existingIdx].requiredSlots + 1;
+      updateTask(existingIdx, { requiredSlots: nextSlots });
+      toast({ title: `${catalogItem.title}: Plätze auf ${nextSlots} erhöht` });
+      return;
+    }
+
+    // Neue Arbeit anhängen
+    setTasks((prev) => [
+      ...prev,
+      {
+        taskDefinitionId: catalogItem.id,
+        title: catalogItem.title,
+        requiredSlots: 1,
+        minAge: catalogItem.minAge ?? '',
+        ageRequirementType: (catalogItem.ageRequirementType as 'ALL' | 'AT_LEAST_ONE') || 'ALL',
+        description: catalogItem.description || '',
+      },
+    ]);
   };
+
+  const addTask = () => {
+    setTasks((prev) => [
+      ...prev,
+      {
+        taskDefinitionId: null,
+        title: '',
+        requiredSlots: 1,
+        minAge: '',
+        ageRequirementType: 'ALL',
+        description: '',
+      },
+    ]);
+  };
+
+  const removeTask = (index: number) => {
+    if (tasks.length <= 1) {
+      setTasks([
+        {
+          taskDefinitionId: null,
+          title: '',
+          requiredSlots: 1,
+          minAge: '',
+          ageRequirementType: 'ALL',
+          description: '',
+        },
+      ]);
+      return;
+    }
+    setTasks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateTask = (index: number, patch: Partial<SeriesTaskItem>) => {
+    setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+  };
+
+  const totalSlotsPerShift = useMemo(() => {
+    return tasks.reduce((sum, t) => sum + (Number(t.requiredSlots) || 1), 0);
+  }, [tasks]);
 
   // Live calculation of shift intervals
   const intervals = useMemo(() => {
@@ -145,10 +237,29 @@ export function ShiftSeriesDialog({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      toast({ tone: 'error', title: 'Titel erforderlich', description: 'Bitte gib einen Stand oder Titel an.' });
+    const cleanTitle = title.trim();
+    const validTasks = tasks.filter((t) => t.title.trim().length > 0);
+
+    if (!cleanTitle && validTasks.length === 0) {
+      toast({
+        tone: 'error',
+        title: 'Titel oder Arbeit erforderlich',
+        description: 'Bitte gib entweder einen Schichttitel oder mindestens eine Arbeit an.',
+      });
       return;
     }
+
+    for (const t of validTasks) {
+      if (t.title.trim().length < 2) {
+        toast({
+          tone: 'error',
+          title: 'Ungültige Arbeit',
+          description: `Die Arbeit «${t.title}» muss mindestens 2 Zeichen lang sein.`,
+        });
+        return;
+      }
+    }
+
     const startIso = zurichInputToIso(startInput);
     const endIso = zurichInputToIso(endInput);
     if (!startIso || !endIso || intervals.length === 0) {
@@ -160,13 +271,35 @@ export function ShiftSeriesDialog({
       return;
     }
 
+    // Wenn keine spezifischen Arbeiten definiert wurden, den Titel als 1 Standard-Arbeit verwenden
+    const resolvedTasks =
+      validTasks.length > 0
+        ? validTasks.map((t) => ({
+            taskDefinitionId: t.taskDefinitionId || null,
+            title: t.title.trim(),
+            description: t.description.trim() || null,
+            requiredSlots: Math.max(1, Number(t.requiredSlots) || 1),
+            minAge: t.minAge ? Number(t.minAge) : null,
+            ageRequirementType: t.ageRequirementType,
+          }))
+        : [
+            {
+              taskDefinitionId: null,
+              title: cleanTitle,
+              description: description.trim() || null,
+              requiredSlots: 1,
+              minAge: minAge ? Number(minAge) : null,
+              ageRequirementType: 'ALL' as const,
+            },
+          ];
+
     setSaving(true);
     try {
       await api<{ count: number }>('/api/shifts/series', {
         method: 'POST',
         json: {
           eventId: event.id,
-          title: title.trim(),
+          title: cleanTitle,
           category: category.trim() || null,
           isSetupTeardown,
           startTime: startIso,
@@ -176,22 +309,17 @@ export function ShiftSeriesDialog({
           firstShiftIncludesOverlap,
           description: description.trim() || null,
           minAge: minAge ? Number(minAge) : null,
-          tasks: [
-            {
-              title: title.trim(),
-              description: description.trim() || null,
-              requiredSlots: Number(requiredSlots) || 1,
-              minAge: minAge ? Number(minAge) : null,
-              ageRequirementType: 'ALL' as const,
-            },
-          ],
+          tasks: resolvedTasks,
         },
       });
 
+      const totalSlotsAllShifts = intervals.length * totalSlotsPerShift;
       toast({
         tone: 'success',
         title: 'Schicht-Serie erstellt',
-        description: `Es wurden ${intervals.length} Schichten für «${title.trim()}» erstellt.`,
+        description: cleanTitle
+          ? `Es wurden ${intervals.length} Schichten für «${cleanTitle}» erstellt (${totalSlotsAllShifts} Plätze).`
+          : `Es wurden ${intervals.length} Schichten erstellt (${totalSlotsAllShifts} Plätze).`,
       });
       onCreated();
       onClose();
@@ -205,6 +333,8 @@ export function ShiftSeriesDialog({
       setSaving(false);
     }
   };
+
+  const definedTasks = useMemo(() => tasks.filter((t) => t.title.trim().length > 0), [tasks]);
 
   return (
     <Dialog
@@ -231,7 +361,8 @@ export function ShiftSeriesDialog({
           <div className="text-xs text-fg-muted">
             {intervals.length > 0 ? (
               <span className="font-semibold text-fg">
-                {intervals.length} Schichten · {intervals.length * requiredSlots} Plätze
+                {intervals.length} Schichten · je {totalSlotsPerShift} {totalSlotsPerShift === 1 ? 'Platz' : 'Plätze'} ={' '}
+                {intervals.length * totalSlotsPerShift} Plätze total
               </span>
             ) : (
               <span className="text-warning-ink">Keine Schichten generiert</span>
@@ -255,95 +386,200 @@ export function ShiftSeriesDialog({
       }
     >
       <form id="shift-series-form" onSubmit={handleSubmit} className="space-y-6">
-        {/* Vorlagen / Schnellauswahl aus Arbeiten-Katalog */}
-        {availableTasks.length > 0 && (
-          <div>
-            <label className="text-xs font-semibold text-fg-muted uppercase tracking-wider block mb-1.5">
-              Aus Arbeiten-Katalog übernehmen
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {availableTasks.map((task) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  onClick={() => handleSelectTaskDefinition(task.id)}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition',
-                    title === task.title
-                      ? 'border-accent bg-accent-soft text-accent-ink font-semibold'
-                      : 'border-line bg-surface hover:bg-surface-elevated text-fg-muted'
-                  )}
-                >
-                  {task.title}
-                  {task.minAge ? <span className="text-[10px] opacity-75">ab {task.minAge}j</span> : null}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Stand / Titel & Plätze */}
+        {/* Stand / Schichttitel & Kategorie */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Stand / Titel der Arbeit *" hint="z. B. Grill, Bar, Kasse, Fallbalken">
+          <Field
+            label="Stand / Schichttitel (optional)"
+            hint="z. B. Grillstand, Kasse, Bar oder leer lassen, wenn nur die Arbeiten zählen"
+          >
             <Input
-              required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="z. B. Grill"
+              placeholder="z. B. Grillstand (optional)"
             />
           </Field>
 
-          <Field label="Helfende pro Schicht (Plätze) *" hint="Wie viele Personen gleichzeitig helfen">
+          <Field label="Kategorie (optional)" hint="Zur Gruppierung nach Ressort/Stand">
             <Input
-              type="number"
-              min={1}
-              max={50}
-              required
-              value={requiredSlots}
-              onChange={(e) => setRequiredSlots(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="z. B. Stände, Küche"
+              list="series-categories"
             />
           </Field>
+          <datalist id="series-categories">
+            {DEFAULT_SHIFT_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat} />
+            ))}
+          </datalist>
         </div>
 
-        {/* Kategorie & Mindestalter & Auf-/Abbau */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <Field label="Kategorie" hint="Optional zur Gruppierung">
-              <Input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="z. B. Stände, Küche"
-                list="series-categories"
-              />
-            </Field>
-            <datalist id="series-categories">
-              {DEFAULT_SHIFT_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat} />
-              ))}
-            </datalist>
-          </div>
+        {/* Auf-/Abbau & Gesamtes Mindestalter */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface p-3">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isSetupTeardown}
+              onChange={(e) => setIsSetupTeardown(e.target.checked)}
+              className="size-4 rounded border-line text-accent focus:ring-accent"
+            />
+            <span className="text-sm font-medium text-fg">Auf- oder Abbau-Schichten</span>
+          </label>
 
-          <Field label="Mindestalter" hint="Optional, z. B. 16 für Bar">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-fg-muted font-medium">Mindestalter für gesamte Schicht:</span>
             <Input
               type="number"
               min={0}
               max={99}
               value={minAge}
               onChange={(e) => setMinAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-              placeholder="Keine Beschränkung"
+              placeholder="Keins"
+              className="w-24 text-xs h-8"
             />
-          </Field>
+          </div>
+        </div>
 
-          <div className="flex items-center pt-6">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={isSetupTeardown}
-                onChange={(e) => setIsSetupTeardown(e.target.checked)}
-                className="size-4 rounded border-line text-accent focus:ring-accent"
-              />
-              <span className="text-sm font-medium text-fg">Auf- oder Abbau</span>
-            </label>
+        {/* Arbeiten (Tasks) Konfigurator */}
+        <div className="rounded-xl border border-line bg-surface p-4 space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h4 className="text-sm font-bold text-fg flex items-center gap-2">
+                <Users className="size-4 text-accent" />
+                Arbeiten &amp; Plätze pro Schicht
+              </h4>
+              <p className="text-xs text-fg-muted">
+                Lege fest, welche Aufgaben und wie viele Personen pro Schicht eingeteilt werden ({totalSlotsPerShift}{' '}
+                {totalSlotsPerShift === 1 ? 'Platz' : 'Plätze'} pro Schicht).
+              </p>
+            </div>
+            <Button type="button" size="sm" variant="secondary" onClick={addTask}>
+              <Plus className="size-3.5" /> Arbeit hinzufügen
+            </Button>
+          </div>
+
+          {/* Schnell-Auswahl aus dem Vorlagen-Katalog */}
+          {availableTasks.length > 0 && (
+            <div className="rounded-lg border border-line/70 bg-surface-2/60 p-3">
+              <span className="mb-2 block text-2xs font-bold uppercase tracking-wider text-fg-subtle">
+                Aus Arbeiten-Katalog hinzufügen:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {availableTasks.map((catItem) => {
+                  const inList = tasks.some(
+                    (t) =>
+                      (t.taskDefinitionId && t.taskDefinitionId === catItem.id) ||
+                      t.title.toLowerCase() === catItem.title.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={catItem.id}
+                      type="button"
+                      onClick={() => addFromCatalog(catItem)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition active:scale-95',
+                        inList
+                          ? 'border-accent/40 bg-accent/15 text-accent-ink hover:bg-accent/25'
+                          : 'border-line/80 bg-surface text-fg hover:border-accent hover:bg-accent/10 hover:text-accent-ink'
+                      )}
+                    >
+                      <Plus className="size-3 text-accent-ink" />
+                      <span>{catItem.title}</span>
+                      {catItem.minAge ? (
+                        <span className="rounded bg-warning/20 px-1 py-0.2 text-[10px] font-bold text-warning-ink">
+                          {catItem.minAge}+
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Liste der Arbeiten */}
+          <div className="space-y-3">
+            {tasks.map((task, idx) => (
+              <div key={idx} className="relative rounded-lg border border-line bg-surface-2 p-3 text-xs space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-fg-muted uppercase tracking-wider text-[11px]">
+                    Arbeit #{idx + 1}
+                  </span>
+                  {tasks.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTask(idx)}
+                      className="rounded-full p-1 text-fg-subtle transition hover:bg-danger/10 hover:text-danger-ink"
+                      title="Arbeit entfernen"
+                      aria-label="Arbeit entfernen"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+                  <Field label="Name der Arbeit *" hint="z. B. Grillieren, Kasse, Springer">
+                    <Input
+                      value={task.title}
+                      placeholder="z. B. Grillieren"
+                      onChange={(e) => updateTask(idx, { title: e.target.value })}
+                    />
+                  </Field>
+
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[12px] font-semibold text-fg">Plätze</span>
+                    <div className="flex h-10 items-center justify-between rounded-field border border-line bg-surface px-1">
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        type="button"
+                        aria-label="Weniger"
+                        onClick={() => updateTask(idx, { requiredSlots: Math.max(1, task.requiredSlots - 1) })}
+                      >
+                        <Minus className="size-3.5" />
+                      </Button>
+                      <span className="tabular px-2 text-sm font-bold">{task.requiredSlots}</span>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        type="button"
+                        aria-label="Mehr"
+                        onClick={() => updateTask(idx, { requiredSlots: Math.min(50, task.requiredSlots + 1) })}
+                      >
+                        <Plus className="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 w-24">
+                    <span className="text-[12px] font-semibold text-fg">Mindestalter</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={99}
+                      value={task.minAge}
+                      onChange={(e) =>
+                        updateTask(idx, {
+                          minAge: e.target.value === '' ? '' : parseInt(e.target.value, 10),
+                        })
+                      }
+                      placeholder="Keins"
+                      className="h-10 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Input
+                    value={task.description}
+                    onChange={(e) => updateTask(idx, { description: e.target.value })}
+                    placeholder="Notiz oder Aufgabenbeschreibung für diese Arbeit (optional)"
+                    className="text-xs h-8"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -355,9 +591,7 @@ export function ShiftSeriesDialog({
               Gesamter Betriebs-Zeitraum
             </h4>
             {totalOperatingHours > 0 && (
-              <Badge tone="neutral">
-                {totalOperatingHours} Stunden Gesamtdauer
-              </Badge>
+              <Badge tone="neutral">{totalOperatingHours} Stunden Gesamtdauer</Badge>
             )}
           </div>
 
@@ -387,7 +621,9 @@ export function ShiftSeriesDialog({
               <label className="text-xs font-semibold text-fg-muted uppercase tracking-wider">
                 Schichtdauer pro Einsatz
               </label>
-              <span className="text-xs font-medium text-fg">{durationMinutes} Minuten ({Math.round(durationMinutes / 6) / 10} Std.)</span>
+              <span className="text-xs font-medium text-fg">
+                {durationMinutes} Minuten ({Math.round(durationMinutes / 6) / 10} Std.)
+              </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {DURATION_PRESETS.map((preset) => (
@@ -439,8 +675,8 @@ export function ShiftSeriesDialog({
             {overlapMinutes > 0 && (
               <div className="pt-2 flex flex-col gap-2">
                 <Callout tone="info">
-                  Jede Ablösung beginnt <strong>{overlapMinutes} Minuten vor Ende der vorherigen Schicht</strong> für die Übergabe.
-                  Das Kollisions-Toleranzfenster des Anlasses erlaubt es Helfern, sich für aufeinanderfolgende Schichten einzutragen.
+                  Jede Ablösung beginnt <strong>{overlapMinutes} Minuten vor Ende der vorherigen Schicht</strong> für
+                  die Übergabe.
                 </Callout>
 
                 <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-fg-muted">
@@ -465,8 +701,8 @@ export function ShiftSeriesDialog({
               Live-Vorschau ({intervals.length} Schichten)
             </span>
             {intervals.length > 0 && (
-              <span className="text-xs text-fg-muted">
-                {intervals.length * requiredSlots} Helfende benötigt
+              <span className="text-xs text-fg-muted font-medium">
+                {intervals.length * totalSlotsPerShift} Helfende benötigt
               </span>
             )}
           </div>
@@ -476,7 +712,7 @@ export function ShiftSeriesDialog({
               Keine Schichten generiert. Bitte überprüfe Start- und Endzeit.
             </div>
           ) : (
-            <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
               {intervals.map((shift, idx) => {
                 const shiftDurationMin = Math.round(
                   (shift.endTime.getTime() - shift.startTime.getTime()) / (60 * 1000)
@@ -486,19 +722,43 @@ export function ShiftSeriesDialog({
                 return (
                   <div
                     key={idx}
-                    className="flex items-center justify-between rounded-lg border border-line bg-surface px-3 py-2 text-xs"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border border-line bg-surface p-2.5 text-xs gap-2"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-mono font-semibold text-fg-muted w-5">#{idx + 1}</span>
-                      <div>
-                        <span className="font-medium text-fg">
-                          {fmtShortWeekday(shift.startTime.toISOString())} {fmtTimeRange(shift.startTime.toISOString(), shift.endTime.toISOString())}
-                        </span>
-                        <span className="text-[11px] text-fg-muted ml-2">({title})</span>
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <span className="font-mono font-semibold text-fg-muted w-6 shrink-0">#{idx + 1}</span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold text-fg">
+                            {fmtShortWeekday(shift.startTime.toISOString())}{' '}
+                            {fmtTimeRange(shift.startTime.toISOString(), shift.endTime.toISOString())}
+                          </span>
+                          {title.trim() && (
+                            <span className="text-xs text-accent-ink font-semibold">({title.trim()})</span>
+                          )}
+                        </div>
+
+                        {/* Arbeiten Vorschau */}
+                        <div className="flex flex-wrap items-center gap-1 mt-1 text-[11px] text-fg-muted">
+                          {definedTasks.length > 0 ? (
+                            definedTasks.map((t, tIdx) => (
+                              <span
+                                key={tIdx}
+                                className="rounded bg-surface-2 px-1.5 py-0.5 border border-line/60 font-medium text-fg"
+                              >
+                                {t.title} <span className="font-bold text-accent-ink">({t.requiredSlots})</span>
+                                {t.minAge ? (
+                                  <span className="text-warning-ink ml-1 font-bold">ab {t.minAge}</span>
+                                ) : null}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-fg-subtle italic">1 Platz ({title.trim() || 'Schicht'})</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                       {hasOverlap && (
                         <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent-ink">
                           +{overlapMinutes}m Übergabe

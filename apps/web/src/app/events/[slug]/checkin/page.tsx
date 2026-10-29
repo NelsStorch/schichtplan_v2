@@ -96,7 +96,7 @@ function CheckinResult({ slug, result, name }: { slug: string; result: CheckinRe
         title={result.nextShift ? 'Deine Schicht hat noch nicht begonnen' : 'Gerade keine Schicht für dich'}
         description={
           result.nextShift
-            ? `Deine nächste Schicht «${result.nextShift.shiftTitle}» beginnt ${fmtWeekday(result.nextShift.startTime)} um ${fmtTime(result.nextShift.startTime)}. Einchecken geht ab 30 Minuten vorher: scann den QR-Code dann nochmals.`
+            ? `Deine nächste Schicht${result.nextShift.shiftTitle?.trim() ? ` «${result.nextShift.shiftTitle}»` : ''} beginnt ${fmtWeekday(result.nextShift.startTime)} um ${fmtTime(result.nextShift.startTime)}. Einchecken geht ab 30 Minuten vorher: scann den QR-Code dann nochmals.`
             : `Du bist bei «${result.eventTitle}» in keiner laufenden oder kommenden Schicht eingetragen. Melde dich beim OK, wenn du trotzdem hilfst.`
         }
         action={actions}
@@ -120,9 +120,9 @@ function CheckinResult({ slug, result, name }: { slug: string; result: CheckinRe
         {result.checkedIn.map((c) => (
           <Card key={c.signupId} className="flex items-center justify-between gap-3 p-4">
             <div className="min-w-0">
-              <p className="font-bold text-fg">{c.shiftTitle}</p>
+              <p className="font-bold text-fg">{c.shiftTitle?.trim() || c.taskTitle || fmtTimeRange(c.startTime, c.endTime)}</p>
               <p className="text-xs text-fg-muted">
-                {[c.taskTitle, `${fmtWeekday(c.startTime)}, ${fmtTimeRange(c.startTime, c.endTime)}`]
+                {[c.shiftTitle?.trim() ? c.taskTitle : null, `${fmtWeekday(c.startTime)}, ${fmtTimeRange(c.startTime, c.endTime)}`]
                   .filter(Boolean)
                   .join(' · ')}
               </p>

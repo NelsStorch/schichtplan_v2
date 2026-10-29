@@ -123,7 +123,7 @@ export async function findShiftCollisions(
     return filtered.map((s) => ({
       signupId: s.id,
       shiftId: s.shift.id,
-      shiftTitle: s.shift.title,
+      shiftTitle: s.shift.title || s.task?.title || 'Schicht',
       taskTitle: s.task?.title || null,
       startTime: s.shift.startTime.toISOString(),
       endTime: s.shift.endTime.toISOString(),
@@ -171,7 +171,7 @@ export async function findShiftCollisions(
     return filtered.map((s) => ({
       signupId: s.id,
       shiftId: s.shift.id,
-      shiftTitle: s.shift.title,
+      shiftTitle: s.shift.title || s.task?.title || 'Schicht',
       taskTitle: s.task?.title || null,
       startTime: s.shift.startTime.toISOString(),
       endTime: s.shift.endTime.toISOString(),

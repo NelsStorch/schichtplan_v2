@@ -3,7 +3,7 @@
 import { AlertCircle, Check, ChevronRight, Coffee, Hammer, Plus, Repeat, Timer, Zap } from 'lucide-react';
 import type { ShiftDto } from '@schichtplan/shared';
 import { Badge, Button, cn } from '@schichtplan/ui';
-import { businessDayKey, fmtDayMonth, fmtShortWeekday, fmtTime } from '@/lib/format';
+import { businessDayKey, fmtDayMonth, fmtShortWeekday, fmtTime, fmtTimeRange } from '@/lib/format';
 import { STATUS_STYLES, freeLabel, replacementOffers, shiftStats, shiftTasks } from './shift-utils';
 
 export interface ShiftPauseHint {
@@ -75,7 +75,7 @@ export function NeededShifts({
           const mine = actions.isMine(shift);
           const handover = !mine ? actions.getHandover?.(shift) : null;
           return (
-            <li key={shift.id}>
+            <li key={shift.id} id={`shift-${shift.id}`}>
               <div
                 role="button"
                 tabIndex={0}
@@ -97,7 +97,9 @@ export function NeededShifts({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-fg">
-                    <span className="truncate">{shift.title}</span>
+                    {shift.title?.trim() ? (
+                      <span className="truncate">{shift.title}</span>
+                    ) : null}
                     {stats.urgent && (
                       <Badge size="sm" tone="warning">
                         <Timer className="size-3" /> bald
@@ -110,7 +112,7 @@ export function NeededShifts({
                     )}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-fg-muted">
-                    {openTasks.length > 1 || openTasks[0]?.title !== shift.title
+                    {openTasks.length > 1 || !shift.title?.trim() || openTasks[0]?.title !== shift.title
                       ? openTasks.map((t) => `${t.title} ${t.requiredSlots - t.filled}`).join(' · ')
                       : `${fmtDayMonth(shift.startTime)}, bis ${fmtTime(shift.endTime)}`}
                   </p>
@@ -142,7 +144,7 @@ export function NeededShifts({
                       )}
                       <Button
                         size="icon-sm"
-                        aria-label={`In ${shift.title} eintragen`}
+                        aria-label={`In ${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)} eintragen`}
                         loading={actions.busyShiftId === shift.id}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -172,7 +174,7 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
       {shifts.map((shift) => {
         const stats = shiftStats(shift);
         const tasks = shiftTasks(shift);
-        const showTasks = tasks.length > 1 || tasks[0]?.title !== shift.title;
+        const showTasks = tasks.length > 1 || !shift.title?.trim() || tasks[0]?.title !== shift.title;
         const mine = actions.isMine(shift);
         const style = STATUS_STYLES[stats.status];
         const isFull = stats.free === 0;
@@ -185,7 +187,7 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
             ? actions.dayResponsibles?.[dayKey]
             : shift.responsibles;
         return (
-          <li key={shift.id}>
+          <li key={shift.id} id={`shift-${shift.id}`}>
             <div
               role="button"
               tabIndex={0}
@@ -209,7 +211,9 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <h3 className="truncate text-[15px] font-semibold text-fg">{shift.title}</h3>
+                  {shift.title?.trim() ? (
+                    <h3 className="truncate text-[15px] font-semibold text-fg">{shift.title}</h3>
+                  ) : null}
                   {shift.isSetupTeardown && (
                     <Badge size="sm" tone="neutral">
                       <Hammer className="size-3" /> Auf-/Abbau

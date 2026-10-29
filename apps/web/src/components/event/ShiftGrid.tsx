@@ -44,6 +44,7 @@ export function ShiftGrid({
             {columns.map(({ shift, stats }) => (
               <th
                 key={shift.id}
+                id={`shift-${shift.id}`}
                 scope="col"
                 className={cn(
                   'min-w-[6.5rem] border-b border-l border-line px-2 py-2 text-left align-bottom font-normal',
@@ -58,8 +59,8 @@ export function ShiftGrid({
                   <span className="tabular block text-[13px] font-bold text-fg">
                     {fmtTimeRange(shift.startTime, shift.endTime)}
                   </span>
-                  {showShiftTitles && (
-                    <span className="block max-w-[9rem] truncate text-2xs text-fg-subtle">{shift.title}</span>
+                  {showShiftTitles && shift.title?.trim() && (
+                    <span className="block max-w-[9rem] truncate text-2xs text-fg-subtle">{shift.title?.trim()}</span>
                   )}
                   {isMine(shift) && <span className="block text-2xs font-semibold text-success-ink">Du bist dabei</span>}
                 </button>
@@ -118,6 +119,7 @@ export function ShiftGrid({
             {columns.map(({ shift, stats }) => (
               <td
                 key={shift.id}
+                id={`shift-${shift.id}`}
                 className={cn(
                   'tabular border-l border-line bg-surface-2 px-2 py-2 text-center text-[13px] font-bold',
                   STATUS_STYLES[stats.status].text

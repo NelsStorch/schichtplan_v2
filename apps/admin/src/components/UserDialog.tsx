@@ -741,7 +741,7 @@ export function UserDialog({
                             <CalendarClock className="size-4" aria-hidden />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-fg">{s.shiftTitle}</span>
+                            <span className="block truncate text-sm font-semibold text-fg">{s.shiftTitle || 'Schicht'}</span>
                             <span className="block truncate text-xs text-fg-subtle">
                               {s.eventTitle} · {s.departmentName}
                             </span>

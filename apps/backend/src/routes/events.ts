@@ -1232,7 +1232,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                 helperName: hName,
                 performedByUserId: request.user?.id || null,
                 performedByName: pLabel,
-                shiftTitle: su.shift.title,
+                shiftTitle: su.shift.title || su.task?.title || 'Schicht',
                 shiftStartTime: su.shift.startTime,
                 shiftEndTime: su.shift.endTime,
                 taskTitle: su.task?.title || null,

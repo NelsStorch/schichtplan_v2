@@ -40,7 +40,7 @@ import {
   useConfirm,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
-import { fmtDayMonth, fmtWeekday } from '@/lib/format';
+import { fmtDayMonth, fmtTimeRange, fmtWeekday } from '@/lib/format';
 import type { EventDetails, EventOrganizer } from '@/lib/types';
 
 /** ISO -> Wert für <input type="datetime-local"> in Schweizer Zeit */
@@ -438,7 +438,14 @@ function ShiftForm({
   const isDirty = currentSnapshot !== lastSavedSnapshotRef.current;
 
   const getValidationError = (): string | null => {
-    if (form.title.trim().length < 2) return 'Titel muss mindestens 2 Zeichen haben';
+    const hasTitle = form.title.trim().length > 0;
+    const hasValidTask = tasks.some((t) => t.title.trim().length >= 2);
+    if (!hasTitle && !hasValidTask) {
+      return 'Bitte gib einen Schichttitel oder mindestens eine Arbeit an';
+    }
+    if (hasTitle && form.title.trim().length < 2) {
+      return 'Schichttitel muss mindestens 2 Zeichen haben';
+    }
     if (!form.startTime || !form.endTime) return 'Zeiten unvollständig';
     const s = new Date(form.startTime).getTime();
     const e = new Date(form.endTime).getTime();
@@ -563,11 +570,11 @@ function ShiftForm({
     <form id={formId} onSubmit={submit} className="space-y-5">
       {error && <Callout tone="danger">{error}</Callout>}
 
-      <Field label="Schichttitel" required>
+      <Field label="Schichttitel (optional)" hint="z. B. Stand, Bar oder leer lassen, wenn nur die Arbeiten zählen">
         <Input
           value={form.title}
           autoFocus
-          placeholder="z.B. Bar & Grill Samstagabend"
+          placeholder="z. B. Bar & Grill Samstagabend (optional)"
           onChange={(e) => handleTitleChange(e.target.value)}
         />
       </Field>
@@ -891,7 +898,7 @@ export function DuplicateShiftDialog({
       onClose={onClose}
       icon={<Copy />}
       title="Schicht duplizieren"
-      description={shift ? `Kopie von "${shift.title}" erstellen` : ''}
+      description={shift ? `Kopie von "${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}" erstellen` : ''}
     >
       {shift && <DuplicateShiftForm shift={shift} onCancel={onClose} onDuplicated={onDuplicated} />}
     </Dialog>
@@ -908,7 +915,7 @@ function DuplicateShiftForm({
   onDuplicated: () => void;
 }) {
   const toast = useToast();
-  const [title, setTitle] = useState(`${shift.title} (Folgeschicht)`);
+  const [title, setTitle] = useState(shift.title?.trim() ? `${shift.title} (Folgeschicht)` : '');
   const [startTime, setStartTime] = useState(toLocalInput(shift.endTime)); // Standard: schliesst direkt an vorherige Schicht an!
 
   // Dauer der vorherigen Schicht berechnen
@@ -932,7 +939,7 @@ function DuplicateShiftForm({
           endTime: zurichInputToIso(endTime)!,
         },
       });
-      toast({ title: 'Schicht dupliziert', description: title });
+      toast({ title: 'Schicht dupliziert', description: title.trim() || 'Folgeschicht' });
       onDuplicated();
     } catch (err) {
       setError(errorMessage(err));
@@ -944,8 +951,13 @@ function DuplicateShiftForm({
     <form onSubmit={submit} className="space-y-4">
       {error && <Callout tone="danger">{error}</Callout>}
 
-      <Field label="Titel der neuen Schicht" required>
-        <Input value={title} autoFocus onChange={(e) => setTitle(e.target.value)} />
+      <Field label="Titel der neuen Schicht (optional)">
+        <Input
+          value={title}
+          autoFocus
+          placeholder="z. B. Stand (Folgeschicht) oder leer lassen"
+          onChange={(e) => setTitle(e.target.value)}
+        />
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">

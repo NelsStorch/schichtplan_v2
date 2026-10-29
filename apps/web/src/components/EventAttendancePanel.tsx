@@ -120,7 +120,7 @@ export function EventAttendancePanel({
               if (!query) return true;
               return (
                 su.displayName.toLowerCase().includes(query) ||
-                s.title.toLowerCase().includes(query) ||
+                (s.title ? s.title.toLowerCase().includes(query) : false) ||
                 (su.taskTitle?.toLowerCase().includes(query) ?? false)
               );
             }),
@@ -223,7 +223,7 @@ export function EventAttendancePanel({
       s.signups.map((su) => ({
         date: fmtWeekday(s.startTime),
         time: `${fmtTimeRange(s.startTime, s.endTime)}`,
-        shift: s.title,
+        shift: s.title ?? '',
         task: su.taskTitle ?? '',
         name: su.displayName,
         status: statusLabel(su.attendance),
@@ -256,7 +256,7 @@ export function EventAttendancePanel({
     const body = shifts
       .map(
         (s) => `
-        <h2>${escapeHtml(s.title)} <small>${escapeHtml(fmtWeekday(s.startTime))}, ${fmtTimeRange(s.startTime, s.endTime)}</small></h2>
+        <h2>${escapeHtml(s.title || fmtTimeRange(s.startTime, s.endTime))} <small>${escapeHtml(fmtWeekday(s.startTime))}, ${fmtTimeRange(s.startTime, s.endTime)}</small></h2>
         <table>
           <thead><tr><th class="box">Da</th><th>Name</th><th>Arbeit</th><th>Status</th><th>Erfasst</th></tr></thead>
           <tbody>${s.signups

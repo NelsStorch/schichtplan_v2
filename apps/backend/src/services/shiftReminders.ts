@@ -76,7 +76,7 @@ interface CandidateEntry {
   taskTitle: string | null;
   shift: {
     id: string;
-    title: string;
+    title: string | null;
     category: string | null;
     startTime: Date;
     endTime: Date;
@@ -342,8 +342,9 @@ export async function sendDueShiftReminders(
     const diffMinutes = (shift.startTime.getTime() - now.getTime()) / 60_000;
     if (diffMinutes <= 0) continue;
 
-    const shiftTitle =
-      entry.taskTitle && entry.taskTitle !== shift.title ? `${shift.title} · ${entry.taskTitle}` : shift.title;
+    const shiftTitle = shift.title?.trim()
+      ? (entry.taskTitle && entry.taskTitle !== shift.title ? `${shift.title} · ${entry.taskTitle}` : shift.title)
+      : (entry.taskTitle || 'Schicht');
     const targetUrl = eventUrl(shift.event.department.slug, shift.event.slug);
     const timeFormatted = formatShiftTime(shift.startTime, shift.endTime);
 

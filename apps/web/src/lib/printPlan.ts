@@ -85,7 +85,7 @@ interface TaskRow {
 function taskRows(shift: ShiftDto): TaskRow[] {
   const tasks = shift.tasks ?? [];
   const signups = shift.signups ?? [];
-  if (tasks.length === 0) return [{ title: shift.title, requiredSlots: shift.requiredSlots, signups }];
+  if (tasks.length === 0) return [{ title: shift.title || 'Schicht', requiredSlots: shift.requiredSlots, signups }];
   return tasks.map((t) => ({
     title: t.title,
     requiredSlots: t.requiredSlots,
@@ -133,7 +133,7 @@ function buildDays(event: EventDetails, options: PrintPlanOptions): PlanDay[] {
             id: shift.id,
             time: `${fmtTimeRange(shift.startTime, shift.endTime)}`,
             duration: duration(shift),
-            title: shift.title,
+            title: shift.title || '',
             category: options.showDetails ? (shift.category ?? null) : null,
             color: categoryColor(shift.category),
             tags,
@@ -166,7 +166,7 @@ function buildPeople(event: EventDetails, options: PrintPlanOptions): PersonEntr
           entry.items.push({
             day: `${fmtShortWeekday(dayKeyToIso(d.key))} ${fmtShortDate(dayKeyToIso(d.key))}`,
             time: `${fmtTimeRange(shift.startTime, shift.endTime)}`,
-            shift: shift.title,
+            shift: shift.title || '',
             task: task.title === shift.title ? null : task.title,
           });
           byPerson.set(key, entry);

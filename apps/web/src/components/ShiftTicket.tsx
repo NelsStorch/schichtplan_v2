@@ -3,7 +3,7 @@
 import { Check, ChevronRight, Edit } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
 import { Avatar, Badge, Button, SlotMeter, cn, slotStatus } from '@schichtplan/ui';
-import { fmtDuration, fmtTime, isPast } from '@/lib/format';
+import { fmtDuration, fmtTime, fmtTimeRange, isPast } from '@/lib/format';
 
 export interface ShiftTicketProps {
   shift: ShiftDto;
@@ -88,7 +88,7 @@ export function ShiftTicket({
       }}
       role="button"
       tabIndex={0}
-      aria-label={`Schicht ${shift.title}, ${fmtTime(shift.startTime)} bis ${fmtTime(shift.endTime)}, ${STATUS_TEXT[status](free)}`}
+      aria-label={`Schicht ${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}, ${fmtTime(shift.startTime)} bis ${fmtTime(shift.endTime)}, ${STATUS_TEXT[status](free)}`}
       className={cn(
         'group relative grid animate-fade-up stagger grid-cols-[5.25rem_1fr] cursor-pointer rounded-card border text-left',
         'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
@@ -171,16 +171,22 @@ export function ShiftTicket({
         </div>
 
         {/* Titel & Kurzbeschreibung */}
-        <div>
-          <h3 className="text-lg font-bold leading-snug tracking-tight text-fg transition-colors group-hover:text-accent-ink">
-            {shift.title}
-          </h3>
-          {shift.description && (
-            <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-muted">
-              {shift.description}
-            </p>
-          )}
-        </div>
+        {shift.title?.trim() ? (
+          <div>
+            <h3 className="text-lg font-bold leading-snug tracking-tight text-fg transition-colors group-hover:text-accent-ink">
+              {shift.title}
+            </h3>
+            {shift.description && (
+              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-muted">
+                {shift.description}
+              </p>
+            )}
+          </div>
+        ) : shift.description ? (
+          <p className="line-clamp-2 text-sm leading-relaxed text-fg-muted">
+            {shift.description}
+          </p>
+        ) : null}
 
         {/* Arbeiten-Vorschau (Pills mit Einteilungszähler) */}
         <div className="space-y-1.5 rounded-field border border-line/70 bg-surface-2/40 p-2.5">
