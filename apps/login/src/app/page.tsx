@@ -70,7 +70,7 @@ function getPasswordStrength(pwd: string): {
 // Fehlercodes, mit denen das Backend nach einem gescheiterten Cevi.DB-Login hierher zurückleitet
 const loginErrors: Record<string, string> = {
   cevidb_unavailable:
-    'Die Anmeldung mit Cevi.DB ist im Moment nicht verfügbar. Melde dich bitte mit Cevi-Name oder E-Mail an.',
+    'Die Anmeldung mit Cevi.DB ist im Moment nicht verfügbar. Melde dich bitte mit E-Mail oder Cevi-Name an.',
   cevidb_denied: 'Die Anmeldung bei Cevi.DB wurde abgebrochen.',
   cevidb_failed: 'Die Anmeldung mit Cevi.DB hat nicht geklappt. Bitte versuche es nochmals.',
   cevidb_email_taken:
@@ -562,55 +562,57 @@ function LoginContent() {
                 </div>
 
                 <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface/70">
-                  {/* Ohne Passwort nur, wenn die Person von einer Abteilung kommt: das Profil gehört zu dieser */}
-                  {department && (
-                    <li>
-                      <button
-                        type="button"
-                        onClick={() => goTo('ceviname')}
-                        className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
-                      >
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors group-hover:bg-emerald-500/20">
-                          <UserRound className="size-[18px]" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-fg">Mit Cevi-Name</span>
-                            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                              Für Helfende & Eltern
-                            </span>
-                          </span>
-                          <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
-                            Ohne Passwort für {department.name}
-                          </span>
-                        </span>
-                        <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
-                      </button>
-                    </li>
-                  )}
+                  {/* E-Mail & Passwort: Empfohlener Standard für alle Helfenden */}
                   <li>
                     <button
                       type="button"
                       onClick={() => goTo('password')}
                       className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
                     >
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors group-hover:bg-emerald-500/20">
                         <KeyRound className="size-[18px]" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-semibold text-fg">Mit E-Mail & Passwort</span>
-                          <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold text-fg-muted">
-                            Eigenes Passwort
+                          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                            Empfohlen für Helfende
                           </span>
                         </span>
                         <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
-                          Anmelden oder neues Konto erstellen
+                          Sicheres Konto für Schichten, Profil & Benachrichtigungen
                         </span>
                       </span>
                       <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
                     </button>
                   </li>
+
+                  {/* Cevi-Name: De-priorisierter Fallback für Personen ohne E-Mail */}
+                  {department && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => goTo('ceviname')}
+                        className="group flex w-full items-center gap-3.5 px-4 py-3 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none opacity-85 hover:opacity-100"
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
+                          <UserRound className="size-[18px]" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium text-fg">Mit Cevi-Name</span>
+                            <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-fg-subtle">
+                              Ohne Passwort (eingeschränkt)
+                            </span>
+                          </span>
+                          <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
+                            Schnellzugang ohne E-Mail-Adresse für {department.name}
+                          </span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                      </button>
+                    </li>
+                  )}
                 </ul>
               </div>
             )}
@@ -632,7 +634,7 @@ function LoginContent() {
                   Mit Cevi-Name anmelden
                 </h1>
                 <p className="mt-1.5 text-[14px] leading-relaxed text-fg-muted">
-                  Für {department.name}. Kein Passwort nötig: Cevi-Name und Geburtsdatum sind dein Schlüssel.
+                  Eingeschränkter Zugang für {department.name} ohne Passwort.
                 </p>
 
                 <div className="mt-6 space-y-4.5">
@@ -701,15 +703,18 @@ function LoginContent() {
                       Dieses Profil hat <strong>kein Passwort</strong>. Jede Person, die deinen Cevi-Namen und dein Geburtsdatum kennt, kann sich in deinen Account einloggen.
                     </p>
                     <p className="mt-2 text-xs leading-relaxed text-fg-muted">
-                      Wenn du dein Profil mit einem Passwort schützen möchtest oder Aufgaben im OK übernimmst, nutze stattdessen die Anmeldung mit{' '}
+                      Wir empfehlen dir stattdessen die{' '}
                       <button
                         type="button"
-                        onClick={() => goTo('start')}
+                        onClick={() => {
+                          setAuthMode('register');
+                          goTo('password');
+                        }}
                         className="font-medium text-accent-ink underline-offset-4 hover:underline"
                       >
-                        Cevi.DB oder E-Mail
+                        Registrierung mit E-Mail und Passwort
                       </button>
-                      .
+                      , damit deine Schichten geschützt sind und du wichtige Benachrichtigungen erhältst.
                     </p>
                   </Callout>
 
