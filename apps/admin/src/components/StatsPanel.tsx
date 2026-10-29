@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Download, RefreshCw, ShieldCheck, ThumbsDown, ThumbsUp } from 'lucide-react';
-import { Button, Callout, Chip, ChipRow, Select, Skeleton, cn } from '@schichtplan/ui';
+import { Button, Callout, Chip, ChipRow, Select, Skeleton, cn, useToast } from '@schichtplan/ui';
 import {
   STATS_RANGES,
   STATS_RETENTION,
@@ -390,13 +390,39 @@ function SystemView({
   system,
   usage,
   onOpenAudit,
+  onReload,
 }: {
   system: AdminStatsSystemDto;
   usage: AdminStatsUsageDto | null;
   onOpenAudit?: (query: string) => void;
+  onReload?: () => void;
 }) {
   const [sort, setSort] = useState<RouteSort>('count');
+  const [cleaning, setCleaning] = useState(false);
+  const toast = useToast();
   const { requests } = system;
+  const healthcheckIssue = requests.routes.find((r) => r.route === '/api/departments/current' && r.client4xx > 0);
+
+  const handleCleanup = async () => {
+    setCleaning(true);
+    try {
+      const res = await api<{ deleted: number }>('/api/admin/stats/cleanup-healthchecks', { method: 'POST' });
+      toast({
+        title: 'Statistik bereinigt',
+        description: `${fmtNumber(res.deleted)} verfälschte 4xx-Einträge von alten Healthchecks wurden entfernt.`,
+        tone: 'success',
+      });
+      onReload?.();
+    } catch (err) {
+      toast({
+        title: 'Fehler beim Bereinigen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    } finally {
+      setCleaning(false);
+    }
+  };
   const routes = useMemo(
     () => [...requests.routes].sort((a, b) => (b[sort] ?? 0) - (a[sort] ?? 0) || b.count - a.count).slice(0, 25),
     [requests.routes, sort]
@@ -446,6 +472,20 @@ function SystemView({
             </Select>
           </div>
         </div>
+        {healthcheckIssue && healthcheckIssue.client4xx > 0 && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-accent/30 bg-accent/5 p-4 text-xs text-fg">
+            <div>
+              <p className="font-semibold text-fg">Verfälschte Healthcheck-Einträge erkannt</p>
+              <p className="mt-0.5 text-fg-muted">
+                Auf <code className="font-mono font-medium text-fg">GET /api/departments/current</code> wurden{' '}
+                <span className="font-semibold text-fg">{fmtNumber(healthcheckIssue.client4xx)}</span> 4xx-Fehler durch alte Docker-Healthchecks gezählt.
+              </p>
+            </div>
+            <Button size="sm" variant="secondary" loading={cleaning} onClick={handleCleanup}>
+              Healthcheck-Fehler bereinigen
+            </Button>
+          </div>
+        )}
         {routes.length === 0 ? (
           <p className="text-sm text-fg-subtle">Noch keine Anfragen gezählt.</p>
         ) : (
@@ -676,7 +716,7 @@ export function StatsPanel({
       {view === 'nutzung' && (usage ? <UsageView usage={usage} days={days} /> : !error && <LoadingCards />)}
       {view === 'funktionen' && (usage ? <FunctionsView usage={usage} /> : !error && <LoadingCards />)}
       {view === 'anlaesse' && (features ? <EventsView data={features} /> : !error && <LoadingCards />)}
-      {view === 'betrieb' && (system ? <SystemView system={system} usage={usage} onOpenAudit={onOpenAudit} /> : !error && <LoadingCards />)}
+      {view === 'betrieb' && (system ? <SystemView system={system} usage={usage} onOpenAudit={onOpenAudit} onReload={() => setReload((n) => n + 1)} /> : !error && <LoadingCards />)}
 
       <p className="flex items-start gap-2 border-t border-line pt-5 text-xs leading-relaxed text-fg-subtle">
         <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden />

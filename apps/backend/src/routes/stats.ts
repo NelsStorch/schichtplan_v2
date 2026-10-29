@@ -564,6 +564,16 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
       };
       return result;
     });
+
+    // Bereinigung der durch alte Healthchecks verfälschten 4xx-Statistik
+    admin.post('/api/admin/stats/cleanup-healthchecks', guard, async () => {
+      const deleted = await fastify.prisma.$executeRaw`
+        DELETE FROM "request_stats"
+        WHERE "route" = '/api/departments/current'
+          AND "status_class" = '4xx'
+      `;
+      return { deleted: Number(deleted) };
+    });
   });
 };
 

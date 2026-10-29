@@ -58,7 +58,7 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
-  CMD node -e "fetch('http://localhost:3000/').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
+  CMD node -e "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
 CMD ["node", "apps/web/server.js"]

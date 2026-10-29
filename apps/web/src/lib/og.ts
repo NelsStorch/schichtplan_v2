@@ -11,7 +11,7 @@ export interface DepartmentPreview {
 /** Abteilungs-Slug aus dem Host (`illnau.cevi-schichtplan.ch` → `illnau`), null auf der Hauptdomain. */
 function slugFromHost(host: string): string | null {
   const hostname = host.split(':')[0].toLowerCase();
-  if (hostname === 'localhost') return process.env.DEV_TENANT_SLUG ?? 'demo';
+  if (hostname === 'localhost') return process.env.DEV_TENANT_SLUG ?? (process.env.NODE_ENV === 'production' ? null : 'demo');
   const root = getRootDomain(hostname);
   if (hostname === root) return null;
   const sub = hostname.slice(0, -(root.length + 1));
