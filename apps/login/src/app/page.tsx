@@ -1,21 +1,22 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   ArrowUpRight,
-  Check,
   CheckCircle2,
   ChevronRight,
   KeyRound,
   LogOut,
   Mail,
+  ShieldCheck,
   UserRound,
 } from 'lucide-react';
 import {
   Button,
   Callout,
+  CeviLogo,
   Field,
   Input,
   buttonClasses,
@@ -38,6 +39,33 @@ const STUFE_OPTIONS: { value: StufeRole | null; label: string }[] = [
 
 /** 2010-03-14 → 14.03.2010 */
 const fmtBirthDate = (iso: string) => iso.split('-').reverse().join('.');
+
+function getPasswordStrength(pwd: string): {
+  score: number; // 0..4
+  label: string;
+  tone: 'danger' | 'warning' | 'info' | 'success';
+} {
+  if (!pwd) return { score: 0, label: '', tone: 'danger' };
+  let s = 0;
+  if (pwd.length >= 8) s++;
+  if (pwd.length >= 12) s++;
+  if (/[0-9]/.test(pwd) && /[a-zA-Z]/.test(pwd)) s++;
+  if (/[^a-zA-Z0-9]/.test(pwd)) s++;
+
+  switch (s) {
+    case 0:
+    case 1:
+      return { score: 1, label: 'Zu kurz (mind. 8 Zeichen)', tone: 'danger' };
+    case 2:
+      return { score: 2, label: 'Ausreichend', tone: 'warning' };
+    case 3:
+      return { score: 3, label: 'Gut', tone: 'info' };
+    case 4:
+      return { score: 4, label: 'Sehr stark', tone: 'success' };
+    default:
+      return { score: 1, label: 'Zu kurz', tone: 'danger' };
+  }
+}
 
 // Fehlercodes, mit denen das Backend nach einem gescheiterten Cevi.DB-Login hierher zurückleitet
 const loginErrors: Record<string, string> = {
@@ -131,6 +159,9 @@ function LoginContent() {
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [resendNotice, setResendNotice] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+
+  // Passwort-Stärke
+  const pwdStrength = useMemo(() => getPasswordStrength(password), [password]);
 
   // Fehlercode aus der Adresse entfernen, damit er nach einem Neuladen nicht erneut erscheint
   useEffect(() => {
@@ -386,535 +417,631 @@ function LoginContent() {
 
   return (
     <AuthShell returnTo={returnTo} landingHref={landingHref} showBackLink={true}>
-      {/* Bereits angemeldete Sitzung erkennen & One-Click Weiterleitung anbieten */}
-      {existingUser && !switchAccount ? (
-        <div key="already_logged_in" className="animate-fade-up">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="size-6" />
-          </div>
-          <h1 className="mt-4 font-display text-[2rem] font-semibold leading-[1.1] tracking-tight text-fg text-balance">
-            Bereits angemeldet
-          </h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
-            Du bist angemeldet als{' '}
-            <strong className="font-semibold text-fg">
-              {existingUser.ceviName || existingUser.firstName}
-              {existingUser.lastName ? ` ${existingUser.lastName}` : ''}
-            </strong>
-            {existingUser.email ? ` (${existingUser.email})` : ''}.
-          </p>
-
-          {destination && (
-            <p className="mt-2 text-xs leading-relaxed text-fg-subtle">
-              Ziel: <span className="font-medium text-fg">{destination}</span>
-            </p>
-          )}
-
-          <div className="mt-8 space-y-3">
-            <a
-              href={afterLogin(existingUser, returnTo)}
-              className={buttonClasses({
-                size: 'lg',
-                className: 'w-full justify-between',
-              })}
-            >
-              <span>Weiter {destination ? `zu ${destination}` : 'zur Übersicht'}</span>
-              <ArrowUpRight className="size-4" />
-            </a>
-
-            <Button
-              type="button"
-              variant="secondary"
-              size="lg"
-              className="w-full"
-              onClick={() => setSwitchAccount(true)}
-            >
-              <UserRound className="size-4" /> Mit anderem Konto anmelden
-            </Button>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex w-full items-center justify-center gap-1.5 pt-2 text-xs text-fg-subtle transition hover:text-danger"
-            >
-              <LogOut className="size-3.5" />
-              Vollständig abmelden
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {view === 'start' && (
-            <div key="start" className="animate-fade-up">
-              <h1 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight text-fg text-balance">
-                Anmelden
-              </h1>
-              {destination ? (
-                <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
-                  Danach geht es weiter zu{' '}
-                  <span className="whitespace-nowrap font-medium text-fg">{destination}</span>.
-                </p>
+      {/* Elegante Card mit Glassmorphism-Effekt */}
+      <div className="rounded-card border border-line bg-surface/85 p-6 shadow-soft backdrop-blur-md transition-all duration-300 sm:p-7 animate-scale-in">
+        {/* Welcome-Card mit Abteilungs-Identität */}
+        {department && view === 'start' && (
+          <div className="mb-6 flex items-center gap-3.5 rounded-2xl border border-line bg-surface-2/70 p-3 shadow-xs">
+            <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-tile border border-line/60 bg-surface">
+              {department.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={department.logoUrl} alt={department.name} className="size-full object-cover" />
               ) : (
-                <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
-                  Ein Login für alle Abteilungen und Anlässe.
-                </p>
+                <CeviLogo className="size-5" alt="" />
               )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-fg">{department.name}</span>
+              <span className="inline-flex items-center gap-1.5 text-2xs font-medium text-accent-ink">
+                <span className="size-1.5 rounded-full bg-accent" />
+                Abteilungsportal
+              </span>
+            </div>
+          </div>
+        )}
 
-              <div className="mt-9 space-y-3">
-                {feedback}
-                <a
-                  href={cevidbAuthUrl}
-                  onClick={() => setRedirecting(true)}
-                  aria-busy={redirecting || undefined}
-                  className={buttonClasses({
-                    size: 'lg',
-                    className: cn('w-full justify-between', redirecting && 'pointer-events-none opacity-80'),
-                  })}
-                >
-                  <span>{redirecting ? 'Weiterleitung zu Cevi.DB …' : 'Mit Cevi.DB anmelden'}</span>
-                  {redirecting ? (
-                    <span
-                      aria-hidden
-                      className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
-                    />
-                  ) : (
-                    <ArrowUpRight className="size-4" />
+        {/* Bereits angemeldete Sitzung erkennen & One-Click Weiterleitung anbieten */}
+        {existingUser && !switchAccount ? (
+          <div key="already_logged_in">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-6" />
+            </div>
+            <h1 className="mt-4 font-display text-[1.75rem] font-semibold leading-[1.1] tracking-tight text-fg text-balance">
+              Bereits angemeldet
+            </h1>
+            <p className="mt-2.5 text-[14px] leading-relaxed text-fg-muted">
+              Du bist angemeldet als{' '}
+              <strong className="font-semibold text-fg">
+                {existingUser.ceviName || existingUser.firstName}
+                {existingUser.lastName ? ` ${existingUser.lastName}` : ''}
+              </strong>
+              {existingUser.email ? ` (${existingUser.email})` : ''}.
+            </p>
+
+            {destination && (
+              <div className="mt-4 rounded-xl border border-line bg-surface-2/60 p-3 text-xs text-fg-subtle">
+                Ziel:{' '}
+                <span className="font-medium text-fg">{destination}</span>
+              </div>
+            )}
+
+            <div className="mt-6 space-y-3">
+              <a
+                href={afterLogin(existingUser, returnTo)}
+                className={buttonClasses({
+                  size: 'lg',
+                  className: 'w-full justify-between shadow-soft',
+                })}
+              >
+                <span>Weiter {destination ? `zu ${destination}` : 'zur Übersicht'}</span>
+                <ArrowUpRight className="size-4" />
+              </a>
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                className="w-full"
+                onClick={() => setSwitchAccount(true)}
+              >
+                <UserRound className="size-4" /> Mit anderem Konto anmelden
+              </Button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center justify-center gap-1.5 pt-2 text-xs text-fg-subtle transition hover:text-danger"
+              >
+                <LogOut className="size-3.5" />
+                Vollständig abmelden
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {view === 'start' && (
+              <div key="start">
+                <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg text-balance">
+                  Anmelden
+                </h1>
+                {destination ? (
+                  <p className="mt-2 text-[14px] leading-relaxed text-fg-muted">
+                    Danach geht es weiter zu{' '}
+                    <span className="whitespace-nowrap font-medium text-fg">{destination}</span>.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[14px] leading-relaxed text-fg-muted">
+                    Ein Login für alle Abteilungen und Anlässe.
+                  </p>
+                )}
+
+                <div className="mt-7 space-y-3">
+                  {feedback}
+
+                  <div>
+                    <span className="mb-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-accent-ink">
+                      <ShieldCheck className="size-3.5" />
+                      Empfohlen für Leitende & OK
+                    </span>
+                    <a
+                      href={cevidbAuthUrl}
+                      onClick={() => setRedirecting(true)}
+                      aria-busy={redirecting || undefined}
+                      className={buttonClasses({
+                        size: 'lg',
+                        className: cn(
+                          'w-full justify-between shadow-soft transition-all duration-200',
+                          redirecting && 'pointer-events-none opacity-80'
+                        ),
+                      })}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <ShieldCheck className="size-4.5 opacity-90 text-white" />
+                        <span>{redirecting ? 'Weiterleitung zu Cevi.DB …' : 'Mit Cevi.DB anmelden'}</span>
+                      </span>
+                      {redirecting ? (
+                        <span
+                          aria-hidden
+                          className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+                        />
+                      ) : (
+                        <ArrowUpRight className="size-4" />
+                      )}
+                    </a>
+                    <div className="mt-1.5 flex items-center justify-between px-1 text-[12px] text-fg-subtle">
+                      <span>Offizieller Verbands-Login</span>
+                      <span className="font-mono text-[11px] text-fg-muted">db.cevi.ch</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="my-6 flex items-center gap-4 text-xs text-fg-subtle">
+                  <span className="h-px flex-1 bg-line" />
+                  <span>weitere Optionen</span>
+                  <span className="h-px flex-1 bg-line" />
+                </div>
+
+                <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface/70">
+                  {/* Ohne Passwort nur, wenn die Person von einer Abteilung kommt: das Profil gehört zu dieser */}
+                  {department && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => goTo('ceviname')}
+                        className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors group-hover:bg-emerald-500/20">
+                          <UserRound className="size-[18px]" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-fg">Mit Cevi-Name</span>
+                            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                              Für Helfende & Eltern
+                            </span>
+                          </span>
+                          <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
+                            Ohne Passwort für {department.name}
+                          </span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                      </button>
+                    </li>
                   )}
-                </a>
-                <p className="px-1 text-[13px] leading-relaxed text-fg-subtle">
-                  Du meldest dich auf <span className="font-mono text-fg-muted">db.cevi.ch</span> an
-                  und kommst danach automatisch hierher zurück.
-                </p>
-              </div>
-
-              <div className="my-9 flex items-center gap-4 text-xs text-fg-subtle">
-                <span className="h-px flex-1 bg-line" />
-                <span>oder</span>
-                <span className="h-px flex-1 bg-line" />
-              </div>
-
-              <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface/70">
-                {/* Ohne Passwort nur, wenn die Person von einer Abteilung kommt: das Profil gehört zu dieser */}
-                {department && (
                   <li>
                     <button
                       type="button"
-                      onClick={() => goTo('ceviname')}
-                      className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                      onClick={() => goTo('password')}
+                      className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
                     >
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
-                        <UserRound className="size-[18px]" />
+                        <KeyRound className="size-[18px]" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-fg">Mit Cevi-Name</span>
-                        <span className="mt-0.5 block text-[13px] leading-snug text-fg-subtle">
-                          Ohne Passwort, für Helfer*innen bei {department.name}
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-fg">Mit E-Mail & Passwort</span>
+                          <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold text-fg-muted">
+                            Eigenes Passwort
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
+                          Anmelden oder neues Konto erstellen
                         </span>
                       </span>
                       <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
                     </button>
                   </li>
-                )}
-                <li>
+                </ul>
+              </div>
+            )}
+
+            {view !== 'start' && (
+              <button
+                type="button"
+                onClick={() => goTo('start')}
+                className="-ml-2 mb-5 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              >
+                <ArrowLeft className="size-3.5" />
+                Alle Anmeldeoptionen
+              </button>
+            )}
+
+            {view === 'ceviname' && department && (
+              <form key="ceviname" onSubmit={handleQuickSubmit}>
+                <h1 className="font-display text-[1.65rem] font-semibold leading-[1.15] tracking-tight text-fg">
+                  Mit Cevi-Name anmelden
+                </h1>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-fg-muted">
+                  Für {department.name}. Kein Passwort nötig: Cevi-Name und Geburtsdatum sind dein Schlüssel.
+                </p>
+
+                <div className="mt-6 space-y-4.5">
+                  {feedback}
+
+                  <Field label="Cevi-Name oder Vorname" required>
+                    <Input
+                      type="text"
+                      value={quickCeviName}
+                      onChange={(e) => setQuickCeviName(e.target.value)}
+                      autoComplete="nickname"
+                      autoFocus
+                      required
+                      minLength={2}
+                      maxLength={60}
+                    />
+                  </Field>
+
+                  <Field
+                    label="Geburtsdatum"
+                    required
+                    hint="Gleich wie beim ersten Mal (Format: TT.MM.JJJJ). So unterscheiden wir Personen mit gleichem Namen."
+                  >
+                    <BirthDateInput
+                      value={quickBirthDate}
+                      onChange={setQuickBirthDate}
+                      required
+                    />
+                  </Field>
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    loading={loading}
+                    disabled={quickCeviName.trim().length < 2 || !quickBirthDate || !!success}
+                    className="w-full shadow-soft"
+                  >
+                    {loading ? 'Wird überprüft …' : 'Weiter'}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {view === 'ceviname_new' && department && (
+              <form key="ceviname_new" onSubmit={handleQuickRegister}>
+                <h1 className="font-display text-[1.65rem] font-semibold leading-[1.15] tracking-tight text-fg text-balance">
+                  Neu bei {department.name}?
+                </h1>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-fg-muted">
+                  Wir haben kein Profil für «{quickCeviName.trim()}», geboren am {fmtBirthDate(quickBirthDate)}, gefunden.
+                  Tippfehler?{' '}
                   <button
                     type="button"
-                    onClick={() => goTo('password')}
-                    className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                    onClick={() => goTo('ceviname')}
+                    className="font-medium text-accent-ink underline-offset-4 hover:underline"
                   >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-surface-2 text-fg-muted transition-colors group-hover:bg-surface-3 group-hover:text-fg">
-                      <KeyRound className="size-[18px]" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-fg">Mit E-Mail und Passwort</span>
-                      <span className="mt-0.5 block text-[13px] leading-snug text-fg-subtle">
-                        Anmelden oder Konto erstellen
-                      </span>
-                    </span>
-                    <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                    Nochmals eingeben
                   </button>
-                </li>
-              </ul>
-            </div>
-          )}
-
-          {view !== 'start' && (
-            <button
-              type="button"
-              onClick={() => goTo('start')}
-              className="-ml-2 mb-6 inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-medium text-fg-muted transition hover:text-fg"
-            >
-              <ArrowLeft className="size-4" />
-              Alle Anmeldeoptionen
-            </button>
-          )}
-
-          {view === 'ceviname' && department && (
-            <form key="ceviname" onSubmit={handleQuickSubmit} className="animate-fade-up">
-              <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
-                Mit Cevi-Name anmelden
-              </h1>
-              <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-                Für {department.name}. Kein Passwort nötig: Cevi-Name und Geburtsdatum sind dein Schlüssel.
-              </p>
-
-              <div className="mt-8 space-y-5">
-                {feedback}
-
-                <Field label="Cevi-Name oder Vorname" required>
-                  <Input
-                    type="text"
-                    value={quickCeviName}
-                    onChange={(e) => setQuickCeviName(e.target.value)}
-                    autoComplete="nickname"
-                    autoFocus
-                    required
-                    minLength={2}
-                    maxLength={60}
-                  />
-                </Field>
-
-                <Field
-                  label="Geburtsdatum"
-                  required
-                  hint="Gleich wie beim ersten Mal (Format: TT.MM.JJJJ). So unterscheiden wir Personen mit gleichem Namen."
-                >
-                  <BirthDateInput
-                    value={quickBirthDate}
-                    onChange={setQuickBirthDate}
-                    required
-                  />
-                </Field>
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  loading={loading}
-                  disabled={quickCeviName.trim().length < 2 || !quickBirthDate || !!success}
-                  className="w-full"
-                >
-                  {loading ? 'Wird überprüft …' : 'Weiter'}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {view === 'ceviname_new' && department && (
-            <form key="ceviname_new" onSubmit={handleQuickRegister} className="animate-fade-up">
-              <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg text-balance">
-                Neu bei {department.name}?
-              </h1>
-              <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-                Wir haben kein Profil für «{quickCeviName.trim()}», geboren am {fmtBirthDate(quickBirthDate)}, gefunden.
-                Tippfehler?{' '}
-                <button
-                  type="button"
-                  onClick={() => goTo('ceviname')}
-                  className="font-medium text-accent-ink underline-offset-4 hover:underline"
-                >
-                  Nochmals eingeben
-                </button>
-              </p>
-
-              <div className="mt-8 space-y-5">
-                {feedback}
-
-                <Callout tone="warning" title="Wichtiger Sicherheitshinweis: Kein Passwort-Schutz">
-                  <p className="mt-1 text-[13px] leading-relaxed text-fg">
-                    Dieses Profil hat <strong>kein Passwort</strong>. Jede Person, die deinen Cevi-Namen und dein Geburtsdatum kennt, kann sich in deinen Account einloggen.
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-fg-muted">
-                    Wenn du dein Profil mit einem Passwort schützen möchtest oder Aufgaben im OK übernimmst, nutze stattdessen die Anmeldung mit{' '}
-                    <button
-                      type="button"
-                      onClick={() => goTo('start')}
-                      className="font-medium text-accent-ink underline-offset-4 hover:underline"
-                    >
-                      Cevi.DB oder E-Mail
-                    </button>
-                    .
-                  </p>
-                </Callout>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Vorname">
-                    <Input
-                      type="text"
-                      value={quickFirstName}
-                      onChange={(e) => setQuickFirstName(e.target.value)}
-                      autoComplete="given-name"
-                      maxLength={80}
-                    />
-                  </Field>
-                  <Field label="Nachname (freiwillig)" hint="Freiwillig">
-                    <Input
-                      type="text"
-                      value={quickLastName}
-                      onChange={(e) => setQuickLastName(e.target.value)}
-                      autoComplete="family-name"
-                      maxLength={80}
-                    />
-                  </Field>
-                </div>
-
-                {department.stufen.length > 0 && (
-                  <section aria-labelledby="stufen-titel">
-                    <h2 id="stufen-titel" className="text-sm font-semibold text-fg">
-                      In welchen Stufen bist du dabei?
-                    </h2>
-                    <p className="mt-1 text-[13px] text-fg-subtle">Wähle alle, die passen. Keine ist auch in Ordnung.</p>
-                    <ul className="mt-3 divide-y divide-line rounded-card border border-line bg-surface/70">
-                      {department.stufen.map((stufe) => {
-                        const role = quickStufen[stufe.id] ?? null;
-                        return (
-                          <li key={stufe.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                            <span className="text-sm font-semibold text-fg">{stufe.name}</span>
-                            <div
-                              role="radiogroup"
-                              aria-label={`Rolle in ${stufe.name}`}
-                              className="flex rounded-full bg-surface-2 p-0.5"
-                            >
-                              {STUFE_OPTIONS.map((option) => (
-                                <button
-                                  key={option.label}
-                                  type="button"
-                                  role="radio"
-                                  aria-checked={role === option.value}
-                                  onClick={() =>
-                                    setQuickStufen((prev) => {
-                                      const next = { ...prev };
-                                      if (option.value) next[stufe.id] = option.value;
-                                      else delete next[stufe.id];
-                                      return next;
-                                    })
-                                  }
-                                  className={cn(
-                                    'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                                    role === option.value ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
-                                  )}
-                                >
-                                  {option.label}
-                                </button>
-                              ))}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </section>
-                )}
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  loading={loading}
-                  disabled={!!success}
-                  className="w-full"
-                >
-                  {loading ? 'Profil wird angelegt …' : 'Profil anlegen und weiter'}
-                </Button>
-                <p className="px-1 text-[13px] leading-relaxed text-fg-subtle">
-                  Beim nächsten Mal meldest du dich hier wieder mit Cevi-Name und Geburtsdatum an. Für Aufgaben im OK
-                  brauchst du ein Konto mit Cevi.DB oder mit E-Mail und Passwort.
                 </p>
-              </div>
-            </form>
-          )}
 
-          {view === 'password' && (
-            <form key="password" onSubmit={handlePasswordSubmit} className="animate-fade-up">
-              <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
-                {authMode === 'login' ? 'Mit E-Mail anmelden' : 'Konto erstellen'}
-              </h1>
-              <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-                {authMode === 'login' ? 'Noch kein Konto? ' : 'Schon ein Konto? '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode(authMode === 'login' ? 'register' : 'login');
-                    setError(null);
-                  }}
-                  className="font-medium text-accent-ink underline-offset-4 hover:underline"
-                >
-                  {authMode === 'login' ? 'Konto erstellen' : 'Anmelden'}
-                </button>
-              </p>
+                <div className="mt-6 space-y-4.5">
+                  {feedback}
 
-              <div className="mt-8 space-y-5">
-                {feedback}
+                  <Callout tone="warning" title="Wichtiger Sicherheitshinweis: Kein Passwort-Schutz">
+                    <p className="mt-1 text-[13px] leading-relaxed text-fg">
+                      Dieses Profil hat <strong>kein Passwort</strong>. Jede Person, die deinen Cevi-Namen und dein Geburtsdatum kennt, kann sich in deinen Account einloggen.
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+                      Wenn du dein Profil mit einem Passwort schützen möchtest oder Aufgaben im OK übernimmst, nutze stattdessen die Anmeldung mit{' '}
+                      <button
+                        type="button"
+                        onClick={() => goTo('start')}
+                        className="font-medium text-accent-ink underline-offset-4 hover:underline"
+                      >
+                        Cevi.DB oder E-Mail
+                      </button>
+                      .
+                    </p>
+                  </Callout>
 
-                {authMode === 'register' && (
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="Vorname" required>
+                    <Field label="Vorname">
                       <Input
                         type="text"
-                        value={regFirstName}
-                        onChange={(e) => setRegFirstName(e.target.value)}
+                        value={quickFirstName}
+                        onChange={(e) => setQuickFirstName(e.target.value)}
                         autoComplete="given-name"
-                        minLength={2}
-                        required
+                        maxLength={80}
                       />
                     </Field>
                     <Field label="Nachname (freiwillig)" hint="Freiwillig">
                       <Input
                         type="text"
-                        value={regLastName}
-                        onChange={(e) => setRegLastName(e.target.value)}
+                        value={quickLastName}
+                        onChange={(e) => setQuickLastName(e.target.value)}
                         autoComplete="family-name"
+                        maxLength={80}
                       />
                     </Field>
                   </div>
-                )}
 
-                <Field label="E-Mail" required>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    autoFocus
-                    required
-                  />
-                </Field>
+                  {department.stufen.length > 0 && (
+                    <section aria-labelledby="stufen-titel">
+                      <h2 id="stufen-titel" className="text-sm font-semibold text-fg">
+                        In welchen Stufen bist du dabei?
+                      </h2>
+                      <p className="mt-0.5 text-xs text-fg-subtle">Wähle alle, die passen. Keine ist auch in Ordnung.</p>
+                      <ul className="mt-2.5 divide-y divide-line rounded-card border border-line bg-surface/70">
+                        {department.stufen.map((stufe) => {
+                          const role = quickStufen[stufe.id] ?? null;
+                          return (
+                            <li key={stufe.id} className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5">
+                              <span className="text-sm font-semibold text-fg">{stufe.name}</span>
+                              <div
+                                role="radiogroup"
+                                aria-label={`Rolle in ${stufe.name}`}
+                                className="flex rounded-full bg-surface-2 p-0.5"
+                              >
+                                {STUFE_OPTIONS.map((option) => (
+                                  <button
+                                    key={option.label}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={role === option.value}
+                                    onClick={() =>
+                                      setQuickStufen((prev) => {
+                                        const next = { ...prev };
+                                        if (option.value) next[stufe.id] = option.value;
+                                        else delete next[stufe.id];
+                                        return next;
+                                      })
+                                    }
+                                    className={cn(
+                                      'rounded-full px-2.5 py-1 text-xs font-semibold transition',
+                                      role === option.value ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+                                    )}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  )}
 
-                <div>
-                  <Field
-                    label="Passwort"
-                    required
-                    hint={authMode === 'register' ? 'Mindestens 8 Zeichen.' : undefined}
+                  <Button
+                    type="submit"
+                    size="lg"
+                    loading={loading}
+                    disabled={!!success}
+                    className="w-full shadow-soft"
                   >
-                    <PasswordInput
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
-                      minLength={authMode === 'register' ? 8 : undefined}
+                    {loading ? 'Profil wird angelegt …' : 'Profil anlegen und weiter'}
+                  </Button>
+                  <p className="px-1 text-[12px] leading-relaxed text-fg-subtle">
+                    Beim nächsten Mal meldest du dich hier wieder mit Cevi-Name und Geburtsdatum an. Für Aufgaben im OK
+                    brauchst du ein Konto mit Cevi.DB oder mit E-Mail und Passwort.
+                  </p>
+                </div>
+              </form>
+            )}
+
+            {view === 'password' && (
+              <form key="password" onSubmit={handlePasswordSubmit}>
+                {/* Segmented Control / Pill-Tabs für schnelles Umschalten */}
+                <div className="mb-6 flex rounded-full border border-line/70 bg-surface-2 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('login');
+                      setError(null);
+                    }}
+                    className={cn(
+                      'flex-1 rounded-full py-1.5 text-xs font-semibold transition-all duration-200',
+                      authMode === 'login' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+                    )}
+                  >
+                    Anmelden
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('register');
+                      setError(null);
+                    }}
+                    className={cn(
+                      'flex-1 rounded-full py-1.5 text-xs font-semibold transition-all duration-200',
+                      authMode === 'register' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+                    )}
+                  >
+                    Konto erstellen
+                  </button>
+                </div>
+
+                <h1 className="font-display text-[1.65rem] font-semibold leading-[1.15] tracking-tight text-fg">
+                  {authMode === 'login' ? 'Mit E-Mail anmelden' : 'Neues Konto erstellen'}
+                </h1>
+                <p className="mt-1 text-[14px] leading-relaxed text-fg-muted">
+                  {authMode === 'login'
+                    ? 'Melde dich mit deiner E-Mail und deinem persönlichen Passwort an.'
+                    : 'Erstelle ein passwortgeschütztes Konto für alle Abteilungen.'}
+                </p>
+
+                <div className="mt-6 space-y-4.5">
+                  {feedback}
+
+                  {authMode === 'register' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Vorname" required>
+                        <Input
+                          type="text"
+                          value={regFirstName}
+                          onChange={(e) => setRegFirstName(e.target.value)}
+                          autoComplete="given-name"
+                          minLength={2}
+                          required
+                        />
+                      </Field>
+                      <Field label="Nachname (freiwillig)" hint="Freiwillig">
+                        <Input
+                          type="text"
+                          value={regLastName}
+                          onChange={(e) => setRegLastName(e.target.value)}
+                          autoComplete="family-name"
+                        />
+                      </Field>
+                    </div>
+                  )}
+
+                  <Field label="E-Mail" required>
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      autoFocus
                       required
                     />
                   </Field>
 
-                  {authMode === 'register' && (
-                    <div className="mt-2 flex items-center gap-2 text-xs transition-colors duration-200" aria-live="polite">
-                      <span
-                        className={cn(
-                          'flex size-4 items-center justify-center rounded-full transition-colors',
-                          password.length >= 8
-                            ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-surface-3 text-fg-subtle'
-                        )}
-                      >
-                        <Check className="size-2.5 stroke-[3]" />
-                      </span>
-                      <span
-                        className={
-                          password.length >= 8
-                            ? 'font-medium text-emerald-600 dark:text-emerald-400'
-                            : 'text-fg-subtle'
-                        }
-                      >
-                        {password.length >= 8 ? 'Mindestens 8 Zeichen erfüllt' : 'Mindestens 8 Zeichen'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {authMode === 'login' && (
-                  <p className="-mt-2 text-right text-sm">
-                    <a
-                      href={withReturnTo(
-                        `/passwort-vergessen${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''}`,
-                        returnTo
-                      )}
-                      className="font-medium text-accent-ink underline-offset-4 hover:underline"
+                  <div>
+                    <Field
+                      label="Passwort"
+                      required
+                      hint={authMode === 'register' ? 'Mindestens 8 Zeichen.' : undefined}
                     >
-                      Passwort vergessen?
-                    </a>
-                  </p>
-                )}
+                      <PasswordInput
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                        minLength={authMode === 'register' ? 8 : undefined}
+                        required
+                      />
+                    </Field>
 
-                {authMode === 'register' && (
-                  <Field label="Cevi-Name">
-                    <Input
-                      type="text"
-                      value={regCeviName}
-                      onChange={(e) => setRegCeviName(e.target.value)}
-                      autoComplete="nickname"
-                    />
-                  </Field>
-                )}
+                    {/* Passwort-Stärke-Balken bei Registrierung */}
+                    {authMode === 'register' && password.length > 0 && (
+                      <div className="mt-2.5 space-y-1.5" aria-live="polite">
+                        <div className="grid grid-cols-4 gap-1.5 h-1.5">
+                          {[1, 2, 3, 4].map((step) => {
+                            const active = pwdStrength.score >= step;
+                            const color =
+                              pwdStrength.tone === 'danger'
+                                ? 'bg-danger'
+                                : pwdStrength.tone === 'warning'
+                                ? 'bg-amber-500'
+                                : pwdStrength.tone === 'info'
+                                ? 'bg-sky-500'
+                                : 'bg-emerald-500';
+                            return (
+                              <div
+                                key={step}
+                                className={cn(
+                                  'rounded-full transition-all duration-300',
+                                  active ? color : 'bg-surface-3'
+                                )}
+                              />
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-center justify-between text-2xs text-fg-subtle">
+                          <span>Passwortstärke</span>
+                          <span
+                            className={cn(
+                              'font-medium transition-colors',
+                              pwdStrength.tone === 'danger'
+                                ? 'text-danger-ink'
+                                : pwdStrength.tone === 'warning'
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : pwdStrength.tone === 'info'
+                                ? 'text-sky-600 dark:text-sky-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
+                            )}
+                          >
+                            {pwdStrength.label}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                <Button
-                  type="submit"
-                  size="lg"
-                  loading={loading}
-                  disabled={!!success}
-                  className="w-full"
-                >
-                  {loading
-                    ? authMode === 'login'
-                      ? 'Wird angemeldet …'
-                      : 'Konto wird erstellt …'
-                    : authMode === 'login'
-                    ? 'Anmelden'
-                    : 'Konto erstellen'}
-                </Button>
-              </div>
-            </form>
-          )}
+                  {authMode === 'login' && (
+                    <p className="-mt-1.5 text-right text-xs">
+                      <a
+                        href={withReturnTo(
+                          `/passwort-vergessen${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''}`,
+                          returnTo
+                        )}
+                        className="font-medium text-accent-ink underline-offset-4 hover:underline"
+                      >
+                        Passwort vergessen?
+                      </a>
+                    </p>
+                  )}
 
-          {view === 'verify_sent' && (
-            <div key="verify_sent" className="animate-fade-up">
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <Mail className="size-6" />
-              </div>
-              <h1 className="mt-4 font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
-                E-Mail bestätigen
-              </h1>
-              <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-                Wir haben einen Bestätigungslink an{' '}
-                <strong className="font-semibold text-fg">{email}</strong> gesendet.
-              </p>
-              <div className="mt-4 rounded-xl border border-line bg-surface p-4 text-xs leading-relaxed text-fg-subtle">
-                Bitte klicke auf den Link in der E-Mail, um dein Konto zu aktivieren.
-                Prüfe bitte auch deinen Spam-Ordner, falls die E-Mail nicht innerhalb weniger Minuten ankommt.
-              </div>
+                  {authMode === 'register' && (
+                    <Field label="Cevi-Name">
+                      <Input
+                        type="text"
+                        value={regCeviName}
+                        onChange={(e) => setRegCeviName(e.target.value)}
+                        autoComplete="nickname"
+                      />
+                    </Field>
+                  )}
 
-              {resendNotice && (
-                <div className="mt-4">
-                  <Callout tone={resendNotice.tone}>{resendNotice.text}</Callout>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    loading={loading}
+                    disabled={!!success}
+                    className="w-full shadow-soft"
+                  >
+                    {loading
+                      ? authMode === 'login'
+                        ? 'Wird angemeldet …'
+                        : 'Konto wird erstellt …'
+                      : authMode === 'login'
+                      ? 'Anmelden'
+                      : 'Konto erstellen'}
+                  </Button>
                 </div>
-              )}
+              </form>
+            )}
 
-              <div className="mt-6 space-y-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="lg"
-                  loading={resending}
-                  disabled={resending}
-                  onClick={() => handleResend(email)}
-                  className="w-full"
-                >
-                  Bestätigungs-E-Mail erneut senden
-                </Button>
+            {view === 'verify_sent' && (
+              <div key="verify_sent">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <Mail className="size-6" />
+                </div>
+                <h1 className="mt-4 font-display text-[1.65rem] font-semibold leading-[1.15] tracking-tight text-fg">
+                  E-Mail bestätigen
+                </h1>
+                <p className="mt-2 text-[14px] leading-relaxed text-fg-muted">
+                  Wir haben einen Bestätigungslink an{' '}
+                  <strong className="font-semibold text-fg">{email}</strong> gesendet.
+                </p>
+                <div className="mt-4 rounded-xl border border-line bg-surface p-4 text-xs leading-relaxed text-fg-subtle">
+                  Bitte klicke auf den Link in der E-Mail, um dein Konto zu aktivieren.
+                  Prüfe bitte auch deinen Spam-Ordner, falls die E-Mail nicht innerhalb weniger Minuten ankommt.
+                </div>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="lg"
-                  onClick={() => {
-                    setView('password');
-                    setAuthMode('login');
-                    setError(null);
-                    setResendNotice(null);
-                  }}
-                  className="w-full"
-                >
-                  Zurück zum Login
-                </Button>
+                {resendNotice && (
+                  <div className="mt-4">
+                    <Callout tone={resendNotice.tone}>{resendNotice.text}</Callout>
+                  </div>
+                )}
+
+                <div className="mt-6 space-y-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="lg"
+                    loading={resending}
+                    disabled={resending}
+                    onClick={() => handleResend(email)}
+                    className="w-full"
+                  >
+                    Bestätigungs-E-Mail erneut senden
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="lg"
+                    onClick={() => {
+                      setView('password');
+                      setAuthMode('login');
+                      setError(null);
+                      setResendNotice(null);
+                    }}
+                    className="w-full"
+                  >
+                    Zurück zum Login
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Ehrlicher Datenschutzhinweis (ohne Schweizer Server Claim) */}
+      <p className="mt-5 text-center text-xs leading-relaxed text-fg-subtle px-2">
+        Deine Daten werden vertraulich behandelt, ausschliesslich für die Helferorganisation verwendet und niemals an Dritte weitergegeben.
+      </p>
     </AuthShell>
   );
 }
