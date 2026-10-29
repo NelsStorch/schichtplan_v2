@@ -100,7 +100,7 @@ services:
       - "traefik.http.routers.schichtplan-dev-web.priority=10"
       - "traefik.http.routers.schichtplan-dev-web.service=schichtplan-dev-web"
       - "traefik.http.services.schichtplan-dev-web.loadbalancer.server.port=3000"
-      - "traefik.http.services.schichtplan-dev-web.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.schichtplan-dev-web.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.schichtplan-dev-web.loadbalancer.healthcheck.interval=3s"
 
   landing:
