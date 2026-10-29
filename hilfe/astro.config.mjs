@@ -25,6 +25,8 @@ export default defineConfig({
         { tag: 'link', attrs: { rel: 'icon', href: '/favicon-48x48.png', type: 'image/png', sizes: '48x48' } },
         { tag: 'link', attrs: { rel: 'icon', href: '/icon-192.png', type: 'image/png', sizes: '192x192' } },
         { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
+        { tag: 'meta', attrs: { property: 'og:image', content: 'https://cevi-schichtplan.ch/og' } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://cevi-schichtplan.ch/og' } },
         { tag: 'meta', attrs: { name: 'theme-color', content: '#0c0a09', media: '(prefers-color-scheme: dark)' } },
         { tag: 'meta', attrs: { name: 'theme-color', content: '#fafaf9', media: '(prefers-color-scheme: light)' } },
       ],
