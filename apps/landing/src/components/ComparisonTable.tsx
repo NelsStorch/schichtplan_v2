@@ -8,6 +8,7 @@ import {
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
+import { Reveal } from '@/components/Reveal';
 
 interface Row {
   title: string;
@@ -81,7 +82,7 @@ export function ComparisonTable() {
     <section className="py-20 md:py-28 border-t border-line/60 bg-surface/25 relative overflow-hidden">
       <div className="mx-auto max-w-6xl px-4">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
+        <Reveal className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
           <div className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-2xs font-bold uppercase tracking-wider bg-accent/12 text-accent-ink border border-accent/25 mb-4 shadow-sm">
             <Sparkles className="size-3 text-accent" />
             <span>Der direkte Vergleich</span>
@@ -92,10 +93,10 @@ export function ComparisonTable() {
           <p className="mt-3 text-base text-fg-muted leading-relaxed">
             Wie sich der Cevi Schichtplan gegenüber typischen Notlösungen und Bezahl-Tools schlägt:
           </p>
-        </div>
+        </Reveal>
 
         {/* Comparison Table Container */}
-        <div className="rounded-2xl sm:rounded-card border border-line bg-surface shadow-soft overflow-hidden">
+        <Reveal className="rounded-2xl sm:rounded-card border border-line bg-surface shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[620px]">
               <thead>
@@ -199,7 +200,7 @@ export function ComparisonTable() {
               ✓ Speziell auf das Cevi-Vereinsleben zugeschnitten
             </span>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

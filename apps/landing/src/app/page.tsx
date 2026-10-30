@@ -9,9 +9,6 @@ import {
   CheckCircle2,
   Sparkles,
   LifeBuoy,
-  CalendarPlus,
-  Share2,
-  UserCheck,
   ShieldCheck,
   ChevronDown,
   ArrowRight,
@@ -31,6 +28,8 @@ import { Avatar, Button, ThemeToggle, buttonClasses } from '@schichtplan/ui';
 import { Campfire3DCanvas } from '@/components/Campfire3DCanvas';
 import { Hero3DStage } from '@/components/Hero3DStage';
 import { ComparisonTable } from '@/components/ComparisonTable';
+import { Reveal } from '@/components/Reveal';
+import { StepsTimeline } from '@/components/StepsTimeline';
 import { CeviDbIsometricGraphic } from '@/components/CeviDbIsometricGraphic';
 import { SubdomainIsometricGraphic } from '@/components/SubdomainIsometricGraphic';
 import { MultiEventIsometricGraphic } from '@/components/MultiEventIsometricGraphic';
@@ -274,39 +273,12 @@ export default function LandingPage() {
         {/* So funktioniert's: drei Schritte aus Sicht des OK */}
         <section id="so-funktionierts" className="scroll-mt-24 py-16 md:py-20 border-t border-line/60 relative">
           <div className="mx-auto max-w-6xl px-4">
-            <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">
-              In drei Schritten zum vollen Schichtplan.
-            </h2>
-            <ol className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                {
-                  icon: CalendarPlus,
-                  title: 'Anlass erfassen',
-                  text: 'Das OK legt Schichten an: wann, was zu tun ist und wie viele Leute es braucht. Mit einer Vorlage vom Vorjahr geht das in Minuten.',
-                },
-                {
-                  icon: Share2,
-                  title: 'Link teilen',
-                  text: 'Den Link per WhatsApp, Mail oder Flyer verschicken. Ihr bestimmt, wer sich eintragen darf: alle, nur eure Abteilung oder einzelne Stufen.',
-                },
-                {
-                  icon: UserCheck,
-                  title: 'Alle tragen sich ein',
-                  text: 'Helfer*innen wählen ihre Schicht selbst, auch Eltern und Ehemalige ohne Cevi.DB. Das OK sieht sofort, wo noch Lücken sind.',
-                },
-              ].map((step, index) => (
-                <li key={step.title} className="rounded-card border border-line bg-surface/80 p-6 shadow-soft">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-10 items-center justify-center rounded-full bg-accent/12 text-accent-ink">
-                      <step.icon className="size-5" />
-                    </span>
-                    <span className="font-mono text-xs font-bold text-fg-subtle">Schritt {index + 1}</span>
-                  </div>
-                  <h3 className="mt-4 font-display text-xl font-bold text-fg">{step.title}</h3>
-                  <p className="mt-2 text-sm text-fg-muted leading-relaxed">{step.text}</p>
-                </li>
-              ))}
-            </ol>
+            <Reveal>
+              <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">
+                In drei Schritten zum vollen Schichtplan.
+              </h2>
+            </Reveal>
+            <StepsTimeline />
           </div>
         </section>
 
@@ -316,7 +288,7 @@ export default function LandingPage() {
         {/* Section 3: Zielgruppen & Was es euch bringt */}
         <section className="py-20 md:py-28 border-t border-line/60 bg-surface/30 relative">
           <div className="mx-auto max-w-6xl px-4">
-            <div className="max-w-2xl mb-12 sm:mb-16">
+            <Reveal className="max-w-2xl mb-12 sm:mb-16">
               <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-2xs font-bold uppercase tracking-[0.16em] bg-surface-2 border border-line text-fg-subtle mb-3">
                 <Sparkles className="size-3 text-accent" />
                 Was es euch bringt
@@ -328,11 +300,11 @@ export default function LandingPage() {
                 Ob du am Grill stehst, den Anlass organisierst oder die ganze Abteilung leitest – der Schichtplan
                 nimmt euch die mühsame Organisation ab.
               </p>
-            </div>
+            </Reveal>
 
             {/* Zielgruppen-Gliederung */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-              <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
+              <Reveal className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
                   <Heart className="size-3.5" />
                   <span>Für Helfer*innen</span>
@@ -343,9 +315,9 @@ export default function LandingPage() {
                 <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
                   Schicht direkt im Chat-Browser auswählen. Kein neues Passwort nötig und automatische Kalender-Erinnerung vor dem Einsatz.
                 </p>
-              </div>
+              </Reveal>
 
-              <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
+              <Reveal delay={100} className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-500">
                   <Users className="size-3.5" />
                   <span>Für das Anlass-OK</span>
@@ -356,9 +328,9 @@ export default function LandingPage() {
                 <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
                   Live-Übersicht über alle Schichten, automatische Altersprüfung (z.&nbsp;B. Bar ab 18) und Vorlagen vom Vorjahr mit einem Klick.
                 </p>
-              </div>
+              </Reveal>
 
-              <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
+              <Reveal delay={200} className="rounded-2xl border border-line bg-surface/70 p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-500">
                   <ShieldCheck className="size-3.5" />
                   <span>Für die Abteilungsleitung</span>
@@ -369,13 +341,13 @@ export default function LandingPage() {
                 <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
                   Feste Subdomain mit Logo und Farbe eurer Abteilung. Leitungsrechte werden direkt aus der Cevi.DB übernommen.
                 </p>
-              </div>
+              </Reveal>
             </div>
 
             {/* Asymmetrical Feature Bento Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6">
               {/* Tile 1: Cevi.DB Single Sign-On (Large 7-cols) */}
-              <div className="md:col-span-7">
+              <Reveal className="md:col-span-7">
                 <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
                   <div>
                     <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
@@ -400,10 +372,10 @@ export default function LandingPage() {
                     <span className="text-2xs text-fg-subtle">Einmal anmelden, auf allen Abteilungsseiten drin</span>
                   </div>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Tile 2: Eigene Subdomain (5-cols) */}
-              <div className="md:col-span-5">
+              <Reveal delay={100} className="md:col-span-5">
                 <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
                   <div>
                     <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
@@ -426,10 +398,10 @@ export default function LandingPage() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Tile 3: Multi-Event Unterstützung (5-cols) */}
-              <div className="md:col-span-5">
+              <Reveal className="md:col-span-5">
                 <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
                   <div>
                     <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
@@ -451,10 +423,10 @@ export default function LandingPage() {
                     <span className="text-2xs text-fg-subtle">Jedes OK sieht seinen Bereich</span>
                   </div>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Tile 4: Mobil optimiert & PWA (7-cols) */}
-              <div className="md:col-span-7">
+              <Reveal delay={100} className="md:col-span-7">
                 <div className="h-full rounded-card border border-line/80 bg-surface p-6 sm:p-8 shadow-soft hover:shadow-lift hover:border-line-strong transition-all duration-200 flex flex-col justify-between">
                   <div>
                     <h3 className="font-display text-xl sm:text-2xl font-bold text-fg">
@@ -479,7 +451,7 @@ export default function LandingPage() {
                     <span className="text-2xs text-fg-subtle">z. B. Barbetrieb ab 18</span>
                   </div>
                 </div>
-              </div>
+              </Reveal>
             </div>
           </div>
         </section>
@@ -487,7 +459,7 @@ export default function LandingPage() {
         {/* Strong Final Conversion & Help Section before Footer */}
         <section className="py-16 md:py-24 border-t border-line/60">
           <div className="mx-auto max-w-6xl px-4">
-            <div className="rounded-card border border-line bg-surface/90 p-8 sm:p-12 shadow-soft relative overflow-hidden">
+            <Reveal className="rounded-card border border-line bg-surface/90 p-8 sm:p-12 shadow-soft relative overflow-hidden">
               <div className="max-w-2xl">
                 <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-2xs font-bold uppercase tracking-wider bg-accent/12 text-accent-ink border border-accent/25 mb-4">
                   <Flame className="size-3 text-accent" />
@@ -561,7 +533,7 @@ export default function LandingPage() {
                   Ein ehrenamtliches Projekt · Kostenlos für alle Abteilungen des Cevi Schweiz.
                 </p>
               </div>
-            </div>
+            </Reveal>
           </div>
         </section>
       </main>

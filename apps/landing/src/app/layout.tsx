@@ -105,7 +105,7 @@ export default async function RootLayout({
   const { origin } = await getRequestOrigin();
 
   return (
-    <html lang="de-CH" className={fontVariables} suppressHydrationWarning>
+    <html lang="de-CH" className={`${fontVariables} scroll-smooth`} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <ThemeScript />
         <JsonLd origin={origin} />
