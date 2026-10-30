@@ -12,6 +12,8 @@ const ACTION_LABELS: Record<string, string> = {
   LEADER_REVOKE: 'Abteilungsleitung entzogen',
   STUFEN_SET: 'Stufen geändert',
   MEMBER_REMOVE: 'Aus der Abteilung entfernt',
+  MEMBER_CONFIRM: 'Zugehörigkeit bestätigt',
+  MEMBER_UNCONFIRM: 'Bestätigung aufgehoben',
 };
 
 const list = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v) => typeof v === 'string') : []);

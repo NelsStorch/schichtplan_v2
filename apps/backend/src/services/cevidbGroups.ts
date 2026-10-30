@@ -107,8 +107,13 @@ async function refreshGroups(
   const results: CeviDbGroupInfo[] = [];
   const worker = async () => {
     for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-      const info = await fetchGroup(baseUrl, accessToken, id, signal, log);
-      if (info) results.push(info);
+      // Ein Fehler betrifft nur diese Gruppe: Was schon gelesen ist, wird trotzdem gespeichert
+      try {
+        const info = await fetchGroup(baseUrl, accessToken, id, signal, log);
+        if (info) results.push(info);
+      } catch (err) {
+        log.warn({ groupId: id, reason: err instanceof Error ? err.message : 'unbekannt' }, 'Cevi.DB: Gruppe nicht erreichbar');
+      }
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));

@@ -60,8 +60,8 @@ export async function storeCeviDbFields(
         ceviDbDepartmentLeader: derived.isDepartmentLeader,
         ceviDbLeaderGroupName: derived.leaderGroupName,
         ceviDbLeaderGroupIds: derived.leaderGroupIds,
-        // Ohne Gruppenstruktur bleibt der letzte geprüfte Stand
-        ...(placement.verified ? { ceviDbJungscharIds: placement.jungscharIds } : {}),
+        // Ohne vollständige Gruppenstruktur bleibt der letzte geprüfte Stand
+        ...(placement.verified && placement.complete ? { ceviDbJungscharIds: placement.jungscharIds } : {}),
       },
     });
     await tx.userCeviDbStufe.deleteMany({ where: { userId } });
@@ -218,6 +218,16 @@ export async function syncCeviDbStufen(prisma: Db, userId: string) {
   });
 }
 
+/** Gehört in jedes Schreiben von homeDepartmentSource, das eine Bestätigung beendet */
+export const NO_HOME_CONFIRMATION = { homeDepartmentConfirmedAt: null, homeDepartmentConfirmedById: null };
+
+/** Ortsgruppe zur Cevi.DB-Gruppe einer Abteilung: die Gruppe selbst oder die Ortsgruppe ihrer Jungschar */
+export async function departmentOrtsgruppeId(prisma: Pick<Db, 'ceviDbGroup'>, groupId: number | null) {
+  if (groupId === null) return null;
+  const group = await prisma.ceviDbGroup.findUnique({ where: { id: groupId }, select: { ortsgruppeId: true } });
+  return group?.ortsgruppeId ?? groupId;
+}
+
 /**
  * Wer gehört laut Cevi.DB zur Gruppe einer Abteilung (Jungschar oder Ortsgruppe) und wer leitet sie?
  * Die Leitung zählt nur über die Gruppe der Rolle: bei einer Ortsgruppe über ihre einzige Jungschar.
@@ -267,6 +277,7 @@ export async function syncCeviDbHomeDepartment(
       data: {
         homeDepartmentId: department.id,
         homeDepartmentSource: 'CEVIDB',
+        ...NO_HOME_CONFIRMATION,
         departmentSetupAt: user.departmentSetupAt ?? new Date(),
       },
     });
@@ -281,8 +292,21 @@ export async function syncCeviDbHomeDepartment(
     if (current?.homeDepartmentId) {
       await autoCreateCeviDbDepartmentStufen(prisma, current.homeDepartmentId, user.id);
     }
-    if (placement.verified) {
-      if (placement.complete && user.homeDepartmentSource === 'CEVIDB') {
+    // Bestätigt ist eine Person nur, solange ihre Rollen in der Ortsgruppe der Abteilung liegen
+    if (current?.homeDepartmentId && user.homeDepartmentSource === 'CONFIRMED' && placement.complete) {
+      const home = await prisma.department.findUnique({
+        where: { id: current.homeDepartmentId },
+        select: { ceviDbGroupId: true },
+      });
+      if ((await departmentOrtsgruppeId(prisma, home?.ceviDbGroupId ?? null)) !== placement.ortsgruppeId) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { homeDepartmentSource: 'SELF', ...NO_HOME_CONFIRMATION },
+        });
+      }
+    }
+    if (placement.verified && placement.complete) {
+      if (user.homeDepartmentSource === 'CEVIDB') {
         // Abteilung gewechselt oder gelöscht: erneut nachfragen
         await prisma.user.update({
           where: { id: user.id },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { audienceLabel, checkRules, evaluateEventAccess, type AccessEvent, type AccessUser } from './eventAccess.js';
+import { audienceLabel, checkRules, evaluateEventAccess, isVerifiedHomeSource, type AccessEvent, type AccessUser } from './eventAccess.js';
 import { EVENT_CAPABILITIES, type EventCapability } from '@schichtplan/shared';
 
 const HOME = 'dep-home';
@@ -171,5 +171,23 @@ describe('audienceLabel', () => {
     });
     expect(audienceLabel(ev, 'Cevi Home')).toBe('Cevi Home (Hiskia), Cevi Other, mit Cevi.DB-Login, nur Leitende');
     expect(audienceLabel(event(), 'Cevi Home')).toBe('alle mit Konto');
+  });
+});
+
+describe('bestätigte Zugehörigkeit', () => {
+  const internal = event({ accessType: 'DEPARTMENT_CEVIDB' });
+
+  it('zählt bei Cevi.DB-Anlässen wie aus Cevi.DB', () => {
+    expect(isVerifiedHomeSource('CONFIRMED')).toBe(true);
+    expect(isVerifiedHomeSource('CEVIDB')).toBe(true);
+    expect(isVerifiedHomeSource('SELF')).toBe(false);
+    expect(isVerifiedHomeSource(null)).toBe(false);
+  });
+
+  it('lässt nur Bestätigte der eigenen Abteilung zu', () => {
+    const home = internal.departmentId;
+    const person = { ceviDbId: 1, homeDepartmentId: home };
+    expect(checkRules(internal, user({ ...person, homeDepartmentSource: 'CONFIRMED' }), 'Abteilung').ok).toBe(true);
+    expect(checkRules(internal, user({ ...person, homeDepartmentSource: 'SELF' }), 'Abteilung').ok).toBe(false);
   });
 });

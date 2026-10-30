@@ -20,6 +20,7 @@ import { refreshCeviDbGroups } from '../services/cevidbGroups.js';
 import { cevidbConfig } from '../config/cevidb.js';
 import {
   autoCreateCeviDbDepartmentStufen,
+  NO_HOME_CONFIRMATION,
   storeCeviDbFields,
   resolveCeviDbPlacement,
   syncCeviDbHomeDepartment,
@@ -1241,6 +1242,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       const fromCeviDb = current.homeDepartmentSource === 'CEVIDB';
       const departmentId = fromCeviDb ? current.homeDepartmentId : parse.data.departmentId;
+      // Stufen ändern lässt eine Bestätigung bestehen, ein Abteilungswechsel beendet sie
+      const staysConfirmed = current.homeDepartmentSource === 'CONFIRMED' && departmentId === current.homeDepartmentId;
 
       if (departmentId && !fromCeviDb) {
         const exists = await fastify.prisma.department.count({ where: { id: departmentId } });
@@ -1263,7 +1266,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: userId },
           data: {
             homeDepartmentId: departmentId,
-            homeDepartmentSource: departmentId ? (fromCeviDb ? 'CEVIDB' : 'SELF') : null,
+            ...(staysConfirmed
+              ? {}
+              : { homeDepartmentSource: departmentId ? (fromCeviDb ? 'CEVIDB' : 'SELF') : null, ...NO_HOME_CONFIRMATION }),
             departmentSetupAt: new Date(),
           },
         });

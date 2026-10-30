@@ -15,7 +15,7 @@ import {
   type DepartmentStufeDto,
   type StufeSuggestionDto,
 } from '@schichtplan/shared';
-import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen, ceviDbGroupPeople } from '../services/homeDepartment.js';
+import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen, ceviDbGroupPeople, departmentOrtsgruppeId, NO_HOME_CONFIRMATION } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
 import { UNRELATED_PERSON_ERROR, isDepartmentInsider, isDepartmentManager } from '../services/departmentVisibility.js';
 import { canGrantPermissions, departmentAccess, type DepartmentAccess } from '../services/permissions.js';
@@ -308,6 +308,38 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     return canGrantPermissions(actor, target.permissions);
   }
 
+  const homeSource = (source: string | null): 'CEVIDB' | 'CONFIRMED' | 'SELF' =>
+    source === 'CEVIDB' || source === 'CONFIRMED' ? source : 'SELF';
+
+  /**
+   * Zugehörigkeit bestätigen: für Cevi.DB-Personen, die die Abteilung selbst gewählt haben, weil ihre Rollen zu keiner
+   * Abteilung führen (z. B. nur im Vorstand einer Ortsgruppe mit mehreren Jungscharen). Nur die Abteilungsleitung,
+   * nie für sich selbst, und nur innerhalb derselben Ortsgruppe.
+   */
+  function canConfirmHome(
+    actor: DepartmentAccess,
+    actorId: string,
+    target: {
+      id: string;
+      ceviDbId: number | null;
+      ceviDbOrtsgruppeId: number | null;
+      homeDepartmentId: string | null;
+      homeDepartmentSource: string | null;
+    },
+    departmentId: string,
+    ortsgruppeId: number | null
+  ) {
+    return (
+      actor.hasFullAccess &&
+      target.id !== actorId &&
+      target.ceviDbId !== null &&
+      target.homeDepartmentId === departmentId &&
+      target.homeDepartmentSource === 'SELF' &&
+      ortsgruppeId !== null &&
+      target.ceviDbOrtsgruppeId === ortsgruppeId
+    );
+  }
+
   // Personen der Abteilung: Heimabteilung hier, Abteilungsleitung oder Rechte. Mit ?alle=1 auch Gäste
   // (über die Subdomain angemeldet, ohne Heimabteilung und ohne Rechte), damit man ihnen Rechte geben kann.
   fastify.get<{ Querystring: { alle?: string } }>(
@@ -319,6 +351,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenant, access } = ctx;
       reply.header('Cache-Control', 'no-store');
       const withGuests = request.query.alle === '1';
+      const ortsgruppeId = await departmentOrtsgruppeId(fastify.prisma, tenant.ceviDbGroupId);
       const users = await fastify.prisma.user.findMany({
         where: {
           OR: [
@@ -342,6 +375,9 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           homeDepartmentSource: true,
           passwordHash: true,
           ceviDbId: true,
+          ceviDbOrtsgruppeId: true,
+          homeDepartmentConfirmedAt: true,
+          homeDepartmentConfirmedBy: { select: { ceviName: true, firstName: true, lastName: true } },
           memberships: {
             where: { departmentId: tenant.id },
             select: { role: true, permissions: true, leaderSource: true },
@@ -365,7 +401,10 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           firstName: u.firstName,
           lastName: u.lastName,
           isHomeDepartment: isHome,
-          source: isHome ? (u.homeDepartmentSource === 'CEVIDB' ? 'CEVIDB' : 'SELF') : null,
+          source: isHome ? homeSource(u.homeDepartmentSource) : null,
+          canConfirmHome: canConfirmHome(access, request.user.id, u, tenant.id, ortsgruppeId),
+          confirmedAt: isHome ? (u.homeDepartmentConfirmedAt?.toISOString() ?? null) : null,
+          confirmedBy: isHome && u.homeDepartmentConfirmedBy ? personLabel(u.homeDepartmentConfirmedBy) : null,
           departmentRole: role,
           permissions,
           leaderSource:
@@ -516,6 +555,86 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Zugehörigkeit bestätigen (siehe canConfirmHome): Die Person zählt danach bei Cevi.DB-Anlässen
+  fastify.post<{ Params: { userId: string } }>(
+    '/api/departments/current/people/:userId/confirm',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
+      if (!ctx) return;
+      const { tenant, access } = ctx;
+      if (!access.hasFullAccess) {
+        return reply.status(403).send({ error: 'Bestätigen kann nur die Abteilungsleitung.' });
+      }
+      const user = await fastify.prisma.user.findFirst({
+        where: { id: request.params.userId, homeDepartmentId: tenant.id },
+        select: {
+          id: true,
+          ceviDbId: true,
+          ceviDbOrtsgruppeId: true,
+          homeDepartmentId: true,
+          homeDepartmentSource: true,
+          ceviName: true,
+          firstName: true,
+          lastName: true,
+        },
+      });
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+      const ortsgruppeId = await departmentOrtsgruppeId(fastify.prisma, tenant.ceviDbGroupId);
+      if (!canConfirmHome(access, request.user.id, user, tenant.id, ortsgruppeId)) {
+        return reply
+          .status(400)
+          .send({ error: 'Bestätigen geht nur für andere Personen mit Cevi.DB-Konto aus eurer Ortsgruppe, die die Abteilung selbst gewählt haben.' });
+      }
+      await fastify.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          homeDepartmentSource: 'CONFIRMED',
+          homeDepartmentConfirmedAt: new Date(),
+          homeDepartmentConfirmedById: request.user.id,
+        },
+      });
+      await recordDepartmentAction(fastify.prisma, request.log, {
+        departmentId: tenant.id,
+        actorId: request.user.id,
+        action: 'MEMBER_CONFIRM',
+        targetUserId: user.id,
+        targetLabel: personLabel(user),
+      });
+      return { message: 'Zugehörigkeit bestätigt' };
+    }
+  );
+
+  fastify.delete<{ Params: { userId: string } }>(
+    '/api/departments/current/people/:userId/confirm',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
+      if (!ctx) return;
+      const { tenant, access } = ctx;
+      if (!access.hasFullAccess) {
+        return reply.status(403).send({ error: 'Bestätigen kann nur die Abteilungsleitung.' });
+      }
+      const user = await fastify.prisma.user.findFirst({
+        where: { id: request.params.userId, homeDepartmentId: tenant.id, homeDepartmentSource: 'CONFIRMED' },
+        select: { id: true, ceviName: true, firstName: true, lastName: true },
+      });
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+      await fastify.prisma.user.update({
+        where: { id: user.id },
+        data: { homeDepartmentSource: 'SELF', ...NO_HOME_CONFIRMATION },
+      });
+      await recordDepartmentAction(fastify.prisma, request.log, {
+        departmentId: tenant.id,
+        actorId: request.user.id,
+        action: 'MEMBER_UNCONFIRM',
+        targetUserId: user.id,
+        targetLabel: personLabel(user),
+      });
+      return { message: 'Bestätigung aufgehoben' };
+    }
+  );
+
   // Selbst angegebene Zugehörigkeit entfernen (Angaben aus Cevi.DB lassen sich hier nicht ändern).
   // Rechte in der Abteilung fallen dabei weg.
   fastify.delete<{ Params: { userId: string } }>(
@@ -560,7 +679,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         }),
         fastify.prisma.user.update({
           where: { id: user.id },
-          data: { homeDepartmentId: null, homeDepartmentSource: null, departmentSetupAt: null },
+          data: { homeDepartmentId: null, homeDepartmentSource: null, ...NO_HOME_CONFIRMATION, departmentSetupAt: null },
         }),
       ]);
       await recordDepartmentAction(fastify.prisma, request.log, {
@@ -741,7 +860,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           });
           await tx.user.update({
             where: { id: request.user.id },
-            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
+            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', ...NO_HOME_CONFIRMATION, departmentSetupAt: new Date() },
           });
 
           // Alle bereits angemeldeten Cevi.DB-Personen dieser Gruppe werden Helfer*innen bzw. Abteilungsleitung
@@ -749,7 +868,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           const people = await ceviDbGroupPeople(tx, ceviDbGroupId);
           await tx.user.updateMany({
             where: { id: { in: people.filter((p) => p.moveHome).map((p) => p.id) } },
-            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
+            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', ...NO_HOME_CONFIRMATION, departmentSetupAt: new Date() },
           });
           await tx.departmentMember.createMany({
             data: people.map((p) => ({

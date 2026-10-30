@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Crown, Database, LayoutList, Pencil, Table2, UserMinus } from 'lucide-react';
+import { BadgeCheck, Check, Crown, Database, LayoutList, Pencil, Table2, UserMinus } from 'lucide-react';
 import {
   DEPARTMENT_PERMISSION_KEYS,
   DEPARTMENT_PERMISSIONS,
   STUFE_ROLES,
   departmentRoleLabel,
+  formatZurichDate,
   type DepartmentPermission,
   type DepartmentPersonDto,
   type DepartmentStufeDto,
@@ -68,6 +69,34 @@ export function DepartmentPeoplePanel() {
       await load();
     } catch (err) {
       toast({ title: 'Entfernen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+    }
+  };
+
+  const confirmHome = async (person: DepartmentPersonDto) => {
+    const name = person.ceviName || person.firstName;
+    const ok = await confirm({
+      title: `${name} bestätigen?`,
+      description:
+        'Die Person gehört laut dir zu eurer Abteilung und zählt danach auch bei Anlässen «Abteilungs-intern, Cevi.DB». Das steht im Protokoll.',
+      confirmLabel: 'Bestätigen',
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/departments/current/people/${person.userId}/confirm`, { method: 'POST', json: {} });
+      toast({ title: `${name} bestätigt` });
+      await load();
+    } catch (err) {
+      toast({ title: 'Bestätigen hat nicht geklappt', description: errorMessage(err), tone: 'error' });
+    }
+  };
+
+  const unconfirmHome = async (person: DepartmentPersonDto) => {
+    try {
+      await api(`/api/departments/current/people/${person.userId}/confirm`, { method: 'DELETE' });
+      setEditing(null);
+      await load();
+    } catch (err) {
+      toast({ title: 'Aufheben hat nicht geklappt', description: errorMessage(err), tone: 'error' });
     }
   };
 
@@ -162,6 +191,11 @@ export function DepartmentPeoplePanel() {
                         <Database className="size-3" /> Cevi.DB
                       </Badge>
                     )}
+                    {p.source === 'CONFIRMED' && (
+                      <Badge size="sm">
+                        <BadgeCheck className="size-3" /> Bestätigt
+                      </Badge>
+                    )}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-fg-subtle">
                     {!p.isHomeDepartment
@@ -170,7 +204,18 @@ export function DepartmentPeoplePanel() {
                         ? p.stufen.map((s) => `${s.name} (${STUFE_ROLES[s.role]})`).join(', ')
                         : 'Keine Stufe'}
                   </p>
+                  {p.source === 'CONFIRMED' && (
+                    <p className="mt-0.5 text-xs text-fg-subtle">
+                      Von Hand bestätigt{p.confirmedBy ? ` von ${p.confirmedBy}` : ''}
+                      {p.confirmedAt ? ` am ${formatZurichDate(p.confirmedAt)}` : ''}, nicht aus Cevi.DB
+                    </p>
+                  )}
                 </div>
+                {p.canConfirmHome && (
+                  <Button size="sm" variant="ghost" onClick={() => confirmHome(p)} aria-label={`${p.displayName} bestätigen`}>
+                    <BadgeCheck /> <span className="hidden sm:inline">Bestätigen</span>
+                  </Button>
+                )}
                 {p.canEdit && (
                   <Button
                     size="sm"
@@ -191,6 +236,7 @@ export function DepartmentPeoplePanel() {
                   isSelf={user?.id === p.userId}
                   onCancel={() => setEditing(null)}
                   onRemove={() => remove(p)}
+                  onUnconfirm={isDeptAdmin && p.source === 'CONFIRMED' ? () => unconfirmHome(p) : undefined}
                   onSaved={async () => {
                     setEditing(null);
                     toast({ title: `${p.ceviName || p.firstName} gespeichert` });
@@ -272,6 +318,7 @@ function PersonEditor({
   isSelf,
   onCancel,
   onRemove,
+  onUnconfirm,
   onSaved,
 }: {
   person: DepartmentPersonDto;
@@ -280,6 +327,7 @@ function PersonEditor({
   isSelf: boolean;
   onCancel: () => void;
   onRemove: () => void;
+  onUnconfirm?: () => void;
   onSaved: () => void;
 }) {
   const [roles, setRoles] = useState<Record<string, StufeRole>>(
@@ -383,13 +431,18 @@ function PersonEditor({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-        {person.isHomeDepartment && person.source === 'SELF' && !isLeader ? (
-          <Button size="sm" variant="ghost" onClick={onRemove} className="hover:text-danger-ink">
-            <UserMinus /> Aus Abteilung entfernen
-          </Button>
-        ) : (
-          <span />
-        )}
+        <div className="flex flex-wrap gap-2">
+          {person.isHomeDepartment && person.source !== 'CEVIDB' && !isLeader && (
+            <Button size="sm" variant="ghost" onClick={onRemove} className="hover:text-danger-ink">
+              <UserMinus /> Aus Abteilung entfernen
+            </Button>
+          )}
+          {onUnconfirm && (
+            <Button size="sm" variant="ghost" onClick={onUnconfirm}>
+              Bestätigung aufheben
+            </Button>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button size="sm" variant="ghost" onClick={onCancel}>
             Abbrechen

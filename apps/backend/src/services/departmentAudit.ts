@@ -7,7 +7,14 @@ import { Prisma, PrismaClient } from '../db.js';
 import type { DepartmentAuditEntryDto } from '@schichtplan/shared';
 import { personLabel } from './profile.js';
 
-export type DepartmentAuditAction = 'PERMISSIONS_SET' | 'LEADER_GRANT' | 'LEADER_REVOKE' | 'STUFEN_SET' | 'MEMBER_REMOVE';
+export type DepartmentAuditAction =
+  | 'PERMISSIONS_SET'
+  | 'LEADER_GRANT'
+  | 'LEADER_REVOKE'
+  | 'STUFEN_SET'
+  | 'MEMBER_REMOVE'
+  | 'MEMBER_CONFIRM'
+  | 'MEMBER_UNCONFIRM';
 
 export interface DepartmentAuditEntry {
   departmentId: string;

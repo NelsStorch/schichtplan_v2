@@ -130,7 +130,7 @@ function PersonRow({
         <span className="flex flex-wrap items-center gap-2 pl-10 sm:pl-0">
           {person.isHome && (
             <Badge tone="outline" title="Heimabteilung">
-              {person.homeSource === 'CEVIDB' ? 'Heim · Cevi.DB' : 'Heim · selbst'}
+              {person.homeSource === 'CEVIDB' ? 'Heim · Cevi.DB' : person.homeSource === 'CONFIRMED' ? 'Heim · bestätigt' : 'Heim · selbst'}
             </Badge>
           )}
           {person.role === 'ADMIN' && (
@@ -426,6 +426,8 @@ const AUDIT_LABELS: Record<string, string> = {
   LEADER_REVOKE: 'Abteilungsleitung entzogen',
   STUFEN_SET: 'Stufen geändert',
   MEMBER_REMOVE: 'Aus der Abteilung entfernt',
+  MEMBER_CONFIRM: 'Zugehörigkeit bestätigt',
+  MEMBER_UNCONFIRM: 'Bestätigung aufgehoben',
 };
 
 /** Protokoll der Abteilung (Rechte, Abteilungsleitung, Stufen), auch was die Abteilung selbst geändert hat */

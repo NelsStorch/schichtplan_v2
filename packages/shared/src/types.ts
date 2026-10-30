@@ -346,7 +346,13 @@ export interface DepartmentPersonDto {
   lastName: string | null;
   /** Heimabteilung ist diese Abteilung (sonst nur wegen einer Rolle in der Liste) */
   isHomeDepartment: boolean;
-  source: 'SELF' | 'CEVIDB' | null;
+  /** CONFIRMED: selbst gewählt, von der Abteilungsleitung bestätigt (zählt bei Cevi.DB-Anlässen) */
+  source: 'SELF' | 'CEVIDB' | 'CONFIRMED' | null;
+  /** Kann die angemeldete Person die Zugehörigkeit bestätigen? (nur Abteilungsleitung, Cevi.DB-Konto derselben Ortsgruppe) */
+  canConfirmHome: boolean;
+  /** Bei CONFIRMED: wann und von wem (null, wenn das Konto inzwischen gelöscht ist) */
+  confirmedAt: string | null;
+  confirmedBy: string | null;
   /** Rolle im Schichtplan dieser Abteilung (ADMIN = Abteilungsleitung) */
   departmentRole: 'ADMIN' | 'HELPER' | null;
   /** Gespeicherte Rechte (bei der Abteilungsleitung ohne Bedeutung) */
@@ -408,7 +414,7 @@ export interface DepartmentAuditEntryDto {
   /** null = automatisch über den Cevi.DB-Login */
   actorId: string | null;
   actorName: string;
-  /** PERMISSIONS_SET, LEADER_GRANT, LEADER_REVOKE, STUFEN_SET, MEMBER_REMOVE */
+  /** PERMISSIONS_SET, LEADER_GRANT, LEADER_REVOKE, STUFEN_SET, MEMBER_REMOVE, MEMBER_CONFIRM, MEMBER_UNCONFIRM */
   action: string;
   targetUserId: string | null;
   targetLabel: string;

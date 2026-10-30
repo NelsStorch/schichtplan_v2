@@ -132,7 +132,12 @@ model User {
   ceviDbSyncedAt DateTime?         // Zeitstempel der letzten Cevi.DB Synchronisation
   // Heimabteilung: aus Cevi.DB (Ortsgruppe) oder beim Login selbst angegeben
   homeDepartmentId     String?     @map("home_department_id")
-  homeDepartmentSource String?     @map("home_department_source") // "CEVIDB", "SELF"
+  homeDepartmentSource String?     @map("home_department_source") // "CEVIDB", "SELF", "CONFIRMED" (selbst gewählt, von der Abteilungsleitung bestätigt)
+  // Nur bei "CONFIRMED" gesetzt: Wer hat die Zugehörigkeit wann bestätigt? (Verlauf im Protokoll der Abteilung)
+  homeDepartmentConfirmedAt   DateTime? @map("home_department_confirmed_at")
+  homeDepartmentConfirmedById String?   @map("home_department_confirmed_by_id")
+  homeDepartmentConfirmedBy   User?     @relation("HomeDepartmentConfirmedBy", fields: [homeDepartmentConfirmedById], references: [id], onDelete: SetNull)
+  confirmedHomeDepartments    User[]    @relation("HomeDepartmentConfirmedBy")
   // Gesetzt, sobald die Person ihre Abteilung angegeben hat (auch «keine Abteilung»). Null = nachfragen.
   departmentSetupAt    DateTime?   @map("department_setup_at")
   emailVerified       Boolean            @default(false) @map("email_verified")

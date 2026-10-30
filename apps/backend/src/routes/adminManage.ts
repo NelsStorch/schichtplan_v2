@@ -21,7 +21,7 @@ import {
   type AdminEventListItemDto,
   normalizePermissions,
 } from '@schichtplan/shared';
-import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, ceviDbGroupPeople } from '../services/homeDepartment.js';
+import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, ceviDbGroupPeople, NO_HOME_CONFIRMATION } from '../services/homeDepartment.js';
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
 import { mergeUserInto } from '../services/mergeProfiles.js';
 import { personLabel } from '../services/profile.js';
@@ -191,7 +191,7 @@ async function attachCeviDbGroup(prisma: PrismaClient, departmentId: string, gro
   await prisma.$transaction([
     prisma.user.updateMany({
       where: { id: { in: people.filter((p) => p.moveHome).map((p) => p.id) } },
-      data: { homeDepartmentId: departmentId, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
+      data: { homeDepartmentId: departmentId, homeDepartmentSource: 'CEVIDB', ...NO_HOME_CONFIRMATION, departmentSetupAt: new Date() },
     }),
     prisma.departmentMember.createMany({
       data: people.map((p) => ({
@@ -580,7 +580,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
       // Heimabteilung fällt weg: beim nächsten Login wieder nachfragen
       fastify.prisma.user.updateMany({
         where: { homeDepartmentId: department.id },
-        data: { homeDepartmentId: null, homeDepartmentSource: null, departmentSetupAt: null },
+        data: { homeDepartmentId: null, homeDepartmentSource: null, ...NO_HOME_CONFIRMATION, departmentSetupAt: null },
       }),
       // Kaskadiert zu Anlässen, Schichten, Eintragungen, Rollen, Stufen, Vorlagen und Arbeiten
       fastify.prisma.department.delete({ where: { id: department.id } }),
@@ -927,6 +927,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
           data: {
             homeDepartmentId,
             homeDepartmentSource: homeDepartmentId ? 'SELF' : null,
+            ...NO_HOME_CONFIRMATION,
             departmentSetupAt: new Date(),
           },
         });

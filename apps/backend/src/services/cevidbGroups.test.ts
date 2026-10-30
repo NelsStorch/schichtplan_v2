@@ -161,6 +161,20 @@ describe('refreshCeviDbGroups', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('speichert trotz eines Fehlers bei einer Gruppe, was gelesen ist', async () => {
+    const fetchMock = stubFetch();
+    const answer = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/805.json')) throw new Error('Netzwerk');
+      return answer(url, init);
+    });
+    const db = fakeDb();
+    await refreshCeviDbGroups(db as any, log, { ...options, groupIds: [805, 806] });
+    expect(db.rows.has(805)).toBe(false);
+    expect(db.rows.get(806).ortsgruppeId).toBe(161);
+    expect(db.rows.get(161).jungscharCount).toBe(2);
+  });
+
   it('lässt den Login bei einem Fehler nicht scheitern und behält den alten Stand', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Netzwerk')));
     const old = new Date(Date.now() - 2 * 24 * 3600 * 1000);

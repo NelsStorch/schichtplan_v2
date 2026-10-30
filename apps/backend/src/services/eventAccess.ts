@@ -37,6 +37,14 @@ export const accessEventInclude = {
 } as const;
 
 /** Was die Prüfung von der Person braucht */
+/**
+ * Zählt die Heimabteilung bei Cevi.DB-Anlässen? Aus Cevi.DB oder von der Abteilungsleitung bestätigt
+ * (Personen, deren Rollen keiner Abteilung zuzuordnen sind, z. B. nur im Vorstand).
+ */
+export function isVerifiedHomeSource(source: string | null): boolean {
+  return source === 'CEVIDB' || source === 'CONFIRMED';
+}
+
 export interface AccessUser {
   id: string;
   isGlobalAdmin: boolean;
@@ -150,7 +158,7 @@ export function checkRules(event: AccessEvent, user: AccessUser, departmentName:
       ...(cfg.whitelist ? event.allowedDepartments.map((a) => a.departmentId) : []),
     ]);
     const personDepartmentId =
-      cfg.ceviDb && user.homeDepartmentSource !== 'CEVIDB' ? null : user.homeDepartmentId;
+      cfg.ceviDb && !isVerifiedHomeSource(user.homeDepartmentSource) ? null : user.homeDepartmentId;
 
     if (!personDepartmentId) {
       return cfg.ceviDb
