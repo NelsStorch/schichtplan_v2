@@ -19,6 +19,7 @@ import { EventForm, eventFormInitial } from '@/components/EventFormDialog';
 import { EventRangeField } from '@/components/ok/EventRangeField';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
+import { SectionNav, SectionsProvider } from '@/components/ok/SettingsSections';
 import { OrganizerDialog } from '@/components/ShiftDialogs';
 import { api, errorMessage } from '@/lib/api';
 import type { EventOrganizer } from '@/lib/types';
@@ -32,6 +33,10 @@ const SECTIONS = [
   ['anwesenheit', 'Anwesenheit'],
   ['design', 'Design'],
 ] as const;
+
+const SECTION_IDS = SECTIONS.map(([id]) => id);
+/** Selten gebraucht: Beim Öffnen eingeklappt mit Zusammenfassung */
+const COLLAPSED_SECTIONS = ['zustaendigkeiten', 'anwesenheit', 'design'];
 
 /**
  * Anlass endgültig löschen (nur Abteilungsleitung). Der Knopf wird erst aktiv, wenn das Kürzel
@@ -78,7 +83,7 @@ function DeleteEventSection({
   const matches = typed.trim() === slug;
 
   return (
-    <section id="loeschen" className="mt-6 scroll-mt-24">
+    <section id="loeschen" className="mt-6">
       <Card className="border-danger/30 bg-danger/5 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -178,26 +183,16 @@ export default function SettingsPage() {
   const organizers = event.organizers ?? [];
 
   return (
-    <div>
+    <SectionsProvider sections={SECTION_IDS} collapsed={COLLAPSED_SECTIONS}>
       <OkPageHeader
         title="Einstellungen"
-        description="Alles, was für den ganzen Anlass gilt. Änderungen am Formular gelten erst nach «Speichern», das OK-Team ändert sich sofort."
+        description="Alles, was für den ganzen Anlass gilt. Änderungen werden automatisch gespeichert, eine neue Adresse erst nach deiner Bestätigung."
         help="/ok/anlass-erstellen/"
       />
 
-      <nav aria-label="Abschnitte" className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:px-0">
-        {SECTIONS.map(([id, label]) => (
-          <a
-            key={id}
-            href={`#${id}`}
-            className="shrink-0 rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm font-semibold text-fg-muted transition hover:border-line-strong hover:text-fg"
-          >
-            {label}
-          </a>
-        ))}
-      </nav>
+      <SectionNav sections={SECTIONS} />
 
-      <section id="ok-team" className="mb-6 scroll-mt-24">
+      <section id="ok-team" className="mb-6">
         <Card className="p-5 shadow-soft sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -280,7 +275,7 @@ export default function SettingsPage() {
         eventSlug={event.slug}
         initial={eventFormInitial(event)}
         dateRange={<EventRangeField key={`${event.startDate}-${event.endDate}`} event={event} onMoved={reload} />}
-        onCancel={() => setFormKey((k) => k + 1)}
+        onAutoSaved={reload}
         onSaved={async (slug) => {
           if (slug !== event.slug) {
             router.replace(`/events/${slug}/ok/einstellungen`);
@@ -314,6 +309,6 @@ export default function SettingsPage() {
           await reload();
         }}
       />
-    </div>
+    </SectionsProvider>
   );
 }

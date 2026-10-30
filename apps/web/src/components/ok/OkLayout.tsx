@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -99,6 +99,16 @@ function OkNav({ onNavigate }: { onNavigate?: () => void }) {
     })
     .sort((a, b) => b.path.length - a.path.length)[0];
 
+  // Auf kleinen Bildschirmen scrollt die Navigation selbst: aktiven Bereich sichtbar halten
+  const activeLink = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const link = activeLink.current;
+    const box = link?.closest('[data-ok-nav-scroll]');
+    if (!link || !box) return;
+    const top = link.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTop = top - (box.clientHeight - link.offsetHeight) / 2;
+  }, [active]);
+
   return (
     <nav aria-label="OK-Bereich" className="space-y-5">
       {NAV.map((group) => {
@@ -117,6 +127,7 @@ function OkNav({ onNavigate }: { onNavigate?: () => void }) {
                 return (
                   <li key={item.path}>
                     <Link
+                      ref={isActive ? activeLink : undefined}
                       href={itemHref(base, item.path)}
                       onClick={onNavigate}
                       aria-current={isActive ? 'page' : undefined}
@@ -285,7 +296,7 @@ function OkFrame({ children }: { children: ReactNode }) {
 
       <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-24">
+          <div data-ok-nav-scroll className="sticky top-24 -m-1 max-h-[calc(100dvh-7rem)] overflow-y-auto p-1">
             <OkNav />
           </div>
         </aside>

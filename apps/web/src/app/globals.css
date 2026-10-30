@@ -1,3 +1,20 @@
 @import "tailwindcss";
 @import "../../../../packages/ui/theme.css";
 @source "../../../../packages/ui/src";
+
+/* Platz für die Bildlaufleiste bleibt reserviert: Die Seite springt nicht, wenn ein Dialog sie sperrt */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Seiten mit klebenden Leisten: Sprünge und Tab-Fokus landen nicht darunter */
+html:has([data-sticky-bars]) {
+  scroll-padding-top: 9.5rem;
+  scroll-padding-bottom: 6rem;
+}
+
+@media (min-width: 64rem) {
+  html:has([data-sticky-bars]) {
+    scroll-padding-top: 7.5rem;
+  }
+}

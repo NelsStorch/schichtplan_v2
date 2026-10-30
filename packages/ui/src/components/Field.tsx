@@ -22,8 +22,19 @@ const control =
   'disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger aria-[invalid=true]:ring-danger/15';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
-  function Input({ className, ...props }, ref) {
-    return <input ref={ref} className={cn(control, 'h-12', className)} {...props} />;
+  function Input({ className, onWheel, ...props }, ref) {
+    return (
+      <input
+        ref={ref}
+        className={cn(control, 'h-12', className)}
+        {...props}
+        onWheel={(e) => {
+          // Das Mausrad soll die Seite scrollen, nicht still den Wert eines aktiven Zahlenfelds ändern
+          if (props.type === 'number') e.currentTarget.blur();
+          onWheel?.(e);
+        }}
+      />
+    );
   }
 );
 

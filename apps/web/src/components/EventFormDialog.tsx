@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
-import { AlertCircle, AlertTriangle, CalendarPlus, Check, Crown, LifeBuoy, Palette, Plus, Save, Shield, Trash2, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CalendarPlus, Check, ChevronDown, Crown, LifeBuoy, Loader2, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
 import {
   ATTENDANCE_MODES,
   REPLACEMENT_CUTOFF_HOURS,
@@ -14,12 +14,14 @@ import {
 } from '@schichtplan/shared';
 import { Badge, Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
+import { fmtTime } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
 import type { EventDetails } from '@/lib/types';
 import { BANNER_PRESETS } from './event-meta';
 import { EMPTY_ACCESS, EventAccessFields, accessPayload, type EventAccessValues } from './EventAccessFields';
 import { ImageUpload } from './ImageUpload';
 import { questionDraft } from './ok/QuestionsEditor';
+import { SectionBody, useSection } from './ok/SettingsSections';
 
 export interface EventFormValues {
   title: string;
@@ -171,7 +173,16 @@ export function EventFormDialog({
 }
 
 /** Abschnitt im Dialog: nur Überschrift */
-function DialogSection({ title, children }: { id: string; title: string; description?: string; children: ReactNode }) {
+function DialogSection({
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  summary?: string;
+  children: ReactNode;
+}) {
   return (
     <section className="space-y-4">
       <h4 className="text-[13px] font-semibold text-fg">{title}</h4>
@@ -180,25 +191,110 @@ function DialogSection({ title, children }: { id: string; title: string; descrip
   );
 }
 
-/** Abschnitt auf der Einstellungs-Seite: eigene Karte mit Sprungmarke */
+/** Abschnitt auf der Einstellungs-Seite: eigene Karte mit Sprungmarke, seltene lassen sich einklappen */
 function PageSection({
   id,
   title,
   description,
+  summary,
   children,
 }: {
   id: string;
   title: string;
   description?: string;
+  /** Eingeklappt: die wichtigsten Werte des Abschnitts */
+  summary?: string;
   children: ReactNode;
 }) {
+  const { open, collapsible, setOpen } = useSection(id);
+  const bodyId = `${id}-inhalt`;
+
   return (
-    <section id={id} className="scroll-mt-24 rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
-      <h3 className="font-display text-lg font-bold text-fg">{title}</h3>
-      {description && <p className="mt-0.5 text-sm text-fg-muted">{description}</p>}
-      <div className="mt-5 space-y-5">{children}</div>
+    <section id={id} className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-6">
+      {collapsible ? (
+        <h3>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={bodyId}
+            onClick={() => setOpen(!open)}
+            className="flex w-full items-start justify-between gap-3 rounded-field text-left"
+          >
+            <span className="min-w-0">
+              <span className="block font-display text-lg font-bold text-fg">{title}</span>
+              <span className="mt-0.5 block text-sm text-fg-muted">{open ? description : summary}</span>
+            </span>
+            <ChevronDown
+              aria-hidden
+              className={cn('mt-1 size-5 shrink-0 text-fg-subtle transition-transform duration-200', open && 'rotate-180')}
+            />
+          </button>
+        </h3>
+      ) : (
+        <>
+          <h3 className="font-display text-lg font-bold text-fg">{title}</h3>
+          {description && <p className="mt-0.5 text-sm text-fg-muted">{description}</p>}
+        </>
+      )}
+      <SectionBody id={bodyId} open={open} onFound={() => setOpen(true)}>
+        {children}
+      </SectionBody>
     </section>
   );
+}
+
+/** Stand des automatischen Speicherns in der Leiste unten */
+function SaveStatus({
+  saving,
+  dirty,
+  error,
+  blocked,
+  savedAt,
+}: {
+  saving: boolean;
+  dirty: boolean;
+  error: string | null;
+  /** Warum gerade nicht automatisch gespeichert wird */
+  blocked: string | null;
+  savedAt: Date | null;
+}) {
+  const row = 'flex min-w-0 items-center gap-1.5 text-sm font-medium';
+  if (saving) {
+    return (
+      <p role="status" className={cn(row, 'text-fg-muted')}>
+        <Loader2 aria-hidden className="size-4 shrink-0 animate-spin text-accent" /> Wird gespeichert …
+      </p>
+    );
+  }
+  if (error) {
+    return (
+      <p role="alert" className={cn(row, 'text-danger-ink')}>
+        <AlertCircle aria-hidden className="size-4 shrink-0 text-danger" /> {error}
+      </p>
+    );
+  }
+  if (blocked) {
+    return (
+      <p role="status" className={cn(row, 'text-warning-ink')}>
+        <AlertCircle aria-hidden className="size-4 shrink-0 text-warning" /> {blocked}
+      </p>
+    );
+  }
+  if (dirty) {
+    return (
+      <p role="status" className={cn(row, 'text-accent-ink')}>
+        <span aria-hidden className="size-2 shrink-0 animate-pulse rounded-full bg-accent" /> Wird gespeichert …
+      </p>
+    );
+  }
+  if (savedAt) {
+    return (
+      <p role="status" className={cn(row, 'text-success-ink')}>
+        <Check aria-hidden className="size-4 shrink-0 text-success" /> Gespeichert um {fmtTime(savedAt.toISOString())} Uhr
+      </p>
+    );
+  }
+  return <p className={cn(row, 'font-normal text-fg-subtle')}>Änderungen werden automatisch gespeichert</p>;
 }
 
 /**
@@ -211,14 +307,18 @@ export function EventForm({
   eventSlug,
   onCancel,
   onSaved,
+  onAutoSaved,
   layout = 'dialog',
   dateRange,
 }: {
   mode: 'create' | 'edit';
   initial?: Partial<EventFormValues>;
   eventSlug?: string;
-  onCancel: () => void;
+  /** Nur im Dialog: Auf der Seite ersetzt «Rückgängig» das Abbrechen */
+  onCancel?: () => void;
   onSaved: (slug: string) => void;
+  /** Nach dem automatischen Speichern auf der Seite */
+  onAutoSaved?: () => void;
   layout?: 'dialog' | 'page';
   /** Bearbeiten: Anzeige des Zeitraums (aus den Schichten) mit «Verschieben» */
   dateRange?: ReactNode;
@@ -243,8 +343,12 @@ export function EventForm({
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const lastSavedSnapshotRef = useRef<string>(JSON.stringify({ ...EMPTY, ...initial }));
+  // Stand beim Öffnen der Seite: dorthin führt «Rückgängig», auch nach dem automatischen Speichern
+  const openedSnapshotRef = useRef<string>(lastSavedSnapshotRef.current);
 
-  const isDirty = JSON.stringify(form) !== lastSavedSnapshotRef.current;
+  const formSnapshot = JSON.stringify(form);
+  const isDirty = formSnapshot !== lastSavedSnapshotRef.current;
+  const changedSinceOpen = formSnapshot !== openedSnapshotRef.current;
 
   // Auto-Save Effect
   useEffect(() => {
@@ -298,6 +402,7 @@ export function EventForm({
         lastSavedSnapshotRef.current = JSON.stringify(form);
         setAutoSaveStatus('saved');
         setLastSavedAt(new Date());
+        onAutoSaved?.();
       } catch (err) {
         setAutoSaveStatus('error');
         setError(errorMessage(err));
@@ -305,7 +410,7 @@ export function EventForm({
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [form, isDirty, saving, mode, layout, eventSlug, initialSlug]);
+  }, [form, isDirty, saving, mode, layout, eventSlug, initialSlug, onAutoSaved]);
 
   // Schutz beim Verlassen des Fensters mit ungespeicherten Daten
   useEffect(() => {
@@ -518,11 +623,32 @@ export function EventForm({
     (m) => !m.isCeviNameProfile && !organizers.some((o) => o.userId === m.userId)
   );
 
+  const undo = () => {
+    setForm(JSON.parse(openedSnapshotRef.current));
+    setError(null);
+  };
+
   const S = layout === 'page' ? PageSection : DialogSection;
+  // Auf der Seite passen kurze Felder nebeneinander, im Dialog bleibt alles untereinander
+  const fieldColumns = layout === 'page' ? 'grid items-start gap-5 lg:grid-cols-2' : 'space-y-4';
+
+  // Gründe, warum nicht automatisch gespeichert wird: Der Slug braucht die Bestätigung, ohne Titel gibt es keinen Anlass
+  const titleMissing = !form.title.trim();
+  const slugChanged = form.slug !== initialSlug;
+  const autoSaveBlocked = titleMissing
+    ? 'Titel fehlt: Es wird nichts gespeichert'
+    : slugChanged
+      ? 'Neue Adresse: Speichern und bestätigen'
+      : null;
+  const needsManualSave = isDirty && !titleMissing && (slugChanged || Boolean(error));
+
+  const contactName = deptMembers.find((m) => m.userId === form.contactUserId)?.displayName;
+  const bannerName = BANNER_PRESETS.find((p) => p.url === form.bannerUrl)?.name ?? (form.bannerUrl ? 'Eigenes Bild' : 'Keines');
 
   return (
     <form onSubmit={submit} className={layout === 'page' ? 'space-y-6' : 'space-y-7'}>
-      {error && (
+      {/* Auf der Seite steht die Meldung in der Speicherleiste, die immer sichtbar ist */}
+      {error && layout === 'dialog' && (
         <div ref={errorRef} className="scroll-mt-24">
           <Callout tone="danger">{error}</Callout>
         </div>
@@ -579,7 +705,7 @@ export function EventForm({
             </Field>
           )}
 
-          <Field label="Titel" required className="sm:col-span-2">
+          <Field label="Titel" required className={cn('sm:col-span-2', layout === 'page' && 'lg:col-span-1')}>
             <Input
               value={form.title}
               placeholder="Chilbi 2026"
@@ -602,11 +728,11 @@ export function EventForm({
                   Adresse (Slug) <span className="text-accent-ink" aria-hidden>*</span>
                 </span>
                 {mode === 'edit' && form.slug !== initialSlug ? (
-                  <Badge tone="danger" size="sm" className="font-normal">
+                  <Badge tone="danger" size="sm" className="-my-1 font-normal">
                     Änderung bricht Links (10s Warnung)
                   </Badge>
                 ) : mode === 'edit' ? (
-                  <Badge tone="outline" size="sm" className="font-normal text-fg-subtle">
+                  <Badge tone="outline" size="sm" className="-my-1 font-normal text-fg-subtle">
                     Änderung bricht geteilte Links
                   </Badge>
                 ) : null}
@@ -631,7 +757,7 @@ export function EventForm({
                 </span>
               )
             }
-            className="sm:col-span-2"
+            className={cn('sm:col-span-2', layout === 'page' && 'lg:col-span-1')}
           >
             <Input
               value={form.slug}
@@ -834,6 +960,7 @@ export function EventForm({
             description="Ausgeschaltet teilen nur noch das OK und die Abteilungsleitung Personen ein."
           />
         )}
+        <div className={fieldColumns}>
         <Field
           label="Eintragen erst ab (optional)"
           hint={
@@ -885,6 +1012,7 @@ export function EventForm({
             }}
           />
         </Field>
+        </div>
 
         <Switch
           checked={form.allowReplacement}
@@ -892,6 +1020,7 @@ export function EventForm({
           label="Helfende können «Ersatz suchen»"
           description="Wer nicht kann, bietet die Schicht an und bleibt eingetragen, bis jemand übernimmt. Geht auch nach der Austrage-Sperre."
         />
+        <div className={fieldColumns}>
         {form.allowReplacement && (
           <Field
             label="Ersatz suchen und übernehmen bis"
@@ -966,6 +1095,7 @@ export function EventForm({
             }}
           />
         </Field>
+        </div>
 
         <Field
           label="Hinweis in der Schicht-Erinnerung (optional)"
@@ -989,7 +1119,13 @@ export function EventForm({
         id="zustaendigkeiten"
         title="Zuständigkeiten"
         description="Wer bei Fragen hilft und wie die Tage eingeteilt sind."
+        summary={[
+          contactName ? `Ansprechperson: ${contactName}` : 'Keine Ansprechperson',
+          form.responsibleMode === 'BY_DAY' ? 'Verantwortliche pro Tag' : 'Verantwortliche pro Schicht',
+          `Tageswechsel ${form.dayCutoffTime}`,
+        ].join(' · ')}
       >
+        <div className={fieldColumns}>
         <Field
           label="Ansprechperson für Fragen (optional)"
           hint="Sehen die Helfenden bei vollen Schichten, damit sie sich bei Fragen melden können."
@@ -1045,10 +1181,15 @@ export function EventForm({
             <option value="NONE">Keine Kontaktdaten anzeigen (nur Name)</option>
           </Select>
         </Field>
-
+        </div>
       </S>
 
-      <S id="anwesenheit" title="Anwesenheit" description="Am Anlass abhaken, wer da war.">
+      <S
+        id="anwesenheit"
+        title="Anwesenheit"
+        description="Am Anlass abhaken, wer da war."
+        summary={ATTENDANCE_MODES[form.attendanceMode]}
+      >
         <Field
           label="Anwesenheitsliste"
           hint="Das OK hakt pro Schicht ab, wer da war. Mit QR-Code checken sich die Helfenden zusätzlich selbst ein (ab 30 Minuten vor Schichtbeginn bis Schichtende)."
@@ -1067,11 +1208,16 @@ export function EventForm({
 
       </S>
 
-      <S id="design" title="Design" description="Banner und Logo auf der Seite des Anlasses.">
+      <S
+        id="design"
+        title="Design"
+        description="Banner und Logo auf der Seite des Anlasses."
+        summary={`Banner: ${bannerName} · Logo: ${form.logoUrl ? 'Eigenes Bild' : 'Cevi-Logo'}`}
+      >
         <fieldset className="space-y-5">
           <div>
             <legend className="mb-3 text-[13px] font-semibold text-fg">Banner des Anlasses</legend>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div className={cn('grid grid-cols-2 gap-2.5 sm:grid-cols-3', layout === 'page' && 'xl:grid-cols-6')}>
               {BANNER_PRESETS.map((preset) => {
                 const selected = form.bannerUrl === preset.url;
                 return (
@@ -1096,6 +1242,7 @@ export function EventForm({
             </div>
           </div>
 
+          <div className={fieldColumns}>
           {/* Eigenes Bannerbild hochladen (kein Pfad/URL eingeben) */}
           <ImageUpload
             label="Oder eigenes Bannerbild hochladen"
@@ -1115,30 +1262,45 @@ export function EventForm({
             onChange={(url) => set('logoUrl', url ?? '')}
             showCeviFallback={true}
           />
+          </div>
         </fieldset>
 
       </S>
 
-      <div
-        className={cn(
-          'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
-          layout === 'page'
-            ? 'sticky bottom-4 z-10 rounded-card border border-line-strong bg-surface/95 p-3 shadow-lift backdrop-blur'
-            : 'border-t border-line pt-5'
-        )}
-      >
-        {layout === 'page' && error && (
-          <p role="alert" className="mr-auto self-center text-sm font-semibold text-danger-ink">
-            {error}
-          </p>
-        )}
-        <Button variant="ghost" onClick={onCancel}>
-          {layout === 'page' ? 'Änderungen verwerfen' : 'Abbrechen'}
-        </Button>
-        <Button type="submit" loading={saving}>
-          {mode === 'create' ? 'Anlass erstellen' : 'Speichern'}
-        </Button>
-      </div>
+      {layout === 'page' ? (
+        <div className="sticky bottom-20 z-10 flex min-h-[3.125rem] flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-card border border-line-strong bg-surface/95 px-4 py-1.5 shadow-lift backdrop-blur md:bottom-4">
+          <SaveStatus
+            saving={saving || autoSaveStatus === 'saving'}
+            dirty={isDirty}
+            error={error}
+            blocked={autoSaveBlocked}
+            savedAt={lastSavedAt}
+          />
+          {(changedSinceOpen || needsManualSave) && (
+            <div className="ml-auto flex items-center gap-2">
+              {changedSinceOpen && (
+                <Button size="sm" variant="ghost" onClick={undo} title="Alle Felder auf den Stand beim Öffnen der Seite zurücksetzen">
+                  Rückgängig
+                </Button>
+              )}
+              {needsManualSave && (
+                <Button size="sm" type="submit" loading={saving}>
+                  Speichern
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={onCancel}>
+            Abbrechen
+          </Button>
+          <Button type="submit" loading={saving}>
+            {mode === 'create' ? 'Anlass erstellen' : 'Speichern'}
+          </Button>
+        </div>
+      )}
 
       {/* 10s Countdown-Warnungs-Dialog bei Adressänderung */}
       {showSlugWarning && (

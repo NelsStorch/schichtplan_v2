@@ -52,6 +52,9 @@ export function accessPayload(values: EventAccessValues, includeQuestions = fals
   };
 }
 
+/** Bis hierhin steht die ganze Abteilungsliste offen, darüber nur die gewählten und die Suche */
+const DEPARTMENT_LIST_LIMIT = 12;
+
 let directoryCache: Promise<DepartmentDirectoryItemDto[]> | null = null;
 function loadDirectory() {
   directoryCache ??= api<DepartmentDirectoryItemDto[]>('/api/departments/directory').catch((err) => {
@@ -72,6 +75,7 @@ export function EventAccessFields({
   const { department } = usePortal();
   const [directory, setDirectory] = useState<DepartmentDirectoryItemDto[]>([]);
   const [deptQuery, setDeptQuery] = useState('');
+  const [showAllDepts, setShowAllDepts] = useState(false);
 
   useEffect(() => {
     loadDirectory().then(setDirectory).catch(() => setDirectory([]));
@@ -82,10 +86,14 @@ export function EventAccessFields({
     onChange({ ...values, [key]: value });
 
   const others = directory.filter((d) => d.id !== department?.id);
+  const longList = others.length > DEPARTMENT_LIST_LIMIT;
+  const searching = deptQuery.trim().length > 0;
   const visibleOthers = useMemo(() => {
     const q = deptQuery.trim().toLowerCase();
-    return q ? others.filter((d) => d.name.toLowerCase().includes(q)) : others;
-  }, [others, deptQuery]);
+    if (q) return others.filter((d) => d.name.toLowerCase().includes(q));
+    if (longList && !showAllDepts) return others.filter((d) => values.allowedDepartmentIds.includes(d.id));
+    return others;
+  }, [others, deptQuery, longList, showAllDepts, values.allowedDepartmentIds]);
 
   // Stufen der eigenen und der freigeschalteten Abteilungen
   const stufenGroups = [
@@ -173,7 +181,7 @@ export function EventAccessFields({
               />
             </div>
           )}
-          <ul className="max-h-56 space-y-1 overflow-y-auto">
+          <ul className="grid gap-x-3 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
             {visibleOthers.map((d) => {
               const checked = values.allowedDepartmentIds.includes(d.id);
               return (
@@ -191,7 +199,21 @@ export function EventAccessFields({
               );
             })}
             {others.length === 0 && <li className="text-xs text-fg-subtle">Es gibt noch keine anderen Abteilungen.</li>}
+            {others.length > 0 && visibleOthers.length === 0 && (
+              <li className="px-2 py-1 text-xs text-fg-subtle sm:col-span-2 lg:col-span-3">
+                {searching ? 'Keine Abteilung gefunden.' : 'Noch keine gewählt. Suche eine Abteilung oder zeige alle an.'}
+              </li>
+            )}
           </ul>
+          {longList && !searching && (
+            <button
+              type="button"
+              onClick={() => setShowAllDepts((v) => !v)}
+              className="mt-2 px-2 text-xs font-semibold text-accent-ink underline-offset-2 hover:underline"
+            >
+              {showAllDepts ? 'Nur gewählte anzeigen' : `Alle ${others.length} Abteilungen anzeigen`}
+            </button>
+          )}
         </fieldset>
       )}
 
