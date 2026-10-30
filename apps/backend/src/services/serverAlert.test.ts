@@ -26,6 +26,11 @@ describe('serverAlert', () => {
       expect(isDatabaseOverloadError(err)).toBe(true);
     });
 
+    it('erkennt den Timeout des pg-Pools und abgebrochene Statements', () => {
+      expect(isDatabaseOverloadError(new Error('timeout exceeded when trying to connect'))).toBe(true);
+      expect(isDatabaseOverloadError({ code: '57014', message: 'canceling statement due to statement timeout' })).toBe(true);
+    });
+
     it('gibt false für reguläre Anwendungs- und Validierungsfehler zurück', () => {
       expect(isDatabaseOverloadError(new Error('Ungültiges Passwort'))).toBe(false);
       expect(isDatabaseOverloadError({ code: 'P2002', message: 'Unique constraint failed' })).toBe(false);

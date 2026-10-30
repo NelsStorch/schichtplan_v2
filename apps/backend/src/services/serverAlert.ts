@@ -64,6 +64,8 @@ export function isDatabaseOverloadError(err: unknown): boolean {
     msg.includes("can't reach database server") ||
     msg.includes('connection closed') ||
     msg.includes('connection timeout') ||
+    // pg-Pool: keine freie Verbindung innert connectionTimeoutMillis (siehe db.ts)
+    msg.includes('timeout exceeded when trying to connect') ||
     msg.includes('remaining connection slots are reserved')
   );
 }

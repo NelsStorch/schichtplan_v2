@@ -151,6 +151,8 @@ function loginPageUrl(path: string, returnTo: string) {
  */
 const PENDING_LINK_COOKIE = 'cevidb_link';
 const PENDING_LINK_TTL_SECONDS = 15 * 60;
+/** Hängt die Cevi.DB, landet der Login lieber auf der Fehlerseite als minutenlang in der Warteschleife */
+const CEVIDB_REQUEST_TIMEOUT_MS = 10_000;
 interface PendingLink {
   profile: any;
   returnTo: string | null;
@@ -372,6 +374,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             redirect_uri: redirectUri,
             code,
           }),
+          signal: AbortSignal.timeout(CEVIDB_REQUEST_TIMEOUT_MS),
         });
 
         if (!tokenRes.ok) {
@@ -397,6 +400,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             'X-Scope': 'with_roles',
             Accept: 'application/json',
           },
+          signal: AbortSignal.timeout(CEVIDB_REQUEST_TIMEOUT_MS),
         });
 
         if (!profileRes.ok) {
@@ -414,6 +418,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
               Authorization: `Bearer ${accessToken}`,
               Accept: 'application/json',
             },
+            signal: AbortSignal.timeout(CEVIDB_REQUEST_TIMEOUT_MS),
           });
           if (userinfoRes.ok) {
             const userinfo = await userinfoRes.json();

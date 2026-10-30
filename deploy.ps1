@@ -13,9 +13,10 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # Deployst den Schichtplan V2 auf den Server:
 #   1. Packt das Projekt (ohne node_modules, build-output und .env-Dateien)
 #   2. Erstellt ein Backup der PostgreSQL-Datenbank auf dem Server
-#   3. Entpackt den Code, baut die Container und startet sie unterbruchfrei via Traefik
-#   4. Fuehrt DB-Migrationen durch
-#   5. Wartet bis API und Frontend HTTP 200 melden
+#   3. Entpackt den Code und baut die Images (die laufenden Container bleiben unberuehrt)
+#   4. Fuehrt DB-Migrationen durch: schlagen sie fehl, bricht der Deploy ab, bevor neuer Code startet
+#   5. Tauscht die Dienste einzeln per docker rollout (Plugin auf dem Server, siehe docs/internal/deployment.md)
+#   6. Wartet bis API und Frontend HTTP 200 melden
 
 # Serverdetails ($Server, $RemoteBase) liegen ausserhalb von Git in deploy.config.ps1
 $ConfigFile = Join-Path $PSScriptRoot "deploy.config.ps1"
@@ -118,6 +119,12 @@ if ! docker network inspect "$ProxyNetwork" --format '{{range .Containers}}{{.Na
   echo "Traefik ist nicht mit $ProxyNetwork verbunden: docker network connect $ProxyNetwork traefik (und im Proxy-Compose eintragen)"
   exit 1
 fi
+if ! docker rollout --version > /dev/null 2>&1; then
+  echo "Das Docker-Plugin rollout fehlt auf dem Server (siehe docs/internal/deployment.md)"
+  exit 1
+fi
+
+compose() { docker compose -f "$ComposeFile" -p "$ProjectName" "`$@"; }
 
 if [ "$backup" = "1" ]; then
   if docker ps --format '{{.Names}}' | grep -qx "$Prefix-db"; then
@@ -188,23 +195,43 @@ ENVEOF
   chmod 600 .env
 fi
 
-# Rolling Build & Restart
-echo "Docker Images werden gebaut und gestartet (das kann 1-2 Minuten dauern)..."
+# Bauen: die laufenden Container bleiben dabei unberuehrt
+echo "Docker Images werden gebaut (das kann 1-2 Minuten dauern)..."
 log=`$(mktemp)
-if ! docker compose -f "$ComposeFile" -p "$ProjectName" up -d --build > "`$log" 2>&1; then
+if ! compose build > "`$log" 2>&1; then
   tail -n 60 "`$log"; rm -f "`$log"
-  echo "Build oder Start fehlgeschlagen. Die bisherigen Container laufen unveraendert weiter."
+  echo "Build fehlgeschlagen. Die bisherigen Container laufen unveraendert weiter."
   exit 1
 fi
 rm -f "`$log"
 
+# Die DB startet nur neu, wenn sich ihre Konfiguration geaendert hat
+compose up -d --no-build --wait db
+
+# Migrationen vor dem Tausch, im neuen Image: neuer Code findet sein Schema immer schon vor.
+# Darum muessen Migrationen auch mit dem alten Code laufen, der noch bis zum Rollout aktiv ist.
+# Das Label haelt den Einmal-Container von Traefik fern (run uebernimmt die Labels des Dienstes).
+echo "Prisma Migrationen ausfuehren..."
+if ! compose run --rm --no-deps -T --label traefik.enable=false backend npx prisma migrate deploy; then
+  echo "Migration fehlgeschlagen, neuer Code wurde nicht gestartet. Die bisherigen Container laufen weiter."
+  exit 1
+fi
+# Kein Seed auf dem Server: Demo-Daten (npm run db:seed) sind nur für die lokale Entwicklung
+
+# Dienste einzeln tauschen: der neue Container uebernimmt, sobald er gesund ist, erst dann geht der alte.
+# Wird er nicht gesund, bleibt der alte stehen und der Deploy bricht hier ab.
+for service in backend web landing login admin hilfe; do
+  echo "Rollout `$service..."
+  if ! docker rollout -f "$ComposeFile" -p "$ProjectName" "`$service" > "`$log" 2>&1; then
+    tail -n 60 "`$log"; rm -f "`$log"
+    echo "Rollout von `$service fehlgeschlagen. `$service laeuft weiter auf dem alten Stand, bereits getauschte Dienste auf dem neuen."
+    exit 1
+  fi
+  rm -f "`$log"
+done
+
 # Altes Netz (vor der Segmentierung) aufraeumen, sobald es leer ist
 docker network rm "$LegacyNetwork" > /dev/null 2>&1 || true
-
-# Migrationen ausfuehren
-echo "Prisma Migrationen ausfuehren..."
-docker compose -f "$ComposeFile" -p "$ProjectName" exec -T backend npx prisma migrate deploy || true
-# Kein Seed auf dem Server: Demo-Daten (npm run db:seed) sind nur für die lokale Entwicklung
 
 # Healthcheck Verify
 domain=`$(grep -E '^(DOMAIN|DOMAIN_DEV)=' .env 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '\r"' || true)
