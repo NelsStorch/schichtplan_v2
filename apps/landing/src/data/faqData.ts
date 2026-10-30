@@ -46,7 +46,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     category: 'leitende',
     question: 'Wie richte ich den Schichtplan für meine Cevi-Abteilung ein?',
     answer:
-      'Melde dich als Abteilungsleitung auf login.cevi-schichtplan.ch mit deinem Cevi.DB-Account an. Hat deine Ortsgruppe noch keinen Schichtplan, kannst du ihn mit einem einzigen Klick anlegen. Ihr erhaltet sofort eure eigene, feste Adresse (z. B. eure-abteilung.cevi-schichtplan.ch) inklusive individuellem Logo und Abteilungsfarbe.',
+      'Melde dich als Abteilungsleitung auf login.cevi-schichtplan.ch mit deinem Cevi.DB-Account an. Hat deine Abteilung noch keinen Schichtplan, kannst du ihn mit einem einzigen Klick anlegen. Ihr erhaltet sofort eure eigene, feste Adresse (z. B. eure-abteilung.cevi-schichtplan.ch) inklusive individuellem Logo und Abteilungsfarbe.',
   },
   {
     id: 'datenschutz-sicherheit',
