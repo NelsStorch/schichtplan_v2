@@ -189,22 +189,22 @@ describe.skipIf(!hasTestDb)('Rechte in der Abteilung', () => {
     const roleOf = async (userId: string) =>
       (await app.prisma.departmentMember.findFirstOrThrow({ where: { departmentId: department.id, userId } })).role;
 
-    await syncCeviDbLeadership(app.prisma, app.log, a.id, department.id, false);
+    await syncCeviDbLeadership(app.prisma, app.log, a.id, department.id, []);
     expect(await roleOf(a.id)).toBe('HELPER');
     // b ist jetzt die letzte Abteilungsleitung und bleibt
-    await syncCeviDbLeadership(app.prisma, app.log, b.id, department.id, false);
+    await syncCeviDbLeadership(app.prisma, app.log, b.id, department.id, []);
     expect(await roleOf(b.id)).toBe('ADMIN');
 
     // Mit einer von Hand gesetzten Leitung daneben fällt b weg, die von Hand gesetzte bleibt
     await app.prisma.departmentMember.create({
       data: { departmentId: department.id, userId: manual.id, role: 'ADMIN', leaderSource: 'MANUAL' },
     });
-    await syncCeviDbLeadership(app.prisma, app.log, b.id, department.id, false);
+    await syncCeviDbLeadership(app.prisma, app.log, b.id, department.id, []);
     expect(await roleOf(b.id)).toBe('HELPER');
     expect(await roleOf(manual.id)).toBe('ADMIN');
 
     // Wieder Leitungsrolle in Cevi.DB: wird erneut Abteilungsleitung
-    await syncCeviDbLeadership(app.prisma, app.log, a.id, department.id, true);
+    await syncCeviDbLeadership(app.prisma, app.log, a.id, department.id, [department.id]);
     expect(await roleOf(a.id)).toBe('ADMIN');
     expect(await app.prisma.departmentAuditLog.count({ where: { departmentId: department.id } })).toBe(3);
   });

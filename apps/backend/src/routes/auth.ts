@@ -15,10 +15,13 @@ import {
   type UserDto,
 } from '@schichtplan/shared';
 import { AUTH_COOKIE_NAME } from '../plugins/jwt.js';
-import { deriveCeviDbFields } from '../services/cevidb.js';
+import { ceviDbRoleGroupIds, deriveCeviDbFields } from '../services/cevidb.js';
+import { refreshCeviDbGroups } from '../services/cevidbGroups.js';
+import { cevidbConfig } from '../config/cevidb.js';
 import {
   autoCreateCeviDbDepartmentStufen,
   storeCeviDbFields,
+  resolveCeviDbPlacement,
   syncCeviDbHomeDepartment,
   syncCeviDbStufen,
   toUserStufeDto,
@@ -309,7 +312,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('client_id', CEVIDB_CLIENT_ID);
       authUrl.searchParams.set('redirect_uri', redirectUri);
-      authUrl.searchParams.set('scope', 'email name with_roles');
+      authUrl.searchParams.set('scope', cevidbConfig().oauthScopes);
       authUrl.searchParams.set('state', stateEncoded);
 
       return reply.redirect(authUrl.toString());
@@ -421,10 +424,18 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
         profile._meta = {
           fetchedAt: new Date().toISOString(),
-          grantedScopes: tokenData.scope || 'email name with_roles',
+          grantedScopes: tokenData.scope || cevidbConfig().oauthScopes,
           tokenType: tokenData.token_type || 'Bearer',
           expiresIn: tokenData.expires_in,
         };
+
+        // Gruppenstruktur zu den Rollen: hier, weil das Token nur jetzt da ist (wird nicht gespeichert)
+        await refreshCeviDbGroups(fastify.prisma, fastify.log, {
+          baseUrl: CEVIDB_BASE_URL,
+          accessToken,
+          grantedScopes: profile._meta.grantedScopes,
+          groupIds: ceviDbRoleGroupIds(profile),
+        });
       } catch (err) {
         fastify.log.error(err, 'Cevi.DB nicht erreichbar');
         trackCeviDbFailure();
@@ -571,17 +582,19 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Was der Schichtplan aus Cevi.DB braucht, in eigene Spalten schreiben (ceviDbData wird nie gelesen).
-    // Die eigene Abteilung kommt aus der Ortsgruppe, Stufen über die Cevi.DB-Gruppen der Rollen.
+    // Die eigene Abteilung und die Stufen kommen aus den Rollen und der Cevi.DB-Gruppenstruktur.
     const derived = deriveCeviDbFields(profile);
-    await storeCeviDbFields(fastify.prisma, user.id, derived);
-    const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, derived.ortsgruppeId);
-    // Abteilungsleitung der Heimabteilung vergeben bzw. entziehen (nie die letzte einer Abteilung)
+    const placement = await resolveCeviDbPlacement(fastify.prisma, derived, user.homeDepartmentId);
+    await storeCeviDbFields(fastify.prisma, user.id, derived, placement);
+    const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, placement);
+    // Abteilungsleitung vergeben bzw. entziehen (nie die letzte einer Abteilung), in weiteren Abteilungen mit Rollen eintragen
     await syncCeviDbLeadership(
       fastify.prisma,
       fastify.log,
       user.id,
       homeDepartment?.id ?? null,
-      derived.isDepartmentLeader
+      placement.leaderDepartmentIds,
+      placement.departmentIds
     );
 
     // Kommt die Person von einer Abteilungs-Subdomain, dort ohne Rechte eintragen (Leitung nur in der Heimabteilung)
@@ -631,9 +644,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (!homeDepartment && derived.isDepartmentLeader && derived.ortsgruppeId !== null) {
       return loginPageUrl('/abteilung-erstellen', target);
     }
-    // Ortsgruppe ohne Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen
-    if (!homeDepartment && !user.departmentSetupAt) {
-      return loginPageUrl('/abteilung', target);
+    // Ohne passende Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen (auch nach einem Abteilungswechsel)
+    if (!homeDepartment) {
+      const setup = await fastify.prisma.user.findUnique({ where: { id: user.id }, select: { departmentSetupAt: true } });
+      if (!setup?.departmentSetupAt) return loginPageUrl('/abteilung', target);
     }
     return target;
   }

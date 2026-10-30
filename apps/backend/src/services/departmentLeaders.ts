@@ -1,8 +1,10 @@
 /**
- * Abteilungsleitung aus Cevi.DB: Wer in Cevi.DB eine Leitungsrolle (CEVIDB_DEPARTMENT_LEADER_ROLES) hat, wird
- * beim Login Abteilungsleitung der eigenen Heimabteilung (leaderSource CEVIDB). Fällt die Rolle weg oder wechselt
- * die Ortsgruppe, wird sie wieder entzogen, aber nur, solange die Abteilung noch eine andere Abteilungsleitung hat.
- * Von Hand im Admin-Portal gesetzte Abteilungsleitungen (MANUAL) fasst der Login nicht an.
+ * Abteilungsleitung aus Cevi.DB: Wer in Cevi.DB eine Leitungsrolle (CEVIDB_DEPARTMENT_LEADER_ROLES) in der Jungschar
+ * einer Abteilung hat, wird beim Login deren Abteilungsleitung (leaderSource CEVIDB). Fällt die Rolle weg, wird sie
+ * wieder entzogen, aber nur, solange die Abteilung noch eine andere Abteilungsleitung hat. Welche Abteilungen das
+ * sind, ergibt placeCeviDbPerson aus den Rollen; `leaderDepartmentIds = null` heisst «nicht prüfbar»: Dann wird
+ * weder etwas vergeben noch entzogen. Von Hand im Admin-Portal gesetzte Abteilungsleitungen (MANUAL) fasst der
+ * Login nicht an.
  */
 import type { FastifyBaseLogger } from 'fastify';
 import type { PrismaClient } from '../db.js';
@@ -16,7 +18,8 @@ export async function syncCeviDbLeadership(
   log: FastifyBaseLogger,
   userId: string,
   homeDepartmentId: string | null,
-  isLeader: boolean
+  leaderDepartmentIds: string[] | null,
+  otherDepartmentIds: string[] = []
 ) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -25,19 +28,24 @@ export async function syncCeviDbLeadership(
   if (!user) return;
   const label = personLabel(user);
 
-  if (homeDepartmentId) {
+  const departmentIds = new Set([
+    ...(homeDepartmentId ? [homeDepartmentId] : []),
+    ...otherDepartmentIds,
+    ...(leaderDepartmentIds ?? []),
+  ]);
+  for (const departmentId of departmentIds) {
     const existing = await prisma.departmentMember.findUnique({
-      where: { departmentId_userId: { departmentId: homeDepartmentId, userId } },
+      where: { departmentId_userId: { departmentId, userId } },
       select: { role: true },
     });
-    if (isLeader && existing?.role !== 'ADMIN') {
+    if (leaderDepartmentIds?.includes(departmentId) && existing?.role !== 'ADMIN') {
       await prisma.departmentMember.upsert({
-        where: { departmentId_userId: { departmentId: homeDepartmentId, userId } },
+        where: { departmentId_userId: { departmentId, userId } },
         update: { role: 'ADMIN', leaderSource: 'CEVIDB' },
-        create: { departmentId: homeDepartmentId, userId, role: 'ADMIN', leaderSource: 'CEVIDB' },
+        create: { departmentId, userId, role: 'ADMIN', leaderSource: 'CEVIDB' },
       });
       await recordDepartmentAction(prisma, log, {
-        departmentId: homeDepartmentId,
+        departmentId,
         actorId: null,
         action: 'LEADER_GRANT',
         targetUserId: userId,
@@ -45,9 +53,11 @@ export async function syncCeviDbLeadership(
         details: { source: 'CEVIDB' },
       });
     } else if (!existing) {
-      await prisma.departmentMember.create({ data: { departmentId: homeDepartmentId, userId, role: 'HELPER' } });
+      await prisma.departmentMember.create({ data: { departmentId, userId, role: 'HELPER' } });
     }
   }
+
+  if (leaderDepartmentIds === null) return;
 
   // Abteilungsleitungen aus Cevi.DB, die nicht mehr stimmen
   const stale = await prisma.departmentMember.findMany({
@@ -55,7 +65,7 @@ export async function syncCeviDbLeadership(
       userId,
       role: 'ADMIN',
       leaderSource: 'CEVIDB',
-      ...(isLeader && homeDepartmentId ? { departmentId: { not: homeDepartmentId } } : {}),
+      departmentId: { notIn: leaderDepartmentIds },
     },
     select: { id: true, departmentId: true },
   });
@@ -80,7 +90,7 @@ export async function syncCeviDbLeadership(
       action: 'LEADER_REVOKE',
       targetUserId: userId,
       targetLabel: label,
-      details: { source: 'CEVIDB', reason: isLeader ? 'OTHER_DEPARTMENT' : 'NO_LEADER_ROLE' },
+      details: { source: 'CEVIDB', reason: leaderDepartmentIds.length ? 'OTHER_DEPARTMENT' : 'NO_LEADER_ROLE' },
     });
   }
 }

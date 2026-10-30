@@ -503,7 +503,7 @@ function SettingsTab({
       });
       toast({
         title: 'Abteilung gespeichert',
-        description: result.attached ? `${result.attached} Personen aus der Ortsgruppe zugeordnet.` : undefined,
+        description: result.attached ? `${result.attached} Personen aus der Cevi.DB-Gruppe zugeordnet.` : undefined,
         tone: 'success',
       });
       onSaved();
@@ -535,8 +535,8 @@ function SettingsTab({
             />
           </Field>
           <Field
-            label="Cevi.DB-Ortsgruppe (ID)"
-            hint="Personen dieser Ortsgruppe werden beim Cevi.DB-Login automatisch zugeordnet."
+            label="Cevi.DB-Gruppe (ID)"
+            hint="Die Ortsgruppe, oder die Jungschar, wenn die Ortsgruppe mehrere hat. Personen mit Rollen darin werden beim Cevi.DB-Login automatisch zugeordnet."
             error={groupValid ? undefined : 'Nur Ziffern'}
           >
             <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
@@ -757,7 +757,7 @@ export function DepartmentDialog({
           </dl>
           <p className="mt-3 text-xs text-fg-subtle">
             Angelegt am {formatDate(loaded.createdAt)}
-            {loaded.ceviDbGroupId !== null && <> · Cevi.DB-Ortsgruppe {loaded.ceviDbGroupId}</>}
+            {loaded.ceviDbGroupId !== null && <> · Cevi.DB-Gruppe {loaded.ceviDbGroupId}</>}
             {loaded.membersOnly ? ' · Startseite nur für Mitglieder' : ' · Startseite öffentlich'}
           </p>
 

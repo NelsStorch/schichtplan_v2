@@ -18,6 +18,12 @@ function list(value: string | undefined, fallback: readonly string[]): string[] 
 
 export interface CeviDbConfig {
   /**
+   * OAuth-Scopes beim Login. `groups` braucht die Gruppen-API für die Gruppenstruktur (Jungschar, Ortsgruppe).
+   * Muss in der Cevi.DB bei der Applikation freigeschaltet sein. Env: CEVIDB_OAUTH_SCOPES
+   */
+  oauthScopes: string;
+
+  /**
    * Profilfeld mit der Gruppen-ID der Ortsgruppe. Daraus folgt die Abteilung
    * (`departments.ceviDbGroupId`), der Personen beim Login automatisch zugeordnet werden.
    * Env: CEVIDB_ORTSGRUPPE_FIELD
@@ -49,6 +55,7 @@ export interface CeviDbConfig {
 
 export function cevidbConfig(): CeviDbConfig {
   return {
+    oauthScopes: process.env.CEVIDB_OAUTH_SCOPES?.trim() || 'email name with_roles groups',
     ortsgruppeField: process.env.CEVIDB_ORTSGRUPPE_FIELD?.trim() || 'ortsgruppe_id',
     departmentLeaderRoleClasses: list(process.env.CEVIDB_DEPARTMENT_LEADER_ROLES, [
       'Group::Jungschar::Abteilungsleiter',

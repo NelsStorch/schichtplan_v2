@@ -15,7 +15,7 @@ import {
   type DepartmentStufeDto,
   type StufeSuggestionDto,
 } from '@schichtplan/shared';
-import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen } from '../services/homeDepartment.js';
+import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen, ceviDbGroupPeople } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';
 import { UNRELATED_PERSON_ERROR, isDepartmentInsider, isDepartmentManager } from '../services/departmentVisibility.js';
 import { canGrantPermissions, departmentAccess, type DepartmentAccess } from '../services/permissions.js';
@@ -66,10 +66,14 @@ const NOT_ELIGIBLE_MESSAGES = {
   NOT_LEADER:
     'Einen neuen Schichtplan für eine Abteilung kann nur die Abteilungsleitung anlegen. Bitte wende dich an deine Abteilungsleitung: Sie kann den Schichtplan für eure Abteilung anlegen und dir danach unter «Personen» das Recht «Anlässe erstellen» geben – oder sie erstellt den Anlass direkt für dich.',
   NO_ORTSGRUPPE: 'In Cevi.DB ist für dich keine Ortsgruppe hinterlegt.',
-  EXISTS: 'Für deine Ortsgruppe gibt es bereits eine Abteilung.',
+  EXISTS: 'Für deine Abteilung gibt es bereits einen Schichtplan.',
+  UNVERIFIED: 'Wir konnten deine Gruppe in Cevi.DB gerade nicht prüfen. Melde dich bitte nochmals mit Cevi.DB an.',
 } as const;
 
-/** Darf die Person (laut gespeichertem Cevi.DB-Profil) für ihre Ortsgruppe eine Abteilung anlegen? */
+/**
+ * Darf die Person für ihre Gruppe eine Abteilung anlegen? Es zählt die Gruppe der Leitungsrolle, nicht das selbst
+ * änderbare Feld `ortsgruppe_id`. Die Abteilung hängt an der Ortsgruppe, bei mehreren Jungscharen an der Jungschar.
+ */
 async function departmentCreationEligibility(
   prisma: PrismaClient,
   userId: string
@@ -87,34 +91,48 @@ async function departmentCreationEligibility(
     ...extra,
   });
 
-  // Die ceviDb*-Spalten schreibt nur der Cevi.DB-Login, sie sind deshalb vertrauenswürdig
+  // Die ceviDb*-Spalten schreibt nur der Cevi.DB-Login
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       ceviDbId: true,
       ceviDbDepartmentLeader: true,
-      ceviDbOrtsgruppeId: true,
-      ceviDbOrtsgruppeName: true,
+      ceviDbLeaderGroupIds: true,
       ceviDbLeaderGroupName: true,
     },
   });
   if (!user || user.ceviDbId === null) return denied('NOT_CEVIDB');
 
-  const ortsgruppeId = user.ceviDbOrtsgruppeId;
-  const ortsgruppeName = user.ceviDbOrtsgruppeName;
   const leaderGroupName = user.ceviDbLeaderGroupName;
   if (!user.ceviDbDepartmentLeader) return denied('NOT_LEADER');
-  if (ortsgruppeId === null) return denied('NO_ORTSGRUPPE', { leaderGroupName });
 
-  const existing = await prisma.department.findUnique({
-    where: { ceviDbGroupId: ortsgruppeId },
-    select: { name: true, slug: true },
-  });
-  if (existing) {
-    return denied('EXISTS', { ortsgruppeId, ortsgruppeName, leaderGroupName, existingDepartment: existing });
+  const leaderGroups = await prisma.ceviDbGroup.findMany({ where: { id: { in: user.ceviDbLeaderGroupIds } } });
+  if (leaderGroups.length === 0 || leaderGroups.length < user.ceviDbLeaderGroupIds.length) {
+    return denied('UNVERIFIED', { leaderGroupName });
   }
 
-  return { eligible: true, reason: null, ortsgruppeId, ortsgruppeName, leaderGroupName, existingDepartment: null };
+  let firstExisting: DepartmentCreationEligibilityDto | null = null;
+  for (const group of leaderGroups) {
+    if (group.ortsgruppeId === null) continue;
+    const ortsgruppe = await prisma.ceviDbGroup.findUnique({ where: { id: group.ortsgruppeId } });
+    if (!ortsgruppe || ortsgruppe.jungscharCount === null) return denied('UNVERIFIED', { leaderGroupName });
+
+    const perJungschar = ortsgruppe.jungscharCount > 1 && group.jungscharId !== null;
+    const groupId = perJungschar ? group.jungscharId! : ortsgruppe.id;
+    // Vorschlag für den Namen: «JS Effretikon» wird zu «Effretikon» (dazu kommt «Cevi»)
+    const name = perJungschar ? group.name.replace(/^JS\s+/i, '') : ortsgruppe.name;
+
+    const existing = await prisma.department.findUnique({
+      where: { ceviDbGroupId: groupId },
+      select: { name: true, slug: true },
+    });
+    if (!existing) {
+      return { eligible: true, reason: null, ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: null };
+    }
+    firstExisting ??= denied('EXISTS', { ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: existing });
+  }
+
+  return firstExisting ?? denied('NO_ORTSGRUPPE', { leaderGroupName });
 }
 
 const departmentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -678,7 +696,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     }));
   });
 
-  // Darf ich für meine Ortsgruppe eine Abteilung anlegen? (Abteilungsleitung laut Cevi.DB)
+  // Darf ich für meine Gruppe eine Abteilung anlegen? (Abteilungsleitung laut Cevi.DB)
   fastify.get(
     '/api/departments/creation-eligibility',
     { preHandler: [fastify.authenticate] },
@@ -688,7 +706,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Abteilung anlegen als Abteilungsleitung: ohne Passwort, verknüpft mit der Cevi.DB-Ortsgruppe
+  // Abteilung anlegen als Abteilungsleitung: ohne Passwort, verknüpft mit der Cevi.DB-Gruppe
   fastify.post(
     '/api/departments/cevidb',
     { preHandler: [fastify.authenticate] },
@@ -706,7 +724,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           .status(reason === 'EXISTS' ? 409 : 403)
           .send({ error: NOT_ELIGIBLE_MESSAGES[reason], reason, existingDepartment: eligibility.existingDepartment });
       }
-      const ortsgruppeId = eligibility.ortsgruppeId;
+      const ceviDbGroupId = eligibility.ortsgruppeId;
 
       try {
         const departmentResult = await fastify.prisma.$transaction(async (tx) => {
@@ -715,33 +733,34 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
               name: departmentName,
               slug,
               contactUserId: request.user.id,
-              ceviDbGroupId: ortsgruppeId,
+              ceviDbGroupId,
             },
           });
           await tx.departmentMember.create({
             data: { departmentId: created.id, userId: request.user.id, role: 'ADMIN', leaderSource: 'CEVIDB' },
           });
-
-          // Alle bereits angemeldeten Cevi.DB-Personen dieser Ortsgruppe (inkl. der anlegenden Person)
-          // bekommen die neue Abteilung als Heimabteilung und werden Helfer*innen bzw. Abteilungsleitung
-          const people = await tx.user.findMany({
-            where: { ceviDbOrtsgruppeId: ortsgruppeId },
-            select: { id: true, ceviDbDepartmentLeader: true },
+          await tx.user.update({
+            where: { id: request.user.id },
+            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
           });
+
+          // Alle bereits angemeldeten Cevi.DB-Personen dieser Gruppe bekommen die neue Abteilung als
+          // Heimabteilung und werden Helfer*innen bzw. Abteilungsleitung (nur über ihre eigene Leitungsrolle)
+          const people = await ceviDbGroupPeople(tx, ceviDbGroupId);
           await tx.user.updateMany({
-            where: { ceviDbOrtsgruppeId: ortsgruppeId },
+            where: { id: { in: people.map((p) => p.id) } },
             data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
           });
           await tx.departmentMember.createMany({
             data: people.map((p) => ({
               departmentId: created.id,
               userId: p.id,
-              role: p.ceviDbDepartmentLeader ? 'ADMIN' : 'HELPER',
-              leaderSource: p.ceviDbDepartmentLeader ? 'CEVIDB' : null,
+              role: p.isLeader ? 'ADMIN' : 'HELPER',
+              leaderSource: p.isLeader ? 'CEVIDB' : null,
             })),
             skipDuplicates: true,
           });
-          const leaderIds = people.filter((p) => p.ceviDbDepartmentLeader).map((p) => p.id);
+          const leaderIds = people.filter((p) => p.isLeader).map((p) => p.id);
           if (leaderIds.length) {
             await tx.departmentMember.updateMany({
               where: { departmentId: created.id, userId: { in: leaderIds } },
@@ -757,7 +776,7 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         request.log.info(
-          { userId: request.user.id, departmentId: departmentResult.department.id, slug, ortsgruppeId },
+          { userId: request.user.id, departmentId: departmentResult.department.id, slug, ceviDbGroupId },
           'Abteilung von Abteilungsleitung (Cevi.DB) angelegt'
         );
         return reply.status(201).send({

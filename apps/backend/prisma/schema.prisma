@@ -21,8 +21,8 @@ model Department {
   // Kontaktperson der Abteilung: Abteilungsleitung oder jemand mit dem Recht «Personen und Rechte verwalten»
   contactUserId String?           @map("contact_user_id")
   contactUser   User?             @relation("DepartmentContactUser", fields: [contactUserId], references: [id], onDelete: SetNull)
-  // Cevi.DB-Gruppen-ID der Ortsgruppe (Feld `ortsgruppe_id` im Cevi.DB-Profil).
-  // Wer sich mit Cevi.DB anmeldet und zu dieser Ortsgruppe gehört, wird automatisch Mitglied.
+  // Cevi.DB-Gruppe der Abteilung: die Ortsgruppe oder, wenn eine Ortsgruppe mehrere Jungscharen hat, die Jungschar.
+  // Wer sich mit Cevi.DB anmeldet und dort Rollen hat, wird automatisch Mitglied (siehe services/homeDepartment.ts).
   ceviDbGroupId Int?              @unique
   // Startseite (Liste der Anlässe) nur für Mitglieder (Vorgabe: an); öffentliche Anlässe bleiben per Link erreichbar
   membersOnly   Boolean           @default(true) @map("members_only")
@@ -58,6 +58,21 @@ model DepartmentStufe {
   @@unique([departmentId, name])
   @@unique([departmentId, ceviDbGroupId])
   @@map("department_stufen")
+}
+
+// Gruppenstruktur aus der Cevi.DB-Gruppen-API (Scope `groups`), beim Login aufgefrischt. Keine Personendaten.
+model CeviDbGroup {
+  id             Int      @id
+  name           String
+  // Jungschar-Ebene der Gruppe (bei einer Jungschar ihre eigene ID), null ausserhalb einer Jungschar
+  jungscharId    Int?     @map("jungschar_id")
+  ortsgruppeId   Int?     @map("ortsgruppe_id")
+  // Nur bei Ortsgruppen: Anzahl Jungscharen. Mehr als eine heisst: eine Abteilung pro Jungschar
+  jungscharCount Int?     @map("jungschar_count")
+  fetchedAt      DateTime @map("fetched_at")
+
+  @@index([ortsgruppeId])
+  @@map("cevidb_groups")
 }
 
 // Stufen-Rollen einer Person laut Cevi.DB (Rollen mit Präfix Group::Stufe::), bei jedem Cevi.DB-Login ersetzt.
@@ -110,6 +125,10 @@ model User {
   ceviDbOrtsgruppeName    String?  @map("cevidb_ortsgruppe_name")
   ceviDbDepartmentLeader  Boolean  @default(false) @map("cevidb_department_leader")
   ceviDbLeaderGroupName   String?  @map("cevidb_leader_group_name")
+  // Jungscharen der Rollen laut Cevi.DB-Gruppenstruktur; leer, solange sie nicht geprüft werden konnten
+  ceviDbJungscharIds      Int[]    @default([]) @map("cevidb_jungschar_ids")
+  // Gruppen der Abteilungsleitungs-Rollen (role.group_id), nicht aus dem selbst änderbaren Feld `ortsgruppe_id`
+  ceviDbLeaderGroupIds    Int[]    @default([]) @map("cevidb_leader_group_ids")
   ceviDbSyncedAt DateTime?         // Zeitstempel der letzten Cevi.DB Synchronisation
   // Heimabteilung: aus Cevi.DB (Ortsgruppe) oder beim Login selbst angegeben
   homeDepartmentId     String?     @map("home_department_id")

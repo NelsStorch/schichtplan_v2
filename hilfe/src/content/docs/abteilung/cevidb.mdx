@@ -13,7 +13,7 @@ Die Cevi.DB (`db.cevi.ch`, Hitobito) ist die Mitgliederdatenbank des Cevi. Der S
 | Übername (Cevi-Name), Vor- und Nachname | Name auf dem Plan |
 | Geburtsdatum | Altersprüfung bei Schichten, im Schichtplan nicht änderbar |
 | E-Mail | Konto, Kontakt fürs OK |
-| Ortsgruppe | Heimabteilung (fest) |
+| Rollen und Gruppenstruktur (Jungschar, Ortsgruppe) | Heimabteilung (fest) |
 | Rollen in Stufen-Gruppen | [Stufen](/abteilung/stufen/) mit Leitung oder Teilnehmer\*in |
 | Rolle Abteilungsleiter\*in | **Abteilungsleitung** der eigenen Abteilung im Schichtplan, darf eine [Abteilung anlegen](/abteilung/anlegen/), zählt bei «Nur Leitende» |
 
@@ -33,11 +33,13 @@ Die Handynummer kommt nicht aus der Cevi.DB, die gibt sie dem Schichtplan nicht 
 
 ## Ortsgruppe und Abteilung
 
-Jede Abteilung im Schichtplan ist mit genau einer Cevi.DB-Ortsgruppe verknüpft. Das passiert beim Anlegen automatisch. Wer sich mit Cevi.DB anmeldet und zu dieser Ortsgruppe gehört,
+Jede Abteilung im Schichtplan ist mit genau einer Cevi.DB-Gruppe verknüpft: normalerweise mit der Ortsgruppe. Hat eine Ortsgruppe mehrere Jungscharen, bekommt jede Jungschar ihre eigene Abteilung. Das passiert beim Anlegen automatisch. Massgebend sind die Rollen in der Cevi.DB, nicht das Feld «Ortsgruppe» im Profil. Wer sich mit Cevi.DB anmeldet und dort eine Rolle hat,
 
 - bekommt die Abteilung als **Heimabteilung**, fest und nicht änderbar,
-- wird **Abteilungsleitung**, wenn die Person in der Cevi.DB Abteilungsleiter\*in ist. Fällt die Rolle in der Cevi.DB weg, nimmt der nächste Login die Abteilungsleitung wieder weg, ausser es ist die letzte der Abteilung,
+- wird **Abteilungsleitung**, wenn die Person in der Cevi.DB Abteilungsleiter\*in genau dieser Jungschar ist. Fällt die Rolle in der Cevi.DB weg, nimmt der nächste Login die Abteilungsleitung wieder weg, ausser es ist die letzte der Abteilung,
 - sonst **Mitglied** ohne besondere Rechte. Rechte, die ihr in der Abteilung vergeben habt, bleiben.
+
+Wer Rollen in mehreren Abteilungen hat, ist überall Mitglied. Heimabteilung ist die mit der Hauptgruppe aus der Cevi.DB.
 
 ## Was das für Anlässe heisst
 

@@ -2,6 +2,10 @@
  * Auswertung des Cevi.DB-Profils (`/oauth/profile` mit Scope `with_roles`).
  * Wird nur beim Cevi.DB-Login auf die frische Antwort angewendet (`deriveCeviDbFields`), nie auf `users.ceviDbData`.
  * Welche Rollen was bedeuten, steht in `config/cevidb.ts`.
+ *
+ * Vertrauen: `roles` vergibt die Leitung in der Cevi.DB, `primary_group_id` lässt sich nur aus den eigenen Rollen
+ * wählen. `ortsgruppe_id` dagegen kann jede Person im eigenen Profil frei ändern, und es wird nach der ersten Rolle
+ * nie nachgeführt. Rechte und die Abteilung aus Cevi.DB hängen deshalb nur an den Rollen (`placeCeviDbPerson`).
  */
 import type { CeviDbStufeDto } from '@schichtplan/shared';
 import { cevidbConfig } from '../config/cevidb.js';
@@ -13,6 +17,8 @@ export interface CeviDbLeadership {
   ortsgruppeId: number | null;
   /** Gruppe, in der die Leitungsrolle liegt (z. B. "JS Illnau") */
   leaderGroupName: string | null;
+  /** Alle Gruppen mit einer Leitungsrolle */
+  leaderGroupIds: number[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -34,6 +40,10 @@ function profileRoles(profile: unknown): Record<string, unknown>[] {
   return isRecord(profile) && Array.isArray(profile.roles) ? profile.roles.filter(isRecord) : [];
 }
 
+function uniqueIds(ids: (number | null)[]): number[] {
+  return [...new Set(ids.filter((id): id is number => id !== null))];
+}
+
 function roleClassOf(role: Record<string, unknown>): string | null {
   const roleClass = typeof role.role_class === 'string' ? role.role_class : role.role;
   return typeof roleClass === 'string' ? roleClass : null;
@@ -52,10 +62,11 @@ export function isDepartmentLeaderRole(roleClass: string, configuredRoles: strin
 
 export function ceviDbLeadership(profile: unknown): CeviDbLeadership {
   const { departmentLeaderRoleClasses } = cevidbConfig();
-  const leaderRole = profileRoles(profile).find((role) => {
+  const leaderRoles = profileRoles(profile).filter((role) => {
     const roleClass = roleClassOf(role);
     return roleClass !== null && isDepartmentLeaderRole(roleClass, departmentLeaderRoleClasses);
   });
+  const leaderRole = leaderRoles[0];
 
   const ortsgruppeId =
     ortsgruppeIdFromProfile(profile) ??
@@ -65,6 +76,7 @@ export function ceviDbLeadership(profile: unknown): CeviDbLeadership {
     isLeader: Boolean(leaderRole),
     ortsgruppeId,
     leaderGroupName: leaderRole && typeof leaderRole.group_name === 'string' ? leaderRole.group_name : null,
+    leaderGroupIds: uniqueIds(leaderRoles.map((role) => parseCeviDbGroupId(role.group_id))),
   };
 }
 
@@ -116,6 +128,11 @@ export function ceviDbStufen(profile: unknown): CeviDbStufeDto[] {
   );
 }
 
+/** Gruppen aller Rollen (für die Gruppenstruktur beim Login) */
+export function ceviDbRoleGroupIds(profile: unknown): number[] {
+  return uniqueIds(profileRoles(profile).map((role) => parseCeviDbGroupId(role.group_id)));
+}
+
 /** Name der Ortsgruppe: Gruppe einer Rolle mit der ID der Ortsgruppe (z. B. «Illnau-Effretikon») */
 function ortsgruppeNameFromProfile(profile: unknown, ortsgruppeId: number | null): string | null {
   if (ortsgruppeId === null) return null;
@@ -128,6 +145,10 @@ export interface CeviDbDerived {
   ortsgruppeName: string | null;
   isDepartmentLeader: boolean;
   leaderGroupName: string | null;
+  leaderGroupIds: number[];
+  /** Gruppen aller Rollen der Person */
+  roleGroupIds: number[];
+  primaryGroupId: number | null;
   stufen: CeviDbStufeDto[];
 }
 
@@ -142,6 +163,109 @@ export function deriveCeviDbFields(profile: unknown): CeviDbDerived {
     ortsgruppeName: ortsgruppeNameFromProfile(profile, leadership.ortsgruppeId),
     isDepartmentLeader: leadership.isLeader,
     leaderGroupName: leadership.leaderGroupName,
+    leaderGroupIds: leadership.leaderGroupIds,
+    roleGroupIds: ceviDbRoleGroupIds(profile),
+    primaryGroupId: isRecord(profile) ? parseCeviDbGroupId(profile.primary_group_id) : null,
     stufen: ceviDbStufen(profile),
+  };
+}
+
+/** Gruppe aus der Cevi.DB-Gruppenstruktur (Tabelle `cevidb_groups`) */
+export interface CeviDbGroupInfo {
+  id: number;
+  name: string;
+  jungscharId: number | null;
+  ortsgruppeId: number | null;
+  /** Nur bei Ortsgruppen: Anzahl Jungscharen */
+  jungscharCount: number | null;
+}
+
+export interface CeviDbPlacement {
+  /** Mindestens eine Rolle liegt nachweislich in einer Ortsgruppe */
+  verified: boolean;
+  /** Alle Gruppen der Rollen sind bekannt. Sonst ist ein fehlender Treffer keine Aussage. */
+  complete: boolean;
+  /** Heimabteilung laut Rollen; null, wenn keine Abteilung passt oder mehrere gleich gut passen */
+  homeDepartmentId: string | null;
+  /** Alle Abteilungen, in denen die Person Rollen hat */
+  departmentIds: string[];
+  /** Abteilungen mit Abteilungsleitung; null: nicht prüfbar, dann bleiben die Leitungen, wie sie sind */
+  leaderDepartmentIds: string[] | null;
+  /** Abteilung zum selbst änderbaren Feld `ortsgruppe_id`: nur eine Angabe der Person, gibt keine Cevi.DB-Rechte */
+  selfDeclaredDepartmentId: string | null;
+  ortsgruppeId: number | null;
+  ortsgruppeName: string | null;
+  jungscharIds: number[];
+}
+
+/**
+ * Wohin gehört eine Person? Nur Rollen und Gruppenstruktur zählen. Eine Gruppe gehört zur Abteilung ihrer Jungschar,
+ * sonst zur Abteilung ihrer Ortsgruppe (im Normalfall hat eine Ortsgruppe genau eine Jungschar und eine Abteilung).
+ * Abteilungsleitung gibt es nur in der Jungschar der Rolle. Hängt die Abteilung noch an einer Ortsgruppe mit mehreren
+ * Jungscharen, wäre nicht klar, für welchen Teil die Rolle gilt: Dann ist die Leitung «nicht prüfbar».
+ */
+export function placeCeviDbPerson(
+  person: Pick<CeviDbDerived, 'roleGroupIds' | 'primaryGroupId' | 'leaderGroupIds' | 'ortsgruppeId'>,
+  groups: ReadonlyMap<number, CeviDbGroupInfo>,
+  departments: ReadonlyMap<number, string>,
+  currentHomeDepartmentId: string | null
+): CeviDbPlacement {
+  const departmentOf = (groupId: number | null) => (groupId !== null ? departments.get(groupId) : undefined);
+  const departmentOfGroup = (groupId: number): string | null => {
+    const group = groups.get(groupId);
+    return group ? (departmentOf(group.jungscharId) ?? departmentOf(group.ortsgruppeId) ?? null) : null;
+  };
+
+  const leaderDepartmentIds = (): string[] | null => {
+    const ids = new Set<string>();
+    for (const groupId of person.leaderGroupIds) {
+      const group = groups.get(groupId);
+      if (!group) return null;
+      const ofJungschar = departmentOf(group.jungscharId);
+      if (ofJungschar) {
+        ids.add(ofJungschar);
+        continue;
+      }
+      const ofOrtsgruppe = departmentOf(group.ortsgruppeId);
+      if (!ofOrtsgruppe) continue;
+      const jungscharCount = groups.get(group.ortsgruppeId!)?.jungscharCount ?? null;
+      if (jungscharCount === null || jungscharCount > 1) return null;
+      ids.add(ofOrtsgruppe);
+    }
+    return [...ids];
+  };
+
+  const known = person.roleGroupIds.flatMap((id) => groups.get(id) ?? []);
+  const departmentIds = [
+    ...new Set(person.roleGroupIds.map(departmentOfGroup).filter((id): id is string => id !== null)),
+  ];
+  const leaders = leaderDepartmentIds();
+
+  const pool = leaders?.length ? leaders : departmentIds;
+  const selfDeclared = departmentOf(person.ortsgruppeId) ?? null;
+  let homeDepartmentId = person.primaryGroupId !== null ? departmentOfGroup(person.primaryGroupId) : null;
+  if (!homeDepartmentId) {
+    if (pool.length === 1) homeDepartmentId = pool[0];
+    else if (currentHomeDepartmentId && pool.includes(currentHomeDepartmentId)) homeDepartmentId = currentHomeDepartmentId;
+    // Nur noch Auswahl unter den eigenen Rollen: Dafür darf die Angabe der Person den Ausschlag geben
+    else if (selfDeclared && pool.includes(selfDeclared)) homeDepartmentId = selfDeclared;
+  }
+
+  const anchorIds = [person.primaryGroupId, ...person.leaderGroupIds, ...person.roleGroupIds];
+  const anchor = anchorIds
+    .flatMap((id) => (id !== null ? (groups.get(id) ?? []) : []))
+    .find((g) => g.ortsgruppeId !== null);
+  const ortsgruppeId = anchor?.ortsgruppeId ?? null;
+
+  return {
+    verified: anchor !== undefined,
+    complete: known.length === person.roleGroupIds.length,
+    homeDepartmentId,
+    departmentIds,
+    leaderDepartmentIds: leaders,
+    selfDeclaredDepartmentId: selfDeclared,
+    ortsgruppeId,
+    ortsgruppeName: ortsgruppeId !== null ? (groups.get(ortsgruppeId)?.name ?? null) : null,
+    jungscharIds: uniqueIds(known.map((g) => g.jungscharId)),
   };
 }

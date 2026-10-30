@@ -21,7 +21,7 @@ import {
   type AdminEventListItemDto,
   normalizePermissions,
 } from '@schichtplan/shared';
-import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen } from '../services/homeDepartment.js';
+import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, ceviDbGroupPeople } from '../services/homeDepartment.js';
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
 import { mergeUserInto } from '../services/mergeProfiles.js';
 import { personLabel } from '../services/profile.js';
@@ -182,31 +182,28 @@ async function toDepartmentItems(prisma: PrismaClient, rows: DepartmentRow[]): P
 }
 
 /**
- * Bereits angemeldete Cevi.DB-Personen einer Ortsgruppe der Abteilung zuordnen (Heimabteilung + Helfer*in),
+ * Bereits angemeldete Cevi.DB-Personen einer Gruppe der Abteilung zuordnen (Heimabteilung + Helfer*in),
  * wie beim Anlegen durch die Abteilungsleitung. Bestehende Rollen bleiben.
  */
-async function attachOrtsgruppe(prisma: PrismaClient, departmentId: string, ortsgruppeId: number) {
-  const people = await prisma.user.findMany({
-    where: { ceviDbOrtsgruppeId: ortsgruppeId },
-    select: { id: true, ceviDbDepartmentLeader: true },
-  });
+async function attachCeviDbGroup(prisma: PrismaClient, departmentId: string, groupId: number) {
+  const people = await ceviDbGroupPeople(prisma, groupId);
   if (!people.length) return 0;
   await prisma.$transaction([
     prisma.user.updateMany({
-      where: { ceviDbOrtsgruppeId: ortsgruppeId },
+      where: { id: { in: people.map((p) => p.id) } },
       data: { homeDepartmentId: departmentId, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
     }),
     prisma.departmentMember.createMany({
       data: people.map((p) => ({
         departmentId,
         userId: p.id,
-        role: p.ceviDbDepartmentLeader ? 'ADMIN' : 'HELPER',
-        leaderSource: p.ceviDbDepartmentLeader ? 'CEVIDB' : null,
+        role: p.isLeader ? 'ADMIN' : 'HELPER',
+        leaderSource: p.isLeader ? 'CEVIDB' : null,
       })),
       skipDuplicates: true,
     }),
   ]);
-  const leaderIds = people.filter((p) => p.ceviDbDepartmentLeader).map((p) => p.id);
+  const leaderIds = people.filter((p) => p.isLeader).map((p) => p.id);
   if (leaderIds.length) {
     await prisma.departmentMember.updateMany({
       where: { departmentId, userId: { in: leaderIds }, role: { not: 'ADMIN' } },
@@ -438,7 +435,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
       });
       if (existingWithGroup) {
         return reply.status(409).send({
-          error: `Für diese Cevi.DB-Ortsgruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
+          error: `Für diese Cevi.DB-Gruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
         });
       }
     }
@@ -475,7 +472,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
       throw err;
     }
 
-    const attached = ceviDbGroupId ? await attachOrtsgruppe(fastify.prisma, created.id, ceviDbGroupId) : 0;
+    const attached = ceviDbGroupId ? await attachCeviDbGroup(fastify.prisma, created.id, ceviDbGroupId) : 0;
 
     await recordAdminAction(fastify.prisma, request, {
       action: 'DEPARTMENT_CREATE',
@@ -518,7 +515,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
       });
       if (existingWithGroup && existingWithGroup.id !== existing.id) {
         return reply.status(409).send({
-          error: `Für diese Cevi.DB-Ortsgruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
+          error: `Für diese Cevi.DB-Gruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
         });
       }
     }
@@ -545,7 +542,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
 
     const newGroup = data.ceviDbGroupId;
     const attached =
-      newGroup && newGroup !== existing.ceviDbGroupId ? await attachOrtsgruppe(fastify.prisma, existing.id, newGroup) : 0;
+      newGroup && newGroup !== existing.ceviDbGroupId ? await attachCeviDbGroup(fastify.prisma, existing.id, newGroup) : 0;
 
     await recordAdminAction(fastify.prisma, request, {
       action: 'DEPARTMENT_UPDATE',

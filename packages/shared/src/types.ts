@@ -860,11 +860,13 @@ export interface DepartmentCreationEligibilityDto {
   eligible: boolean;
   /**
    * Warum nicht: NOT_CEVIDB (nicht mit Cevi.DB angemeldet), NOT_LEADER (keine Abteilungsleitung),
-   * NO_ORTSGRUPPE (Cevi.DB liefert keine Ortsgruppe), EXISTS (Ortsgruppe hat schon eine Abteilung)
+   * NO_ORTSGRUPPE (Leitungsrolle liegt in keiner Ortsgruppe), EXISTS (Gruppe hat schon eine Abteilung),
+   * UNVERIFIED (Gruppenstruktur aus Cevi.DB fehlt, neu anmelden hilft)
    */
-  reason: 'NOT_CEVIDB' | 'NOT_LEADER' | 'NO_ORTSGRUPPE' | 'EXISTS' | null;
+  reason: 'NOT_CEVIDB' | 'NOT_LEADER' | 'NO_ORTSGRUPPE' | 'EXISTS' | 'UNVERIFIED' | null;
+  /** Cevi.DB-Gruppe der neuen Abteilung: die Ortsgruppe oder, bei mehreren Jungscharen, die Jungschar */
   ortsgruppeId: number | null;
-  /** Name der Ortsgruppe laut Cevi.DB (z. B. "Illnau-Effretikon"), Vorschlag für den Namen */
+  /** Name dieser Gruppe (z. B. "Weiningen-Geroldswil" oder "Effretikon"), Vorschlag für den Namen */
   ortsgruppeName: string | null;
   /** Name der Cevi.DB-Gruppe, in der die Person Abteilungsleitung ist (z. B. "JS Illnau") */
   leaderGroupName: string | null;

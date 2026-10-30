@@ -117,7 +117,7 @@ function CreateDepartment() {
             <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
               Du bist laut Cevi.DB Abteilungsleitung
               {eligibility.leaderGroupName ? ` (${eligibility.leaderGroupName})` : ''}. Lege den Schichtplan für eure
-              Abteilung jetzt an. Alle aus eurer Ortsgruppe, die sich mit Cevi.DB anmelden, gehören automatisch dazu.
+              Abteilung jetzt an. Alle aus eurer Abteilung, die sich mit Cevi.DB anmelden, gehören automatisch dazu.
             </p>
 
             <div className="mt-8 space-y-5">
@@ -177,7 +177,7 @@ function CreateDepartment() {
             {eligibility.reason === 'EXISTS' && eligibility.existingDepartment ? (
               <>
                 <p className="text-[15px] leading-relaxed text-fg-muted">
-                  Für deine Ortsgruppe gibt es schon einen Schichtplan: {eligibility.existingDepartment.name}.
+                  Für deine Abteilung gibt es schon einen Schichtplan: {eligibility.existingDepartment.name}.
                 </p>
                 <a
                   href={getDepartmentUrl(eligibility.existingDepartment.slug)}
@@ -201,6 +201,10 @@ function CreateDepartment() {
                   Mit Cevi.DB anmelden <ArrowUpRight />
                 </a>
               </>
+            ) : eligibility.reason === 'UNVERIFIED' ? (
+              <p className="text-[15px] leading-relaxed text-fg-muted">
+                Wir konnten deine Gruppe in Cevi.DB gerade nicht prüfen. Melde dich bitte nochmals mit Cevi.DB an.
+              </p>
             ) : eligibility.reason === 'NO_ORTSGRUPPE' ? (
               <p className="text-[15px] leading-relaxed text-fg-muted">
                 In Cevi.DB ist für dich keine Ortsgruppe hinterlegt. Melde dich bei der Cevi.DB-Verwaltung eurer Abteilung.

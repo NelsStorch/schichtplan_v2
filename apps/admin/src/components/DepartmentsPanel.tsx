@@ -106,7 +106,7 @@ function CreateDepartmentDialog({
       toast({
         title: 'Abteilung angelegt',
         description: result.attached
-          ? `${result.department.name}: ${result.attached} Personen aus der Ortsgruppe zugeordnet.`
+          ? `${result.department.name}: ${result.attached} Personen aus der Cevi.DB-Gruppe zugeordnet.`
           : result.department.name,
         tone: 'success',
       });
@@ -173,8 +173,8 @@ function CreateDepartmentDialog({
             />
           </Field>
           <Field
-            label="Cevi.DB-Ortsgruppe (ID)"
-            hint="Optional. Bereits angemeldete Personen der Ortsgruppe werden sofort zugeordnet."
+            label="Cevi.DB-Gruppe (ID)"
+            hint="Optional. Die Ortsgruppe, oder die Jungschar, wenn die Ortsgruppe mehrere hat. Bereits angemeldete Personen werden sofort zugeordnet."
             error={groupValid ? undefined : 'Nur Ziffern'}
           >
             <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />

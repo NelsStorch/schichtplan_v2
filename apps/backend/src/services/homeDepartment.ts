@@ -1,16 +1,16 @@
 /**
  * Heimabteilung und Stufen einer Person.
- * Cevi.DB-Personen: Abteilung aus der Ortsgruppe, Stufen aus den Rollen (Quelle CEVIDB, bei jedem Login neu).
+ * Cevi.DB-Personen: Abteilung und Stufen aus den Rollen und der Gruppenstruktur (Quelle CEVIDB, bei jedem Login neu).
  * Alle anderen geben beides beim Login selbst an (Quelle SELF).
  * Grundlage sind die beim Login gespeicherten Spalten (users.ceviDb*) und user_cevidb_stufen, nie users.ceviDbData.
  */
 import type { PrismaClient } from '../db.js';
 import type { CeviDbStufeDto, StufeRole, UserStufeDto } from '@schichtplan/shared';
-import type { CeviDbDerived } from './cevidb.js';
+import { placeCeviDbPerson, type CeviDbDerived, type CeviDbPlacement } from './cevidb.js';
 
 type Db = Pick<
   PrismaClient,
-  'department' | 'departmentStufe' | 'user' | 'userStufe' | 'userCeviDbStufe'
+  'department' | 'departmentStufe' | 'user' | 'userStufe' | 'userCeviDbStufe' | 'ceviDbGroup'
 > & {
   $transaction?: any;
 };
@@ -22,16 +22,46 @@ async function runInTransaction<T>(prisma: Db, fn: (tx: any) => Promise<T>): Pro
   return fn(prisma);
 }
 
+/** Rollen der Person mit der gespeicherten Gruppenstruktur und den Abteilungen abgleichen */
+export async function resolveCeviDbPlacement(
+  prisma: Db,
+  derived: CeviDbDerived,
+  currentHomeDepartmentId: string | null
+): Promise<CeviDbPlacement> {
+  const roleGroups = await prisma.ceviDbGroup.findMany({ where: { id: { in: derived.roleGroupIds } } });
+  const ortsgruppeIds = roleGroups.map((g) => g.ortsgruppeId).filter((id): id is number => id !== null);
+  const ortsgruppen = await prisma.ceviDbGroup.findMany({ where: { id: { in: ortsgruppeIds } } });
+  const groups = new Map([...roleGroups, ...ortsgruppen].map((g) => [g.id, g]));
+
+  const departmentGroupIds = [...roleGroups.map((g) => g.jungscharId), ...ortsgruppeIds, derived.ortsgruppeId].filter(
+    (id): id is number => id !== null
+  );
+  const departments = await prisma.department.findMany({
+    where: { ceviDbGroupId: { in: departmentGroupIds } },
+    select: { id: true, ceviDbGroupId: true },
+  });
+  const departmentByGroup = new Map(departments.map((d) => [d.ceviDbGroupId!, d.id]));
+  return placeCeviDbPerson(derived, groups, departmentByGroup, currentHomeDepartmentId);
+}
+
 /** Cevi.DB-Angaben nach dem Login speichern (Spalten und Stufen-Rollen ersetzen) */
-export async function storeCeviDbFields(prisma: Db, userId: string, derived: CeviDbDerived) {
+export async function storeCeviDbFields(
+  prisma: Db,
+  userId: string,
+  derived: CeviDbDerived,
+  placement: CeviDbPlacement
+) {
   await runInTransaction(prisma, async (tx) => {
     await tx.user.update({
       where: { id: userId },
       data: {
-        ceviDbOrtsgruppeId: derived.ortsgruppeId,
-        ceviDbOrtsgruppeName: derived.ortsgruppeName,
+        ceviDbOrtsgruppeId: placement.verified ? placement.ortsgruppeId : derived.ortsgruppeId,
+        ceviDbOrtsgruppeName: placement.verified ? placement.ortsgruppeName : derived.ortsgruppeName,
         ceviDbDepartmentLeader: derived.isDepartmentLeader,
         ceviDbLeaderGroupName: derived.leaderGroupName,
+        ceviDbLeaderGroupIds: derived.leaderGroupIds,
+        // Ohne Gruppenstruktur bleibt der letzte geprüfte Stand
+        ...(placement.verified ? { ceviDbJungscharIds: placement.jungscharIds } : {}),
       },
     });
     await tx.userCeviDbStufe.deleteMany({ where: { userId } });
@@ -54,6 +84,7 @@ export async function storeCeviDbFields(prisma: Db, userId: string, derived: Cev
 /**
  * Stufen aus Cevi.DB für die Abteilung der Person automatisch in department_stufen anlegen,
  * falls sie noch nicht existieren oder noch nicht mit der Cevi.DB-Gruppe verknüpft sind.
+ * Laut Gruppenstruktur fremde Stufen bleiben draussen: Mitglied kann auch sein, wer anderswo zu Hause ist.
  */
 export async function autoCreateAllCeviDbDepartmentStufen(
   prisma: Db,
@@ -72,6 +103,24 @@ export async function autoCreateAllCeviDbDepartmentStufen(
   });
   if (!fromCeviDb.length) return;
 
+  const department = await prisma.department.findUnique({
+    where: { id: departmentId },
+    select: { ceviDbGroupId: true },
+  });
+  const departmentGroupId = department?.ceviDbGroupId ?? null;
+  const structure = await prisma.ceviDbGroup.findMany({
+    where: { id: { in: [...fromCeviDb.map((s) => s.groupId), ...(departmentGroupId !== null ? [departmentGroupId] : [])] } },
+  });
+  const groupInfo = new Map(structure.map((g) => [g.id, g]));
+  const departmentIsJungschar = departmentGroupId !== null && groupInfo.get(departmentGroupId)?.jungscharId === departmentGroupId;
+  // Unbekannte Gruppen nur, wenn die Abteilung nicht an einer Jungschar hängt (Stand vor der Gruppenstruktur)
+  const belongsToDepartment = (groupId: number) => {
+    if (departmentGroupId === null) return true;
+    const info = groupInfo.get(groupId);
+    if (!info) return !departmentIsJungschar;
+    return info.jungscharId === departmentGroupId || info.ortsgruppeId === departmentGroupId;
+  };
+
   const existingStufen = await prisma.departmentStufe.findMany({
     where: { departmentId },
     select: { id: true, name: true, ceviDbGroupId: true, sortOrder: true },
@@ -87,7 +136,7 @@ export async function autoCreateAllCeviDbDepartmentStufen(
 
   const uniqueGroups = new Map<number, string>();
   for (const stufe of fromCeviDb) {
-    if (!uniqueGroups.has(stufe.groupId)) {
+    if (!uniqueGroups.has(stufe.groupId) && belongsToDepartment(stufe.groupId)) {
       uniqueGroups.set(stufe.groupId, stufe.groupName);
     }
   }
@@ -170,18 +219,44 @@ export async function syncCeviDbStufen(prisma: Db, userId: string) {
 }
 
 /**
- * Nach dem Cevi.DB-Login: Heimabteilung aus der gespeicherten Ortsgruppe setzen (falls es dafür eine
- * Abteilung gibt), Stufen automatisch in der Abteilung anlegen und Stufen abgleichen. Gibt die Heimabteilung zurück.
+ * Wer gehört laut Cevi.DB zur Gruppe einer Abteilung (Jungschar oder Ortsgruppe) und wer leitet sie?
+ * Die Leitung zählt nur über die Gruppe der Rolle: bei einer Ortsgruppe über ihre einzige Jungschar.
+ */
+export async function ceviDbGroupPeople(prisma: Pick<Db, 'user' | 'ceviDbGroup'>, groupId: number) {
+  const group = await prisma.ceviDbGroup.findUnique({ where: { id: groupId } });
+  const isJungschar = group?.jungscharId === groupId;
+  const people = await prisma.user.findMany({
+    where: isJungschar ? { ceviDbJungscharIds: { has: groupId } } : { ceviDbOrtsgruppeId: groupId },
+    select: { id: true, ceviDbLeaderGroupIds: true },
+  });
+  const jungscharen =
+    group?.jungscharCount === 1
+      ? await prisma.ceviDbGroup.findMany({ where: { ortsgruppeId: groupId }, select: { jungscharId: true } })
+      : [];
+  const leaderGroupIds = new Set<number | null>(jungscharen.map((g) => g.jungscharId));
+  if (isJungschar) leaderGroupIds.add(groupId);
+  return people.map((p) => ({
+    id: p.id,
+    isLeader: p.ceviDbLeaderGroupIds.some((id) => leaderGroupIds.has(id)),
+  }));
+}
+
+/**
+ * Nach dem Cevi.DB-Login: Heimabteilung setzen, Stufen automatisch in der Abteilung anlegen und Stufen abgleichen.
+ * Belegen die Rollen eine Abteilung, zählt sie (Quelle CEVIDB). Gehen sie nachweislich nirgends hin, wird eine
+ * Zuordnung aus Cevi.DB aufgehoben. Ohne Aussage (Cevi.DB nicht erreichbar, keine Rolle in einer Ortsgruppe) bleibt
+ * alles beim Alten; nur wer noch keine Abteilung hat, bekommt die zu `ortsgruppe_id`, aber wie selbst gewählt
+ * (Quelle SELF), denn das Feld kann die Person selbst ändern. Gibt die Heimabteilung zurück.
  */
 export async function syncCeviDbHomeDepartment(
   prisma: Db,
   user: { id: string; homeDepartmentSource: string | null; departmentSetupAt: Date | null },
-  ortsgruppeId: number | null
+  placement: CeviDbPlacement
 ): Promise<{ id: string; slug: string } | null> {
-  const department =
-    ortsgruppeId !== null
-      ? await prisma.department.findUnique({ where: { ceviDbGroupId: ortsgruppeId }, select: { id: true, slug: true } })
-      : null;
+  const select = { id: true, slug: true } as const;
+  let department = placement.homeDepartmentId
+    ? await prisma.department.findUnique({ where: { id: placement.homeDepartmentId }, select })
+    : null;
 
   if (department) {
     await prisma.user.update({
@@ -203,12 +278,28 @@ export async function syncCeviDbHomeDepartment(
     if (current?.homeDepartmentId) {
       await autoCreateCeviDbDepartmentStufen(prisma, current.homeDepartmentId, user.id);
     }
-    if (user.homeDepartmentSource === 'CEVIDB') {
-      // Ortsgruppe gewechselt oder Abteilung gelöscht: erneut nachfragen
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { homeDepartmentId: null, homeDepartmentSource: null, departmentSetupAt: null },
-      });
+    if (placement.verified) {
+      if (placement.complete && user.homeDepartmentSource === 'CEVIDB') {
+        // Abteilung gewechselt oder gelöscht: erneut nachfragen
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { homeDepartmentId: null, homeDepartmentSource: null, departmentSetupAt: null },
+        });
+      }
+    } else if (current?.homeDepartmentId) {
+      department = await prisma.department.findUnique({ where: { id: current.homeDepartmentId }, select });
+    } else if (placement.selfDeclaredDepartmentId) {
+      department = await prisma.department.findUnique({ where: { id: placement.selfDeclaredDepartmentId }, select });
+      if (department) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            homeDepartmentId: department.id,
+            homeDepartmentSource: 'SELF',
+            departmentSetupAt: user.departmentSetupAt ?? new Date(),
+          },
+        });
+      }
     }
   }
 

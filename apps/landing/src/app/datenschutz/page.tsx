@@ -175,8 +175,10 @@ export default function DatenschutzPage() {
               <strong>Cevi.DB:</strong> Cevi.DB-Personen-ID, Vor- und Nachname,
               Cevi-Name, E-Mail, Geburtsdatum, Ortsgruppe sowie deine Rollen in
               der Cevi.DB, soweit wir daraus Abteilung, Stufen und eine
-              allfällige Abteilungsleitung ableiten. Deine Postadresse aus der
-              Cevi.DB übernehmen und speichern wir nicht.
+              allfällige Abteilungsleitung ableiten. Dafür lesen wir beim Login
+              auch die Gruppenstruktur zu deinen Rollen (welche Gruppe zu welcher
+              Jungschar und Ortsgruppe gehört). Deine Postadresse aus der Cevi.DB
+              übernehmen und speichern wir nicht.
             </li>
             <li>
               <strong>Cevi-Name (ohne Passwort):</strong> Cevi-Name und
