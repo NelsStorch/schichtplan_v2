@@ -221,13 +221,15 @@ export async function syncCeviDbStufen(prisma: Db, userId: string) {
 /**
  * Wer gehört laut Cevi.DB zur Gruppe einer Abteilung (Jungschar oder Ortsgruppe) und wer leitet sie?
  * Die Leitung zählt nur über die Gruppe der Rolle: bei einer Ortsgruppe über ihre einzige Jungschar.
+ * `moveHome`: Die Heimabteilung folgt nur, wenn die Person keine hat oder nur in dieser Jungschar Rollen hat. Bei
+ * Rollen in mehreren Jungscharen entscheidet die Hauptgruppe, und die ist hier nicht bekannt, sondern nur beim Login.
  */
 export async function ceviDbGroupPeople(prisma: Pick<Db, 'user' | 'ceviDbGroup'>, groupId: number) {
   const group = await prisma.ceviDbGroup.findUnique({ where: { id: groupId } });
   const isJungschar = group?.jungscharId === groupId;
   const people = await prisma.user.findMany({
     where: isJungschar ? { ceviDbJungscharIds: { has: groupId } } : { ceviDbOrtsgruppeId: groupId },
-    select: { id: true, ceviDbLeaderGroupIds: true },
+    select: { id: true, homeDepartmentId: true, ceviDbJungscharIds: true, ceviDbLeaderGroupIds: true },
   });
   const jungscharen =
     group?.jungscharCount === 1
@@ -238,6 +240,7 @@ export async function ceviDbGroupPeople(prisma: Pick<Db, 'user' | 'ceviDbGroup'>
   return people.map((p) => ({
     id: p.id,
     isLeader: p.ceviDbLeaderGroupIds.some((id) => leaderGroupIds.has(id)),
+    moveHome: !isJungschar || p.homeDepartmentId === null || p.ceviDbJungscharIds.length === 1,
   }));
 }
 

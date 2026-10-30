@@ -190,7 +190,7 @@ async function attachCeviDbGroup(prisma: PrismaClient, departmentId: string, gro
   if (!people.length) return 0;
   await prisma.$transaction([
     prisma.user.updateMany({
-      where: { id: { in: people.map((p) => p.id) } },
+      where: { id: { in: people.filter((p) => p.moveHome).map((p) => p.id) } },
       data: { homeDepartmentId: departmentId, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
     }),
     prisma.departmentMember.createMany({

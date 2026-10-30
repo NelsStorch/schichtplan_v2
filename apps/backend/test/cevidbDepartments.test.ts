@@ -252,6 +252,42 @@ describe.skipIf(!hasTestDb)('Cevi.DB: Abteilung aus Rollen und Gruppenstruktur',
     expect(role(founder, illnau.id)).toBeNull();
   });
 
+  it('verschiebt beim Anlegen niemanden, der noch in einer anderen Jungschar Rollen hat', async () => {
+    const illnau = await department('illnau', 295);
+    const beide = person(12211, 161, 805, [
+      leader(295),
+      { role_class: 'Group::Jungschar::FreierMitarbeiter', group_id: 726 },
+      stufe(805),
+    ]);
+    await login(beide);
+    const nurEffi = await login(person(53, 161, 910, [stufe(910)]));
+    expect(nurEffi.user.homeDepartmentId).toBeNull();
+
+    const { cookie } = await login(person(50783, 161, 726, [leader(726)]));
+    const created = await inject(app, {
+      method: 'POST',
+      url: '/api/departments/cevidb',
+      cookie,
+      payload: { departmentName: 'Cevi Effretikon', slug: 'effretikon' },
+    });
+    expect(created.statusCode).toBe(201);
+    const effretikon = await app.prisma.department.findUniqueOrThrow({ where: { slug: 'effretikon' } });
+
+    const stayed = await app.prisma.user.findUniqueOrThrow({ where: { ceviDbId: 12211 }, include: { memberships: true } });
+    expect(stayed.homeDepartmentId).toBe(illnau.id);
+    expect(role(stayed, illnau.id)).toBe('ADMIN');
+    expect(role(stayed, effretikon.id)).toBe('HELPER');
+
+    const moved = await app.prisma.user.findUniqueOrThrow({ where: { ceviDbId: 53 } });
+    expect(moved.homeDepartmentId).toBe(effretikon.id);
+
+    // Der nächste Login ändert daran nichts
+    const again = await login(beide);
+    expect(again.user.homeDepartmentId).toBe(illnau.id);
+    expect(role(again.user, illnau.id)).toBe('ADMIN');
+    expect(role(again.user, effretikon.id)).toBe('HELPER');
+  });
+
   it('bindet eine neue Abteilung sonst an die Ortsgruppe', async () => {
     const { cookie } = await login(person(61, 3000, 3001, [leader(3001)]));
     const eligibility = await inject(app, { method: 'GET', url: '/api/departments/creation-eligibility', cookie });
@@ -275,6 +311,9 @@ describe.skipIf(!hasTestDb)('Cevi.DB: Abteilung aus Rollen und Gruppenstruktur',
     const adminCookie = `token=${token}`;
     const leitungIllnau = await login(person(81, 161, 295, [leader(295)]));
     const leitungEffi = await login(person(82, 161, 726, [leader(726)]));
+    const home = await department('effretikon', 726);
+    const beide = await login(person(83, 161, 726, [stufe(910), { role_class: 'Group::Jungschar::FreierMitarbeiter', group_id: 295 }]));
+    expect(beide.user.homeDepartmentId).toBe(home.id);
 
     const target = await createDepartment(app, { slug: 'illnau' });
     const res = await inject(app, {
@@ -285,7 +324,10 @@ describe.skipIf(!hasTestDb)('Cevi.DB: Abteilung aus Rollen und Gruppenstruktur',
       payload: { ceviDbGroupId: 295 },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().attached).toBe(1);
+    expect(res.json().attached).toBe(2);
+    const stayed = await app.prisma.user.findUniqueOrThrow({ where: { id: beide.user.id }, include: { memberships: true } });
+    expect(stayed.homeDepartmentId).toBe(home.id);
+    expect(role(stayed, target.id)).toBe('HELPER');
 
     const first = await app.prisma.user.findUniqueOrThrow({ where: { id: leitungIllnau.user.id }, include: { memberships: true } });
     const second = await app.prisma.user.findUniqueOrThrow({ where: { id: leitungEffi.user.id }, include: { memberships: true } });

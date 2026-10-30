@@ -744,11 +744,11 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
             data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
           });
 
-          // Alle bereits angemeldeten Cevi.DB-Personen dieser Gruppe bekommen die neue Abteilung als
-          // Heimabteilung und werden Helfer*innen bzw. Abteilungsleitung (nur über ihre eigene Leitungsrolle)
+          // Alle bereits angemeldeten Cevi.DB-Personen dieser Gruppe werden Helfer*innen bzw. Abteilungsleitung
+          // (nur über ihre eigene Leitungsrolle) und bekommen die neue Abteilung wenn möglich als Heimabteilung
           const people = await ceviDbGroupPeople(tx, ceviDbGroupId);
           await tx.user.updateMany({
-            where: { id: { in: people.map((p) => p.id) } },
+            where: { id: { in: people.filter((p) => p.moveHome).map((p) => p.id) } },
             data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', departmentSetupAt: new Date() },
           });
           await tx.departmentMember.createMany({
