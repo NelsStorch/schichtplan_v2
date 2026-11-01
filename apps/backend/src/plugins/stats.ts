@@ -54,7 +54,7 @@ const ROUTE_METRICS: Record<string, (request: FastifyRequest, departmentId: stri
 const statsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('onResponse', async (request, reply) => {
     const route = request.routeOptions.url;
-    if (route && IGNORED_ROUTES.has(route)) return;
+    if (route && (IGNORED_ROUTES.has(route) || route.startsWith('/api/docs'))) return;
     recordRequest(route ?? '(unbekannt)', request.method, reply.statusCode, reply.elapsedTime);
     if (route && reply.statusCode >= 200 && reply.statusCode < 300) {
       ROUTE_METRICS[`${request.method} ${route}`]?.(request, request.tenant?.id ?? null);

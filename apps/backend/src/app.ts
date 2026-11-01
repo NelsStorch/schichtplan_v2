@@ -8,6 +8,7 @@ import prismaPlugin from './plugins/prisma.js';
 import jwtPlugin from './plugins/jwt.js';
 import tenantPlugin from './plugins/tenant.js';
 import statsPlugin from './plugins/stats.js';
+import docsPlugin from './plugins/docs.js';
 
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
@@ -85,6 +86,16 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(helmet, {
     crossOriginResourcePolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        fontSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+      },
+    },
   });
 
   await app.register(compress);
@@ -94,6 +105,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(statsPlugin);
   await app.register(jwtPlugin);
   await app.register(tenantPlugin);
+  await app.register(docsPlugin);
 
   // Application routes
   await app.register(healthRoutes);

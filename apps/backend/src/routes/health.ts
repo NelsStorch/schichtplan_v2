@@ -1,4 +1,19 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+
+const HealthOkResponseSchema = z.object({
+  status: z.string().describe('Status der API (ok)'),
+  timestamp: z.string().describe('ISO-Zeitstempel des Abfragezeitpunkts'),
+  version: z.string().describe('Aktuelle Versionsnummer der API'),
+  database: z.boolean().describe('Gibt an, ob die Datenbankabfrage erfolgreich war'),
+});
+
+const HealthErrorResponseSchema = z.object({
+  status: z.string().describe('Status der API (error)'),
+  timestamp: z.string().describe('ISO-Zeitstempel des Fehlerzeitpunkts'),
+  version: z.string().describe('Aktuelle Versionsnummer der API'),
+  database: z.boolean().describe('Gibt an, ob die Datenbank erreichbar war (false)'),
+});
 
 const healthRoutes: FastifyPluginAsync = async (fastify) => {
   const handler = async (_request: unknown, reply: any) => {
@@ -22,8 +37,20 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
     }
   };
 
-  fastify.get('/health', handler);
-  fastify.get('/api/health', handler);
+  const createHealthRouteOptions = () => ({
+    schema: {
+      tags: ['Health'],
+      summary: 'System-Gesundheitsprüfung',
+      description: 'Prüft die Verfügbarkeit der Fastify API und der PostgreSQL-Datenbank.',
+      response: {
+        200: HealthOkResponseSchema,
+        503: HealthErrorResponseSchema,
+      },
+    },
+  });
+
+  fastify.get('/health', createHealthRouteOptions(), handler);
+  fastify.get('/api/health', createHealthRouteOptions(), handler);
 };
 
 export default healthRoutes;
