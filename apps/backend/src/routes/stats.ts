@@ -82,7 +82,18 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Ohne Login und ohne Cookie. Wer «nicht verfolgen» (GPC/DNT) eingestellt hat, wird nicht gezählt
   // (der Browser schickt dann schon nichts, das hier ist die zweite Sicherung).
-  fastify.post('/api/stats/ui', async (request, reply) => {
+  fastify.post(
+    '/api/stats/ui',
+    {
+      schema: {
+        tags: ['Statistik'],
+        summary: 'UI-Ereignisse aus dem Browser melden',
+        description:
+          'Nimmt anonymisierte Oberflächen-Metriken (ohne Cookies, unter Beachtung von Do-Not-Track/GPC) für aggregierte Nutzungsstatistiken entgegen.',
+        body: UiStatsSchema,
+      },
+    },
+    async (request, reply) => {
     const isDnt = request.headers['sec-gpc'] === '1' || request.headers.dnt === '1';
     if (uiLimiter.hit(request.ip)) return reply.status(429).send({ error: 'Zu viele Meldungen' });
     // sendBeacon schickt text/plain, damit der Browser keine Vorab-Anfrage braucht
@@ -115,7 +126,19 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
     const guard = { preHandler: [admin.requireGlobalAdmin] };
 
     // Zähler pro Tag, aktive Personen und eine Zeile pro Abteilung
-    admin.get('/api/admin/stats/usage', guard, async (request, reply) => {
+    admin.get(
+      '/api/admin/stats/usage',
+      {
+        ...guard,
+        schema: {
+          tags: ['Statistik'],
+          summary: 'Nutzungsstatistiken abrufen (Admin)',
+          description: 'Aggregierte Kennzahlen über Logins, Eintragungen, aktive Personen und Abteilungsaktivität.',
+          security: [{ bearerAuth: [] }],
+          querystring: RangeQuerySchema,
+        },
+      },
+      async (request, reply) => {
       await flushUsageStats(fastify.prisma);
       const parse = RangeQuerySchema.safeParse(request.query);
       if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -207,7 +230,19 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // Einstellungen und Abläufe der Anlässe, aus den bestehenden Daten (es wird dafür nichts erhoben)
-    admin.get('/api/admin/stats/features', guard, async (request, reply) => {
+    admin.get(
+      '/api/admin/stats/features',
+      {
+        ...guard,
+        schema: {
+          tags: ['Statistik'],
+          summary: 'Feature- und Anlass-Statistiken abrufen (Admin)',
+          description: 'Statistische Auswertungen über verwendete Funktionen wie Zugangstypen, Auslastung, Vorlaufzeiten, Anwesenheitserfassung und Rollen.',
+          security: [{ bearerAuth: [] }],
+          querystring: RangeQuerySchema,
+        },
+      },
+      async (request, reply) => {
       const parse = RangeQuerySchema.safeParse(request.query);
       if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
       const { days, departmentId } = parse.data;
@@ -430,7 +465,19 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // Betrieb: Anfragen, Antwortzeiten, Datenbank, Speicher, Verläufe der Bestandszahlen
-    admin.get('/api/admin/stats/system', guard, async (request, reply) => {
+    admin.get(
+      '/api/admin/stats/system',
+      {
+        ...guard,
+        schema: {
+          tags: ['Statistik'],
+          summary: 'System- und Performance-Metriken abrufen (Admin)',
+          description: 'Technische Kennzahlen: HTTP-Anfragen, Antwortzeiten, Tabellengrössen, Speicherplatz und Uploads.',
+          security: [{ bearerAuth: [] }],
+          querystring: RangeQuerySchema,
+        },
+      },
+      async (request, reply) => {
       const parse = RangeQuerySchema.safeParse(request.query);
       if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
       const dayList = rangeDays(parse.data.days);

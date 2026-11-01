@@ -38,6 +38,23 @@ Diese API-Dokumentation wird vollständig **lokal ohne externe CDNs, Web-Fonts o
           description: 'Aktuelle API-Basis',
         },
       ],
+      tags: [
+        { name: 'Health', description: 'System-Gesundheitsprüfung und Datenbank-Verfügbarkeit' },
+        { name: 'Auth', description: 'Authentifizierung (Cevi.DB OAuth, Cevi-Name, E-Mail/Passwort) und Benutzerprofil' },
+        { name: 'Abteilungen', description: 'Abteilungsverwaltung, Stufen, Leitungsteam und Mitgliederlisten' },
+        { name: 'Events', description: 'Anlässe erstellen, bearbeiten, verschieben und OK-Verwaltung' },
+        { name: 'Schichten', description: 'Schichten, Schichtserien, Einteilung und Helfer-Eintragungen' },
+        { name: 'Anwesenheit', description: 'QR-Code-Check-in und Erfassung der Helfer-Anwesenheit' },
+        { name: 'Ersatz', description: '«Ersatz gesucht»-Workflow und Schicht-Übernahmen' },
+        { name: 'Aufgaben', description: 'Katalog vordefinierter Tätigkeiten und Altersanforderungen' },
+        { name: 'Vorlagen', description: 'Wiederverwendbare Event- und Schichtvorlagen' },
+        { name: 'Nachrichten', description: 'Zielgerichtete Rundmails und Benachrichtigungen an Helfende' },
+        { name: 'Push', description: 'Web Push Benachrichtigungen (VAPID) für Schichterinnerungen' },
+        { name: 'Kalender', description: 'Persönliche iCal/Webcal-Kalender-Abonnements' },
+        { name: 'Uploads', description: 'Upload und Auslieferung von Abteilungslogos und Eventbannern' },
+        { name: 'Statistik', description: 'Anonyme UI- und Nutzungsmetriken' },
+        { name: 'Administration', description: 'Globale Plattformverwaltung für Systemadministratoren' },
+      ],
       components: {
         securitySchemes: {
           bearerAuth: {

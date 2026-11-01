@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync, FastifyReply } from 'fastify';
+import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import {
@@ -277,6 +278,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 1. Cevi.DB OAuth Login Redirect
   fastify.get<{ Querystring: { returnTo?: string; tenantSlug?: string } }>(
     '/api/auth/cevidb/login',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Cevi.DB OAuth-Login starten',
+        description: 'Leitet den Browser zur Authentifizierung an die Cevi.DB (Hitobito) weiter.',
+        querystring: z.object({
+          returnTo: z.string().optional().describe('Ziel-URL nach erfolgreicher Anmeldung'),
+          tenantSlug: z.string().optional().describe('Subdomain der Abteilung'),
+        }),
+      },
+    },
     async (request, reply) => {
       const host = request.headers.host || 'cevi-schichtplan.ch';
       const protocol = host.includes('localhost') ? 'http' : 'https';
@@ -325,6 +337,18 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 2. Cevi.DB OAuth Callback
   fastify.get<{ Querystring: { code?: string; state?: string; error?: string } }>(
     '/api/auth/cevidb/callback',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Cevi.DB OAuth Callback',
+        description: 'OAuth-Rücksprungadresse der Cevi.DB. Tauscht den Authorization Code gegen Tokens und initialisiert die Benutzersitzung.',
+        querystring: z.object({
+          code: z.string().optional(),
+          state: z.string().optional(),
+          error: z.string().optional(),
+        }),
+      },
+    },
     async (request, reply) => {
       const { code, state, error } = request.query;
 
@@ -660,7 +684,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   // 2b. Cevi.DB mit bestehendem Passwort-Konto (gleiche E-Mail) verknüpfen: nur mit dessen Passwort.
   //     Ohne Passwort kein Login, denn zwei Konten mit derselben E-Mail gibt es nicht.
-  fastify.get('/api/auth/cevidb/link', async (request, reply) => {
+  fastify.get(
+    '/api/auth/cevidb/link',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Status einer offenen Cevi.DB-Verknüpfung abrufen',
+        description: 'Liefert E-Mail und Name eines Kontos, das mit einem Cevi.DB-Profil verknüpft werden soll.',
+      },
+    },
+    async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const link = readPendingLink(request.cookies[PENDING_LINK_COOKIE]);
     if (!link) return reply.status(404).send({ error: 'Keine offene Verknüpfung. Melde dich nochmals mit Cevi.DB an.' });
@@ -672,7 +705,19 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { email: user.email, name: user.ceviName || user.firstName, returnTo: link.returnTo };
   });
 
-  fastify.post('/api/auth/cevidb/link', async (request, reply) => {
+  fastify.post(
+    '/api/auth/cevidb/link',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Cevi.DB-Konto mit Passwort bestätigen und verknüpfen',
+        description: 'Bestätigt die Kontoverknüpfung mit dem bisherigen Kontopasswort.',
+        body: z.object({
+          password: z.string().describe('Passwort des bestehenden Kontos'),
+        }),
+      },
+    },
+    async (request, reply) => {
     if (tooManyRequests(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR });
     }
@@ -702,7 +747,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { redirectUrl };
   });
 
-  fastify.delete('/api/auth/cevidb/link', async (request, reply) => {
+  fastify.delete(
+    '/api/auth/cevidb/link',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Offene Cevi.DB-Verknüpfung verwerfen',
+        description: 'Bricht den Verknüpfungsvorgang zwischen Cevi.DB und bestehendem Passwortkonto ab.',
+      },
+    },
+    async (request, reply) => {
     const token = request.cookies[PENDING_LINK_COOKIE];
     if (token) pendingLinks.delete(token);
     reply.clearCookie(PENDING_LINK_COOKIE, { path: '/' });
@@ -713,7 +767,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   //    Cevi-Name + Geburtsdatum + Abteilung bestimmen das Profil. Nur reine Cevi-Name-Profile ohne
   //    Rechte lassen sich so anmelden; Cevi.DB- und Passwort-Konten verlangen ihren eigenen Login.
   //    Findet sich niemand, bietet das Login-Portal die Registrierung an (ceviname-register).
-  fastify.post('/api/auth/ceviname-login', async (request, reply) => {
+  fastify.post(
+    '/api/auth/ceviname-login',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Schnellanmeldung mit Cevi-Name und Geburtsdatum',
+        description: 'Passwortlose Helfer-Anmeldung an einer Abteilung mit Cevi-Name und Geburtsdatum.',
+        body: CeviNameQuickLoginSchema,
+      },
+    },
+    async (request, reply) => {
     if (tooManyRequests(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
@@ -767,7 +831,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // 3b. Neues Cevi-Name-Profil an einer Abteilung (nach einem Login ohne Treffer)
-  fastify.post('/api/auth/ceviname-register', async (request, reply) => {
+  fastify.post(
+    '/api/auth/ceviname-register',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Neues Helferprofil mit Cevi-Name anlegen',
+        description: 'Erstellt ein neues passwortloses Helferprofil für eine Abteilung.',
+        body: CeviNameRegisterSchema,
+      },
+    },
+    async (request, reply) => {
     if (tooManyRequests(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
@@ -867,7 +941,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   }
 
   // 4. Normales Login mit Passwort
-  fastify.post('/api/auth/login', async (request, reply) => {
+  fastify.post(
+    '/api/auth/login',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Anmeldung mit E-Mail und Passwort',
+        description: 'Meldet einen Benutzer mit E-Mail und Passwort an und setzt das HttpOnly Session-Cookie.',
+        body: LoginSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = LoginSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -918,7 +1002,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // 5. Helfer registrieren mit Passwort (erfordert E-Mail-Bestätigung)
-  fastify.post('/api/auth/register-helper', async (request, reply) => {
+  fastify.post(
+    '/api/auth/register-helper',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Neues Helferkonto mit Passwort registrieren',
+        description: 'Registriert ein neues Helferkonto mit E-Mail und Passwort. Sendet einen Bestätigungslink per E-Mail.',
+        body: RegisterHelperSchema,
+      },
+    },
+    async (request, reply) => {
     if (mailRequestsByIp.hit(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
@@ -995,7 +1089,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // 5a. Bestätigungs-E-Mail erneut anfordern
-  fastify.post('/api/auth/resend-verification', async (request, reply) => {
+  fastify.post(
+    '/api/auth/resend-verification',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Bestätigungs-E-Mail erneut senden',
+        description: 'Sendet einen neuen E-Mail-Bestätigungslink an die angegebene Adresse.',
+        body: ResendVerificationSchema,
+      },
+    },
+    async (request, reply) => {
     if (mailRequestsByIp.hit(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
@@ -1050,7 +1154,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // 5b. E-Mail-Adresse mit Token bestätigen (POST für UI & API)
-  fastify.post('/api/auth/verify-email', async (request, reply) => {
+  fastify.post(
+    '/api/auth/verify-email',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'E-Mail-Adresse mit Token bestätigen',
+        description: 'Aktiviert das Benutzerkonto mit dem Token aus der Bestätigungs-E-Mail.',
+        body: VerifyEmailSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = VerifyEmailSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -1107,6 +1221,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 5c. Direkter Link-Klick aus E-Mail (leitet auf Next.js Verify-Page weiter)
   fastify.get<{ Querystring: { token?: string } }>(
     '/api/auth/verify-email',
+    {
+      schema: {
+        hide: true,
+      },
+    },
     async (request, reply) => {
       const token = request.query.token;
       const loginBase = getLoginPortalBaseUrl(request.headers.host);
@@ -1120,7 +1239,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 6. Profil des aktuellen Users abfragen
   fastify.get(
     '/api/auth/me',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Eigenes Benutzerprofil abrufen',
+        description: 'Gibt die Profil- und Sitzungsdaten der aktuell angemeldeten Person zurück.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
       const user = await loadUserDto(fastify.prisma, request.user.id, request.tenant?.id ?? null);
@@ -1134,7 +1261,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 6a. Eigene Profilangaben ergänzen (Handynummer, Adresse, ...)
   fastify.patch(
     '/api/auth/me',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Eigenes Benutzerprofil aktualisieren',
+        description: 'Aktualisiert persönliche Kontaktdaten wie Telefonnummer, Adresse oder Cevi-Name.',
+        security: [{ bearerAuth: [] }],
+        body: UpdateProfileSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const parse = UpdateProfileSchema.safeParse(request.body);
       if (!parse.success) {
@@ -1149,7 +1285,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 6c. Eigenes Konto komplett löschen (nur für Accounts mit Cevi.DB oder Passwort)
   fastify.delete(
     '/api/auth/me',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Eigenes Benutzerkonto löschen',
+        description: 'Löscht das eigene Benutzerkonto und alle personenbezogenen Daten unwiderruflich.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const userId = request.user.id;
 
@@ -1232,7 +1376,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Kommt die Abteilung aus Cevi.DB, bleibt sie fest; Stufen aus Cevi.DB ebenfalls.
   fastify.put(
     '/api/auth/me/department',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Heimabteilung und Stufen festlegen',
+        description: 'Speichert die gewählte Heimabteilung und die zugehörigen Stufen im Profil.',
+        security: [{ bearerAuth: [] }],
+        body: SetHomeDepartmentSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const parse = SetHomeDepartmentSchema.safeParse(request.body);
       if (!parse.success) {
@@ -1307,7 +1460,18 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 6b. Cevi.DB Rohdaten / Debug-Profil (Streng geschützt: NUR globale Admins in der DB)
   fastify.get<{ Querystring: { userId?: string } }>(
     '/api/auth/cevidb/debug-profile',
-    { preHandler: [fastify.requireGlobalAdmin] },
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Cevi.DB Debug-Profil abrufen (Admin)',
+        description: 'Liefert die rohen Cevi.DB/Hitobito-Profildaten eines Benutzers zu Diagnosezwecken.',
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({
+          userId: z.string().uuid().optional(),
+        }),
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
 
@@ -1345,7 +1509,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   // 6c. Liste aller Benutzer mit Cevi.DB Profil (NUR globale Admins)
   fastify.get(
     '/api/auth/cevidb/users',
-    { preHandler: [fastify.requireGlobalAdmin] },
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Alle Benutzer mit Cevi.DB-Verknüpfung auflisten (Admin)',
+        description: 'Liefert eine Übersicht aller Benutzerkonten mit hinterlegter Cevi.DB-ID.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
     async (_request, reply) => {
       reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
 
@@ -1376,7 +1548,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // 7. Logout
-  fastify.post('/api/auth/logout', async (request, reply) => {
+  fastify.post(
+    '/api/auth/logout',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Abmelden',
+        description: 'Entwertet das aktuelle Sitzungstoken und löscht die Authentifizierungs-Cookies.',
+      },
+    },
+    async (request, reply) => {
     // Token serverseitig sperren: ein kopiertes Cookie hilft nach dem Abmelden nichts mehr
     await fastify.revokeAuthToken(request);
     clearAuthCookie(reply);

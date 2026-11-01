@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { ReplacementOfferSchema } from '@schichtplan/shared';
 import { managerFlags } from '../services/eventAccess.js';
 import { personLabel } from '../services/attendance.js';
@@ -30,9 +31,21 @@ const replacementRoutes: FastifyPluginAsync = async (fastify) => {
   }
 
   // «Ersatz gesucht» setzen oder den Grund ändern
-  fastify.put<{ Params: { signupId: string } }>(
+  fastify.put<{ Params: { signupId: string }; Body: z.infer<typeof ReplacementOfferSchema> }>(
     '/api/signups/:signupId/replacement',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Ersatz'],
+        summary: 'Ersatz gesucht markieren oder Grund ändern',
+        description: 'Markiert eine Schicht-Eintragung als «Ersatz gesucht» oder aktualisiert die Begründung. Die Person bleibt eingetragen, bis jemand die Schicht übernimmt.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          signupId: z.string().describe('ID der Schicht-Eintragung'),
+        }),
+        body: ReplacementOfferSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const parse = ReplacementOfferSchema.safeParse(request.body ?? {});
       if (!parse.success) {
@@ -83,7 +96,18 @@ const replacementRoutes: FastifyPluginAsync = async (fastify) => {
   // «Ersatz gesucht» zurückziehen: Die Person bleibt eingetragen
   fastify.delete<{ Params: { signupId: string } }>(
     '/api/signups/:signupId/replacement',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Ersatz'],
+        summary: 'Ersatz-Gesuch zurückziehen',
+        description: 'Zieht den Status «Ersatz gesucht» für eine Schicht zurück. Die Person bleibt weiterhin regulär eingetragen.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          signupId: z.string().describe('ID der Schicht-Eintragung'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const found = await loadSignup(request.params.signupId, request.user);
       if (!found.ok) return reply.status(found.status).send({ error: found.error });

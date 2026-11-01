@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import {
   InstantiateTemplateSchema,
   addDaysToDayKey,
@@ -16,46 +17,69 @@ import { replaceAccessLists, resolveAccessLists, syncQuestions } from './events.
 
 const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Event-Vorlagen der Abteilung
-  fastify.get('/api/event-templates', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-    if (!request.tenant) {
-      return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
-    }
-    // Vorlagen (mit Fragen und Freigaben) nur für wer hier plant
-    if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
-      return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder ein Event-OK' });
-    }
+  fastify.get(
+    '/api/event-templates',
+    {
+      schema: {
+        tags: ['Vorlagen'],
+        summary: 'Event-Vorlagen der Abteilung auflisten',
+        description: 'Liefert alle gespeicherten Event- und Schichtvorlagen der aktuellen Abteilung.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      // Vorlagen (mit Fragen und Freigaben) nur für wer hier plant
+      if (!(await isDepartmentManager(fastify.prisma, request.tenant.id, request.user.id))) {
+        return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder ein Event-OK' });
+      }
 
-    const templates = await fastify.prisma.eventTemplate.findMany({
-      where: { departmentId: request.tenant.id },
-      orderBy: { createdAt: 'desc' },
-    });
+      const templates = await fastify.prisma.eventTemplate.findMany({
+        where: { departmentId: request.tenant.id },
+        orderBy: { createdAt: 'desc' },
+      });
 
-    return templates.map((t) => {
-      const data = t.data as unknown as EventTemplateData;
-      const shifts = data?.shifts || [];
-      return {
-        id: t.id,
-        departmentId: t.departmentId,
-        title: t.title,
-        description: t.description,
-        accessType: toEventAccessType(t.accessType),
-        leadersOnly: t.leadersOnly,
-        requiredFields: cleanRequiredFields(t.requiredFields),
-        minShiftsPerPerson: t.minShiftsPerPerson ?? null,
-        cancelDeadlineDays: t.cancelDeadlineDays ?? null,
-        overlapToleranceMinutes: t.overlapToleranceMinutes ?? 15,
-        shiftCount: shifts.length,
-        createdAt: t.createdAt.toISOString(),
-        updatedAt: t.updatedAt.toISOString(),
-        data,
-      };
-    });
-  });
+      return templates.map((t) => {
+        const data = t.data as unknown as EventTemplateData;
+        const shifts = data?.shifts || [];
+        return {
+          id: t.id,
+          departmentId: t.departmentId,
+          title: t.title,
+          description: t.description,
+          accessType: toEventAccessType(t.accessType),
+          leadersOnly: t.leadersOnly,
+          requiredFields: cleanRequiredFields(t.requiredFields),
+          minShiftsPerPerson: t.minShiftsPerPerson ?? null,
+          cancelDeadlineDays: t.cancelDeadlineDays ?? null,
+          overlapToleranceMinutes: t.overlapToleranceMinutes ?? 15,
+          shiftCount: shifts.length,
+          createdAt: t.createdAt.toISOString(),
+          updatedAt: t.updatedAt.toISOString(),
+          data,
+        };
+      });
+    }
+  );
 
   // Details einer Event-Vorlage
   fastify.get<{ Params: { id: string } }>(
     '/api/event-templates/:id',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Vorlagen'],
+        summary: 'Details einer Event-Vorlage abrufen',
+        description: 'Liefert die vollständigen Konfigurations- und Schichtdaten einer Vorlage.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('Eindeutige ID der Vorlage'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -95,7 +119,19 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
   // Event aus Vorlage erzeugen (z.B. für das kommende Jahr)
   fastify.post<{ Params: { id: string } }>(
     '/api/event-templates/:id/instantiate',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Vorlagen'],
+        summary: 'Neuen Anlass aus Vorlage generieren',
+        description: 'Erstellt einen neuen Anlass mit allen zugehörigen Schichten, Aufgaben und Einstellungen auf Basis einer Vorlage.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('Eindeutige ID der Vorlage'),
+        }),
+        body: InstantiateTemplateSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -272,7 +308,18 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
   // Vorlage löschen
   fastify.delete<{ Params: { id: string } }>(
     '/api/event-templates/:id',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Vorlagen'],
+        summary: 'Event-Vorlage löschen',
+        description: 'Löscht eine gespeicherte Event-Vorlage aus der Abteilung.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('Eindeutige ID der Vorlage'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });

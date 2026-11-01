@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { Prisma, PrismaClient } from '../db.js';
 import {
@@ -137,7 +138,17 @@ async function departmentCreationEligibility(
 
 const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Current department (auf Subdomain)
-  fastify.get('/api/departments/current', { preHandler: [fastify.optionalAuthenticate] }, async (request, reply) => {
+  fastify.get(
+    '/api/departments/current',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Aktuelle Abteilung abrufen',
+        description: 'Liefert die Konfigurationsdaten (Name, Logo, Primärfarbe, Kontaktperson) der Abteilung für die aktuelle Subdomain.',
+      },
+      preHandler: [fastify.optionalAuthenticate],
+    },
+    async (request, reply) => {
     if (!request.tenant) {
       return reply.status(404).send({ error: 'Keine Abteilung für diese Subdomain gefunden' });
     }
@@ -159,7 +170,16 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Alle Abteilungen mit ihren Stufen (Auswahl im Login, Whitelist und Stufen-Filter bei Anlässen)
-  fastify.get('/api/departments/directory', async (_request, reply) => {
+  fastify.get(
+    '/api/departments/directory',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Öffentliches Abteilungsverzeichnis abrufen',
+        description: 'Liefert alle Abteilungen inklusive ihrer Stufen für Auswahldialoge und Anlassfreigaben.',
+      },
+    },
+    async (_request, reply) => {
     reply.header('Cache-Control', 'public, max-age=60');
     const departments = await fastify.prisma.department.findMany({
       select: {
@@ -189,7 +209,16 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   }
 
   // Stufen der aktuellen Abteilung
-  fastify.get('/api/departments/current/stufen', async (request, reply) => {
+  fastify.get(
+    '/api/departments/current/stufen',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Stufen der aktuellen Abteilung abrufen',
+        description: 'Liefert alle Alters- und Gruppenstufen der aktuellen Abteilung.',
+      },
+    },
+    async (request, reply) => {
     if (!request.tenant) return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
     await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, request.tenant.id);
     const stufen = await fastify.prisma.departmentStufe.findMany({
@@ -199,7 +228,19 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     return stufen.map(toStufeDto);
   });
 
-  fastify.post('/api/departments/current/stufen', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+  fastify.post(
+    '/api/departments/current/stufen',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Neue Stufe in der Abteilung anlegen',
+        description: 'Erstellt eine neue Stufe in der aktuellen Abteilung (Recht «Stufen verwalten» erforderlich).',
+        security: [{ bearerAuth: [] }],
+        body: StufeInputSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
     const ctx = await requirePermission(request, reply, 'STUFEN_MANAGE');
     if (!ctx) return;
     const { tenant } = ctx;
@@ -228,7 +269,19 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.patch<{ Params: { id: string } }>(
     '/api/departments/current/stufen/:id',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Stufe bearbeiten',
+        description: 'Aktualisiert Name, Cevi.DB-Verknüpfung oder Sortierreihenfolge einer Stufe.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Stufe'),
+        }),
+        body: StufeInputSchema.partial(),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'STUFEN_MANAGE');
       if (!ctx) return;
@@ -267,7 +320,18 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.delete<{ Params: { id: string } }>(
     '/api/departments/current/stufen/:id',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Stufe löschen',
+        description: 'Entfernt eine Stufe aus der aktuellen Abteilung.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Stufe'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'STUFEN_MANAGE');
       if (!ctx) return;
@@ -282,7 +346,15 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Vorschläge: Cevi.DB-Stufen werden automatisch angelegt
   fastify.get(
     '/api/departments/current/stufen/suggestions',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Stufen-Vorschläge synchronisieren',
+        description: 'Synchronisiert automatisch fehlende Gruppen aus der Cevi.DB als Stufen.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'STUFEN_MANAGE');
       if (!ctx) return;
@@ -344,7 +416,18 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // (über die Subdomain angemeldet, ohne Heimabteilung und ohne Rechte), damit man ihnen Rechte geben kann.
   fastify.get<{ Querystring: { alle?: string } }>(
     '/api/departments/current/people',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Personen und Mitglieder der Abteilung abrufen',
+        description: 'Liefert Abteilungsmitglieder mit Rollen, Rechten und Stufen (Recht «Personen anzeigen» erforderlich).',
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({
+          alle: z.string().optional().describe('1 = auch Gäste ohne Rechte anzeigen'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_VIEW');
       if (!ctx) return;
@@ -429,7 +512,19 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Die Abteilungsleitung selbst ändert sich hier nie (nur über Cevi.DB oder das Admin-Portal).
   fastify.patch<{ Params: { userId: string } }>(
     '/api/departments/current/people/:userId',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Rollen, Rechte und Stufen einer Person bearbeiten',
+        description: 'Aktualisiert die Abteilungsrechte oder Stufenzuweisungen einer Person.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          userId: z.string().uuid().describe('ID der Person'),
+        }),
+        body: UpdateDepartmentPersonSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
       if (!ctx) return;
@@ -558,7 +653,18 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Zugehörigkeit bestätigen (siehe canConfirmHome): Die Person zählt danach bei Cevi.DB-Anlässen
   fastify.post<{ Params: { userId: string } }>(
     '/api/departments/current/people/:userId/confirm',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Zugehörigkeit zur Abteilung bestätigen',
+        description: 'Bestätigt die Heimabteilungs-Zugehörigkeit eines Cevi.DB-Mitglieds durch die Abteilungsleitung.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          userId: z.string().uuid().describe('ID der Person'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
       if (!ctx) return;
@@ -607,7 +713,18 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.delete<{ Params: { userId: string } }>(
     '/api/departments/current/people/:userId/confirm',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Bestätigung der Zugehörigkeit aufheben',
+        description: 'Hebt die Bestätigung der Heimabteilung wieder auf.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          userId: z.string().uuid().describe('ID der Person'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
       if (!ctx) return;
@@ -639,7 +756,18 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Rechte in der Abteilung fallen dabei weg.
   fastify.delete<{ Params: { userId: string } }>(
     '/api/departments/current/people/:userId',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Person aus Abteilung entfernen',
+        description: 'Entfernt die selbst angegebene Zugehörigkeit und entzieht alle Abteilungsrechte.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          userId: z.string().uuid().describe('ID der Person'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
       if (!ctx) return;
@@ -697,7 +825,18 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Protokoll der Abteilung (Rechte, Abteilungsleitung, Stufen, Zugehörigkeit)
   fastify.get<{ Querystring: { page?: string } }>(
     '/api/departments/current/audit',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Audit-Log der Abteilung abrufen',
+        description: 'Protokoll aller Änderungen an Mitgliedern, Rechten, Leitungsrollen und Stufen.',
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({
+          page: z.string().optional().describe('Seitennummer für Paginierung'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
       if (!ctx) return;
@@ -721,7 +860,15 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Wer kann Kontaktperson sein? Abteilungsleitung und «Personen und Rechte verwalten»
   fastify.get(
     '/api/departments/current/contact-candidates',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Kandidaten für die Kontaktperson auflisten',
+        description: 'Liefert Personen, die als offizielle Kontaktperson der Abteilung hinterlegt werden können.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'DEPARTMENT_SETTINGS');
       if (!ctx) return;
@@ -739,7 +886,15 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Mitglieder der aktuellen Abteilung (für OK-Auswahl, Helferliste etc.)
   fastify.get(
     '/api/departments/current/members',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Mitgliederliste für Event-Planung abrufen',
+        description: 'Liefert Mitglieder der Abteilung für OK-Auswahl und Schichteinteilung (für Event-Manager).',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
@@ -788,7 +943,16 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // Liste aller Abteilungen (für Hauptseite / Suche)
-  fastify.get('/api/departments', async () => {
+  fastify.get(
+    '/api/departments',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Alle Abteilungen auflisten',
+        description: 'Öffentliche Übersicht aller aktiven Abteilungen mit Anzahlinformationen zu aktiven Anlässen.',
+      },
+    },
+    async () => {
     const departments = await fastify.prisma.department.findMany({
       select: {
         id: true,
@@ -818,7 +982,15 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Darf ich für meine Gruppe eine Abteilung anlegen? (Abteilungsleitung laut Cevi.DB)
   fastify.get(
     '/api/departments/creation-eligibility',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Berechtigung zum Anlegen einer Abteilung prüfen',
+        description: 'Prüft, ob die angemeldete Person in der Cevi.DB als Abteilungsleitung einer Ortsgruppe hinterlegt ist.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
       return departmentCreationEligibility(fastify.prisma, request.user.id);
@@ -828,7 +1000,16 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Abteilung anlegen als Abteilungsleitung: ohne Passwort, verknüpft mit der Cevi.DB-Gruppe
   fastify.post(
     '/api/departments/cevidb',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Neue Abteilung über Cevi.DB erstellen',
+        description: 'Legt eine neue Abteilung anhand der Cevi.DB-Leitungsrolle an und weist die Subdomain zu.',
+        security: [{ bearerAuth: [] }],
+        body: CreateDepartmentFromCeviDbSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const parse = CreateDepartmentFromCeviDbSchema.safeParse(request.body);
       if (!parse.success) {
@@ -924,7 +1105,16 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
   // Abteilungs-Einstellungen aktualisieren (Logo, Name, Kontaktperson): Recht «Abteilung bearbeiten»
   fastify.patch(
     '/api/departments/current',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Abteilungseinstellungen bearbeiten',
+        description: 'Aktualisiert Logo, Primärfarbe, Name oder Kontaktperson der aktuellen Abteilung.',
+        security: [{ bearerAuth: [] }],
+        body: UpdateDepartmentSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const ctx = await requirePermission(request, reply, 'DEPARTMENT_SETTINGS');
       if (!ctx) return;

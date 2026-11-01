@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import {
   CreateAccessLinkSchema,
   EventDeregistrationSchema,
@@ -85,7 +86,18 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Zugangs-Links eines Anlasses (OK)
   fastify.get<{ Params: { slug: string } }>(
     '/api/events/:slug/access-links',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Zugangs-Links eines Anlasses auflisten (OK)',
+        description: 'Liefert alle erstellten persönlichen und Gruppen-Zugangslinks für diesen Anlass.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadManagedEvent(request, reply);
       if (!event) return;
@@ -124,7 +136,19 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/access-links',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Neuen Zugangs-Link erstellen (OK)',
+        description: 'Erstellt einen persönlichen oder Gruppen-Link für Personen ausserhalb der normalen Zielgruppe.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: CreateAccessLinkSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
@@ -152,7 +176,19 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Link löschen: wer ihn eingelöst hat, verliert den Zugang (bestehende Eintragungen bleiben)
   fastify.delete<{ Params: { slug: string; linkId: string } }>(
     '/api/events/:slug/access-links/:linkId',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Zugangs-Link widerrufen (OK)',
+        description: 'Löscht einen Zugangs-Link. Bereits eingelöste Zugänge verfallen.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+          linkId: z.string().uuid().describe('ID des Zugangslinks'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
@@ -170,7 +206,19 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Link einlösen (angemeldet): persönliche Links gelten nur für das erste Konto, Gruppen-Links für alle
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/access-links/redeem',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Zugangs-Link einlösen',
+        description: 'Löst einen persönlichen oder Gruppen-Link für das angemeldete Benutzerkonto ein.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: RedeemAccessLinkSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadEvent(request, reply);
       if (!event) return;
@@ -215,7 +263,19 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Pflichtangaben und Antworten der angemeldeten Person für diesen Anlass speichern
   fastify.put<{ Params: { slug: string } }>(
     '/api/events/:slug/participation',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Pflichtangaben und Fragen zur Teilnahme speichern',
+        description: 'Aktualisiert Profilangaben und beantwortet anlassspezifische Pflichtfragen.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: EventParticipationSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadEvent(request, reply);
       if (!event) return;
@@ -261,7 +321,18 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Angaben aller eingetragenen Personen (nur OK / Abteilungsleitung)
   fastify.get<{ Params: { slug: string } }>(
     '/api/events/:slug/participants',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Liste aller Teilnehmenden und Antworten (OK)',
+        description: 'Liefert alle eingetragenen Personen inklusive Kontaktdaten, Alterskriterien und Antworten auf Anlassfragen.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadManagedEvent(request, reply);
       if (!event) return;
@@ -369,7 +440,21 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Abteilungen (Whitelist) und nie Personen ohne Bezug zur Abteilung.
   fastify.get<{ Params: { slug: string }; Querystring: { alle?: string } }>(
     '/api/events/:slug/roster',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Helfer-Pool und Soll-Übersicht (OK)',
+        description: 'Liefert den Helferpool der Abteilung mit Soll-Erfüllung (Schichtanzahl), Abmeldungen und Einteilungsstatus.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        querystring: z.object({
+          alle: z.string().optional().describe('1 = auch Personen ohne regulären Zugang anzeigen'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -589,7 +674,19 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Person als abgemeldet eintragen (heisst: muss an diesem Event keine Schichten übernehmen)
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/deregistrations',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Person für den Anlass abmelden (OK)',
+        description: 'Trägt eine Person als entschuldigt / abgemeldet ein, sodass sie für das Schichtsoll nicht berücksichtigt wird.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: EventDeregistrationSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
@@ -633,7 +730,19 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
   // Abmeldung aufheben (Person nimmt wieder regulär teil)
   fastify.delete<{ Params: { slug: string; userId: string } }>(
     '/api/events/:slug/deregistrations/:userId',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Abmeldung aufheben (OK)',
+        description: 'Hebt die Abmeldung einer Person auf. Sie zählt wieder regulär zum Teilnehmer- und Helferpool.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+          userId: z.string().uuid().describe('ID der Person'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
@@ -651,4 +760,3 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
 };
 
 export default eventParticipationRoutes;
-

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { FastifyPluginAsync } from 'fastify';
 import {
   addZurichDays,
@@ -72,7 +73,16 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Schicht erstellen (Admin, Planner oder Event-OK)
   fastify.post(
     '/api/shifts',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Einzelne Schicht erstellen',
+        description: 'Erstellt eine neue Schicht mit Aufgaben und benötigten Plätzen für einen Anlass.',
+        security: [{ bearerAuth: [] }],
+        body: CreateShiftSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const parse = CreateShiftSchema.safeParse(request.body);
       if (!parse.success) {
@@ -201,7 +211,16 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Schicht-Serie erstellen (Raster-Planung für Stände und aufeinanderfolgende Schichten)
   fastify.post(
     '/api/shifts/series',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Schicht-Serie erstellen',
+        description: 'Erstellt eine Reihe aufeinanderfolgender Schichten für Stände oder Stationen.',
+        security: [{ bearerAuth: [] }],
+        body: CreateShiftSeriesSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const parse = CreateShiftSeriesSchema.safeParse(request.body);
       if (!parse.success) {
@@ -356,7 +375,19 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Schicht bearbeiten (Admin, Planner oder Event-OK)
   fastify.patch<{ Params: { id: string } }>(
     '/api/shifts/:id',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Schicht bearbeiten',
+        description: 'Aktualisiert Zeiten, Aufgaben, Plätze oder Schichtleiter einer bestehenden Schicht.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Schicht'),
+        }),
+        body: UpdateShiftSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const shiftId = request.params.id;
       const parse = UpdateShiftSchema.safeParse(request.body);
@@ -523,7 +554,18 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Schicht löschen (Admin, Planner oder Event-OK)
   fastify.delete<{ Params: { id: string } }>(
     '/api/shifts/:id',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Schicht löschen',
+        description: 'Löscht eine Schicht samt Aufgaben und Eintragungen.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Schicht'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const shiftId = request.params.id;
 
@@ -555,7 +597,18 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Schicht duplizieren (Admin, Planner oder Event-OK)
   fastify.post<{ Params: { id: string } }>(
     '/api/shifts/:id/duplicate',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Schicht duplizieren',
+        description: 'Erstellt eine Kopie einer Schicht mit identischen Aufgaben und Zeiten.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Schicht'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const shiftId = request.params.id;
 
@@ -644,7 +697,21 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
     Querystring: { userId?: string; guestName?: string };
   }>(
     '/api/shifts/:id/check-collision',
-    { preHandler: [fastify.optionalAuthenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Zeitkollision prüfen',
+        description: 'Prüft, ob eine Person oder ein Gast zum Schichtzeitpunkt bereits in einer anderen Schicht eingetragen ist.',
+        params: z.object({
+          id: z.string().uuid().describe('ID der Schicht'),
+        }),
+        querystring: z.object({
+          userId: z.string().uuid().optional().describe('ID des Benutzers'),
+          guestName: z.string().optional().describe('Name des Gastes'),
+        }),
+      },
+      preHandler: [fastify.optionalAuthenticate],
+    },
     async (request, reply) => {
       const shiftId = request.params.id;
       const { userId, guestName } = request.query;
@@ -718,7 +785,18 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // In Schicht eintragen (oder durch OK einteilen)
   fastify.post<{ Params: { id: string } }>(
     '/api/shifts/:id/signup',
-    { preHandler: [fastify.optionalAuthenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Für Schicht eintragen oder Person einteilen',
+        description: 'Trägt eine angemeldete Person, ein Abteilungsmitglied oder einen Gast in die Schicht ein oder übernimmt eine Schicht mit «Ersatz gesucht».',
+        params: z.object({
+          id: z.string().uuid().describe('ID der Schicht'),
+        }),
+        body: SignupShiftSchema,
+      },
+      preHandler: [fastify.optionalAuthenticate],
+    },
     async (request, reply) => {
       const shiftId = request.params.id;
 
@@ -1199,7 +1277,20 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Aus Schicht austragen (Eigene Eintragung oder Admin/Planner/Event-OK)
   fastify.delete<{ Params: { id: string }; Querystring: { signupId?: string } }>(
     '/api/shifts/:id/signup',
-    { preHandler: [fastify.optionalAuthenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Aus Schicht austragen',
+        description: 'Trägt eine Person aus einer Schicht aus (unter Einhaltung von Abmeldefristen oder durch das OK).',
+        params: z.object({
+          id: z.string().uuid().describe('ID der Schicht'),
+        }),
+        querystring: z.object({
+          signupId: z.string().uuid().optional().describe('ID der konkreten Schicht-Eintragung'),
+        }),
+      },
+      preHandler: [fastify.optionalAuthenticate],
+    },
     async (request, reply) => {
       const shiftId = request.params.id;
       const { signupId } = request.query;
@@ -1312,7 +1403,15 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Kompakte Helfer-Stunden-Zusammenfassung abfragen (für «Dein Konto» Hero-Card)
   fastify.get(
     '/api/shifts/my/summary',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Helfer-Stunden-Zusammenfassung abrufen',
+        description: 'Liefert geleistete und anstehende Helferstunden der angemeldeten Person.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request): Promise<MyHoursSummaryDto> => {
       const [signups, shiftResp] = await Promise.all([
         fastify.prisma.shiftSignup.findMany({
@@ -1436,7 +1535,15 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Meine Schichten abfragen (inkl. Schichten, bei denen man Schichtleitung oder Tagesleitung ist)
   fastify.get(
     '/api/shifts/my',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Meine Schichten abrufen',
+        description: 'Liefert alle eingetragenen Schichten und Leitungsaufgaben der angemeldeten Person abteilungsübergreifend.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request) => {
       const [signups, shiftResp, dayResp] = await Promise.all([
         fastify.prisma.shiftSignup.findMany({
@@ -1721,7 +1828,19 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Mehrere Schichten eines Anlasses auf einmal ändern (Abteilungsleitung, Planung oder Event-OK)
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/shifts/bulk',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Schichten'],
+        summary: 'Mehrere Schichten gleichzeitig bearbeiten',
+        description: 'Führt Massenänderungen an Schichten eines Anlasses durch (Titel, Zeiten, Aufgaben, Schichtverantwortliche).',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: BulkShiftsSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });

@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   SendEventMessageSchema,
@@ -93,7 +94,18 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
   // Verlauf der verschickten Nachrichten
   fastify.get<{ Params: { slug: string } }>(
     '/api/events/:slug/messages',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Nachrichten'],
+        summary: 'Verlauf der OK-Nachrichten abrufen',
+        description: 'Liefert die bisher verschickten Rundmails und Benachrichtigungen des OK an Helfende dieses Anlasses.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       const { event, canView: allowed } = await loadManagedEvent(request.tenant.id, request.params.slug, request.user);
@@ -113,7 +125,19 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
   // Nachricht verschicken (oder mit dryRun nur die Empfänger zählen)
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/messages',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Nachrichten'],
+        summary: 'Nachricht an Helfende senden',
+        description: 'Verschickt eine formatierte E-Mail-Nachricht (und optional Push-Benachrichtigung) an Helfende des Anlasses oder zählt im Testlauf (dryRun) die Empfänger.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: SendEventMessageSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
       const { event, canSend: allowed } = await loadManagedEvent(request.tenant.id, request.params.slug, request.user);

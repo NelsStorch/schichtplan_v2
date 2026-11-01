@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { FastifyPluginAsync } from 'fastify';
 import type { Prisma, PrismaClient } from '../db.js';
 import {
@@ -182,7 +183,17 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   }
 
   // Liste aller Events der aktuellen Abteilung
-  fastify.get('/api/events', { preHandler: [fastify.optionalAuthenticate] }, async (request, reply) => {
+  fastify.get(
+    '/api/events',
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Anlässe der Abteilung auflisten',
+        description: 'Liefert alle veröffentlichten Anlässe der Abteilung (oder alle Entwürfe für Planer*innen).',
+      },
+      preHandler: [fastify.optionalAuthenticate],
+    },
+    async (request, reply) => {
     if (!request.tenant) {
       return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
     }
@@ -242,7 +253,20 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Event Details anhand von Slug. Namen und Kontaktangaben je nach Berechtigung.
   fastify.get<{ Params: { slug: string }; Querystring: { zugang?: string } }>(
     '/api/events/:slug',
-    { preHandler: [fastify.optionalAuthenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Anlass-Details mit Schichten abrufen',
+        description: 'Liefert alle Stammdaten, Schichten, Aufgaben, OK-Mitglieder und Anmeldezahlen für einen Anlass.',
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        querystring: z.object({
+          zugang: z.string().optional().describe('Optionaler Zugangscode / Token'),
+        }),
+      },
+      preHandler: [fastify.optionalAuthenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -559,7 +583,16 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Neues Event erstellen (Abteilungsleitung / Planer*in)
   fastify.post(
     '/api/events',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Neuen Anlass erstellen',
+        description: 'Erstellt einen neuen Anlass mit Zielgruppe, Zugangsregeln und Einstellungen (Recht «Anlässe erstellen» erforderlich).',
+        security: [{ bearerAuth: [] }],
+        body: CreateEventSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -748,7 +781,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Event bearbeiten (Abteilungsleitung ODER Event-OK)
   fastify.patch<{ Params: { slug: string } }>(
     '/api/events/:slug',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Anlass bearbeiten',
+        description: 'Aktualisiert Titel, Beschreibung, Banner, Zugangsbeschränkungen oder Fristen eines Anlasses.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: UpdateEventSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -878,7 +923,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Anlass verschieben: alle Schichten wandern um dieselbe Anzahl Tage mit (Rechte wie Einstellungen)
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/move',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Anlass verschieben',
+        description: 'Verschiebt den gesamten Anlass und alle zugehörigen Schichten um eine bestimmte Anzahl Tage.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: MoveEventSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -916,7 +973,20 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Tagesverantwortliche setzen (Abteilungsleitung ODER Event-OK)
   fastify.put<{ Params: { slug: string; dayDate: string } }>(
     '/api/events/:slug/days/:dayDate/responsibles',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Tagesverantwortliche festlegen',
+        description: 'Weist bestimmten Benutzern die Tagesverantwortung für einen Kalendertag des Anlasses zu.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+          dayDate: z.string().describe('Kalendertag im Format YYYY-MM-DD'),
+        }),
+        body: SetDayResponsiblesSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -998,7 +1068,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Mitglied zum Event-OK hinzufügen
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/organizers',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'OK-Mitglied hinzufügen',
+        description: 'Fügt eine Person zum Organisationskomitee (OK) des Anlasses hinzu.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: AddEventOrganizerSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -1078,7 +1160,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Zur Bestätigung muss das Kürzel mitkommen (Schutz vor einem versehentlichen Klick).
   fastify.delete<{ Params: { slug: string } }>(
     '/api/events/:slug',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Anlass endgültig löschen',
+        description: 'Löscht den Anlass samt aller Schichten, Eintragungen und Dokumente unwiderruflich (Bestätigung des Slugs erforderlich).',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: ConfirmDeleteSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -1115,7 +1209,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Mitglied aus dem Event-OK entfernen (Abteilungsleitung oder OK-Leitung)
   fastify.delete<{ Params: { slug: string; organizerId: string } }>(
     '/api/events/:slug/organizers/:organizerId',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'OK-Mitglied entfernen',
+        description: 'Entfernt eine Person aus dem Organisationskomitee (OK).',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+          organizerId: z.string().uuid().describe('ID des OK-Eintrags'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const { organizerId } = request.params;
 
@@ -1144,7 +1250,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Helfer komplett vom Event abmelden (aus allen Schichten dieses Events austragen)
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/unregister-helper',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Helfer komplett vom Anlass austragen',
+        description: 'Trägt einen Helfer oder Gast aus ausnahmslos allen Schichten dieses Anlasses aus.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: UnregisterHelperSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -1254,7 +1372,18 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Protokoll aller Schicht-Eintragungen und -Austragungen (Abteilungsleitung ODER Event-OK)
   fastify.get<{ Params: { slug: string } }>(
     '/api/events/:slug/logs',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Schicht- und Helferprotokoll abrufen',
+        description: 'Liefert den detaillierten Audit-Log über Einteilungen, Austragungen und Anwesenheitsänderungen.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -1307,7 +1436,19 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
   // Event als Vorlage für künftige Jahre speichern
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/save-as-template',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Anlass als Vorlage speichern',
+        description: 'Speichert Struktur, Schichten und Aufgaben dieses Anlasses als wiederverwendbare Vorlage für zukünftige Jahre.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: SaveAsTemplateSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });

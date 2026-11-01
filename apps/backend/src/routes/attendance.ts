@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import {
   CheckinSchema,
   SetAttendanceSchema,
@@ -44,7 +45,20 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
   // Anwesenheit einer Eintragung setzen (Abteilungsleitung, Planung oder Event-OK)
   fastify.put<{ Params: { slug: string; signupId: string } }>(
     '/api/events/:slug/signups/:signupId/attendance',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Anwesenheit'],
+        summary: 'Anwesenheit einer Eintragung setzen',
+        description: 'Setzt den Anwesenheitsstatus (z. B. PRESENT, ABSENT_EXCUSED, ABSENT_UNEXCUSED) für eine Schicht-Eintragung durch das OK.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+          signupId: z.string().uuid().describe('ID der Schicht-Eintragung'),
+        }),
+        body: SetAttendanceSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -121,7 +135,19 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
   // Selbst-Check-in per QR-Code: hakt die eigenen Schichten ab, die gerade im Check-in-Fenster liegen
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/checkin',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Anwesenheit'],
+        summary: 'Selbst-Check-in per QR-Code',
+        description: 'Hakt Schichten der angemeldeten Person als anwesend ab, deren Beginn im aktuellen Zeitfenster liegt.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        body: CheckinSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -220,7 +246,18 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
   // nur Abteilungsleitung und OK-Leitung.
   fastify.post<{ Params: { slug: string } }>(
     '/api/events/:slug/checkin-token',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Anwesenheit'],
+        summary: 'Neuen Check-in-Code erzeugen',
+        description: 'Erzeugt einen neuen Geheimcode für den QR-Code-Check-in. Bestehende QR-Codes verlieren ihre Gültigkeit.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
@@ -249,7 +286,21 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
   // QR-Code für den Selbst-Check-in im Cevi-Stil (SVG zum Anzeigen, A4-PDF zum Ausdrucken)
   fastify.get<{ Params: { slug: string }; Querystring: { format?: string } }>(
     '/api/events/:slug/checkin-qr',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Anwesenheit'],
+        summary: 'QR-Code für den Selbst-Check-in abrufen',
+        description: 'Liefert den Check-in-QR-Code im SVG- oder PDF-Format für das OK zum Aushängen am Anlass.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          slug: z.string().describe('Slug des Anlasses'),
+        }),
+        querystring: z.object({
+          format: z.enum(['svg', 'pdf']).optional().describe('Ausgabeformat (svg oder pdf, Standard svg)'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });

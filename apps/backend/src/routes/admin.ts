@@ -198,7 +198,18 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     reply.header('Cache-Control', 'no-store');
   });
 
-  fastify.get('/api/admin/overview', { preHandler: [fastify.requireGlobalAdmin] }, async () => {
+  fastify.get(
+    '/api/admin/overview',
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Globale System- und Benutzerübersicht',
+        description: 'Liefert aggregierte Plattform-Statistiken über Benutzer, Abteilungen, Anlässe und Eintragungen.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
+    async () => {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const [
@@ -244,7 +255,18 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return overview;
   });
 
-  fastify.get('/api/admin/users', { preHandler: [fastify.requireGlobalAdmin] }, async (request, reply) => {
+  fastify.get(
+    '/api/admin/users',
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Benutzerliste abrufen (Admin)',
+        description: 'Filterbare, sortierbare und paginierte Übersicht aller Benutzerkonten auf der Plattform.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
+    async (request, reply) => {
     const parse = ListQuerySchema.safeParse(request.query);
     if (!parse.success) {
       return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -297,7 +319,18 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<{ Params: { id: string } }>(
     '/api/admin/users/:id',
-    { preHandler: [fastify.requireGlobalAdmin] },
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Benutzerdetails abrufen (Admin)',
+        description: 'Detaillierte Übersicht über Rollen, Mitgliedschaften, Schichten und Cevi.DB-Verknüpfung einer Person.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID des Benutzers'),
+        }),
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
     async (request, reply) => {
       const user = await fastify.prisma.user.findUnique({
         where: { id: request.params.id },
@@ -386,7 +419,18 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.delete<{ Params: { id: string } }>(
     '/api/admin/users/:id',
-    { preHandler: [fastify.requireGlobalAdmin] },
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Benutzerkonto löschen (Admin)',
+        description: 'Löscht ein Benutzerkonto und alle personenbezogenen Daten unwiderruflich.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID des Benutzers'),
+        }),
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
     async (request, reply) => {
       const targetUserId = request.params.id;
 
@@ -459,7 +503,18 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   // Passwort-Reset-Link als Notfall-Hilfe durch globale Admins generieren
   fastify.post<{ Params: { id: string } }>(
     '/api/admin/users/:id/reset-token',
-    { preHandler: [fastify.requireGlobalAdmin] },
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Passwort-Reset-Link generieren (Admin)',
+        description: 'Erzeugt einen 24 Stunden gültigen Passwort-Reset-Link für Supportfälle.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID des Benutzers'),
+        }),
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
     async (request, reply) => {
       const user = await fastify.prisma.user.findUnique({
         where: { id: request.params.id },
@@ -501,7 +556,16 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   // Mehrere verwaiste oder gewählte Personen im Stapel löschen
   fastify.post(
     '/api/admin/users/batch-delete',
-    { preHandler: [fastify.requireGlobalAdmin] },
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Mehrere Benutzer löschen (Admin)',
+        description: 'Löscht mehrere Benutzerkonten (z. B. verwaiste Gastkonten) in einem Vorgang.',
+        security: [{ bearerAuth: [] }],
+        body: AdminBatchDeleteUsersSchema,
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
     async (request, reply) => {
       const parse = AdminBatchDeleteUsersSchema.safeParse(request.body);
       if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });

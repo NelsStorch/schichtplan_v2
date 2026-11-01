@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { canUploadImages } from '../services/departmentVisibility.js';
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -12,6 +13,21 @@ const ALLOWED_MIME_TYPES = new Set([
 
 const MAX_FILE_SIZE = 6 * 1024 * 1024; // 6 MB
 
+const UploadRequestBodySchema = z.object({
+  filename: z.string().optional().describe('Dateiname des Bildes (z. B. logo.png)'),
+  mimeType: z.string().optional().describe('MIME-Type (z. B. image/png, image/webp)'),
+  base64: z.string().optional().describe('Reine Base64-kodierte Bilddaten'),
+  dataUrl: z.string().optional().describe('Data-URL inklusive Präfix (data:image/png;base64,...)'),
+});
+
+const UploadResponseSchema = z.object({
+  id: z.string().uuid().describe('Eindeutige ID des Uploads'),
+  url: z.string().describe('Permanente URL des Bildes (/api/uploads/{id})'),
+  filename: z.string().describe('Gespeicherter Dateiname'),
+  size: z.number().int().describe('Dateigrösse in Bytes'),
+  mimeType: z.string().describe('MIME-Type der Bilddatei'),
+});
+
 interface UploadBody {
   filename?: string;
   mimeType?: string;
@@ -21,7 +37,17 @@ interface UploadBody {
 
 const uploadRoutes: FastifyPluginAsync = async (fastify) => {
   // Bild abrufen (öffentlich, mit aggressivem Caching)
-  fastify.get<{ Params: { id: string } }>('/api/uploads/:id', async (request, reply) => {
+  fastify.get<{ Params: { id: string } }>(
+    '/api/uploads/:id',
+    {
+      schema: {
+        tags: ['Uploads'],
+        summary: 'Bild oder Logo abrufen',
+        description: 'Öffentlicher Endpunkt zum Abrufen eines hochgeladenen Bildes (PNG, JPEG, WebP, SVG, GIF) mit Browser-Caching.',
+        params: z.object({ id: z.string().describe('Eindeutige ID des Uploads') }),
+      },
+    },
+    async (request, reply) => {
     const { id } = request.params;
 
     const upload = await fastify.prisma.upload.findUnique({
@@ -50,7 +76,19 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
   // Bild hochladen (nur authentifizierte Benutzer)
   fastify.post<{ Body: UploadBody }>(
     '/api/uploads',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Uploads'],
+        summary: 'Bild oder Logo hochladen',
+        description: 'Lädt ein Bild als Base64 oder Data-URL hoch (max. 6 MB). Berechtigt sind Abteilungsleitende und Event-OK.',
+        security: [{ bearerAuth: [] }],
+        body: UploadRequestBodySchema,
+        response: {
+          200: UploadResponseSchema,
+        },
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       // Hochladen nur für wer Logos und Banner setzen kann (sonst füllt jedes Gratis-Profil die DB)
       if (!(await canUploadImages(fastify.prisma, request.user.id))) {

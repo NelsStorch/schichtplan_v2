@@ -224,14 +224,36 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   const guard = { preHandler: [fastify.requireGlobalAdmin] };
 
   // Admin-Sitzung: Anmeldeart und Ablauf (das Portal fragt das beim Start ab)
-  fastify.get('/api/admin/session', guard, async (request) => ({
+  fastify.get(
+    '/api/admin/session',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Admin-Sitzungsstatus prüfen',
+        description: 'Gibt Gültigkeit, Anmeldeart und Ablaufzeitpunkt der aktuellen Admin-Sitzung zurück.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async (request) => ({
     loginMethod: request.adminSession?.loginMethod ?? null,
     issuedAt: request.adminSession?.issuedAt.toISOString() ?? null,
     expiresAt: request.adminSession?.expiresAt.toISOString() ?? null,
   }));
 
   // Server-Alert-Webhook manuell testen (Server-Leitung)
-  fastify.post('/api/admin/alert-test', guard, async (request) => {
+  fastify.post(
+    '/api/admin/alert-test',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Server-Alert-Webhook testen',
+        description: 'Löst eine Test-Benachrichtigung an den konfigurierten Notfall-Webhook aus.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async (request) => {
     const result = await sendServerAlert(
       {
         category: 'TEST',
@@ -252,7 +274,18 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   // Startseite
   // ---------------------------------------------------------------------------
 
-  fastify.get('/api/admin/dashboard', guard, async () => {
+  fastify.get(
+    '/api/admin/dashboard',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Admin-Dashboard-Zahlen abrufen',
+        description: 'Zentrale Kennzahlen zu Abteilungen, Anlässen, Schichten und Konten für das Admin-Dashboard.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async () => {
     const now = new Date();
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -321,12 +354,37 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   // Abteilungen
   // ---------------------------------------------------------------------------
 
-  fastify.get('/api/admin/departments', guard, async () => {
+  fastify.get(
+    '/api/admin/departments',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Alle Abteilungen verwalten (Admin)',
+        description: 'Liefert alle registrierten Abteilungen mit Leitungs- und Statusinformationen.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async () => {
     const rows = await fastify.prisma.department.findMany({ orderBy: { name: 'asc' }, select: departmentSelect });
     return { items: await toDepartmentItems(fastify.prisma, rows) };
   });
 
-  fastify.get<{ Params: { id: string } }>('/api/admin/departments/:id', guard, async (request, reply) => {
+  fastify.get<{ Params: { id: string } }>(
+    '/api/admin/departments/:id',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Abteilungsdetails abrufen (Admin)',
+        description: 'Detaillierte Übersicht über Mitglieder, Stufen, Anlässe und Cevi.DB-Gruppe einer Abteilung.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Abteilung'),
+        }),
+      },
+    },
+    async (request, reply) => {
     const parsedId = z.string().uuid().safeParse(request.params.id);
     if (!parsedId.success) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
     const departmentId = parsedId.data;
@@ -423,7 +481,19 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     return detail;
   });
 
-  fastify.post('/api/admin/departments', guard, async (request, reply) => {
+  fastify.post(
+    '/api/admin/departments',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Abteilung manuell erstellen (Admin)',
+        description: 'Erstellt eine neue Abteilung ohne Cevi.DB-Prüfung und weist optional eine erste Abteilungsleitung zu.',
+        security: [{ bearerAuth: [] }],
+        body: AdminCreateDepartmentSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = AdminCreateDepartmentSchema.safeParse(request.body);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
     const { name, slug, ceviDbGroupId, membersOnly, leaderUserId } = parse.data;
@@ -484,7 +554,22 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.status(201).send({ department: created, attached });
   });
 
-  fastify.patch<{ Params: { id: string } }>('/api/admin/departments/:id', guard, async (request, reply) => {
+  fastify.patch<{ Params: { id: string } }>(
+    '/api/admin/departments/:id',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Abteilung bearbeiten (Admin)',
+        description: 'Aktualisiert Stammdaten, Subdomain, Cevi.DB-Gruppe oder Sichtbarkeit einer Abteilung.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Abteilung'),
+        }),
+        body: AdminUpdateDepartmentSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = AdminUpdateDepartmentSchema.safeParse(request.body);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
     const data = parse.data;
@@ -563,7 +648,22 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true, attached };
   });
 
-  fastify.delete<{ Params: { id: string } }>('/api/admin/departments/:id', guard, async (request, reply) => {
+  fastify.delete<{ Params: { id: string } }>(
+    '/api/admin/departments/:id',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Abteilung löschen (Admin)',
+        description: 'Löscht eine Abteilung samt aller Anlässe, Schichten und Zuweisungen unwiderruflich (Bestätigung des Slugs erforderlich).',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Abteilung'),
+        }),
+        body: ConfirmDeleteSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
 
@@ -599,7 +699,20 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   // Rolle in einer Abteilung setzen (legt die Mitgliedschaft bei Bedarf an)
   fastify.put<{ Params: { id: string; userId: string } }>(
     '/api/admin/departments/:id/members/:userId',
-    guard,
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Abteilungsrolle oder Rechte setzen (Admin)',
+        description: 'Weist einer Person die Leitungsrolle (ADMIN) oder Helferrechte (HELPER) in einer Abteilung zu.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Abteilung'),
+          userId: z.string().uuid().describe('ID der Person'),
+        }),
+        body: AdminSetMemberRoleSchema,
+      },
+    },
     async (request, reply) => {
       const parse = AdminSetMemberRoleSchema.safeParse(request.body);
       if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
@@ -698,7 +811,19 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   // Rolle entfernen (Heimabteilung bleibt, die kommt aus Cevi.DB oder von der Person selbst)
   fastify.delete<{ Params: { id: string; userId: string } }>(
     '/api/admin/departments/:id/members/:userId',
-    guard,
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Abteilungsrolle entziehen (Admin)',
+        description: 'Entzieht einer Person die Rolle und alle Sonderrechte in einer Abteilung.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Abteilung'),
+          userId: z.string().uuid().describe('ID der Person'),
+        }),
+      },
+    },
     async (request, reply) => {
       const { id: departmentId, userId } = request.params;
       const membership = await fastify.prisma.departmentMember
@@ -747,7 +872,18 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   // Anlässe
   // ---------------------------------------------------------------------------
 
-  fastify.get('/api/admin/events', guard, async (request, reply) => {
+  fastify.get(
+    '/api/admin/events',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Alle Anlässe plattformweit durchsuchen (Admin)',
+        description: 'Paginierte Liste aller Anlässe mit Filter nach Zeitraum, Status oder Abteilung.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async (request, reply) => {
     const parse = EventListQuerySchema.safeParse(request.query);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
     const { q, departmentId, when, page, pageSize } = parse.data;
@@ -799,7 +935,22 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     return result;
   });
 
-  fastify.patch<{ Params: { id: string } }>('/api/admin/events/:id', guard, async (request, reply) => {
+  fastify.patch<{ Params: { id: string } }>(
+    '/api/admin/events/:id',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Anlass-Status ändern (Admin)',
+        description: 'Schaltet Veröffentlichung oder öffentliche Anmeldung eines Anlasses um.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID des Anlasses'),
+        }),
+        body: AdminUpdateEventSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = AdminUpdateEventSchema.safeParse(request.body);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
 
@@ -822,7 +973,22 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-  fastify.delete<{ Params: { id: string } }>('/api/admin/events/:id', guard, async (request, reply) => {
+  fastify.delete<{ Params: { id: string } }>(
+    '/api/admin/events/:id',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Anlass löschen (Admin)',
+        description: 'Löscht einen Anlass samt Schichten und Eintragungen (Bestätigung des Slugs erforderlich).',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID des Anlasses'),
+        }),
+        body: ConfirmDeleteSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
 
@@ -854,7 +1020,22 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   // Personen: globale Admin-Rolle, Heimabteilung & Konten zusammenführen
   // ---------------------------------------------------------------------------
 
-  fastify.patch<{ Params: { id: string } }>('/api/admin/users/:id', guard, async (request, reply) => {
+  fastify.patch<{ Params: { id: string } }>(
+    '/api/admin/users/:id',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Benutzerrolle oder Heimabteilung ändern (Admin)',
+        description: 'Vergibt globale Admin-Rechte oder ändert die Heimabteilung einer Person.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Person'),
+        }),
+        body: AdminUpdateUserSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = AdminUpdateUserSchema.safeParse(request.body);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
     const { isGlobalAdmin, homeDepartmentId } = parse.data;
@@ -954,7 +1135,22 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-  fastify.post<{ Params: { id: string } }>('/api/admin/users/:id/merge', guard, async (request, reply) => {
+  fastify.post<{ Params: { id: string } }>(
+    '/api/admin/users/:id/merge',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Benutzerkonten zusammenführen (Admin)',
+        description: 'Überträgt alle Schichten, Anmeldungen und Rechte eines Quell-Kontos auf ein Ziel-Konto und löscht das Quell-Konto.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID der Quell-Person'),
+        }),
+        body: AdminMergeUserSchema,
+      },
+    },
+    async (request, reply) => {
     const parse = AdminMergeUserSchema.safeParse(request.body);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
     const sourceId = request.params.id;
@@ -1039,7 +1235,18 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
   // Protokoll
   // ---------------------------------------------------------------------------
 
-  fastify.get('/api/admin/audit', guard, async (request, reply) => {
+  fastify.get(
+    '/api/admin/audit',
+    {
+      ...guard,
+      schema: {
+        tags: ['Administration'],
+        summary: 'Plattform-Audit-Log abrufen (Admin)',
+        description: 'Vollständiges Protokoll aller durchgeführten Administrator-Aktionen.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async (request, reply) => {
     const parse = AuditQuerySchema.safeParse(request.query);
     if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
     const { q, targetType, targetId, since, until, page, pageSize } = parse.data;

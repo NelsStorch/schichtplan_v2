@@ -1,4 +1,5 @@
 import { FastifyPluginAsync, FastifyReply } from 'fastify';
+import { z } from 'zod';
 import { PushSubscribeSchema, PushUnsubscribeSchema } from '@schichtplan/shared';
 import {
   getVapidPublicKey,
@@ -47,15 +48,48 @@ function clearPushDeviceCookie(reply: FastifyReply) {
 
 const pushRoutes: FastifyPluginAsync = async (fastify) => {
   // 1. Public VAPID key for ServiceWorker pushManager.subscribe()
-  fastify.get('/api/push/vapid-public-key', async (_request, reply) => {
-    reply.header('Cache-Control', 'no-store');
-    return { publicKey: getVapidPublicKey() };
-  });
+  fastify.get(
+    '/api/push/vapid-public-key',
+    {
+      schema: {
+        tags: ['Push'],
+        summary: 'Öffentlichen VAPID-Schlüssel abrufen',
+        description: 'Liefert den öffentlichen VAPID-Schlüssel für ServiceWorker pushManager.subscribe().',
+        response: {
+          200: z.object({
+            publicKey: z.string().describe('VAPID Public Key im Base64-URL-Format'),
+          }),
+        },
+      },
+    },
+    async (_request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      return { publicKey: getVapidPublicKey() };
+    }
+  );
 
   // 2. Check current user's push subscription count & whether this device (by endpoint or wildcard cookie) is registered
   fastify.get<{ Querystring: { endpoint?: string } }>(
     '/api/push/status',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Push'],
+        summary: 'Push-Status des aktuellen Benutzers prüfen',
+        description: 'Prüft, ob das anfragende Gerät und die angemeldete Person für Push-Benachrichtigungen registriert sind.',
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({
+          endpoint: z.string().optional().describe('Push-Subscription-Endpoint des Browsers'),
+        }),
+        response: {
+          200: z.object({
+            publicKey: z.string(),
+            subscriptionCount: z.number().int(),
+            deviceSubscribed: z.boolean(),
+          }),
+        },
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
       const userId = request.user.id;
@@ -98,7 +132,16 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
   // 3. Register / update a Web Push subscription for the current device
   fastify.post(
     '/api/push/subscribe',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Push'],
+        summary: 'Gerät für Web Push Benachrichtigungen registrieren',
+        description: 'Speichert oder aktualisiert ein Browser-Push-Abonnement für die angemeldete Person.',
+        security: [{ bearerAuth: [] }],
+        body: PushSubscribeSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const parse = PushSubscribeSchema.safeParse(request.body);
       if (!parse.success) {
@@ -187,7 +230,16 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
   // 4. Unsubscribe the current device (via endpoint and/or wildcard cookie)
   fastify.post(
     '/api/push/unsubscribe',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Push'],
+        summary: 'Push-Abonnement beenden',
+        description: 'Entfernt das Browser-Push-Abonnement anhand des übergebenen Endpoints oder des Geräte-Cookies.',
+        security: [{ bearerAuth: [] }],
+        body: PushUnsubscribeSchema.partial().optional(),
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const userId = request.user.id;
       const body = request.body as Record<string, unknown> | null | undefined;
@@ -226,7 +278,15 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
   // 5. Send a test notification to all subscribed devices of the current user
   fastify.post(
     '/api/push/test',
-    { preHandler: [fastify.authenticate] },
+    {
+      schema: {
+        tags: ['Push'],
+        summary: 'Test-Benachrichtigung an eigene Geräte senden',
+        description: 'Sendet eine Test-Benachrichtigung an alle aktiven Push-Endpunkte der angemeldeten Person (Rate-Limit: max. 5 alle 5 Minuten).',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
     async (request, reply) => {
       const userId = request.user.id;
       if (testPushLimiter.hit(userId)) {
