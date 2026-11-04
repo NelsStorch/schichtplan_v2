@@ -3,6 +3,7 @@ import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
+import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 
 import prismaPlugin from './plugins/prisma.js';
 import jwtPlugin from './plugins/jwt.js';
@@ -107,30 +108,17 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(tenantPlugin);
   await app.register(docsPlugin);
 
-  // Application routes
-  await app.register(healthRoutes);
-  await app.register(authRoutes);
-  await app.register(passwordResetRoutes);
-  await app.register(departmentRoutes);
-  await app.register(eventRoutes);
-  await app.register(eventParticipationRoutes);
-  await app.register(shiftRoutes);
-  await app.register(attendanceRoutes);
-  await app.register(replacementRoutes);
-  await app.register(eventMessageRoutes);
-  await app.register(eventTemplateRoutes);
-  await app.register(taskDefinitionRoutes);
-  await app.register(adminRoutes);
-  await app.register(adminManageRoutes);
-  await app.register(uploadRoutes);
-  await app.register(calendarRoutes);
-  await app.register(statsRoutes);
-  await app.register(pushRoutes);
-
-
-  // Zentraler Fehler-Handler für Server-Fehler & Admin-Webhook-Alarme
+  // Zentraler Fehler-Handler für Server-Fehler & Admin-Webhook-Alarme.
+  // Muss VOR den Routen stehen: Fastify gibt ihn nur an Plugins weiter, die danach registriert werden.
   app.setErrorHandler(async (error: FastifyError, request, reply) => {
     const statusCode = error.statusCode || 500;
+
+    // Ungültige Eingaben aus den Routenschemata: wie bisher als {error: "Meldung"} melden,
+    // denn das Frontend zeigt `error` direkt an (sonst stünde dort nur «Bad Request»).
+    if (hasZodFastifySchemaValidationErrors(error)) {
+      const message = error.validation[0]?.message || 'Ungültige Eingabe';
+      return reply.status(400).send({ statusCode: 400, code: 'FST_ERR_VALIDATION', error: message, message });
+    }
 
     if (isDatabaseOverloadError(error)) {
       void sendServerAlert({
@@ -171,6 +159,27 @@ export async function buildApp(): Promise<FastifyInstance> {
 
     return reply.status(statusCode).send(error);
   });
+
+  // Application routes
+  await app.register(healthRoutes);
+  await app.register(authRoutes);
+  await app.register(passwordResetRoutes);
+  await app.register(departmentRoutes);
+  await app.register(eventRoutes);
+  await app.register(eventParticipationRoutes);
+  await app.register(shiftRoutes);
+  await app.register(attendanceRoutes);
+  await app.register(replacementRoutes);
+  await app.register(eventMessageRoutes);
+  await app.register(eventTemplateRoutes);
+  await app.register(taskDefinitionRoutes);
+  await app.register(adminRoutes);
+  await app.register(adminManageRoutes);
+  await app.register(uploadRoutes);
+  await app.register(calendarRoutes);
+  await app.register(statsRoutes);
+  await app.register(pushRoutes);
+
 
   return app;
 }

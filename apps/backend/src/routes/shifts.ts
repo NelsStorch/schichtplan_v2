@@ -793,7 +793,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         params: z.object({
           id: z.string().uuid().describe('ID der Schicht'),
         }),
-        body: SignupShiftSchema,
+        body: SignupShiftSchema.omit({ shiftId: true }),
       },
       preHandler: [fastify.optionalAuthenticate],
     },

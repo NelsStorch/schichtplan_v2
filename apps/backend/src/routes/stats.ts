@@ -89,8 +89,7 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['Statistik'],
         summary: 'UI-Ereignisse aus dem Browser melden',
         description:
-          'Nimmt anonymisierte Oberflächen-Metriken (ohne Cookies, unter Beachtung von Do-Not-Track/GPC) für aggregierte Nutzungsstatistiken entgegen.',
-        body: UiStatsSchema,
+          'Nimmt anonymisierte Oberflächen-Metriken (ohne Cookies, unter Beachtung von Do-Not-Track/GPC) für aggregierte Nutzungsstatistiken entgegen. Der Body ist JSON der Form {"events":[{"name":"…","dim":"…"}]}, per sendBeacon auch als text/plain; darum prüft erst der Handler selbst, nicht das Routenschema.',
       },
     },
     async (request, reply) => {
