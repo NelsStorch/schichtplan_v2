@@ -35,6 +35,7 @@ import { Badge, Button, Card, EmptyState, Skeleton, buttonClasses, cn, trackUi, 
 import { AppShell } from '@/components/AppShell';
 import { CalendarSubscribeDialog } from '@/components/CalendarSubscribeDialog';
 import { ReplacementDialog } from '@/components/event/ReplacementDialog';
+import { CateringTokensDialog } from '@/components/CateringTokensDialog';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
 import { dayKeyToIso, fmtDayMonth, fmtDuration, fmtRelativeDay, fmtTime, fmtTimeRange, fmtWeekday, groupByBusinessDay, hoursBetween, shiftName } from '@/lib/format';
 import {
@@ -97,6 +98,7 @@ export default function MyShiftsPage() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [replacementFor, setReplacementFor] = useState<MyShift | null>(null);
+  const [cateringFor, setCateringFor] = useState<{ slug: string; title: string } | null>(null);
   const [calData, setCalData] = useState<CalendarTokenData | null>(null);
   const [resettingToken, setResettingToken] = useState(false);
   const [calDialogOpen, setCalDialogOpen] = useState(false);
@@ -483,7 +485,7 @@ export default function MyShiftsPage() {
             {past.length > 0 && (
               <section className="mt-14">
                 <h2 className="mb-4 font-display text-2xl font-bold tracking-tight text-fg-subtle">Erledigt</h2>
-                <Timeline shifts={past} muted />
+                <Timeline shifts={past} muted onOpenCatering={(slug, title) => setCateringFor({ slug, title })} />
               </section>
             )}
           </>
@@ -629,6 +631,7 @@ function Timeline({
   onCancel,
   onOfferReplacement,
   onWithdrawReplacement,
+  onOpenCatering,
 }: {
   shifts: MyShift[];
   muted?: boolean;
@@ -636,6 +639,7 @@ function Timeline({
   onCancel?: (shift: MyShift) => void;
   onOfferReplacement?: (shift: MyShift) => void;
   onWithdrawReplacement?: (shift: MyShift) => void;
+  onOpenCatering?: (slug: string, title: string) => void;
 }) {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 

@@ -10,6 +10,10 @@ import {
 } from '@schichtplan/shared';
 import { managerFlags } from '../services/eventAccess.js';
 import {
+  ensureCateringTokensForSignups,
+  getHelperCateringTokens,
+} from '../services/cateringTokens.js';
+import {
   checkinUrl,
   fetchCeviQrCode,
   generateCheckinToken,
@@ -101,6 +105,14 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
           ? { attendance: status, attendanceAt: new Date(), attendanceSource: 'OK', attendanceByName: byName }
           : { attendance: null, attendanceAt: null, attendanceSource: null, attendanceByName: null },
       });
+
+      if (status === 'PRESENT' && event.cateringTokensEnabled) {
+        try {
+          await ensureCateringTokensForSignups(fastify.prisma, event.id, [signup.id]);
+        } catch (catErr) {
+          request.log.error(catErr, 'Fehler beim Erzeugen von Verpflegungs-Tokens');
+        }
+      }
 
       try {
         await fastify.prisma.shiftSignupLog.create({
@@ -222,6 +234,22 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
+      let cateringTokens = undefined;
+      if (event.cateringTokensEnabled) {
+        try {
+          if (due.length > 0) {
+            await ensureCateringTokensForSignups(
+              fastify.prisma,
+              event.id,
+              due.map((s) => s.id)
+            );
+          }
+          cateringTokens = await getHelperCateringTokens(fastify.prisma, event.id, request.user.id, now);
+        } catch (catErr) {
+          request.log.error(catErr, 'Fehler beim Laden von Verpflegungs-Tokens beim Check-in');
+        }
+      }
+
       const next = due.length === 0 ? signups.find((s) => s.shift.startTime > now) : undefined;
       const result: CheckinResultDto = {
         eventTitle: event.title,
@@ -242,6 +270,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
               endTime: next.shift.endTime.toISOString(),
             }
           : null,
+        cateringTokens,
       };
       return result;
     }

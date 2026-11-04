@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  FileText,
   Filter,
   Layers,
   Medal,
@@ -26,6 +27,7 @@ import { Badge, Button, EmptyState, Input, Skeleton, Switch, cn, useToast } from
 import { api, errorMessage } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportFile';
 import { fmtShortDate } from '@/lib/format';
+import { downloadBlob, printBlob } from '@/lib/printPlan';
 import { usePortal } from '@/lib/portal';
 
 export function DepartmentStatsPanel() {
@@ -40,6 +42,7 @@ export function DepartmentStatsPanel() {
   const [includeSetupTeardown, setIncludeSetupTeardown] = useState(true);
   const [helperSearch, setHelperSearch] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'helpers' | 'events' | 'stufen'>('helpers');
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const loadStats = useCallback(async () => {
     setLoading(true);
@@ -206,8 +209,57 @@ export function DepartmentStatsPanel() {
     });
   };
 
-  const handlePrint = () => {
-    window.print();
+  const getPdfBlob = async () => {
+    if (!data) return null;
+    const { renderDepartmentStatsPdf } = await import('./DepartmentStatsPdf');
+    return renderDepartmentStatsPdf(data, department, '/fonts/pdf');
+  };
+
+  const handlePrintPdf = async () => {
+    if (!data) return;
+    setGeneratingPdf(true);
+    try {
+      const blob = await getPdfBlob();
+      if (!blob) return;
+      const deptSlug = department?.slug || 'abteilung';
+      const yearLabel = data.year === 'ALL' ? 'alle-jahre' : String(data.year);
+      const filename = `cevi-jahresbericht-${deptSlug}-${yearLabel}.pdf`;
+      printBlob(blob, filename);
+    } catch (err) {
+      toast({
+        title: 'PDF konnte nicht erstellt werden',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!data) return;
+    setGeneratingPdf(true);
+    try {
+      const blob = await getPdfBlob();
+      if (!blob) return;
+      const deptSlug = department?.slug || 'abteilung';
+      const yearLabel = data.year === 'ALL' ? 'alle-jahre' : String(data.year);
+      const filename = `cevi-jahresbericht-${deptSlug}-${yearLabel}.pdf`;
+      downloadBlob(blob, filename);
+      toast({
+        title: 'PDF heruntergeladen',
+        description: `Datei «${filename}» wurde erfolgreich gespeichert.`,
+        tone: 'success',
+      });
+    } catch (err) {
+      toast({
+        title: 'PDF konnte nicht erstellt werden',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   return (
@@ -226,11 +278,34 @@ export function DepartmentStatsPanel() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 print:hidden">
-            <Button variant="secondary" size="sm" onClick={handleExportCsv} disabled={loading || !data}>
-              <Download className="size-4" /> CSV für GV
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handlePrintPdf}
+              disabled={loading || !data || generatingPdf}
+              title="Sauberes A4-PDF direkt drucken"
+            >
+              <Printer className="size-4" />
+              {generatingPdf ? 'PDF wird erstellt...' : 'PDF drucken'}
             </Button>
-            <Button variant="secondary" size="sm" onClick={handlePrint} disabled={loading || !data}>
-              <Printer className="size-4" /> Drucken
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDownloadPdf}
+              disabled={loading || !data || generatingPdf}
+              title="A4-PDF für die GV als Datei herunterladen"
+            >
+              <FileText className="size-4" />
+              PDF Bericht
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={loading || !data || generatingPdf}
+              title="Rohdaten für Excel herunterladen"
+            >
+              <Download className="size-4" /> CSV für GV
             </Button>
           </div>
         </div>

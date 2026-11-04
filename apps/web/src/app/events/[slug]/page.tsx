@@ -10,6 +10,7 @@ import {
   Check,
   Coffee,
   Crown,
+  KeyRound,
   LayoutGrid,
   List,
   Lock,
@@ -178,21 +179,37 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     load();
   }, [load]);
 
-  // Einladungs-Link einlösen, sobald jemand angemeldet ist
-  useEffect(() => {
-    if (!pendingToken || portalLoading || !user) return;
-    const token = pendingToken;
-    setPendingToken(null);
+  const [redeeming, setRedeeming] = useState(false);
+
+  const dismissPendingLink = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete('zugang');
     window.history.replaceState(null, '', url);
-    api<{ message: string }>(`/api/events/${slug}/access-links/redeem`, { method: 'POST', json: { token } })
-      .then((res) => {
-        toast({ title: res.message, description: 'Du kannst dich jetzt eintragen.' });
-        return load();
-      })
-      .catch((err) => toast({ title: 'Link funktioniert nicht', description: errorMessage(err), tone: 'error' }));
-  }, [pendingToken, portalLoading, user, slug, load, toast]);
+    setPendingToken(null);
+    setEvent((prev) => (prev ? { ...prev, viewer: { ...prev.viewer, pendingLink: null } } : prev));
+  };
+
+  const redeemLink = async (tokenToRedeem?: string) => {
+    const token = tokenToRedeem || event?.viewer.pendingLink?.token || pendingToken;
+    if (!token) return;
+    setRedeeming(true);
+    try {
+      const res = await api<{ message: string }>(`/api/events/${slug}/access-links/redeem`, {
+        method: 'POST',
+        json: { token },
+      });
+      toast({ title: res.message, description: 'Du kannst dich jetzt eintragen.' });
+      setPendingToken(null);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('zugang');
+      window.history.replaceState(null, '', url);
+      await load();
+    } catch (err) {
+      toast({ title: 'Link funktioniert nicht', description: errorMessage(err), tone: 'error' });
+    } finally {
+      setRedeeming(false);
+    }
+  };
 
   const days = useMemo(() => groupByBusinessDay(event?.shifts ?? [], event?.dayCutoffTime), [event]);
   const distinctTasks = useMemo(() => {
@@ -766,15 +783,75 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
               reloadShiftId={selectedShiftId}
             />
           )}
-          {pendingToken && !user && !portalLoading && (
-            <Callout tone="info" title="Du hast einen Einladungs-Link">
-              <p>Melde dich an, damit der Link gilt. Ein Cevi-Name ohne Passwort reicht.</p>
-              <a href={loginHref} className={buttonClasses({ size: 'sm', className: 'mt-3' })}>
-                <LogIn /> Anmelden
-              </a>
+          {/* Einladungs-Link Behandlung */}
+          {pendingToken && !event.viewer.pendingLink && (
+            <Callout tone="danger" title="Ungültiger Zugangs-Link">
+              <p>Dieser Zugangs-Link ist nicht gültig oder wurde gelöscht. Wenn du eingeladen wurdest, frag bitte beim OK nach einem neuen Link.</p>
             </Callout>
           )}
-          {!(pendingToken && !user) && <AccessNotice event={event} loggedIn={Boolean(user)} />}
+
+          {event.viewer.pendingLink && !event.viewer.pendingLink.alreadyRedeemed && (
+            event.viewer.pendingLink.alreadyHasAccess && user ? (
+                <Callout tone="info" title="Zugangs-Link erkannt">
+                  <p>
+                    Du hast diesen Anlass über einen {event.viewer.pendingLink.kind === 'PERSONAL' ? 'persönlichen ' : 'Gruppen-'}Link geöffnet
+                    {event.viewer.pendingLink.label ? ` («${event.viewer.pendingLink.label}»)` : ''}.
+                    Da du als {event.viewer.access.isManager ? 'OK-Leitung / Planer*in' : 'Mitglied'} bereits vollen Zugang hast,
+                    musst du den Link nicht einlösen.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" onClick={dismissPendingLink}>
+                      Hinweis ausblenden
+                    </Button>
+                    {!event.viewer.pendingLink.isExpired && !event.viewer.pendingLink.isBoundToOther && (
+                      <Button size="sm" variant="ghost" loading={redeeming} onClick={() => redeemLink()}>
+                        Trotzdem einlösen (z. B. zum Testen)
+                      </Button>
+                    )}
+                  </div>
+                </Callout>
+              ) : event.viewer.pendingLink.isExpired ? (
+                <Callout tone="warning" title="Einladungs-Link abgelaufen">
+                  <p>
+                    Die Einlösefrist für diesen {event.viewer.pendingLink.kind === 'PERSONAL' ? 'persönlichen ' : ''}Link ist abgelaufen.
+                    Wenn du noch mithelfen möchtest, melde dich bitte beim OK.
+                  </p>
+                </Callout>
+              ) : event.viewer.pendingLink.isBoundToOther ? (
+                <Callout tone="danger" title="Persönlicher Link bereits vergeben">
+                  <p>
+                    Dieser persönliche Zugangs-Link wurde bereits von einer anderen Person eingelöst.
+                    Persönliche Links können nur einmal verwendet werden. Melde dich beim OK für einen eigenen Link.
+                  </p>
+                </Callout>
+              ) : !user && !portalLoading ? (
+                <Callout tone="info" title="Du wurdest eingeladen">
+                  <p>
+                    Über diesen {event.viewer.pendingLink.kind === 'PERSONAL' ? 'persönlichen ' : 'Gruppen-'}Link
+                    {event.viewer.pendingLink.label ? ` («${event.viewer.pendingLink.label}»)` : ''} kannst du dich für «{event.title}» eintragen.
+                    Melde dich kurz an, um den Zugang freizuschalten (ein Cevi-Name ohne Passwort reicht).
+                  </p>
+                  <a href={loginHref} className={buttonClasses({ size: 'sm', className: 'mt-3' })}>
+                    <LogIn /> Anmelden und Zugang freischalten
+                  </a>
+                </Callout>
+              ) : user ? (
+                <Callout tone="info" title="Du wurdest eingeladen">
+                  <p>
+                    Schalte jetzt deinen Zugang zu «{event.title}» frei
+                    {event.viewer.pendingLink.label ? ` (${event.viewer.pendingLink.kind === 'PERSONAL' ? 'Persönlicher Link' : 'Gruppen-Link'}: «${event.viewer.pendingLink.label}»)` : ''}.
+                  </p>
+                  <Button size="sm" className="mt-3" loading={redeeming} onClick={() => redeemLink()}>
+                    <KeyRound /> Jetzt freischalten
+                  </Button>
+                </Callout>
+              ) : null
+          )}
+
+          {/* Standard-Zugangshinweis (wenn kein ungelöster Link den Hinweis ersetzt) */}
+          {(!pendingToken || event.viewer.pendingLink?.alreadyRedeemed || event.viewer.pendingLink?.alreadyHasAccess) && (
+            <AccessNotice event={event} loggedIn={Boolean(user)} />
+          )}
         </div>
 
         {/* Organisationskomitee */}

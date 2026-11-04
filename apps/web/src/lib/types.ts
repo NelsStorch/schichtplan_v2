@@ -97,6 +97,9 @@ export interface EventDetails {
   attendanceMode?: AttendanceMode;
   checkinEarlyMinutes?: number;
   checkinLateMinutes?: number;
+  cateringTokensEnabled?: boolean;
+  cateringTokenItems?: string[];
+  cateringEarlyHours?: number;
   allowReplacement?: boolean;
   replacementCutoffHours?: number;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */

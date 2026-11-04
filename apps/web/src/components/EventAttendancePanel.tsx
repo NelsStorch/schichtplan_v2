@@ -14,6 +14,7 @@ import {
   Search,
   Settings,
   UserX,
+  UtensilsCrossed,
   X,
 } from 'lucide-react';
 import {
@@ -27,6 +28,7 @@ import { Badge, Button, Callout, Card, Chip, EmptyState, Input, cn, trackUi, use
 import { api, errorMessage } from '@/lib/api';
 import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay, fmtTimeRange } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
+import { CateringOverviewDialog } from './ok/CateringOverviewDialog';
 
 type AttendanceFields = Pick<ShiftSignupDto, 'attendance' | 'attendanceAt' | 'attendanceSource' | 'attendanceByName'>;
 type StatusFilter = 'ALL' | 'OPEN' | AttendanceStatus;
@@ -81,6 +83,7 @@ export function EventAttendancePanel({
   const [rotating, setRotating] = useState(false);
   const [qrVersion, setQrVersion] = useState(0);
   const [origin, setOrigin] = useState('');
+  const [cateringStatsOpen, setCateringStatsOpen] = useState(false);
 
   useEffect(() => setOrigin(window.location.origin), []);
   useEffect(() => setOverrides({}), [event]);
@@ -329,6 +332,11 @@ export function EventAttendancePanel({
           <Button variant="secondary" size="sm" onClick={printList} disabled={counts.total === 0}>
             <Printer className="size-4" /> Drucken
           </Button>
+          {event.cateringTokensEnabled && (
+            <Button variant="secondary" size="sm" onClick={() => setCateringStatsOpen(true)}>
+              <UtensilsCrossed className="size-4" /> Verpflegung
+            </Button>
+          )}
         </div>
       </div>
 
@@ -484,6 +492,14 @@ export function EventAttendancePanel({
         <Callout tone="warning" title="Kein QR-Code vorhanden">
           Speichere die Einstellungen einmal neu, damit ein Check-in-Code erstellt wird.
         </Callout>
+      )}
+
+      {event.cateringTokensEnabled && (
+        <CateringOverviewDialog
+          open={cateringStatsOpen}
+          onClose={() => setCateringStatsOpen(false)}
+          eventSlug={event.slug}
+        />
       )}
     </div>
   );

@@ -257,7 +257,11 @@ export function evaluateEventAccess(
   return result(true, hasGrant ? 'LINK' : 'RULES', null, null, true);
 }
 
-/** Hat die Person einen gültigen Zugangs-Link für den Anlass eingelöst? */
+/**
+ * Hat die Person einen gültigen Zugangs-Link für den Anlass eingelöst?
+ * Hinweis: expiresAt des Links ist eine reine Einlösefrist. Ein bereits eingelöster
+ * Grant bleibt gültig, bis das OK den Link löscht.
+ */
 export async function hasValidGrant(
   prisma: Pick<PrismaClient, 'eventAccessGrant'>,
   eventId: string,
@@ -265,7 +269,7 @@ export async function hasValidGrant(
 ): Promise<boolean> {
   const grant = await prisma.eventAccessGrant.findUnique({
     where: { eventId_userId: { eventId, userId } },
-    select: { link: { select: { expiresAt: true } } },
+    select: { id: true },
   });
-  return Boolean(grant && (!grant.link.expiresAt || grant.link.expiresAt > new Date()));
+  return Boolean(grant);
 }

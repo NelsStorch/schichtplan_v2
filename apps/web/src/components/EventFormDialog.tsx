@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
-import { AlertCircle, AlertTriangle, CalendarPlus, Check, ChevronDown, Crown, LifeBuoy, Loader2, Palette, Plus, QrCode, Shield, Trash2, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CalendarPlus, Check, ChevronDown, Crown, LifeBuoy, Loader2, Palette, Plus, QrCode, Shield, Trash2, Users, UtensilsCrossed, X } from 'lucide-react';
 import {
   ATTENDANCE_MODES,
   REPLACEMENT_CUTOFF_HOURS,
@@ -45,6 +45,9 @@ export interface EventFormValues {
   attendanceMode: AttendanceMode;
   checkinEarlyMinutes: number;
   checkinLateMinutes: number;
+  cateringTokensEnabled: boolean;
+  cateringTokenItems: string[];
+  cateringEarlyHours: number;
   /** «Ersatz gesucht» erlaubt, bis so viele Stunden vor Schichtbeginn */
   allowReplacement: boolean;
   replacementCutoffHours: number;
@@ -72,6 +75,9 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     attendanceMode: event.attendanceMode ?? 'OFF',
     checkinEarlyMinutes: event.checkinEarlyMinutes ?? 30,
     checkinLateMinutes: event.checkinLateMinutes ?? 30,
+    cateringTokensEnabled: event.cateringTokensEnabled ?? false,
+    cateringTokenItems: event.cateringTokenItems ?? ['1x Helfermenü', '1x Getränk'],
+    cateringEarlyHours: event.cateringEarlyHours ?? 2,
     allowReplacement: event.allowReplacement ?? true,
     replacementCutoffHours: event.replacementCutoffHours ?? 0,
     access: {
@@ -127,6 +133,9 @@ const EMPTY: EventFormValues = {
   attendanceMode: 'OFF',
   checkinEarlyMinutes: 30,
   checkinLateMinutes: 30,
+  cateringTokensEnabled: false,
+  cateringTokenItems: ['1x Helfermenü', '1x Getränk'],
+  cateringEarlyHours: 2,
   allowReplacement: true,
   replacementCutoffHours: 0,
   access: EMPTY_ACCESS,
@@ -333,6 +342,16 @@ export function EventForm({
   const { user } = usePortal();
   const [form, setForm] = useState<EventFormValues>({ ...EMPTY, ...initial });
   const [saving, setSaving] = useState(false);
+  const [newCateringItem, setNewCateringItem] = useState('');
+  const addCateringItem = () => {
+    const trimmed = newCateringItem.trim();
+    if (!trimmed || form.cateringTokenItems.includes(trimmed)) return;
+    set('cateringTokenItems', [...form.cateringTokenItems, trimmed]);
+    setNewCateringItem('');
+  };
+  const removeCateringItem = (idx: number) => {
+    set('cateringTokenItems', form.cateringTokenItems.filter((_, i) => i !== idx));
+  };
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   // Nach einem Klick auf Speichern zur Fehlermeldung oben scrollen (nicht beim Auto-Speichern im Hintergrund)
@@ -393,6 +412,9 @@ export function EventForm({
           attendanceMode: form.attendanceMode,
           checkinEarlyMinutes: form.checkinEarlyMinutes,
           checkinLateMinutes: form.checkinLateMinutes,
+          cateringTokensEnabled: form.cateringTokensEnabled,
+          cateringTokenItems: form.cateringTokenItems,
+          cateringEarlyHours: form.cateringEarlyHours,
           allowReplacement: form.allowReplacement,
           replacementCutoffHours: form.replacementCutoffHours,
           ...accessPayload(form.access),
@@ -1265,6 +1287,95 @@ export function EventForm({
             </p>
           </div>
         )}
+
+        <div className="mt-6 pt-5 border-t border-line space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <UtensilsCrossed className="size-4 text-accent-ink" />
+                <span className="text-[13px] font-semibold text-fg">Verpflegungs- & Getränke-Tokens</span>
+              </div>
+              <p className="text-xs text-fg-muted mt-0.5">
+                Generiert für Helfende digitale Bons, die sie vor Ort am Stand per Wisch-Geste entwerten können.
+              </p>
+            </div>
+            <Switch
+              checked={form.cateringTokensEnabled}
+              onChange={(checked) => set('cateringTokensEnabled', checked)}
+              aria-label="Verpflegungs-Tokens aktivieren"
+            />
+          </div>
+
+          {form.cateringTokensEnabled && (
+            <div className="space-y-4 rounded-xl border border-line bg-surface-2/40 p-4 animate-in fade-in">
+              <Field
+                label="Bons pro Schicht"
+                hint="Diese Gutscheine erhält jede helfende Person pro Schicht."
+              >
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {form.cateringTokenItems.map((item, idx) => (
+                      <Badge key={idx} tone="neutral" className="pl-2.5 pr-1.5 py-1 text-xs gap-1.5 font-medium">
+                        {item}
+                        <button
+                          type="button"
+                          onClick={() => removeCateringItem(idx)}
+                          className="hover:text-danger-ink focus:outline-none p-0.5 rounded"
+                          title="Entfernen"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="z. B. 1x Kaffee & Kuchen"
+                      value={newCateringItem}
+                      onChange={(e) => setNewCateringItem(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addCateringItem();
+                        }
+                      }}
+                      className="text-xs h-8"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={addCateringItem}
+                      disabled={!newCateringItem.trim()}
+                      className="shrink-0 h-8"
+                    >
+                      <Plus className="size-3.5 mr-1" /> Hinzufügen
+                    </Button>
+                  </div>
+                </div>
+              </Field>
+
+              <Field
+                label="Kulanz-Fenster (Vorlaufzeit für Einlösung)"
+                hint="Ab wie vielen Stunden vor Schichtbeginn Helfende ihren Bon bereits einlösen dürfen (z. B. für Mittagessen vor einer Nachmittagsschicht)."
+              >
+                <Select
+                  value={String(form.cateringEarlyHours)}
+                  onChange={(e) => set('cateringEarlyHours', Number(e.target.value))}
+                >
+                  <option value="0">Erst ab Schichtbeginn / Check-in (0 Std.)</option>
+                  <option value="1">1 Stunde vor Schichtbeginn</option>
+                  <option value="2">2 Stunden vorher (Standard)</option>
+                  <option value="3">3 Stunden vorher</option>
+                  <option value="4">4 Stunden vorher</option>
+                  <option value="6">6 Stunden vorher</option>
+                  <option value="12">12 Stunden vorher</option>
+                </Select>
+              </Field>
+            </div>
+          )}
+        </div>
 
       </S>
 

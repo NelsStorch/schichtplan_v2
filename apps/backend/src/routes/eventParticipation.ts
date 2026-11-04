@@ -113,9 +113,42 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { createdAt: 'desc' },
       });
 
+      // Gebundene Personen fuer persoenliche Links nachladen, falls Grants anderweitig umgehaengt wurden
+      const boundUserIds = [
+        ...new Set(
+          links
+            .filter((l) => l.kind === 'PERSONAL' && l.boundUserId && l.grants.length === 0)
+            .map((l) => l.boundUserId!)
+        ),
+      ];
+      const boundUsers = boundUserIds.length
+        ? await fastify.prisma.user.findMany({
+            where: { id: { in: boundUserIds } },
+            select: { id: true, ceviName: true, firstName: true, lastName: true },
+          })
+        : [];
+      const boundUserMap = new Map(boundUsers.map((u) => [u.id, u]));
+
       const now = new Date();
-      return links.map(
-        (link): EventAccessLinkDto => ({
+      return links.map((link): EventAccessLinkDto => {
+        let redeemedBy = link.grants.map((g) => ({
+          userId: g.user.id,
+          displayName: displayNameOf(g.user),
+          redeemedAt: g.createdAt.toISOString(),
+        }));
+        if (redeemedBy.length === 0 && link.kind === 'PERSONAL' && link.boundUserId) {
+          const boundUser = boundUserMap.get(link.boundUserId);
+          if (boundUser) {
+            redeemedBy = [
+              {
+                userId: boundUser.id,
+                displayName: displayNameOf(boundUser),
+                redeemedAt: link.createdAt.toISOString(),
+              },
+            ];
+          }
+        }
+        return {
           id: link.id,
           label: link.label,
           kind: link.kind === 'GROUP' ? 'GROUP' : 'PERSONAL',
@@ -123,13 +156,9 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           expiresAt: link.expiresAt ? link.expiresAt.toISOString() : null,
           createdAt: link.createdAt.toISOString(),
           isExpired: Boolean(link.expiresAt && link.expiresAt <= now),
-          redeemedBy: link.grants.map((g) => ({
-            userId: g.user.id,
-            displayName: displayNameOf(g.user),
-            redeemedAt: g.createdAt.toISOString(),
-          })),
-        })
-      );
+          redeemedBy,
+        };
+      });
     }
   );
 
@@ -485,7 +514,6 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       ];
       const targetDeptIds = targetDepartments.map((d) => d.id);
       const isRestricted = cfg.scope === 'DEPARTMENT' || event.allowedStufen.length > 0;
-      const now = new Date();
 
       // Kandidaten laden
       const candidateUsers = await fastify.prisma.user.findMany({
@@ -547,7 +575,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const items: EventRosterItemDto[] = [];
 
       for (const u of candidateUsers) {
-        const hasGrant = u.eventAccessGrants.some((g) => !g.link.expiresAt || g.link.expiresAt > now);
+        const hasGrant = u.eventAccessGrants.length > 0;
         const isDeptAdmin =
           u.isGlobalAdmin ||
           u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');

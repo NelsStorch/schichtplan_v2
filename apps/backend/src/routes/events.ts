@@ -25,11 +25,13 @@ import {
   type EventContactVisibility,
   type AttendanceStatus,
   type ShiftSignupLogAction,
+  type EventPendingLinkDto,
 } from '@schichtplan/shared';
 import {
   accessEventInclude,
   accessUserSelect,
   audienceLabel,
+  checkRules,
   evaluateEventAccess,
   hasValidGrant,
   managerFlags,
@@ -174,13 +176,19 @@ async function replaceAccessLists(tx: Tx, eventId: string, departmentIds: string
 
 const eventRoutes: FastifyPluginAsync = async (fastify) => {
   /** Ungelöster Einladungs-Link (?zugang=) erlaubt das Ansehen, damit man ihn danach einlösen kann */
-  async function isValidLinkToken(eventId: string, token: string | undefined) {
+  async function isValidLinkToken(eventId: string, token: string | undefined, viewerId?: string) {
     if (!token || token.length > 100) return false;
     const link = await fastify.prisma.eventAccessLink.findUnique({
       where: { token },
-      select: { eventId: true, expiresAt: true },
+      select: { eventId: true, expiresAt: true, kind: true, boundUserId: true },
     });
-    return Boolean(link && link.eventId === eventId && (!link.expiresAt || link.expiresAt > new Date()));
+    if (!link || link.eventId !== eventId) return false;
+    if (link.expiresAt && link.expiresAt <= new Date()) return false;
+    // Persoenlicher Link: nur gueltig, wenn noch frei oder bereits an diesen User gebunden
+    if (link.kind === 'PERSONAL' && link.boundUserId && link.boundUserId !== viewerId) {
+      return false;
+    }
+    return true;
   }
 
   // Liste aller Events der aktuellen Abteilung
@@ -379,7 +387,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         accessTypeConfig(event.accessType).scope !== 'ANY' &&
         !flags.isManager &&
         !hasGrant &&
-        !(await isValidLinkToken(event.id, request.query.zugang)) &&
+        !(await isValidLinkToken(event.id, request.query.zugang, viewer?.id)) &&
         !(await isDepartmentInsider(fastify.prisma, request.tenant.id, viewer?.id))
       ) {
         reply.header('Cache-Control', 'no-store');
@@ -389,6 +397,32 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             : 'Dieser Anlass ist nur für Mitglieder der Abteilung. Bitte melde dich an.',
           code: 'MEMBERS_ONLY',
         });
+      }
+
+      let pendingLink: EventPendingLinkDto | null = null;
+      if (request.query.zugang) {
+        const pl = await fastify.prisma.eventAccessLink.findUnique({
+          where: { token: request.query.zugang },
+          select: { id: true, eventId: true, label: true, kind: true, expiresAt: true, boundUserId: true },
+        });
+        if (pl && pl.eventId === event.id) {
+          const isExpired = Boolean(pl.expiresAt && pl.expiresAt <= new Date());
+          const isBoundToOther = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && pl.boundUserId !== viewer?.id);
+          const isBoundToMe = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && pl.boundUserId === viewer?.id);
+          const alreadyHasAccess =
+            flags.isManager || (viewer ? checkRules(event, viewer, request.tenant.name).ok : false);
+          pendingLink = {
+            token: request.query.zugang,
+            label: pl.label,
+            kind: pl.kind === 'GROUP' ? 'GROUP' : 'PERSONAL',
+            isExpired,
+            isBoundToOther,
+            isBoundToMe,
+            alreadyRedeemed: hasGrant,
+            alreadyHasAccess,
+            expiresAt: pl.expiresAt ? pl.expiresAt.toISOString() : null,
+          };
+        }
       }
 
       const answers = Object.fromEntries((viewer?.eventAnswers ?? []).map((a) => [a.questionId, a.value]));
@@ -436,6 +470,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         attendanceMode: event.attendanceMode,
         checkinEarlyMinutes: event.checkinEarlyMinutes ?? 30,
         checkinLateMinutes: event.checkinLateMinutes ?? 30,
+        cateringTokensEnabled: event.cateringTokensEnabled,
+        cateringTokenItems: event.cateringTokenItems,
+        cateringEarlyHours: event.cateringEarlyHours ?? 2,
         allowReplacement: event.allowReplacement,
         replacementCutoffHours: event.replacementCutoffHours,
         checkinToken: access.isManager ? event.checkinToken : null,
@@ -456,6 +493,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
           missingFields: viewer ? missingProfileFields(viewer, event.requiredFields) : [],
           missingQuestionIds: viewer ? missingQuestionIds : [],
           answers,
+          pendingLink,
         },
         organizers: event.organizers.map((o) => ({
           id: o.id,
@@ -640,6 +678,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         attendanceMode,
         checkinEarlyMinutes,
         checkinLateMinutes,
+        cateringTokensEnabled,
+        cateringTokenItems,
+        cateringEarlyHours,
         allowReplacement,
         replacementCutoffHours,
         allowedDepartmentIds,
@@ -764,6 +805,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             checkinEarlyMinutes: checkinEarlyMinutes ?? 30,
             checkinLateMinutes: checkinLateMinutes ?? 30,
             checkinToken: attendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
+            cateringTokensEnabled: cateringTokensEnabled ?? false,
+            cateringTokenItems: cateringTokenItems ?? ['1x Helfermenü', '1x Getränk'],
+            cateringEarlyHours: cateringEarlyHours ?? 2,
             allowReplacement: allowReplacement ?? true,
             replacementCutoffHours: replacementCutoffHours ?? 0,
             organizers: {
@@ -901,6 +945,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             attendanceMode: body.attendanceMode,
             checkinEarlyMinutes: body.checkinEarlyMinutes !== undefined ? body.checkinEarlyMinutes : undefined,
             checkinLateMinutes: body.checkinLateMinutes !== undefined ? body.checkinLateMinutes : undefined,
+            cateringTokensEnabled: body.cateringTokensEnabled !== undefined ? body.cateringTokensEnabled : undefined,
+            cateringTokenItems: body.cateringTokenItems !== undefined ? body.cateringTokenItems : undefined,
+            cateringEarlyHours: body.cateringEarlyHours !== undefined ? body.cateringEarlyHours : undefined,
             allowReplacement: body.allowReplacement,
             replacementCutoffHours: body.replacementCutoffHours,
             // Beim ersten Einschalten des Selbst-Check-ins einen Code erzeugen; der bestehende bleibt sonst gültig
@@ -929,6 +976,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         attendanceMode: updated.attendanceMode,
         checkinEarlyMinutes: updated.checkinEarlyMinutes,
         checkinLateMinutes: updated.checkinLateMinutes,
+        cateringTokensEnabled: updated.cateringTokensEnabled,
+        cateringTokenItems: updated.cateringTokenItems,
+        cateringEarlyHours: updated.cateringEarlyHours,
         allowReplacement: updated.allowReplacement,
         replacementCutoffHours: updated.replacementCutoffHours,
       };

@@ -224,7 +224,6 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           ...(cfg.whitelist ? event.allowedDepartments.map((a) => a.departmentId) : []),
         ];
         const minRequired = event.minShiftsPerPerson || 1;
-        const now = new Date();
 
         const candidates = await fastify.prisma.user.findMany({
           where: {
@@ -267,7 +266,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
 
         const matching = candidates.filter((u) => {
           if (u.signups.length >= minRequired) return false;
-          const hasGrant = u.eventAccessGrants.some((g) => !g.link.expiresAt || g.link.expiresAt > now);
+          const hasGrant = u.eventAccessGrants.length > 0;
           const isDeptAdmin =
             u.isGlobalAdmin ||
             u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');

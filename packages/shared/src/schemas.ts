@@ -196,6 +196,20 @@ export const CreateEventSchema = z.object({
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   checkinEarlyMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
   checkinLateMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
+  cateringTokensEnabled: z.boolean().optional().default(false),
+  cateringTokenItems: z
+    .array(z.string().trim().min(1, 'Gutschein-Titel darf nicht leer sein').max(60, 'Maximal 60 Zeichen'))
+    .min(1, 'Mindestens ein Gutschein-Typ erforderlich')
+    .max(10, 'Maximal 10 Gutschein-Typen')
+    .optional()
+    .default(['1x Helfermenü', '1x Getränk']),
+  cateringEarlyHours: z
+    .number()
+    .int()
+    .min(0, 'Stunden dürfen nicht negativ sein')
+    .max(72, 'Maximal 72 Stunden Vorlaufzeit')
+    .optional()
+    .default(2),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -228,6 +242,18 @@ export const UpdateEventSchema = z.object({
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   checkinEarlyMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional(),
   checkinLateMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional(),
+  cateringTokensEnabled: z.boolean().optional(),
+  cateringTokenItems: z
+    .array(z.string().trim().min(1, 'Gutschein-Titel darf nicht leer sein').max(60, 'Maximal 60 Zeichen'))
+    .min(1, 'Mindestens ein Gutschein-Typ erforderlich')
+    .max(10, 'Maximal 10 Gutschein-Typen')
+    .optional(),
+  cateringEarlyHours: z
+    .number()
+    .int()
+    .min(0, 'Stunden dürfen nicht negativ sein')
+    .max(72, 'Maximal 72 Stunden Vorlaufzeit')
+    .optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -518,6 +544,20 @@ export const InstantiateTemplateSchema = z.object({
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
   checkinEarlyMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
   checkinLateMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
+  cateringTokensEnabled: z.boolean().optional().default(false),
+  cateringTokenItems: z
+    .array(z.string().trim().min(1, 'Gutschein-Titel darf nicht leer sein').max(60, 'Maximal 60 Zeichen'))
+    .min(1, 'Mindestens ein Gutschein-Typ erforderlich')
+    .max(10, 'Maximal 10 Gutschein-Typen')
+    .optional()
+    .default(['1x Helfermenü', '1x Getränk']),
+  cateringEarlyHours: z
+    .number()
+    .int()
+    .min(0, 'Stunden dürfen nicht negativ sein')
+    .max(72, 'Maximal 72 Stunden Vorlaufzeit')
+    .optional()
+    .default(2),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -543,6 +583,14 @@ export const CheckinSchema = z.object({
 });
 
 export type CheckinInput = z.infer<typeof CheckinSchema>;
+
+/** Token entwerten (durch Helfer via Swipe oder OK manuell) */
+export const RedeemCateringTokenSchema = z.object({
+  /** true = erzwungene Entwertung durch das OK auch ausserhalb des Kulanzfensters */
+  force: z.boolean().optional(),
+});
+
+export type RedeemCateringTokenInput = z.infer<typeof RedeemCateringTokenSchema>;
 
 /** Nachricht des OK an Helfende eines Anlasses (E-Mail an jede Person einzeln) */
 export const SendEventMessageSchema = z

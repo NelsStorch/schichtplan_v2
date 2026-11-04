@@ -251,6 +251,10 @@ model Event {
   checkinLateMinutes  Int             @default(30) @map("checkin_late_minutes")
   // Geheimer Code im QR-Link für den Selbst-Check-in (erneuerbar, alte Plakate werden damit ungültig)
   checkinToken      String?           @unique @map("checkin_token")
+  // Verpflegungs- & Getränke-Tokens für Helfende
+  cateringTokensEnabled Boolean       @default(false) @map("catering_tokens_enabled")
+  cateringTokenItems    String[]      @default(["1x Helfermenü", "1x Getränk"]) @map("catering_token_items")
+  cateringEarlyHours    Int           @default(2) @map("catering_early_hours")
   // «Ersatz gesucht»: Eingetragene dürfen ihre Schicht zur Übernahme anbieten
   allowReplacement  Boolean           @default(true) @map("allow_replacement")
   // Bis wie viele Stunden vor Schichtbeginn (0 = bis Schichtbeginn)
@@ -492,6 +496,7 @@ model ShiftSignup {
   task        ShiftTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
   user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   answers     ShiftSignupAnswer[]
+  cateringTokens   CateringToken[]
 
   @@index([shiftId])
   @@index([userId])
@@ -759,4 +764,19 @@ model StatsSnapshot {
 
   @@id([day, key])
   @@map("stats_snapshots")
+}
+
+// Digitaler Verpflegungs- oder Getränkegutschein für Helfende
+model CateringToken {
+  id             String      @id @default(uuid())
+  shiftSignupId  String      @map("shift_signup_id")
+  title          String
+  status         String      @default("AVAILABLE")
+  redeemedAt     DateTime?   @map("redeemed_at")
+  redeemedByName String?     @map("redeemed_by_name")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  signup         ShiftSignup @relation(fields: [shiftSignupId], references: [id], onDelete: Cascade)
+
+  @@index([shiftSignupId])
+  @@map("catering_tokens")
 }

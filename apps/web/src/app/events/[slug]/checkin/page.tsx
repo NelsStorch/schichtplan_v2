@@ -2,10 +2,11 @@
 
 import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CalendarClock, CheckCircle2, LogIn, QrCode, TriangleAlert } from 'lucide-react';
-import type { CheckinResultDto } from '@schichtplan/shared';
+import { CalendarClock, CheckCircle2, LogIn, QrCode, TriangleAlert, UtensilsCrossed } from 'lucide-react';
+import type { CateringTokenDto, CheckinResultDto } from '@schichtplan/shared';
 import { Card, EmptyState, Skeleton, buttonClasses } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
+import { CateringTokenCard } from '@/components/CateringTokenCard';
 import { api, errorMessage, loginUrl } from '@/lib/api';
 import { fmtTime, fmtWeekday, fmtTimeRange } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
@@ -85,6 +86,20 @@ export default function CheckinPage({ params }: { params: Promise<{ slug: string
 }
 
 function CheckinResult({ slug, result, name }: { slug: string; result: CheckinResultDto; name: string }) {
+  const [tokens, setTokens] = useState<CateringTokenDto[]>(result.cateringTokens ?? []);
+
+  // Falls beim Check-in keine Tokens mitgegeben wurden (z. B. noch nicht im Check-in-Fenster),
+  // laden wir allfällige Verpflegungs-Bons nach, da sie dank Kulanzfenster bereits verfügbar sein könnten.
+  useEffect(() => {
+    if (result.cateringTokens) {
+      setTokens(result.cateringTokens);
+    } else {
+      api<CateringTokenDto[]>(`/api/events/${slug}/my-catering-tokens`)
+        .then((data) => setTokens(data))
+        .catch(() => {});
+    }
+  }, [slug, result]);
+
   const actions = (
     <div className="flex flex-wrap justify-center gap-2">
       <Link href="/meine-schichten" className={buttonClasses({ variant: 'secondary' })}>
@@ -96,24 +111,51 @@ function CheckinResult({ slug, result, name }: { slug: string; result: CheckinRe
     </div>
   );
 
+  const cateringSection = tokens.length > 0 && (
+    <div className="space-y-3 pt-3 text-left">
+      <div className="flex items-center gap-2">
+        <UtensilsCrossed className="size-5 text-accent-ink" />
+        <h2 className="font-display text-lg font-bold text-fg">Deine Verpflegungs-Bons</h2>
+      </div>
+      <p className="text-xs text-fg-muted">
+        Zeige deinen Bon am Essens- oder Getränkestand vor und wische zum Entwerten direkt vor dem Personal.
+      </p>
+      <div className="grid gap-3">
+        {tokens.map((token) => (
+          <CateringTokenCard
+            key={token.id}
+            token={token}
+            slug={slug}
+            onRedeemed={(updated) => {
+              setTokens((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   if (result.checkedIn.length === 0) {
     return (
-      <EmptyState
-        icon={<CalendarClock />}
-        title={result.nextShift ? 'Deine Schicht hat noch nicht begonnen' : 'Gerade keine Schicht für dich'}
-        description={
-          result.nextShift
-            ? `Deine nächste Schicht${result.nextShift.shiftTitle?.trim() ? ` «${result.nextShift.shiftTitle}»` : ''} beginnt ${fmtWeekday(result.nextShift.startTime)} um ${fmtTime(result.nextShift.startTime)}. ${(() => {
-            const early = result.checkinEarlyMinutes ?? 30;
-            const late = result.checkinLateMinutes ?? 30;
-            const earlyPart = early === 0 ? 'ab Schichtbeginn' : `ab ${early} Minuten vorher`;
-            const latePart = late === 0 ? 'bis Schichtende' : `bis ${late} Minuten nach Schichtende`;
-            return `Einchecken geht ${earlyPart} ${latePart}: scann den QR-Code dann nochmals.`;
-          })()}`
-            : `Du bist bei «${result.eventTitle}» in keiner laufenden oder kommenden Schicht eingetragen. Melde dich beim OK, wenn du trotzdem hilfst.`
-        }
-        action={actions}
-      />
+      <div className="space-y-6">
+        <EmptyState
+          icon={<CalendarClock />}
+          title={result.nextShift ? 'Deine Schicht hat noch nicht begonnen' : 'Gerade keine Schicht für dich'}
+          description={
+            result.nextShift
+              ? `Deine nächste Schicht${result.nextShift.shiftTitle?.trim() ? ` «${result.nextShift.shiftTitle}»` : ''} beginnt ${fmtWeekday(result.nextShift.startTime)} um ${fmtTime(result.nextShift.startTime)}. ${(() => {
+              const early = result.checkinEarlyMinutes ?? 30;
+              const late = result.checkinLateMinutes ?? 30;
+              const earlyPart = early === 0 ? 'ab Schichtbeginn' : `ab ${early} Minuten vorher`;
+              const latePart = late === 0 ? 'bis Schichtende' : `bis ${late} Minuten nach Schichtende`;
+              return `Einchecken geht ${earlyPart} ${latePart}: scann den QR-Code dann nochmals.`;
+            })()}`
+              : `Du bist bei «${result.eventTitle}» in keiner laufenden oder kommenden Schicht eingetragen. Melde dich beim OK, wenn du trotzdem hilfst.`
+          }
+          action={actions}
+        />
+        {cateringSection}
+      </div>
     );
   }
 
@@ -129,6 +171,7 @@ function CheckinResult({ slug, result, name }: { slug: string; result: CheckinRe
         </h1>
         <p className="mt-1 text-sm text-fg-muted">{result.eventTitle}</p>
       </div>
+
       <div className="space-y-2 text-left">
         {result.checkedIn.map((c) => (
           <Card key={c.signupId} className="flex items-center justify-between gap-3 p-4">
@@ -144,6 +187,10 @@ function CheckinResult({ slug, result, name }: { slug: string; result: CheckinRe
           </Card>
         ))}
       </div>
+
+      {/* VERPFLEGUNGSGUTSCHEINE */}
+      {cateringSection}
+
       {actions}
     </div>
   );

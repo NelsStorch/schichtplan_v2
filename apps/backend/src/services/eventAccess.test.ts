@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { audienceLabel, checkRules, evaluateEventAccess, isVerifiedHomeSource, type AccessEvent, type AccessUser } from './eventAccess.js';
+import { audienceLabel, checkRules, evaluateEventAccess, isVerifiedHomeSource,
+  hasValidGrant, type AccessEvent, type AccessUser } from './eventAccess.js';
 import { EVENT_CAPABILITIES, type EventCapability } from '@schichtplan/shared';
 
 const HOME = 'dep-home';
@@ -189,5 +190,25 @@ describe('bestätigte Zugehörigkeit', () => {
     const person = { ceviDbId: 1, homeDepartmentId: home };
     expect(checkRules(internal, user({ ...person, homeDepartmentSource: 'CONFIRMED' }), 'Abteilung').ok).toBe(true);
     expect(checkRules(internal, user({ ...person, homeDepartmentSource: 'SELF' }), 'Abteilung').ok).toBe(false);
+  });
+});
+
+describe('hasValidGrant', () => {
+  it('bleibt gültig, wenn ein Grant existiert (expiresAt des Links ist reine Einlösefrist)', async () => {
+    const mockPrisma = {
+      eventAccessGrant: {
+        findUnique: async () => ({ id: 'grant-1' }),
+      },
+    };
+    expect(await hasValidGrant(mockPrisma as unknown as Parameters<typeof hasValidGrant>[0], 'ev-1', 'u-1')).toBe(true);
+  });
+
+  it('gibt false zurück, wenn kein Grant existiert', async () => {
+    const mockPrisma = {
+      eventAccessGrant: {
+        findUnique: async () => null,
+      },
+    };
+    expect(await hasValidGrant(mockPrisma as unknown as Parameters<typeof hasValidGrant>[0], 'ev-1', 'u-1')).toBe(false);
   });
 });

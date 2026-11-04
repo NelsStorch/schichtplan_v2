@@ -450,6 +450,21 @@ export const ATTENDANCE_STATUS_KEYS = Object.keys(ATTENDANCE_STATUSES) as [Atten
 /** Selbst-Check-in ist ab so vielen Minuten vor Schichtbeginn bis zum Schichtende möglich */
 export const CHECKIN_EARLY_MINUTES = 30;
 
+/** Status eines Verpflegungs- oder Getränketokens */
+export const CATERING_TOKEN_STATUS = {
+  AVAILABLE: 'AVAILABLE',
+  REDEEMED: 'REDEEMED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type CateringTokenStatus = (typeof CATERING_TOKEN_STATUS)[keyof typeof CATERING_TOKEN_STATUS];
+export const CATERING_TOKEN_STATUS_KEYS = ['AVAILABLE', 'REDEEMED', 'CANCELLED'] as const;
+
+/** Standard-Tokens pro Schicht */
+export const DEFAULT_CATERING_TOKEN_ITEMS = ['1x Helfermenü', '1x Getränk'] as const;
+/** Kulanz-Fenster in Stunden vor Schichtbeginn, ab wann Tokens einlösbar sind */
+export const DEFAULT_CATERING_EARLY_HOURS = 2;
+
 export const STUFE_ROLES = {
   LEITUNG: 'Leitung',
   TEILNEHMER: 'Teilnehmer*in',

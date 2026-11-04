@@ -1,6 +1,7 @@
 import type {
   AttendanceMode,
   AttendanceStatus,
+  CateringTokenStatus,
   DepartmentPermission,
   EventCapability,
   EventAccessType,
@@ -89,6 +90,12 @@ export interface EventDto {
   checkinLateMinutes?: number;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
   checkinToken?: string | null;
+  /** Verpflegungs- & Getränke-Tokens aktiviert */
+  cateringTokensEnabled?: boolean;
+  /** Liste der Token-Titel pro Schicht (z. B. ["1x Helfermenü", "1x Getränk"]) */
+  cateringTokenItems?: string[];
+  /** Kulanz-Vorlaufzeit in Stunden vor Schichtbeginn */
+  cateringEarlyHours?: number;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   cancelDeadlineDays?: number | null;
   overlapToleranceMinutes?: number;
@@ -545,6 +552,19 @@ export interface EventQuestionDto {
   retentionDays: QuestionRetentionDays;
 }
 
+/** Vorschau eines Zugangs-Links aus ?zugang= */
+export interface EventPendingLinkDto {
+  token: string;
+  label: string;
+  kind: 'PERSONAL' | 'GROUP';
+  isExpired: boolean;
+  isBoundToOther: boolean;
+  isBoundToMe: boolean;
+  alreadyRedeemed: boolean;
+  alreadyHasAccess: boolean;
+  expiresAt: string | null;
+}
+
 /** Was der angemeldeten Person beim Anlass noch fehlt bzw. was sie angegeben hat */
 export interface EventViewerDto {
   access: EventAccessDto;
@@ -554,6 +574,8 @@ export interface EventViewerDto {
   /** Pflichtfragen ohne Antwort */
   missingQuestionIds: string[];
   answers: Record<string, string>;
+  /** Vorschau des über ?zugang= übergebenen Links */
+  pendingLink?: EventPendingLinkDto | null;
 }
 
 export interface EventAccessLinkDto {
@@ -1023,6 +1045,48 @@ export interface CheckinResultDto {
   checkedIn: Array<{ signupId: string; shiftTitle: string | null; taskTitle: string | null; startTime: string; endTime: string; alreadyPresent: boolean }>;
   /** Nächste eigene Schicht, falls gerade keine im Check-in-Fenster liegt */
   nextShift: { shiftTitle: string | null; startTime: string; endTime: string } | null;
+  /** Verfügbare oder bereits bezogene Verpflegungs- und Getränkegutscheine */
+  cateringTokens?: CateringTokenDto[];
+}
+
+/** Digitaler Verpflegungs- oder Getränkegutschein für Helfende */
+export interface CateringTokenDto {
+  id: string;
+  shiftSignupId: string;
+  shiftTitle: string | null;
+  taskTitle: string | null;
+  shiftStartTime: string;
+  shiftEndTime: string;
+  title: string;
+  status: CateringTokenStatus;
+  /** Kann der Bon im Moment eingelöst werden? (Kulanz-Fenster erreicht oder anwesend) */
+  isAvailableNow: boolean;
+  /** Ab wann der Bon frühestens einlösbar ist (ISO-String) */
+  availableFrom: string;
+  redeemedAt: string | null;
+  redeemedByName: string | null;
+}
+
+/** Übersicht der ausgegebenen Verpflegungs-Bons für das OK */
+export interface CateringTokensOverviewDto {
+  enabled: boolean;
+  earlyHours: number;
+  totalTokens: number;
+  availableTokens: number;
+  redeemedTokens: number;
+  byItem: Array<{
+    title: string;
+    total: number;
+    redeemed: number;
+    available: number;
+  }>;
+  recentRedemptions: Array<{
+    id: string;
+    title: string;
+    helperName: string;
+    redeemedAt: string;
+    shiftTitle: string | null;
+  }>;
 }
 
 export type EventMessageTarget = 'ALL' | 'SHIFTS' | 'PEOPLE' | 'OK' | 'OPEN';

@@ -15,7 +15,7 @@ export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedI
 
   if (access.via === 'LINK') {
     return (
-      <Callout tone="success" title="Du bist über einen persönlichen Link freigeschaltet">
+      <Callout tone="success" title="Du bist über einen Zugangs-Link freigeschaltet">
         Du kannst dich eintragen, auch wenn der Anlass sonst nur für {event.audience} ist.
       </Callout>
     );
