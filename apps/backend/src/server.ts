@@ -7,6 +7,7 @@ import { REMINDER_INTERVAL_MS, sendDueShiftReminders } from './services/shiftRem
 import { isDatabaseOverloadError, sendServerAlert } from './services/serverAlert.js';
 import { STATS_MAINTENANCE_INTERVAL_MS, runStatsMaintenance } from './services/statsMaintenance.js';
 import { trackUsage } from './services/usageStats.js';
+import { runExclusive } from './services/jobLock.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -37,8 +38,10 @@ async function main() {
   // listen() registriert sein (danach wirft Fastify FST_ERR_INSTANCE_ALREADY_LISTENING).
   if (process.env.SHIFT_REMINDERS_ENABLED === 'true') {
     const run = () =>
-      sendDueShiftReminders(app.prisma)
-        .then((sent) => {
+      runExclusive(app.prisma, 'shift-reminders', () => sendDueShiftReminders(app.prisma))
+        .then((res) => {
+          if (!res.ran) return; // läuft schon in einem anderen Backend (z. B. beim Rollout)
+          const sent = res.value;
           trackUsage('JOB_RUN', { dim: 'SHIFT_REMINDERS' });
           if (sent > 0) {
             trackUsage('JOB_ITEMS', { dim: 'SHIFT_REMINDERS', n: sent });
@@ -69,8 +72,10 @@ async function main() {
 
   // Antworten auf eigene Fragen nach der eingestellten Frist löschen (immer an, auch vor listen())
   const purge = () =>
-    purgeExpiredAnswers(app.prisma)
-      .then((deleted) => {
+    runExclusive(app.prisma, 'answer-retention', () => purgeExpiredAnswers(app.prisma))
+      .then((res) => {
+        if (!res.ran) return;
+        const deleted = res.value;
         trackUsage('JOB_RUN', { dim: 'ANSWER_RETENTION' });
         if (deleted > 0) {
           trackUsage('JOB_ITEMS', { dim: 'ANSWER_RETENTION', n: deleted });
@@ -101,8 +106,10 @@ async function main() {
 
   // Nutzungsstatistik: Momentaufnahme des Vortags, alte Stundenwerte zusammenfassen, Altes löschen
   const maintainStats = () =>
-    runStatsMaintenance(app.prisma)
-      .then((rolled) => {
+    runExclusive(app.prisma, 'stats-maintenance', () => runStatsMaintenance(app.prisma))
+      .then((res) => {
+        if (!res.ran) return;
+        const rolled = res.value;
         trackUsage('JOB_RUN', { dim: 'STATS_MAINTENANCE' });
         if (rolled > 0) trackUsage('JOB_ITEMS', { dim: 'STATS_MAINTENANCE', n: rolled });
       })
