@@ -1,6 +1,16 @@
 export { cn } from './utils/cn';
 
-export { accentVars, applyAccent, contrastRatio, hexToRgb } from './theme/accent';
+export {
+  accentVars,
+  applyAccent,
+  contrastRatio,
+  hexToRgb,
+  rgbToHex,
+  evaluateContrast,
+  darkenToContrast,
+  type ContrastEvaluation,
+  type Rgb,
+} from './theme/accent';
 export { ThemeScript, THEME_STORAGE_KEY } from './theme/ThemeScript';
 export { ThemeToggle } from './theme/ThemeToggle';
 

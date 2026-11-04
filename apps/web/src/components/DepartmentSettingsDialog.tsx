@@ -10,6 +10,7 @@ import { DepartmentAuditPanel } from './DepartmentAuditPanel';
 import { DepartmentPeoplePanel } from './DepartmentPeoplePanel';
 import { DepartmentStufenPanel } from './DepartmentStufenPanel';
 import { ImageUpload } from './ImageUpload';
+import { DepartmentBrandingPreview } from './DepartmentBrandingPreview';
 
 // Kuratierte Akzentfarben, alle mit ausreichendem Kontrast in beiden Modi
 const SWATCHES = ['#e11d48', '#dc2626', '#ea580c', '#d97706', '#16a34a', '#0d9488', '#2563eb', '#7c3aed'];
@@ -177,37 +178,55 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
         description="Aussenstehende sehen die Liste der Anlässe nicht. Öffentliche Anlässe bleiben über ihren Link erreichbar, interne nur mit Zugangs-Link."
       />
 
-      <fieldset>
-        <legend className="mb-3 text-[13px] font-semibold text-fg">Abteilungsfarbe</legend>
+      <fieldset className="space-y-4">
+        <legend className="text-[13px] font-semibold text-fg">Abteilungsfarbe</legend>
         <div className="flex flex-wrap items-center gap-2.5">
           {SWATCHES.map((color) => (
             <button
               key={color}
               type="button"
               aria-label={`Farbe ${color}`}
-              aria-pressed={form.primaryColor === color}
+              aria-pressed={form.primaryColor.toLowerCase() === color.toLowerCase()}
               onClick={() => pickColor(color)}
               style={{ backgroundColor: color }}
               className={cn(
                 'flex size-10 items-center justify-center rounded-full text-white ring-2 ring-offset-2 ring-offset-surface transition',
-                form.primaryColor === color ? 'ring-fg' : 'ring-transparent hover:scale-105'
+                form.primaryColor.toLowerCase() === color.toLowerCase() ? 'ring-fg' : 'ring-transparent hover:scale-105'
               )}
             >
-              {form.primaryColor === color && <Check className="size-4" />}
+              {form.primaryColor.toLowerCase() === color.toLowerCase() && <Check className="size-4" />}
             </button>
           ))}
-          <label className="relative flex size-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-line-strong text-xs font-bold text-fg-subtle">
+          <label
+            className="relative flex size-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-line-strong text-xs font-bold text-fg-subtle hover:border-fg"
+            title="Eigene Farbe im Farbwähler auswählen"
+          >
             <span aria-hidden>+</span>
             <input
               type="color"
-              value={form.primaryColor}
+              value={form.primaryColor.startsWith('#') && form.primaryColor.length === 7 ? form.primaryColor : '#e11d48'}
               onChange={(e) => pickColor(e.target.value)}
               aria-label="Eigene Farbe wählen"
               className="absolute inset-0 cursor-pointer opacity-0"
             />
           </label>
+          <div className="w-28">
+            <Input
+              value={form.primaryColor}
+              onChange={(e) => pickColor(e.target.value)}
+              placeholder="#e11d48"
+              maxLength={7}
+              className="h-10 font-mono text-xs uppercase"
+              aria-label="Hex-Farbwert der Abteilung"
+            />
+          </div>
         </div>
-        <p className="mt-2 text-xs text-fg-subtle">Vorschau ist live. Kontraste werden automatisch angepasst.</p>
+
+        <DepartmentBrandingPreview
+          name={form.name}
+          logoUrl={form.logoUrl}
+          primaryColor={form.primaryColor}
+        />
       </fieldset>
 
       <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">

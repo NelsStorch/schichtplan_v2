@@ -325,10 +325,14 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
           text: checkinUrl(request.tenant.slug, event.slug, event.checkinToken),
           title: event.title,
           subtitle: 'Anwesenheit: QR-Code scannen und einchecken',
+          color: request.tenant.primaryColor,
+          logoUrl: event.logoUrl || request.tenant.logoUrl,
+          departmentName: request.tenant.name,
+          prisma: fastify.prisma,
         });
       } catch (err) {
         request.log.error(err, 'QR-Code konnte nicht erzeugt werden');
-        return reply.status(502).send({ error: 'Der QR-Code-Generator (qr.cevi.tools) ist gerade nicht erreichbar' });
+        return reply.status(502).send({ error: 'Der QR-Code konnte gerade nicht erzeugt werden' });
       }
 
       // Enthält den geheimen Code: nicht zwischenspeichern
