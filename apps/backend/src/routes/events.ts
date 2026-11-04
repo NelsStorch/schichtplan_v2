@@ -185,7 +185,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
     if (!link || link.eventId !== eventId) return false;
     if (link.expiresAt && link.expiresAt <= new Date()) return false;
     // Persoenlicher Link: nur gueltig, wenn noch frei oder bereits an diesen User gebunden
-    if (link.kind === 'PERSONAL' && link.boundUserId && link.boundUserId !== viewerId) {
+    if (link.kind === 'PERSONAL' && link.boundUserId && viewerId && link.boundUserId !== viewerId) {
       return false;
     }
     return true;
@@ -407,10 +407,11 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         });
         if (pl && pl.eventId === event.id) {
           const isExpired = Boolean(pl.expiresAt && pl.expiresAt <= new Date());
-          const isBoundToOther = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && pl.boundUserId !== viewer?.id);
-          const isBoundToMe = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && pl.boundUserId === viewer?.id);
+          const isBoundToOther = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId !== viewer.id);
+          const isBoundToMe = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId === viewer.id);
           const alreadyHasAccess =
             flags.isManager || (viewer ? checkRules(event, viewer, request.tenant.name).ok : false);
+          const alreadyRedeemed = pl.kind === 'PERSONAL' ? isBoundToMe : hasGrant;
           pendingLink = {
             token: request.query.zugang,
             label: pl.label,
@@ -418,7 +419,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             isExpired,
             isBoundToOther,
             isBoundToMe,
-            alreadyRedeemed: hasGrant,
+            alreadyRedeemed,
             alreadyHasAccess,
             expiresAt: pl.expiresAt ? pl.expiresAt.toISOString() : null,
           };

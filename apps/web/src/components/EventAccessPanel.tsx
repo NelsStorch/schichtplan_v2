@@ -169,7 +169,7 @@ function AccessLinks({ eventSlug }: { eventSlug: string }) {
                       ? 'Noch nicht eingelöst'
                       : 'Noch niemand'
                     : `Eingelöst von ${link.redeemedBy.map((r) => r.displayName).join(', ')}`}
-                  {link.expiresAt && ` · gültig bis ${fmtFullDate(link.expiresAt)}`}
+                  {link.expiresAt && ` · Einlösefrist: ${fmtFullDate(link.expiresAt)}`}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
@@ -256,7 +256,7 @@ function CreateLinkDialog({
     {
       value: 'PERSONAL' as const,
       title: 'Persönlich',
-      text: 'Gilt nur für das erste Konto, das ihn öffnet.',
+      text: 'Gilt nur für das erste Konto, das ihn einlöst.',
       icon: User,
     },
     {
@@ -299,7 +299,10 @@ function CreateLinkDialog({
             );
           })}
         </div>
-        <Field label="Gültig bis (optional)">
+        <Field
+          label="Einlösefrist (optional)"
+          hint="Bis wann der Link neu eingelöst werden kann. Bereits freigeschaltete Personen behalten ihren Zugang."
+        >
           <Input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
         </Field>
         <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
