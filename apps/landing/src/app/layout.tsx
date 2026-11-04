@@ -5,9 +5,9 @@ import type { Metadata, Viewport } from 'next';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { JsonLd } from '@/components/JsonLd';
 
-const TITLE = 'Cevi Schichtplan · Kostenlose Helfer- & Schichtplanung für Vereine & Cevi';
+const TITLE = 'Cevi Schichtplan · Helferliste & Schichtplan für Vereine (Kostenlos)';
 const DESCRIPTION =
-  'Freiwilligeneinsätze an Chilbi, PfiLa, Lagern & Vereinsfesten ohne Excel-Chaos organisieren. Helfer tragen sich in Sekunden per Link ein. 100% kostenlos & mit Cevi.DB-Login.';
+  'Schichtplan und Helferliste für Chilbi, Lager & Vereinsanlässe. Helfer tragen sich in 10 Sekunden per Link ein – ohne App & Passwort. 100% kostenlos mit Schweizer Datenschutz.';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { origin } = await getRequestOrigin();
@@ -109,6 +109,8 @@ export default async function RootLayout({
       <head>
         <ThemeScript />
         <JsonLd origin={origin} />
+        <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM context" />
+        <link rel="alternate" type="text/markdown" href="/llms-full.txt" title="Full LLM context" />
       </head>
       <body className="min-h-[100dvh] bg-canvas text-fg antialiased flex flex-col selection:bg-accent selection:text-white grain">
         <FeedbackProvider>{children}</FeedbackProvider>

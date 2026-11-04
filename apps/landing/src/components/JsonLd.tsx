@@ -1,6 +1,3 @@
-
-import { FAQ_ITEMS } from '@/data/faqData';
-
 interface JsonLdProps {
   origin: string;
 }
@@ -21,6 +18,8 @@ export function JsonLd({ origin }: JsonLdProps) {
     applicationCategory: 'VolunteerManagementApplication',
     operatingSystem: 'All (Web, iOS, Android Progressive Web App)',
     browserRequirements: 'Requires JavaScript. Requires HTML5.',
+    softwareVersion: '2.0',
+    isAccessibleForFree: true,
     url: origin,
     image: `${origin}/images/cevi-logo.png`,
     screenshot: `${origin}/og`,
@@ -74,18 +73,34 @@ export function JsonLd({ origin }: JsonLdProps) {
     ],
   };
 
-  const faqSchema = {
+  const howToSchema = {
     '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    '@id': `${origin}/#faq`,
-    mainEntity: FAQ_ITEMS.map((item) => ({
-      '@type': 'Question',
-      name: item.question,
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: item.answer,
+    '@type': 'HowTo',
+    '@id': `${origin}/#howto`,
+    name: 'In drei Schritten zum vollen Schichtplan',
+    description:
+      'So organisiert das Organisationskomitee (OK) Helfereinsätze und Schichten mit dem Cevi Schichtplan.',
+    inLanguage: 'de-CH',
+    step: [
+      {
+        '@type': 'HowToStep',
+        position: 1,
+        name: 'Anlass erfassen',
+        text: 'Das OK legt Schichten an: wann, was zu tun ist und wie viele Leute es braucht. Mit einer Vorlage vom Vorjahr geht das in Minuten.',
       },
-    })),
+      {
+        '@type': 'HowToStep',
+        position: 2,
+        name: 'Link teilen',
+        text: 'Den Link per WhatsApp, Mail oder Flyer verschicken. Ihr bestimmt, wer sich eintragen darf: alle, nur eure Abteilung oder einzelne Stufen.',
+      },
+      {
+        '@type': 'HowToStep',
+        position: 3,
+        name: 'Alle tragen sich ein',
+        text: 'Helfer*innen wählen ihre Schicht selbst, auch Eltern und Ehemalige ohne Cevi.DB. Das OK sieht sofort, wo noch Lücken sind.',
+      },
+    ],
   };
 
   const breadcrumbSchema = {
@@ -113,7 +128,7 @@ export function JsonLd({ origin }: JsonLdProps) {
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
       />
       <script
         type="application/ld+json"
