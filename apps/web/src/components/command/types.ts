@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type { EventDetails, MyShift } from '@/lib/types';
-import type { EventDto, ShiftDto } from '@schichtplan/shared';
+import type { EventDto } from '@schichtplan/shared';
 import type { BadgeTone } from '@schichtplan/ui';
 
 export type CommandSection =
@@ -23,13 +23,41 @@ export interface CommandSubAction {
   icon?: ReactNode;
   shortcut?: string;
   keywords?: string[];
+  closeOnSelect?: boolean;
   onSelect: () => void | Promise<void>;
+}
+
+export interface CommandQuickAction {
+  id: string;
+  label: string;
+  icon?: ReactNode;
+  tone?: 'default' | 'accent' | 'success' | 'warning' | 'danger';
+  onClick: () => void | Promise<void>;
+}
+
+export interface CommandPreviewShiftSignup {
+  id: string;
+  displayName: string;
+  userId?: string | null;
+  attendance?: 'PRESENT' | 'EXCUSED' | 'NO_SHOW' | null;
+  isSelf?: boolean;
+}
+
+export interface CommandPreviewShift {
+  id: string;
+  title: string | null;
+  startTime: string;
+  endTime: string;
+  requiredSlots: number;
+  category?: string | null;
+  description?: string | null;
+  signups?: CommandPreviewShiftSignup[];
 }
 
 export interface CommandPreviewData {
   type: 'EVENT' | 'SHIFT' | 'PERSON' | 'ACTION';
   event?: EventDetails | EventDto | null;
-  shift?: ShiftDto | null;
+  shift?: CommandPreviewShift | null;
   person?: {
     id?: string;
     name: string;
@@ -43,10 +71,20 @@ export interface CommandPreviewData {
       title: string;
       time: string;
       category?: string | null;
-      attendance?: 'PRESENT' | null;
+      attendance?: 'PRESENT' | 'EXCUSED' | 'NO_SHOW' | null;
+      signupId?: string;
     }[];
   } | null;
+  eventStats?: {
+    totalSlots: number;
+    filledSlots: number;
+    freeSlots: number;
+    totalShifts: number;
+    shiftsWithGaps: number;
+    helpersCount: number;
+  };
   details?: { label: string; value: string | ReactNode }[];
+  quickActions?: CommandQuickAction[];
 }
 
 export interface CommandItem {
@@ -58,6 +96,7 @@ export interface CommandItem {
   badge?: string;
   badgeTone?: BadgeTone;
   section: CommandSection;
+  closeOnSelect?: boolean;
   onSelect: () => void | Promise<void>;
   subActions?: CommandSubAction[];
   preview?: CommandPreviewData;
@@ -72,4 +111,5 @@ export interface CommandContextData {
   onOpenAssignModal?: () => void;
   onSelectShift?: (shiftId: string) => void;
   onPrintPlan?: () => void;
+  onReloadEvent?: () => void | Promise<void>;
 }

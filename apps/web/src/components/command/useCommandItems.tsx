@@ -5,17 +5,20 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   CalendarDays,
   CalendarPlus,
+  Check,
   CheckCircle2,
   ClipboardCheck,
   Copy,
   Download,
   ExternalLink,
+  HelpCircle,
   Keyboard,
   LayoutDashboard,
   LifeBuoy,
   LogIn,
   LogOut,
   Mail,
+  MessageSquare,
   Moon,
   Phone,
   Printer,
@@ -27,22 +30,30 @@ import {
   Sparkles,
   Sun,
   Ticket,
+  Trash2,
   UserCheck,
   UserPlus,
   UserRound,
   Users,
   Wrench,
 } from 'lucide-react';
-import { getCeviDbDataUrl, type EventDto, } from '@schichtplan/shared';
+import { getCeviDbDataUrl, type EventDto, type ShiftDto, type ShiftSignupDto } from '@schichtplan/shared';
 import { useToast, type BadgeTone } from '@schichtplan/ui';
-import { api, useLoginHref } from '@/lib/api';
+import { api, errorMessage, useLoginHref } from '@/lib/api';
 import { eventStatus } from '@/components/EventTile';
 import { fmtShortDate, fmtShortWeekday, fmtTimeRange, shiftName } from '@/lib/format';
+import { downloadIcs, googleCalendarUrl, type CalendarEntry } from '@/lib/ics';
 import { displayName, usePortal } from '@/lib/portal';
 import type { EventDetails } from '@/lib/types';
 import { useCommandPalette } from './CommandContext';
 import { getRecentCommandIds, recordRecentCommand } from './recentCommands';
-import type { CommandItem, CommandSection, } from './types';
+import type {
+  CommandItem,
+  CommandPreviewData,
+  CommandQuickAction,
+  CommandSection,
+  CommandSubAction,
+} from './types';
 
 const THEME_STORAGE_KEY = 'schichtplan.theme';
 
@@ -80,7 +91,7 @@ export function useCommandItems(query: string) {
       .catch(() => setAllEvents([]));
   }, [department]);
 
-  // Personen laden, falls Recht vorhanden
+  // Personen laden, falls Berechtigung vorhanden
   const canViewPeople = can('PEOPLE_VIEW') || isDeptAdmin;
   useEffect(() => {
     if (!canViewPeople || !department) return;
@@ -140,13 +151,351 @@ export function useCommandItems(query: string) {
     return { prefixMode: 'ALL' as PrefixMode, cleanQuery: raw };
   }, [query]);
 
-  // Hilfsfunktion für Link-Kopieren
+  // =========================================================================
+  // DIREKTE HILFSFUNKTIONEN (KLIPPEN, TEILEN, KALENDER, CHAT)
+  // =========================================================================
+
   const copyToClipboard = async (text: string, title: string) => {
     try {
       await navigator.clipboard.writeText(text);
       toast({ title: `${title} kopiert`, tone: 'success' });
     } catch {
       toast({ title: 'Kopieren fehlgeschlagen', tone: 'error' });
+    }
+  };
+
+  const openWhatsAppDirect = (phone: string, firstName?: string) => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '').replace(/^0/, '41');
+    const greeting = firstName ? `Hallo ${firstName}! ` : 'Hallo! ';
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(greeting)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const openSmsDirect = (phone: string) => {
+    const cleanPhone = phone.replace(/\s+/g, '');
+    window.location.href = `sms:${cleanPhone}`;
+  };
+
+  const handleDownloadIcs = (event: EventDto | EventDetails) => {
+    const entries: CalendarEntry[] = [
+      {
+        uid: `event-${event.id}`,
+        title: event.title,
+        description: event.description || undefined,
+        start: event.startDate,
+        end: event.endDate || event.startDate,
+      },
+    ];
+    downloadIcs(`${event.slug}.ics`, entries);
+    toast({
+      title: 'Kalenderdatei heruntergeladen',
+      description: `«${event.slug}.ics» wurde gespeichert.`,
+      tone: 'success',
+    });
+  };
+
+  const handleGoogleCalendar = (event: EventDto | EventDetails) => {
+    const entry: CalendarEntry = {
+      uid: `event-${event.id}`,
+      title: event.title,
+      description: event.description || undefined,
+      start: event.startDate,
+      end: event.endDate || event.startDate,
+    };
+    const url = googleCalendarUrl(entry);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const copyShiftWhatsAppCall = (eventTitle: string, shift: ShiftDto, eventUrl: string) => {
+    const shiftTime = `${fmtShortWeekday(shift.startTime)} ${fmtTimeRange(shift.startTime, shift.endTime)}`;
+    const freeSlots = Math.max(0, shift.requiredSlots - (shift.signups?.length || 0));
+    const link = `${eventUrl}#shift-${shift.id}`;
+    const text = [
+      `*Helfer gesucht für «${eventTitle}»!* 🙋`,
+      `Schicht: *${shift.title || shiftName(shift)}*`,
+      `⏰ Zeit: ${shiftTime}`,
+      shift.category ? `📍 Bereich: ${shift.category}` : null,
+      `👥 Noch ${freeSlots} freie ${freeSlots === 1 ? 'Platz' : 'Plätze'}!`,
+      '',
+      `👉 Hier direkt ansehen & eintragen:`,
+      link,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    copyToClipboard(text, 'WhatsApp-Aufruf');
+  };
+
+  const copyEventWhatsAppCall = (
+    event: EventDto | EventDetails,
+    shiftsWithGaps: ShiftDto[],
+    eventUrl: string
+  ) => {
+    const dateText = fmtShortDate(event.startDate);
+    const totalMissing = shiftsWithGaps.reduce(
+      (acc, s) => acc + Math.max(0, s.requiredSlots - (s.signups?.length || 0)),
+      0
+    );
+    const text = [
+      `*Helferaufruf für «${event.title}»!* ⛺`,
+      `📅 Datum: ${dateText}`,
+      '',
+      `Wir suchen noch ${totalMissing} helfende ${totalMissing === 1 ? 'Hand' : 'Hände'} für folgende Schichten:`,
+      ...shiftsWithGaps.slice(0, 8).map((s) => {
+        const free = Math.max(0, s.requiredSlots - (s.signups?.length || 0));
+        return `• *${s.title || shiftName(s)}* (${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}): noch ${free} ${free === 1 ? 'Platz' : 'Plätze'}`;
+      }),
+      shiftsWithGaps.length > 8 ? `... und weitere ${shiftsWithGaps.length - 8} Schichten.` : null,
+      '',
+      `👉 Jetzt Schichtplan öffnen & direkt eintragen:`,
+      eventUrl,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    copyToClipboard(text, `WhatsApp-Helferaufruf (${totalMissing} offene Plätze)`);
+  };
+
+  const copyEventTextPlan = (event: EventDto | EventDetails, shifts: ShiftDto[]) => {
+    const dateText = fmtShortDate(event.startDate);
+    const lines = [
+      `📋 Schichtplan: ${event.title} (${dateText})`,
+      `Total Schichten: ${shifts.length}`,
+      '--------------------------------------------------',
+      ...shifts.map((s) => {
+        const time = `${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}`;
+        const names = (s.signups || []).map((su) => su.displayName).join(', ') || 'Keine Helfenden eingeteilt';
+        const count = `${s.signups?.length || 0}/${s.requiredSlots}`;
+        return `• [${time}] ${s.title || shiftName(s)}${s.category ? ` (${s.category})` : ''}: ${names} [${count}]`;
+      }),
+    ];
+    copyToClipboard(lines.join('\n'), 'Schichtplan als Text');
+  };
+
+  const copyHelpersEmailList = (shifts: ShiftDto[]) => {
+    const emails = new Set<string>();
+    for (const s of shifts) {
+      for (const su of s.signups || []) {
+        if (su.guestEmail) emails.add(su.guestEmail.trim());
+      }
+    }
+    for (const p of people) {
+      if (p.email && shifts.some((s) => s.signups?.some((su) => su.userId === p.id))) {
+        emails.add(p.email.trim());
+      }
+    }
+    const list = Array.from(emails).filter(Boolean);
+    if (list.length === 0) {
+      toast({ title: 'Keine E-Mail-Adressen hinterlegt', tone: 'info' });
+      return;
+    }
+    copyToClipboard(list.join(', '), `${list.length} Helfer-E-Mail-Adressen`);
+  };
+
+  const copyHelpersPhoneList = (shifts: ShiftDto[], eventTitle: string) => {
+    const helperMap = new Map<string, { name: string; phone?: string | null; shifts: string[] }>();
+    for (const s of shifts) {
+      const time = `${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}`;
+      const sName = `${s.title || shiftName(s)} (${time})`;
+      for (const su of s.signups || []) {
+        const key = su.userId || su.displayName;
+        const existing = helperMap.get(key) || { name: su.displayName, phone: su.guestPhone, shifts: [] };
+        existing.shifts.push(sName);
+        if (!existing.phone && su.userId) {
+          const found = people.find((p) => p.id === su.userId);
+          if (found?.phone) existing.phone = found.phone;
+        }
+        helperMap.set(key, existing);
+      }
+    }
+    const lines = [
+      `📞 Helfer-Telefonliste: ${eventTitle}`,
+      '--------------------------------------------------',
+      ...Array.from(helperMap.values()).map((h) => {
+        const phoneStr = h.phone ? h.phone : 'Keine Telefonnummer';
+        return `• ${h.name}: ${phoneStr} [${h.shifts.join('; ')}]`;
+      }),
+    ];
+    copyToClipboard(lines.join('\n'), 'Telefonliste');
+  };
+
+  // =========================================================================
+  // DIREKTE AKTIONEN (EINTRAGEN, STORNIEREN, ERSATZ, CHECK-IN)
+  // =========================================================================
+
+  const handleDirectSignup = async (shift: ShiftDto) => {
+    if (!user) {
+      window.location.href = loginHref;
+      return;
+    }
+    try {
+      const res = await api<{ id?: string; signupId?: string }>(`/api/shifts/${shift.id}/signup`, {
+        method: 'POST',
+        json: {},
+      });
+      const newSignupId = res?.id || res?.signupId || `temp-${Date.now()}`;
+      toast({
+        title: 'Erfolgreich eingetragen!',
+        description: `Du bist jetzt für «${shift.title || shiftName(shift)}» eingeteilt.`,
+        tone: 'success',
+      });
+
+      // Optimistisches Update in den geladenen EventDetails
+      setLoadedEventDetails((prev) => {
+        if (!prev) return prev;
+        const updatedShifts = prev.shifts.map((s) => {
+          if (s.id !== shift.id) return s;
+          const newSignup: ShiftSignupDto = {
+            id: newSignupId,
+            shiftId: shift.id,
+            userId: user.id,
+            displayName: displayName(user),
+            guestName: null,
+            guestEmail: null,
+            guestPhone: null,
+            taskTitle: null,
+            createdAt: new Date().toISOString(),
+            isConfirmed: true,
+            attendance: null,
+          };
+          return {
+            ...s,
+            signups: [...(s.signups || []), newSignup],
+          };
+        });
+        return { ...prev, shifts: updatedShifts };
+      });
+      if (contextData.onReloadEvent) {
+        contextData.onReloadEvent();
+      }
+    } catch (err) {
+      toast({
+        title: 'Eintragen fehlgeschlagen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    }
+  };
+
+  const handleDirectCancelSignup = async (shiftId: string, signupId: string, shiftTitle: string) => {
+    try {
+      await api(`/api/shifts/${shiftId}/signup?signupId=${signupId}`, {
+        method: 'DELETE',
+      });
+      toast({
+        title: 'Einsatz storniert',
+        description: `Eintragung für «${shiftTitle}» wurde erfolgreich entfernt.`,
+        tone: 'info',
+      });
+      setLoadedEventDetails((prev) => {
+        if (!prev) return prev;
+        const updatedShifts = prev.shifts.map((s) => {
+          if (s.id !== shiftId) return s;
+          return {
+            ...s,
+            signups: (s.signups || []).filter((su) => su.id !== signupId),
+          };
+        });
+        return { ...prev, shifts: updatedShifts };
+      });
+      if (contextData.onReloadEvent) {
+        contextData.onReloadEvent();
+      }
+    } catch (err) {
+      toast({
+        title: 'Stornieren fehlgeschlagen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    }
+  };
+
+  const handleDirectReplacement = async (signupId: string, isAlreadyOffered: boolean) => {
+    try {
+      if (isAlreadyOffered) {
+        await api(`/api/signups/${signupId}/replacement`, { method: 'DELETE' });
+        toast({
+          title: '«Ersatz gesucht» zurückgezogen',
+          description: 'Du übernimmst die Schicht wieder regulär.',
+          tone: 'info',
+        });
+      } else {
+        await api(`/api/signups/${signupId}/replacement`, {
+          method: 'PUT',
+          json: { note: 'Ersatz gesucht (aus Befehlsmenü gemeldet)' },
+        });
+        toast({
+          title: '«Ersatz gesucht» gemeldet',
+          description: 'Deine Schicht wurde zur Übernahme durch andere Helfer ausgeschrieben.',
+          tone: 'info',
+        });
+      }
+      if (activeSlug) {
+        api<EventDetails>(`/api/events/${activeSlug}`)
+          .then((data) => {
+            if (data && Array.isArray(data.shifts)) setLoadedEventDetails(data);
+          })
+          .catch(() => {});
+      }
+      if (contextData.onReloadEvent) {
+        contextData.onReloadEvent();
+      }
+    } catch (err) {
+      toast({
+        title: 'Aktion fehlgeschlagen',
+        description: errorMessage(err),
+        tone: 'error',
+      });
+    }
+  };
+
+  const toggleAttendance = async (signupId: string, helperName: string, currentStatus: string | null) => {
+    if (!activeSlug) return;
+    const newStatus = currentStatus === 'PRESENT' ? null : 'PRESENT';
+    try {
+      await api(`/api/events/${activeSlug}/signups/${signupId}/attendance`, {
+        method: 'PUT',
+        json: { status: newStatus },
+      });
+      setAttendanceOverrides((prev) => ({ ...prev, [signupId]: newStatus }));
+      toast({
+        title: newStatus === 'PRESENT' ? `${helperName} eingecheckt` : `Anwesenheit zurückgesetzt`,
+        description:
+          newStatus === 'PRESENT' ? 'Erfolgreich als anwesend markiert' : 'Status wurde zurückgesetzt',
+        tone: newStatus === 'PRESENT' ? 'success' : 'info',
+      });
+    } catch {
+      toast({
+        title: 'Check-in fehlgeschlagen',
+        description: 'Die Anwesenheit konnte nicht aktualisiert werden.',
+        tone: 'error',
+      });
+    }
+  };
+
+  const toggleShiftAllAttendance = async (shift: ShiftDto) => {
+    if (!activeSlug || !shift.signups?.length) return;
+    const allPresent = shift.signups.every(
+      (su) => (attendanceOverrides[su.id] ?? su.attendance) === 'PRESENT'
+    );
+    const targetStatus = allPresent ? null : 'PRESENT';
+    try {
+      for (const su of shift.signups) {
+        await api(`/api/events/${activeSlug}/signups/${su.id}/attendance`, {
+          method: 'PUT',
+          json: { status: targetStatus },
+        });
+      }
+      const updates: Record<string, 'PRESENT' | null> = {};
+      for (const su of shift.signups) {
+        updates[su.id] = targetStatus;
+      }
+      setAttendanceOverrides((prev) => ({ ...prev, ...updates }));
+      toast({
+        title: targetStatus === 'PRESENT' ? 'Alle Helfenden eingecheckt' : 'Anwesenheit zurückgesetzt',
+        description: `${shift.signups.length} ${shift.signups.length === 1 ? 'Person' : 'Personen'} aktualisiert`,
+        tone: targetStatus === 'PRESENT' ? 'success' : 'info',
+      });
+    } catch {
+      toast({ title: 'Aktualisierung fehlgeschlagen', tone: 'error' });
     }
   };
 
@@ -161,37 +510,20 @@ export function useCommandItems(query: string) {
     } catch {}
     toast({
       title:
-        choice === 'dark' ? 'Dunkelmodus aktiviert' : choice === 'light' ? 'Hellmodus aktiviert' : 'System-Farbschema aktiv',
+        choice === 'dark'
+          ? 'Dunkelmodus aktiviert'
+          : choice === 'light'
+            ? 'Hellmodus aktiviert'
+            : 'System-Farbschema aktiv',
       tone: 'info',
     });
     close();
   };
 
-  // Inline Helfer Check-in
-  const toggleAttendance = async (signupId: string, helperName: string, currentStatus: string | null) => {
-    if (!activeSlug) return;
-    const newStatus = currentStatus === 'PRESENT' ? null : 'PRESENT';
-    try {
-      await api(`/api/events/${activeSlug}/signups/${signupId}/attendance`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: newStatus }),
-      });
-      setAttendanceOverrides((prev) => ({ ...prev, [signupId]: newStatus }));
-      toast({
-        title: newStatus === 'PRESENT' ? `${helperName} eingecheckt` : `Anwesenheit zurückgesetzt`,
-        description: newStatus === 'PRESENT' ? 'Erfolgreich als anwesend markiert' : 'Status wurde zurückgesetzt',
-        tone: newStatus === 'PRESENT' ? 'success' : 'info',
-      });
-    } catch {
-      toast({
-        title: 'Check-in fehlgeschlagen',
-        description: 'Die Anwesenheit konnte nicht aktualisiert werden.',
-        tone: 'error',
-      });
-    }
-  };
+  // =========================================================================
+  // LISTE ALLER VERFÜGBAREN BEFEHLE GENERIEREN
+  // =========================================================================
 
-  // Liste aller verfügbaren Befehle generieren
   const items = useMemo(() => {
     const list: CommandItem[] = [];
 
@@ -201,8 +533,8 @@ export function useCommandItems(query: string) {
     if (prefixMode === 'HELP') {
       list.push({
         id: 'help-shortcuts',
-        title: 'Tastatur-Navigation',
-        subtitle: '↑ / ↓ zum Navigieren · ↵ zum Ausführen · ⇥ für Unteraktionen · Esc zum Schliessen',
+        title: 'Tastatur-Navigation & Schnellbedienung',
+        subtitle: '↑ / ↓ zum Navigieren · ↵ zum Ausführen · ⇥ Tab für Unteraktionen · Esc zum Schliessen',
         section: 'HELP',
         icon: <Keyboard className="size-4 text-accent-ink" />,
         keywords: ['hilfe', 'tastatur', 'shortcuts', 'navigation'],
@@ -214,6 +546,7 @@ export function useCommandItems(query: string) {
             { label: 'Hauptaktion', value: '↵ Enter' },
             { label: 'Unteraktionen', value: '⇥ Tab' },
             { label: 'Zurück / Schliessen', value: 'Esc' },
+            { label: 'Sofortaktionen', value: '⚡ Direkt ohne Seitenwechsel' },
           ],
         },
       });
@@ -221,7 +554,7 @@ export function useCommandItems(query: string) {
       list.push({
         id: 'help-prefix-people',
         title: 'Präfix @ für Personen',
-        subtitle: 'Tippe «@name», um blitzschnell nur nach Helfenden und Kontakten zu suchen',
+        subtitle: 'Tippe «@name», um blitzschnell nach Helfenden und Kontakten zu suchen',
         section: 'HELP',
         icon: <UserRound className="size-4 text-accent-ink" />,
         keywords: ['präfix', 'filter', 'person', 'helfer', '@'],
@@ -241,7 +574,7 @@ export function useCommandItems(query: string) {
       list.push({
         id: 'help-prefix-shifts',
         title: 'Präfix : oder ! für Schichten',
-        subtitle: 'Tippe «:kueche» oder «!frei», um direkt Schichten und freie Plätze zu finden',
+        subtitle: 'Tippe «:kueche» oder «!frei», um direkt freie Schichten zu finden',
         section: 'HELP',
         icon: <Ticket className="size-4 text-accent-ink" />,
         keywords: ['präfix', 'filter', 'schicht', 'aufgabe', ':', '!'],
@@ -256,7 +589,10 @@ export function useCommandItems(query: string) {
     // =========================================================================
     if (activeSlug && activeEvent) {
       const eventTitle = activeEvent.title;
-      const eventUrl = typeof window !== 'undefined' ? `${window.location.origin}/events/${activeSlug}` : `/events/${activeSlug}`;
+      const eventUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/events/${activeSlug}`
+          : `/events/${activeSlug}`;
       const canManageEvent = can('EVENTS_EDIT_SETTINGS') || can('SHIFTS_MANAGE') || isDeptAdmin;
 
       // Hauptaktionen für den aktuellen Anlass
@@ -278,6 +614,7 @@ export function useCommandItems(query: string) {
               id: 'copy-link',
               title: 'Anlass-Link kopieren',
               icon: <Copy className="size-3.5" />,
+              closeOnSelect: false,
               onSelect: () => copyToClipboard(eventUrl, 'Anlass-Link'),
             },
           ],
@@ -337,9 +674,10 @@ export function useCommandItems(query: string) {
       }
 
       // Lücken-Finder: Unbesetzte Schichten im aktuellen Anlass
-      const shiftsWithGaps = detailedEvent?.shifts?.filter(
-        (s) => Math.max(0, s.requiredSlots - (s.signups?.length || 0)) > 0
-      ) || [];
+      const shiftsWithGaps =
+        detailedEvent?.shifts?.filter(
+          (s) => Math.max(0, s.requiredSlots - (s.signups?.length || 0)) > 0
+        ) || [];
 
       if (shiftsWithGaps.length > 0) {
         const totalMissing = shiftsWithGaps.reduce(
@@ -349,8 +687,8 @@ export function useCommandItems(query: string) {
 
         list.push({
           id: `context-open-shifts`,
-          title: `Lücken-Finder: Freie Schichten`,
-          subtitle: `${totalMissing} offene Plätze in ${shiftsWithGaps.length} Schichten`,
+          title: `Lücken-Finder: ${totalMissing} offene Plätze`,
+          subtitle: `${shiftsWithGaps.length} Schichten benötigen noch Unterstützung`,
           section: 'CONTEXT',
           badge: `${totalMissing} offen`,
           badgeTone: 'warning',
@@ -358,7 +696,6 @@ export function useCommandItems(query: string) {
           keywords: ['lücken', 'frei', 'offen', 'unbesetzt', 'bedarf', 'helfer gesucht', activeSlug],
           onSelect: () => {
             recordRecentCommand(`context-open-shifts`);
-            // Schalte Suche auf freie Schichten um
             if (pathname.startsWith(`/events/${activeSlug}`)) {
               const el = document.getElementById(`shift-${shiftsWithGaps[0]?.id}`);
               el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -369,9 +706,18 @@ export function useCommandItems(query: string) {
           },
           subActions: [
             {
+              id: 'copy-whatsapp-gaps',
+              title: 'WhatsApp-Helferaufruf kopieren',
+              subtitle: 'Fertige Nachricht mit allen offenen Schichten für den Chat',
+              icon: <Share2 className="size-3.5 text-accent-ink" />,
+              closeOnSelect: false,
+              onSelect: () => copyEventWhatsAppCall(activeEvent, shiftsWithGaps, eventUrl),
+            },
+            {
               id: 'copy-link',
               title: 'Anlass-Link zum Eintragen kopieren',
               icon: <Copy className="size-3.5" />,
+              closeOnSelect: false,
               onSelect: () => copyToClipboard(eventUrl, 'Link zum Eintragen'),
             },
           ],
@@ -379,18 +725,123 @@ export function useCommandItems(query: string) {
             type: 'ACTION',
             details: [
               { label: 'Offene Plätze', value: `${totalMissing} Helfer gesucht` },
-              { label: 'Betroffene Schichten', value: `${shiftsWithGaps.length} von ${detailedEvent?.shifts?.length || 0}` },
+              {
+                label: 'Betroffene Schichten',
+                value: `${shiftsWithGaps.length} von ${detailedEvent?.shifts?.length || 0}`,
+              },
+            ],
+            quickActions: [
+              {
+                id: 'wa-gaps',
+                label: 'WhatsApp-Aufruf',
+                icon: <Share2 className="size-3.5" />,
+                tone: 'accent',
+                onClick: () => copyEventWhatsAppCall(activeEvent, shiftsWithGaps, eventUrl),
+              },
+              {
+                id: 'copy-url',
+                label: 'Link kopieren',
+                icon: <Copy className="size-3.5" />,
+                onClick: () => copyToClipboard(eventUrl, 'Link zum Eintragen'),
+              },
             ],
           },
         });
       }
+
+      // Direkte Schnellaktionen für den aktuellen Anlass: WhatsApp-Aufruf, Plan kopieren, Kalender
+      list.push({
+        id: `context-share-whatsapp`,
+        title: `WhatsApp-Helferaufruf kopieren`,
+        subtitle: `Fertiger Text für Gruppenchats mit Datum, Lücken und Link`,
+        section: 'CONTEXT',
+        icon: <Share2 className="size-4 text-accent-ink" />,
+        keywords: ['whatsapp', 'aufruf', 'teilen', 'chat', 'helfer gesucht', activeSlug],
+        closeOnSelect: false,
+        onSelect: () => {
+          recordRecentCommand(`context-share-whatsapp`);
+          copyEventWhatsAppCall(activeEvent, shiftsWithGaps, eventUrl);
+        },
+      });
+
+      if (detailedEvent?.shifts?.length) {
+        list.push({
+          id: `context-copy-textplan`,
+          title: `Schichtplan als Text kopieren`,
+          subtitle: `Vollständige Übersicht aller Schichten und Helfer für E-Mail oder Chat`,
+          section: 'CONTEXT',
+          icon: <Copy className="size-4 text-accent-ink" />,
+          keywords: ['plan', 'text', 'kopieren', 'übersicht', 'export', activeSlug],
+          closeOnSelect: false,
+          onSelect: () => {
+            recordRecentCommand(`context-copy-textplan`);
+            copyEventTextPlan(activeEvent, detailedEvent.shifts);
+          },
+        });
+
+        list.push({
+          id: `context-copy-helpers-email`,
+          title: `E-Mail-Verteiler aller Helfenden kopieren`,
+          subtitle: `Adressen aller eingeteilten Helfer für Rundmails`,
+          section: 'CONTEXT',
+          icon: <Mail className="size-4 text-accent-ink" />,
+          keywords: ['mail', 'email', 'verteiler', 'helfer', 'rundmail', activeSlug],
+          closeOnSelect: false,
+          onSelect: () => {
+            recordRecentCommand(`context-copy-helpers-email`);
+            copyHelpersEmailList(detailedEvent.shifts);
+          },
+        });
+
+        list.push({
+          id: `context-copy-helpers-phone`,
+          title: `Helfer-Telefonliste kopieren`,
+          subtitle: `Name, Telefonnummer und Schichten für Notfälle und Koordination`,
+          section: 'CONTEXT',
+          icon: <Phone className="size-4 text-accent-ink" />,
+          keywords: ['telefon', 'liste', 'notfall', 'kontakte', 'anrufen', activeSlug],
+          closeOnSelect: false,
+          onSelect: () => {
+            recordRecentCommand(`context-copy-helpers-phone`);
+            copyHelpersPhoneList(detailedEvent.shifts, eventTitle);
+          },
+        });
+      }
+
+      list.push({
+        id: `context-download-ics`,
+        title: `Kalendereintrag (.ics) herunterladen`,
+        subtitle: `Direkt in Apple Kalender, Outlook oder Handy-Kalender importieren`,
+        section: 'CONTEXT',
+        icon: <Download className="size-4 text-accent-ink" />,
+        keywords: ['kalender', 'ics', 'ical', 'outlook', 'apple', 'download', activeSlug],
+        closeOnSelect: false,
+        onSelect: () => {
+          recordRecentCommand(`context-download-ics`);
+          handleDownloadIcs(activeEvent);
+        },
+      });
+
+      list.push({
+        id: `context-add-gcal`,
+        title: `Zu Google Kalender hinzufügen`,
+        subtitle: `Öffnet Google Kalender mit vorausgefülltem Eintrag`,
+        section: 'CONTEXT',
+        icon: <ExternalLink className="size-4 text-accent-ink" />,
+        keywords: ['google', 'kalender', 'termin', 'gcal', activeSlug],
+        closeOnSelect: false,
+        onSelect: () => {
+          recordRecentCommand(`context-add-gcal`);
+          handleGoogleCalendar(activeEvent);
+        },
+      });
 
       // Neue Schicht erfassen (im aktuellen Anlass)
       if (canManageEvent) {
         list.push({
           id: `context-add-shift`,
           title: `Neue Schicht anlegen`,
-          subtitle: `In ${eventTitle} eine weitere Schicht erfassen`,
+          subtitle: `In «${eventTitle}» eine weitere Schicht erfassen`,
           section: 'CONTEXT',
           icon: <CalendarPlus className="size-4 text-accent-ink" />,
           keywords: ['schicht', 'neu', 'erstellen', 'anlegen', activeSlug, eventTitle],
@@ -409,7 +860,7 @@ export function useCommandItems(query: string) {
         list.push({
           id: `context-assign-helper`,
           title: `Helfer manuell zuteilen`,
-          subtitle: `Person für eine Schicht in ${eventTitle} einteilen`,
+          subtitle: `Person für eine Schicht in «${eventTitle}» einteilen`,
           section: 'CONTEXT',
           icon: <UserPlus className="size-4 text-accent-ink" />,
           keywords: ['helfer', 'zuweisen', 'zuteilen', 'eintragen', activeSlug, eventTitle],
@@ -444,7 +895,7 @@ export function useCommandItems(query: string) {
       list.push({
         id: `context-print-pdf`,
         title: `Schichtplan drucken / PDF`,
-        subtitle: `Druckversion oder PDF für ${eventTitle} erstellen`,
+        subtitle: `Druckversion oder PDF für «${eventTitle}» erstellen`,
         section: 'CONTEXT',
         icon: <Printer className="size-4 text-accent-ink" />,
         keywords: ['drucken', 'pdf', 'export', 'aushang', 'papier', activeSlug, eventTitle],
@@ -462,39 +913,242 @@ export function useCommandItems(query: string) {
       // Link kopieren
       list.push({
         id: `context-copy-link`,
-        title: `Anlass-Link in Zwischenablage kopieren`,
+        title: `Anlass-Link kopieren`,
         subtitle: eventUrl,
         section: 'CONTEXT',
-        icon: <Share2 className="size-4 text-accent-ink" />,
+        icon: <Copy className="size-4 text-accent-ink" />,
         keywords: ['link', 'kopieren', 'teilen', 'url', activeSlug, eventTitle],
+        closeOnSelect: false,
         onSelect: () => {
           recordRecentCommand(`context-copy-link`);
           copyToClipboard(eventUrl, 'Anlass-Link');
-          close();
         },
       });
 
-      // Schichten des aktuellen Events
+      // =========================================================================
+      // SCHICHTEN DES AKTUELLEN ANLASSES (MIT DIREKTEN SOFORTAKTIONEN!)
+      // =========================================================================
       if (detailedEvent?.shifts?.length) {
         for (const shift of detailedEvent.shifts) {
           const shiftTime = `${fmtShortWeekday(shift.startTime)} ${fmtTimeRange(shift.startTime, shift.endTime)}`;
           const freeSlots = Math.max(0, shift.requiredSlots - (shift.signups?.length || 0));
           const slotBadge = freeSlots > 0 ? `${freeSlots} frei` : 'Voll besetzt';
 
+          // Hat der aktuell angemeldete Benutzer diese Schicht übernommen?
+          const mySignup = user ? shift.signups?.find((su) => su.userId === user.id) : null;
+          const isMyShift = Boolean(mySignup);
+          const isMyShiftReplacement = Boolean(
+            mySignup && (mySignup as unknown as { isReplacement?: boolean }).isReplacement
+          );
+
+          // Subaktionen für diese Schicht aufbauen
+          const shiftSubActions: CommandSubAction[] = [];
+
+          // 1. Direktaktion: Eintragen (ohne Seitenwechsel!)
+          if (user && !isMyShift && freeSlots > 0) {
+            shiftSubActions.push({
+              id: 'direct-signup',
+              title: `⚡ Direkt eintragen (als ${displayName(user)})`,
+              subtitle: 'Schicht sofort übernehmen, ohne die Seite zu wechseln',
+              icon: <UserPlus className="size-3.5 text-success-ink" />,
+              closeOnSelect: false,
+              onSelect: () => handleDirectSignup(shift),
+            });
+          }
+
+          // 2. Direktaktion: Stornieren / Austragen
+          if (isMyShift && mySignup) {
+            shiftSubActions.push({
+              id: 'direct-cancel',
+              title: '⚡ Meinen Einsatz stornieren',
+              subtitle: 'Sofort aus dieser Schicht austragen',
+              icon: <Trash2 className="size-3.5 text-danger-ink" />,
+              closeOnSelect: false,
+              onSelect: () =>
+                handleDirectCancelSignup(shift.id, mySignup.id, shift.title || shiftName(shift)),
+            });
+
+            shiftSubActions.push({
+              id: 'direct-replacement',
+              title: isMyShiftReplacement ? '«Ersatz gesucht» zurückziehen' : '«Ersatz gesucht» ausschreiben',
+              subtitle: isMyShiftReplacement
+                ? 'Du übernimmst die Schicht wieder regulär'
+                : 'Schicht zur Übernahme für andere Helfer anbieten',
+              icon: <RotateCcw className="size-3.5 text-warning-ink" />,
+              closeOnSelect: false,
+              onSelect: () => handleDirectReplacement(mySignup.id, isMyShiftReplacement),
+            });
+          }
+
+          // 3. Direktaktion für OK: Alle Helfenden dieser Schicht einchecken
+          if (canManageEvent && shift.signups && shift.signups.length > 0) {
+            const allPresent = shift.signups.every(
+              (su) => (attendanceOverrides[su.id] ?? su.attendance) === 'PRESENT'
+            );
+            shiftSubActions.push({
+              id: 'checkin-all-shift',
+              title: allPresent
+                ? `Anwesenheit für Schicht zurücksetzen (${shift.signups.length})`
+                : `Alle Helfenden dieser Schicht einchecken (${shift.signups.length})`,
+              subtitle: allPresent ? 'Alle als offen markieren' : 'Alle eingeteilten Helfer als anwesend markieren',
+              icon: allPresent ? <RotateCcw className="size-3.5" /> : <CheckCircle2 className="size-3.5 text-success-ink" />,
+              closeOnSelect: false,
+              onSelect: () => toggleShiftAllAttendance(shift),
+            });
+
+            // Einzelne Helfer der Schicht direkt einchecken
+            for (const su of shift.signups) {
+              const curAtt = attendanceOverrides[su.id] ?? su.attendance;
+              const isPres = curAtt === 'PRESENT';
+              shiftSubActions.push({
+                id: `checkin-helper-${su.id}`,
+                title: isPres ? `${su.displayName} abmelden` : `${su.displayName} einchecken`,
+                subtitle: isPres ? 'Als offen markieren' : 'Als anwesend bestätigen',
+                icon: isPres ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5 text-success-ink" />,
+                closeOnSelect: false,
+                onSelect: () => toggleAttendance(su.id, su.displayName, isPres ? 'PRESENT' : null),
+              });
+            }
+          }
+
+          // 4. Direktaktion: WhatsApp-Aufruf für diese Schicht
+          shiftSubActions.push({
+            id: 'copy-shift-whatsapp',
+            title: 'WhatsApp-Helferaufruf für diese Schicht kopieren',
+            subtitle: 'Fertige Vorlage mit Zeit, Bereich und Link',
+            icon: <Share2 className="size-3.5 text-accent-ink" />,
+            closeOnSelect: false,
+            onSelect: () => copyShiftWhatsAppCall(eventTitle, shift, eventUrl),
+          });
+
+          // 5. Direktaktion: Schichtdetails als Text kopieren
+          shiftSubActions.push({
+            id: 'copy-shift-text',
+            title: 'Schichtdetails als Text kopieren',
+            subtitle: `${shiftTime} · ${shift.category || 'Allgemein'} · ${shift.signups?.length || 0}/${shift.requiredSlots}`,
+            icon: <Copy className="size-3.5" />,
+            closeOnSelect: false,
+            onSelect: () => {
+              const names = (shift.signups || []).map((su) => su.displayName).join(', ') || 'Niemand eingeteilt';
+              const text = [
+                `📋 Schicht: ${shift.title || shiftName(shift)}`,
+                `Anlass: ${eventTitle}`,
+                `Zeit: ${shiftTime}`,
+                shift.category ? `Bereich: ${shift.category}` : null,
+                `Besetzung: ${shift.signups?.length || 0} von ${shift.requiredSlots} (${freeSlots} frei)`,
+                `Helfende: ${names}`,
+                shift.description ? `Hinweise: ${shift.description}` : null,
+                `Link: ${eventUrl}#shift-${shift.id}`,
+              ]
+                .filter(Boolean)
+                .join('\n');
+              copyToClipboard(text, 'Schichtdetails');
+            },
+          });
+
+          // 6. Direktlink kopieren
+          shiftSubActions.push({
+            id: 'copy-shift-link',
+            title: 'Direktlink zur Schicht kopieren',
+            icon: <Copy className="size-3.5" />,
+            closeOnSelect: false,
+            onSelect: () => {
+              const url = `${eventUrl}#shift-${shift.id}`;
+              copyToClipboard(url, 'Schicht-Link');
+            },
+          });
+
+          // 7. Navigation
+          shiftSubActions.push({
+            id: 'select-shift-plan',
+            title: 'Im Schichtplan anspringen',
+            subtitle: `${shiftTime} · ${slotBadge}`,
+            icon: <Ticket className="size-3.5 text-accent-ink" />,
+            onSelect: () => {
+              if (activeSlug && pathname.startsWith(`/events/${activeSlug}`)) {
+                if (contextData.onSelectShift) {
+                  contextData.onSelectShift(shift.id);
+                }
+                const el = document.getElementById(`shift-${shift.id}`);
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else if (activeSlug) {
+                router.push(`/events/${activeSlug}?schicht=${shift.id}#shift-${shift.id}`);
+              }
+              close();
+            },
+          });
+
+          if (canManageEvent) {
+            shiftSubActions.push({
+              id: 'manage-shift',
+              title: 'Im OK-Bereich bearbeiten',
+              icon: <Settings className="size-3.5" />,
+              onSelect: () => {
+                router.push(`/events/${activeSlug}/ok/schichten`);
+                close();
+              },
+            });
+          }
+
+          // QuickActions für Desktop-Vorschau
+          const quickActions: CommandQuickAction[] = [];
+          if (user && !isMyShift && freeSlots > 0) {
+            quickActions.push({
+              id: 'quick-signup',
+              label: 'Jetzt eintragen',
+              icon: <UserPlus className="size-3.5" />,
+              tone: 'success',
+              onClick: () => handleDirectSignup(shift),
+            });
+          } else if (isMyShift && mySignup) {
+            quickActions.push({
+              id: 'quick-cancel',
+              label: 'Einsatz stornieren',
+              icon: <Trash2 className="size-3.5" />,
+              tone: 'danger',
+              onClick: () =>
+                handleDirectCancelSignup(shift.id, mySignup.id, shift.title || shiftName(shift)),
+            });
+          }
+          quickActions.push({
+            id: 'quick-wa',
+            label: 'WhatsApp',
+            icon: <Share2 className="size-3.5" />,
+            tone: 'accent',
+            onClick: () => copyShiftWhatsAppCall(eventTitle, shift, eventUrl),
+          });
+          quickActions.push({
+            id: 'quick-copy',
+            label: 'Kopieren',
+            icon: <Copy className="size-3.5" />,
+            onClick: () => copyToClipboard(`${eventUrl}#shift-${shift.id}`, 'Schicht-Link'),
+          });
+
           list.push({
             id: `shift-${shift.id}`,
             title: shift.title || shiftTime,
-            subtitle: `${shiftTime} · ${shift.category || 'Allgemein'} (${slotBadge})`,
+            subtitle: `${shiftTime} · ${shift.category || 'Allgemein'} (${slotBadge})${isMyShift ? ' · ★ Eingeteilt' : ''}`,
             section: 'SHIFTS',
-            badge: slotBadge,
-            badgeTone: freeSlots > 0 ? (freeSlots <= 2 ? 'warning' : 'accent') : 'neutral',
-            icon: <Ticket className="size-4 text-accent-ink" />,
+            badge: isMyShift ? 'Mein Einsatz' : slotBadge,
+            badgeTone: isMyShift
+              ? 'success'
+              : freeSlots > 0
+                ? freeSlots <= 2
+                  ? 'warning'
+                  : 'accent'
+                : 'neutral',
+            icon: isMyShift ? (
+              <CheckCircle2 className="size-4 text-success-ink" />
+            ) : (
+              <Ticket className="size-4 text-accent-ink" />
+            ),
             keywords: [
               'schicht',
               shift.title || '',
               shift.category || '',
               shiftTime,
-              freeSlots > 0 ? 'frei offen unbesetzt' : 'voll',
+              freeSlots > 0 ? 'frei offen unbesetzt lücke' : 'voll',
+              isMyShift ? 'meine einsatz ich' : '',
               activeSlug,
               eventTitle,
             ],
@@ -511,51 +1165,26 @@ export function useCommandItems(query: string) {
               }
               close();
             },
-            subActions: [
-              {
-                id: 'select-shift-plan',
-                title: 'Im Schichtplan öffnen & Details',
-                subtitle: `${shiftTime} · ${slotBadge}`,
-                icon: <Ticket className="size-3.5 text-accent-ink" />,
-                onSelect: () => {
-                  if (activeSlug && pathname.startsWith(`/events/${activeSlug}`)) {
-                    if (contextData.onSelectShift) {
-                      contextData.onSelectShift(shift.id);
-                    }
-                    const el = document.getElementById(`shift-${shift.id}`);
-                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  } else if (activeSlug) {
-                    router.push(`/events/${activeSlug}?schicht=${shift.id}#shift-${shift.id}`);
-                  }
-                  close();
-                },
-              },
-              {
-                id: 'copy-shift-link',
-                title: 'Direktlink zur Schicht kopieren',
-                icon: <Copy className="size-3.5" />,
-                onSelect: () => {
-                  const url = `${eventUrl}#shift-${shift.id}`;
-                  copyToClipboard(url, 'Schicht-Link');
-                },
-              },
-              ...(canManageEvent
-                ? [
-                    {
-                      id: 'manage-shift',
-                      title: 'Im OK-Bereich bearbeiten',
-                      icon: <Settings className="size-3.5" />,
-                      onSelect: () => {
-                        router.push(`/events/${activeSlug}/ok/schichten`);
-                        close();
-                      },
-                    },
-                  ]
-                : []),
-            ],
+            subActions: shiftSubActions,
             preview: {
               type: 'SHIFT',
-              shift,
+              shift: {
+                id: shift.id,
+                title: shift.title,
+                startTime: shift.startTime,
+                endTime: shift.endTime,
+                requiredSlots: shift.requiredSlots,
+                category: shift.category,
+                description: shift.description,
+                signups: (shift.signups || []).map((su) => ({
+                  id: su.id,
+                  displayName: su.displayName,
+                  userId: su.userId,
+                  attendance: attendanceOverrides[su.id] ?? su.attendance,
+                  isSelf: user ? su.userId === user.id : false,
+                })),
+              },
+              quickActions,
               details: [
                 { label: 'Uhrzeit', value: shiftTime },
                 { label: 'Kategorie', value: shift.category || 'Allgemein' },
@@ -644,15 +1273,132 @@ export function useCommandItems(query: string) {
       });
     }
 
+    // Globale E-Mail-Verteiler-Aktion
+    if (canViewPeople && people.length > 0) {
+      list.push({
+        id: 'action-copy-dept-emails',
+        title: 'E-Mail-Verteiler aller Abteilungsmitglieder kopieren',
+        subtitle: `Deduplizierte Adressen von ${people.filter((p) => p.email).length} Personen in die Zwischenablage`,
+        section: 'ACTIONS',
+        icon: <Mail className="size-4 text-accent-ink" />,
+        keywords: ['mail', 'verteiler', 'abteilung', 'alle', 'rundmail'],
+        closeOnSelect: false,
+        onSelect: () => {
+          recordRecentCommand('action-copy-dept-emails');
+          const emails = Array.from(new Set(people.map((p) => p.email?.trim()).filter(Boolean)));
+          if (emails.length === 0) {
+            toast({ title: 'Keine E-Mail-Adressen vorhanden', tone: 'info' });
+            return;
+          }
+          copyToClipboard(emails.join(', '), `${emails.length} Abteilungs-E-Mail-Adressen`);
+        },
+      });
+    }
+
     // =========================================================================
-    // 3. ANLÄSSE DER ABTEILUNG
+    // 3. ANLÄSSE DER ABTEILUNG (MIT KALENDER, WHATSAPP, TEILEN & EXPORT)
     // =========================================================================
     for (const event of allEvents) {
       const status = eventStatus(event);
       const statusBadge = status === 'past' ? 'Vergangen' : status === 'live' ? 'Findet statt' : 'Demnächst';
-      const badgeTone = status === 'past' ? 'neutral' : status === 'live' ? 'accent' : 'success';
-      const eventUrl = typeof window !== 'undefined' ? `${window.location.origin}/events/${event.slug}` : `/events/${event.slug}`;
+      const badgeTone: BadgeTone = status === 'past' ? 'neutral' : status === 'live' ? 'accent' : 'success';
+      const eventUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/events/${event.slug}`
+          : `/events/${event.slug}`;
       const dateText = fmtShortDate(event.startDate);
+
+      const eventQuickActions: CommandQuickAction[] = [
+        {
+          id: 'quick-ics',
+          label: 'Kalender (.ics)',
+          icon: <Download className="size-3.5" />,
+          onClick: () => handleDownloadIcs(event),
+        },
+        {
+          id: 'quick-gcal',
+          label: 'Google Kalender',
+          icon: <ExternalLink className="size-3.5" />,
+          onClick: () => handleGoogleCalendar(event),
+        },
+        {
+          id: 'quick-link',
+          label: 'Link kopieren',
+          icon: <Copy className="size-3.5" />,
+          onClick: () => copyToClipboard(eventUrl, 'Anlass-Link'),
+        },
+      ];
+
+      const eventSubActions: CommandSubAction[] = [
+        {
+          id: 'open-event',
+          title: 'Zum Anlass gehen',
+          subtitle: `Schichtplan und Details öffnen`,
+          icon: <Ticket className="size-3.5" />,
+          onSelect: () => {
+            router.push(`/events/${event.slug}`);
+            close();
+          },
+        },
+        {
+          id: 'download-ics',
+          title: 'Kalenderdatei (.ics) herunterladen',
+          subtitle: 'Direkt in Apple/Outlook/Handy importieren',
+          icon: <Download className="size-3.5 text-accent-ink" />,
+          closeOnSelect: false,
+          onSelect: () => handleDownloadIcs(event),
+        },
+        {
+          id: 'add-gcal',
+          title: 'Zu Google Kalender hinzufügen',
+          subtitle: 'Neuen Termin in Google Kalender eintragen',
+          icon: <ExternalLink className="size-3.5 text-accent-ink" />,
+          closeOnSelect: false,
+          onSelect: () => handleGoogleCalendar(event),
+        },
+        {
+          id: 'copy-link',
+          title: 'Anlass-Link kopieren',
+          subtitle: eventUrl,
+          icon: <Copy className="size-3.5" />,
+          closeOnSelect: false,
+          onSelect: () => copyToClipboard(eventUrl, 'Anlass-Link'),
+        },
+      ];
+
+      if (can('EVENTS_EDIT_SETTINGS') || can('SHIFTS_MANAGE') || isDeptAdmin) {
+        eventSubActions.push({
+          id: 'open-ok',
+          title: 'OK-Bereich öffnen',
+          subtitle: 'Planung, Schichten und Helfende verwalten',
+          icon: <LayoutDashboard className="size-3.5" />,
+          onSelect: () => {
+            router.push(`/events/${event.slug}/ok`);
+            close();
+          },
+        });
+        eventSubActions.push({
+          id: 'open-export',
+          title: 'Drucken & Export (PDF/Excel)',
+          subtitle: 'Aushänge und Tabellen exportieren',
+          icon: <Download className="size-3.5" />,
+          onSelect: () => {
+            router.push(`/events/${event.slug}/ok/export`);
+            close();
+          },
+        });
+      }
+
+      eventSubActions.push({
+        id: 'open-checkin',
+        title: 'Helfer-Check-in & QR-Code',
+        subtitle: 'Präsenz am Anlass erfassen',
+        icon: <ClipboardCheck className="size-3.5" />,
+        onSelect: () => {
+          router.push(`/events/${event.slug}/checkin`);
+          close();
+        },
+      });
 
       list.push({
         id: `event-${event.id}`,
@@ -668,57 +1414,11 @@ export function useCommandItems(query: string) {
           router.push(`/events/${event.slug}`);
           close();
         },
-        subActions: [
-          {
-            id: 'open-event',
-            title: 'Zum Anlass gehen',
-            icon: <Ticket className="size-3.5" />,
-            onSelect: () => {
-              router.push(`/events/${event.slug}`);
-              close();
-            },
-          },
-          {
-            id: 'copy-link',
-            title: 'Anlass-Link kopieren',
-            icon: <Copy className="size-3.5" />,
-            onSelect: () => copyToClipboard(eventUrl, 'Anlass-Link'),
-          },
-          ...((can('EVENTS_EDIT_SETTINGS') || can('SHIFTS_MANAGE') || isDeptAdmin)
-            ? [
-                {
-                  id: 'open-ok',
-                  title: 'OK-Bereich öffnen',
-                  icon: <LayoutDashboard className="size-3.5" />,
-                  onSelect: () => {
-                    router.push(`/events/${event.slug}/ok`);
-                    close();
-                  },
-                },
-                {
-                  id: 'open-export',
-                  title: 'Drucken & Export (PDF/Excel)',
-                  icon: <Download className="size-3.5" />,
-                  onSelect: () => {
-                    router.push(`/events/${event.slug}/ok/export`);
-                    close();
-                  },
-                },
-              ]
-            : []),
-          {
-            id: 'open-checkin',
-            title: 'Helfer-Check-in',
-            icon: <ClipboardCheck className="size-3.5" />,
-            onSelect: () => {
-              router.push(`/events/${event.slug}/checkin`);
-              close();
-            },
-          },
-        ],
+        subActions: eventSubActions,
         preview: {
           type: 'EVENT',
           event,
+          quickActions: eventQuickActions,
           details: [
             { label: 'Datum', value: `${fmtShortWeekday(event.startDate)} ${fmtShortDate(event.startDate)}` },
             { label: 'Status', value: statusBadge },
@@ -729,7 +1429,7 @@ export function useCommandItems(query: string) {
     }
 
     // =========================================================================
-    // 4. PERSONEN & HELFENDE (UNIFIZIERT MIT SCHICHTEN & ACTIONS)
+    // 4. PERSONEN & HELFENDE (UNIFIZIERT MIT SCHICHTEN & DIREKT-AKTIONEN)
     // =========================================================================
     if (canViewPeople || detailedEvent?.shifts?.length) {
       interface HelperShiftEntry {
@@ -759,7 +1459,9 @@ export function useCommandItems(query: string) {
         for (const shift of detailedEvent.shifts) {
           for (const signup of shift.signups ?? []) {
             const curAtt =
-              attendanceOverrides[signup.id] ?? (signup as unknown as { attendance?: 'PRESENT' | null }).attendance ?? null;
+              attendanceOverrides[signup.id] ??
+              (signup as unknown as { attendance?: 'PRESENT' | null }).attendance ??
+              null;
             const entry: HelperShiftEntry = {
               shiftId: shift.id,
               signupId: signup.id,
@@ -869,10 +1571,6 @@ export function useCommandItems(query: string) {
         const presentCount = personShifts.filter((s) => s.attendance === 'PRESENT').length;
         const allPresent = hasShifts && presentCount === personShifts.length;
 
-        const roleDesc = person.ceviName
-          ? `${person.ceviName} (${person.firstName || ''} ${person.lastName || ''})`.trim()
-          : `${person.firstName || ''} ${person.lastName || ''}`.trim();
-
         let badgeText: string | undefined = undefined;
         let badgeTone: BadgeTone = 'neutral';
 
@@ -906,6 +1604,218 @@ export function useCommandItems(query: string) {
 
         const canManageCurrent = can('EVENTS_EDIT_SETTINGS') || can('SHIFTS_MANAGE') || isDeptAdmin;
 
+        // Subaktionen für Person
+        const personSubActions: CommandSubAction[] = [];
+
+        // 1. Direktaktion: Check-in Toggle für alle Schichten
+        if (hasShifts && canManageCurrent) {
+          personSubActions.push({
+            id: 'toggle-checkin-all',
+            title: allPresent
+              ? `Anwesenheit für ${person.name} zurücksetzen`
+              : `Als anwesend einchecken (${personShifts.length} ${personShifts.length === 1 ? 'Schicht' : 'Schichten'})`,
+            subtitle: `${presentCount} von ${personShifts.length} Schichten eingecheckt`,
+            icon: allPresent ? (
+              <RotateCcw className="size-3.5" />
+            ) : (
+              <CheckCircle2 className="size-3.5 text-success-ink" />
+            ),
+            closeOnSelect: false,
+            onSelect: async () => {
+              for (const s of personShifts) {
+                await toggleAttendance(s.signupId, person.name, allPresent ? 'PRESENT' : null);
+              }
+            },
+          });
+        }
+
+        // 2. Aktionen für jede einzelne übernommene Schicht
+        for (const s of personShifts) {
+          const isPres = s.attendance === 'PRESENT';
+          personSubActions.push({
+            id: `person-shift-${s.shiftId}-${s.signupId}`,
+            title: `Schicht: ${s.title?.trim() || s.taskTitle || shiftName(s)}${s.title?.trim() && s.taskTitle ? ` (${s.taskTitle})` : ''}`,
+            subtitle: `${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}${s.category ? ` · ${s.category}` : ''} · ${isPres ? 'Eingecheckt' : 'Noch offen'}`,
+            icon: <CalendarDays className="size-3.5 text-accent-ink" />,
+            onSelect: () => {
+              if (activeSlug && pathname.startsWith(`/events/${activeSlug}`)) {
+                if (contextData.onSelectShift) {
+                  contextData.onSelectShift(s.shiftId);
+                }
+                const el = document.getElementById(`shift-${s.shiftId}`);
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else if (activeSlug) {
+                router.push(`/events/${activeSlug}?schicht=${s.shiftId}#shift-${s.shiftId}`);
+              }
+              close();
+            },
+          });
+
+          if (canManageCurrent) {
+            personSubActions.push({
+              id: `toggle-single-att-${s.signupId}`,
+              title: isPres ? `Anwesenheit für «${s.title}» zurücksetzen` : `Für «${s.title}» als anwesend markieren`,
+              icon: isPres ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5 text-success-ink" />,
+              closeOnSelect: false,
+              onSelect: () => toggleAttendance(s.signupId, person.name, isPres ? 'PRESENT' : null),
+            });
+          }
+        }
+
+        // 3. Direkte Kommunikation
+        if (person.phone) {
+          personSubActions.push({
+            id: 'wa-chat',
+            title: `WhatsApp-Nachricht an ${person.firstName || person.name} senden`,
+            subtitle: `Direktchat mit ${person.phone} öffnen`,
+            icon: <MessageSquare className="size-3.5 text-success-ink" />,
+            closeOnSelect: false,
+            onSelect: () => openWhatsAppDirect(person.phone!, person.firstName),
+          });
+
+          personSubActions.push({
+            id: 'call-phone',
+            title: `Anrufen (${person.phone})`,
+            icon: <Phone className="size-3.5 text-accent-ink" />,
+            onSelect: () => {
+              window.location.href = `tel:${person.phone}`;
+            },
+          });
+
+          personSubActions.push({
+            id: 'sms-phone',
+            title: `SMS senden (${person.phone})`,
+            icon: <Phone className="size-3.5" />,
+            onSelect: () => openSmsDirect(person.phone!),
+          });
+
+          personSubActions.push({
+            id: 'copy-phone',
+            title: 'Telefonnummer kopieren',
+            subtitle: person.phone,
+            icon: <Copy className="size-3.5" />,
+            closeOnSelect: false,
+            onSelect: () => copyToClipboard(person.phone!, 'Telefonnummer'),
+          });
+        }
+
+        if (person.email) {
+          personSubActions.push({
+            id: 'send-email',
+            title: `E-Mail an ${person.email} schreiben`,
+            icon: <Mail className="size-3.5 text-accent-ink" />,
+            onSelect: () => {
+              window.location.href = `mailto:${person.email}`;
+            },
+          });
+
+          personSubActions.push({
+            id: 'copy-email',
+            title: 'E-Mail-Adresse kopieren',
+            subtitle: person.email,
+            icon: <Copy className="size-3.5" />,
+            closeOnSelect: false,
+            onSelect: () => copyToClipboard(person.email!, 'E-Mail'),
+          });
+        }
+
+        // 4. Kontaktdaten als Text kopieren
+        personSubActions.push({
+          id: 'copy-contact-all',
+          title: 'Kontaktdaten in Zwischenablage kopieren',
+          subtitle: 'Name, Cevi-Name, Telefon, E-Mail und Schichten',
+          icon: <Copy className="size-3.5" />,
+          closeOnSelect: false,
+          onSelect: () => {
+            const lines = [
+              person.name,
+              person.ceviName ? `Cevi-Name: ${person.ceviName}` : null,
+              person.email ? `E-Mail: ${person.email}` : null,
+              person.phone ? `Telefon: ${person.phone}` : null,
+              hasShifts
+                ? `Schichten in «${activeEvent?.title || 'Anlass'}»: ${personShifts.map((s) => `${shiftName(s)} (${fmtTimeRange(s.startTime, s.endTime)})`).join(', ')}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join('\n');
+            copyToClipboard(lines, 'Kontaktdaten');
+          },
+        });
+
+        // 5. Navigation & Einteilung
+        if (activeSlug && canManageCurrent) {
+          personSubActions.push({
+            id: 'assign-shift',
+            title: 'Für eine Schicht einteilen',
+            subtitle: `Person manuell einer Schicht von «${activeEvent?.title || 'Anlass'}» zuweisen`,
+            icon: <UserPlus className="size-3.5" />,
+            onSelect: () => {
+              if (contextData.onOpenAssignModal) {
+                contextData.onOpenAssignModal();
+              } else {
+                router.push(`/events/${activeSlug}/ok/schichten`);
+              }
+              close();
+            },
+          });
+
+          personSubActions.push({
+            id: 'view-ok-helpers',
+            title: 'Im OK-Bereich bei Helfenden öffnen',
+            subtitle: `Filtert die Helfer-Tabelle nach «${person.name}»`,
+            icon: <Users className="size-3.5 text-accent-ink" />,
+            onSelect: () => {
+              router.push(`/events/${activeSlug}/ok/helfende?search=${encodeURIComponent(person.name)}`);
+              close();
+            },
+          });
+        }
+
+        // QuickActions für Desktop-Vorschau
+        const personQuickActions: CommandQuickAction[] = [];
+        if (person.phone) {
+          personQuickActions.push({
+            id: 'p-wa',
+            label: 'WhatsApp',
+            icon: <MessageSquare className="size-3.5" />,
+            tone: 'success',
+            onClick: () => openWhatsAppDirect(person.phone!, person.firstName),
+          });
+          personQuickActions.push({
+            id: 'p-call',
+            label: 'Anrufen',
+            icon: <Phone className="size-3.5" />,
+            onClick: () => {
+              window.location.href = `tel:${person.phone}`;
+            },
+          });
+        }
+        if (person.email) {
+          personQuickActions.push({
+            id: 'p-mail',
+            label: 'E-Mail',
+            icon: <Mail className="size-3.5" />,
+            onClick: () => {
+              window.location.href = `mailto:${person.email}`;
+            },
+          });
+        }
+        personQuickActions.push({
+          id: 'p-copy',
+          label: 'Kopieren',
+          icon: <Copy className="size-3.5" />,
+          onClick: () => {
+            const lines = [
+              person.name,
+              person.phone ? `Tel: ${person.phone}` : null,
+              person.email ? `E-Mail: ${person.email}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ');
+            copyToClipboard(lines, 'Kontaktdaten');
+          },
+        });
+
         const item: CommandItem = {
           id: `person-${person.id}`,
           title: person.name,
@@ -928,150 +1838,14 @@ export function useCommandItems(query: string) {
             person.lastName || '',
             person.ceviName || '',
             person.email || '',
+            person.phone || '',
             ...(hasShifts ? ['schichten', 'eingeteilt', ...personShifts.map((s) => s.title)] : []),
           ],
           onSelect: () => {
             recordRecentCommand(`person-${person.id}`);
             setActiveSubActionItem(item);
           },
-          subActions: [
-            // 1. Aktionen für jede einzelne übernommene Schicht
-            ...personShifts.map((s) => ({
-              id: `person-shift-${s.shiftId}-${s.signupId}`,
-              title: `Schicht: ${s.title?.trim() || s.taskTitle || shiftName(s)}${s.title?.trim() && s.taskTitle ? ` (${s.taskTitle})` : ''}`,
-              subtitle: `${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}${s.category ? ` · ${s.category}` : ''} · ${s.attendance === 'PRESENT' ? 'Eingecheckt' : 'Noch offen'}`,
-              icon: <CalendarDays className="size-3.5 text-accent-ink" />,
-              onSelect: () => {
-                if (activeSlug && pathname.startsWith(`/events/${activeSlug}`)) {
-                  if (contextData.onSelectShift) {
-                    contextData.onSelectShift(s.shiftId);
-                  }
-                  const el = document.getElementById(`shift-${s.shiftId}`);
-                  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } else if (activeSlug) {
-                  router.push(`/events/${activeSlug}?schicht=${s.shiftId}#shift-${s.shiftId}`);
-                }
-                close();
-              },
-            })),
-
-            // 2. Im OK-Bereich bei Helfenden öffnen (falls OK-Rechte)
-            ...(activeSlug && canManageCurrent
-              ? [
-                  {
-                    id: 'view-ok-helpers',
-                    title: 'Im OK-Bereich bei Helfenden öffnen',
-                    subtitle: `Filtert die Helfer-Tabelle nach «${person.name}»`,
-                    icon: <Users className="size-3.5 text-accent-ink" />,
-                    onSelect: () => {
-                      router.push(`/events/${activeSlug}/ok/helfende?search=${encodeURIComponent(person.name)}`);
-                      close();
-                    },
-                  },
-                ]
-              : []),
-
-            // 3. Check-in Toggle
-            ...(hasShifts && canManageCurrent
-              ? [
-                  {
-                    id: 'toggle-checkin',
-                    title: allPresent
-                      ? `Anwesenheit zurücksetzen (${personShifts.length} ${personShifts.length === 1 ? 'Schicht' : 'Schichten'})`
-                      : `Als anwesend einchecken (${personShifts.length} ${personShifts.length === 1 ? 'Schicht' : 'Schichten'})`,
-                    subtitle: `${presentCount} von ${personShifts.length} Schichten eingecheckt`,
-                    icon: allPresent ? (
-                      <RotateCcw className="size-3.5" />
-                    ) : (
-                      <CheckCircle2 className="size-3.5 text-success-ink" />
-                    ),
-                    onSelect: async () => {
-                      for (const s of personShifts) {
-                        await toggleAttendance(s.signupId, person.name, allPresent ? 'PRESENT' : null);
-                      }
-                    },
-                  },
-                ]
-              : []),
-
-            // 4. Manuell in Schicht einteilen
-            ...(activeSlug && canManageCurrent
-              ? [
-                  {
-                    id: 'assign-shift',
-                    title: 'Für eine Schicht einteilen',
-                    subtitle: `Person manuell einer Schicht von «${activeEvent?.title || 'Anlass'}» zuweisen`,
-                    icon: <UserPlus className="size-3.5" />,
-                    onSelect: () => {
-                      if (contextData.onOpenAssignModal) {
-                        contextData.onOpenAssignModal();
-                      } else {
-                        router.push(`/events/${activeSlug}/ok/schichten`);
-                      }
-                      close();
-                    },
-                  },
-                ]
-              : []),
-
-            // 5. Kontakt-Optionen
-            ...(person.email
-              ? [
-                  {
-                    id: 'mail',
-                    title: `E-Mail an ${person.email} schreiben`,
-                    icon: <Mail className="size-3.5" />,
-                    onSelect: () => {
-                      window.location.href = `mailto:${person.email}`;
-                    },
-                  },
-                  {
-                    id: 'copy-email',
-                    title: 'E-Mail-Adresse kopieren',
-                    icon: <Copy className="size-3.5" />,
-                    onSelect: () => copyToClipboard(person.email!, 'E-Mail'),
-                  },
-                ]
-              : []),
-            ...(person.phone
-              ? [
-                  {
-                    id: 'call',
-                    title: `Anrufen (${person.phone})`,
-                    icon: <Phone className="size-3.5" />,
-                    onSelect: () => {
-                      window.location.href = `tel:${person.phone}`;
-                    },
-                  },
-                  {
-                    id: 'copy-phone',
-                    title: 'Telefonnummer kopieren',
-                    icon: <Copy className="size-3.5" />,
-                    onSelect: () => copyToClipboard(person.phone!, 'Telefonnummer'),
-                  },
-                ]
-              : []),
-            {
-              id: 'copy-contact',
-              title: 'Kontaktdaten kopieren',
-              subtitle: 'Name, Telefon, E-Mail und Schichten in Zwischenablage',
-              icon: <Copy className="size-3.5" />,
-              onSelect: () => {
-                const lines = [
-                  person.name,
-                  person.ceviName ? `Cevi-Name: ${person.ceviName}` : null,
-                  person.email ? `E-Mail: ${person.email}` : null,
-                  person.phone ? `Telefon: ${person.phone}` : null,
-                  hasShifts
-                    ? `Schichten in ${activeEvent?.title || 'Anlass'}: ${personShifts.map((s) => `${shiftName(s)} (${fmtTimeRange(s.startTime, s.endTime)})`).join(', ')}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join('\n');
-                copyToClipboard(lines, 'Kontaktdaten');
-              },
-            },
-          ],
+          subActions: personSubActions,
           preview: {
             type: 'PERSON',
             person: {
@@ -1084,12 +1858,14 @@ export function useCommandItems(query: string) {
               stufen: person.stufen?.map((s) => s.name),
               shifts: personShifts.map((s) => ({
                 id: s.shiftId,
+                signupId: s.signupId,
                 title: s.title,
                 time: `${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}`,
                 category: s.category,
                 attendance: s.attendance,
               })),
             },
+            quickActions: personQuickActions,
             details: [
               { label: 'Name', value: `${person.firstName || ''} ${person.lastName || ''}`.trim() || person.name },
               ...(person.ceviName ? [{ label: 'Cevi-Name', value: person.ceviName }] : []),

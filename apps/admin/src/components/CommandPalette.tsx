@@ -6,14 +6,19 @@ import {
   CalendarDays,
   ChartColumn,
   Command,
+  Copy,
+  ExternalLink,
+  FileCode,
   History,
   LayoutDashboard,
+  Mail,
   Plus,
   Search,
+  Sparkles,
   Users,
   X,
 } from 'lucide-react';
-import { Avatar, Badge, Dialog, cn } from '@schichtplan/ui';
+import { Avatar, Badge, Dialog, cn, useToast } from '@schichtplan/ui';
 import type {
   AdminDepartmentListItemDto,
   AdminEventListItemDto,
@@ -42,12 +47,22 @@ export function CommandPalette({
   onOpenUser,
   onCreateDepartment,
 }: CommandPaletteProps) {
+  const toast = useToast();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchedUsers, setSearchedUsers] = useState<AdminUserListItemDto[]>([]);
   const [searchedEvents, setSearchedEvents] = useState<AdminEventListItemDto[]>([]);
   const [loadingRemote, setLoadingRemote] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const copyToClipboard = async (text: string, title: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${title} kopiert`, tone: 'success' });
+    } catch {
+      toast({ title: 'Kopieren fehlgeschlagen', tone: 'error' });
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -95,7 +110,7 @@ export function CommandPalette({
 
   const q = query.trim().toLowerCase();
 
-  // Navigation Items
+  // Navigation & System Items
   const navItems = [
     { id: 'nav-uebersicht', label: 'Zur Übersicht wechseln', icon: <LayoutDashboard />, action: () => onNavigate('uebersicht') },
     { id: 'nav-abteilungen', label: 'Zu Abteilungen wechseln', icon: <Building2 />, action: () => onNavigate('abteilungen') },
@@ -106,17 +121,38 @@ export function CommandPalette({
     ...(onCreateDepartment
       ? [{ id: 'action-create-dept', label: 'Neue Abteilung anlegen', icon: <Plus />, action: onCreateDepartment }]
       : []),
+    {
+      id: 'action-api-docs',
+      label: 'Admin-API Dokumentation öffnen (Scalar)',
+      icon: <FileCode />,
+      action: () => window.open('/docs', '_blank'),
+    },
+    {
+      id: 'action-system-status',
+      label: 'System-Status prüfen',
+      icon: <ExternalLink />,
+      action: () => window.open('https://status.cevi-schichtplan.ch', '_blank'),
+    },
+    {
+      id: 'action-copy-slugs',
+      label: 'Alle Abteilungs-Subdomains kopieren',
+      icon: <Copy />,
+      action: () => {
+        const text = departments.map((d) => `${d.slug}.cevi-schichtplan.ch`).join('\n');
+        copyToClipboard(text, `${departments.length} Subdomains`);
+      },
+    },
   ].filter((item) => !q || item.label.toLowerCase().includes(q));
 
   // Matched Departments
   const matchedDepartments = departments
     .filter((d) => !q || d.name.toLowerCase().includes(q) || d.slug.includes(q))
-    .slice(0, 5);
+    .slice(0, 6);
 
   interface FlatItem {
     id: string;
     category: string;
-    render: () => React.ReactNode;
+    render: (isSelected: boolean) => React.ReactNode;
     action: () => void;
   }
 
@@ -135,39 +171,98 @@ export function CommandPalette({
         onClose();
       },
     })),
-    ...matchedDepartments.map((d) => ({
-      id: `dept-${d.id}`,
-      category: 'Abteilungen',
-      render: () => (
-        <span className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2.5 min-w-0">
-            <Building2 className="size-4 shrink-0 text-accent-ink" />
-            <span className="truncate font-semibold text-fg">{d.name}</span>
-            <span className="truncate font-mono text-xs text-fg-subtle">{d.slug}</span>
+    ...matchedDepartments.map((d) => {
+      const deptUrl = `https://${d.slug}.cevi-schichtplan.ch`;
+      return {
+        id: `dept-${d.id}`,
+        category: 'Abteilungen',
+        render: (isSelected: boolean) => (
+          <span className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2.5 min-w-0">
+              <Building2 className="size-4 shrink-0 text-accent-ink" />
+              <span className="truncate font-semibold text-fg">{d.name}</span>
+              <span className="truncate font-mono text-xs text-fg-subtle">{d.slug}</span>
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Badge tone="outline" className="text-2xs shrink-0">
+                {d.upcomingEventCount} kommend
+              </Badge>
+              {isSelected && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    title="Portal im neuen Tab öffnen"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(deptUrl, '_blank');
+                    }}
+                    className="rounded p-1 text-fg-subtle hover:bg-surface-3 hover:text-accent-ink"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="URL kopieren"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard(deptUrl, 'Portal-URL');
+                    }}
+                    className="rounded p-1 text-fg-subtle hover:bg-surface-3 hover:text-fg"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
           </span>
-          <Badge tone="outline" className="text-2xs shrink-0">
-            {d.upcomingEventCount} kommend
-          </Badge>
-        </span>
-      ),
-      action: () => {
-        onOpenDepartment(d.id);
-        onClose();
-      },
-    })),
+        ),
+        action: () => {
+          onOpenDepartment(d.id);
+          onClose();
+        },
+      };
+    }),
     ...searchedUsers.map((u) => ({
       id: `user-${u.id}`,
       category: 'Personen',
-      render: () => (
+      render: (isSelected: boolean) => (
         <span className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2.5 min-w-0">
             <Avatar name={fullName(u)} size="sm" />
             <span className="truncate font-semibold text-fg">{fullName(u)}</span>
             {u.email && <span className="truncate text-xs text-fg-subtle">{u.email}</span>}
           </span>
-          <Badge tone="outline" className="text-2xs shrink-0">
-            {u.memberships[0]?.departmentName ?? u.homeDepartmentName ?? 'Konto'}
-          </Badge>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge tone="outline" className="text-2xs shrink-0">
+              {u.memberships[0]?.departmentName ?? u.homeDepartmentName ?? 'Konto'}
+            </Badge>
+            {isSelected && u.email && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  title="E-Mail schreiben"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.href = `mailto:${u.email}`;
+                  }}
+                  className="rounded p-1 text-fg-subtle hover:bg-surface-3 hover:text-accent-ink"
+                >
+                  <Mail className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  title="E-Mail kopieren"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(u.email!, 'E-Mail');
+                  }}
+                  className="rounded p-1 text-fg-subtle hover:bg-surface-3 hover:text-fg"
+                >
+                  <Copy className="size-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </span>
       ),
       action: () => {
@@ -178,16 +273,31 @@ export function CommandPalette({
     ...searchedEvents.map((e) => ({
       id: `event-${e.id}`,
       category: 'Anlässe',
-      render: () => (
+      render: (isSelected: boolean) => (
         <span className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2.5 min-w-0">
             <CalendarDays className="size-4 shrink-0 text-accent-ink" />
             <span className="truncate font-semibold text-fg">{e.title}</span>
             <span className="truncate text-xs text-fg-subtle">{e.departmentName}</span>
           </span>
-          <Badge tone="outline" className="text-2xs shrink-0">
-            {e.slotCount ? `${e.signupCount}/${e.slotCount}` : 'Anlass'}
-          </Badge>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge tone="outline" className="text-2xs shrink-0">
+              {e.slotCount ? `${e.signupCount}/${e.slotCount}` : 'Anlass'}
+            </Badge>
+            {isSelected && (
+              <button
+                type="button"
+                title="Titel kopieren"
+                onClick={(e_click) => {
+                  e_click.stopPropagation();
+                  copyToClipboard(e.title, 'Anlass-Titel');
+                }}
+                className="rounded p-1 text-fg-subtle hover:bg-surface-3 hover:text-fg"
+              >
+                <Copy className="size-3.5" />
+              </button>
+            )}
+          </div>
         </span>
       ),
       action: () => {
@@ -275,7 +385,7 @@ export function CommandPalette({
                       isSelected ? 'bg-accent/12 text-fg' : 'hover:bg-surface-2 text-fg'
                     )}
                   >
-                    <div className="min-w-0 flex-1">{item.render()}</div>
+                    <div className="min-w-0 flex-1">{item.render(isSelected)}</div>
                   </button>
                 </li>
               );
