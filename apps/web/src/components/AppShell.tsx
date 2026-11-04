@@ -35,7 +35,7 @@ import {
 import { PRIVACY_URL, departmentRoleLabel, getCeviDbDataUrl, getLandingUrl, helpUrl, statusUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
 import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
-import { useInstallPrompt } from '@/lib/offline';
+import { clearOfflineData, useInstallPrompt } from '@/lib/offline';
 import { CommandPaletteButton } from './command';
 import { OfflineBanner } from './OfflineBanner';
 
@@ -272,6 +272,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
         description: 'Dein Konto wurde erfolgreich gelöscht.',
         tone: 'success',
       });
+      await clearOfflineData();
       onClose();
       window.location.href = '/';
     } catch (err) {

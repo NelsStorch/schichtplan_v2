@@ -4,6 +4,54 @@ import { useCallback, useEffect, useState } from 'react';
 import { fmtStand } from './format';
 
 const OFFLINE_SYNC_KEY = 'schichtplan.last_online_sync';
+const OFFLINE_OWNER_KEY = 'schichtplan.offline_owner';
+
+/**
+ * Löscht alle Offline-Daten dieses Geräts (Service-Worker-Caches mit Schichten, Anlässen und Profil).
+ * Aufrufen beim Abmelden, bei abgelaufener Sitzung und wenn eine andere Person angemeldet ist,
+ * damit auf geteilten Geräten keine fremden Personendaten zurückbleiben.
+ */
+export async function clearOfflineData(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(OFFLINE_SYNC_KEY);
+    window.localStorage.removeItem(OFFLINE_OWNER_KEY);
+  } catch {
+    // LocalStorage könnte im privaten Modus blockiert sein
+  }
+  try {
+    if ('caches' in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((key) => window.caches.delete(key)));
+    }
+  } catch {
+    // Caches nicht verfügbar: nichts zu löschen
+  }
+}
+
+/**
+ * Merkt sich, wem die Offline-Daten gehören. Wechselt die angemeldete Person, werden die
+ * Daten der vorherigen Person gelöscht. Gibt es keine Anmeldung (`userId` = null), wird alles gelöscht.
+ */
+export async function syncOfflineOwner(userId: string | null): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!userId) {
+    await clearOfflineData();
+    return;
+  }
+  let previous: string | null = null;
+  try {
+    previous = window.localStorage.getItem(OFFLINE_OWNER_KEY);
+  } catch {
+    // ignorieren
+  }
+  if (previous && previous !== userId) await clearOfflineData();
+  try {
+    window.localStorage.setItem(OFFLINE_OWNER_KEY, userId);
+  } catch {
+    // ignorieren
+  }
+}
 
 /** Speichert den Zeitstempel des letzten erfolgreichen Online-Datenabrufs im LocalStorage */
 export function recordLastSyncTime(date: Date = new Date()): void {

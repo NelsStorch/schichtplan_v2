@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { DepartmentDto, DepartmentPermission, UserDto } from '@schichtplan/shared';
 import { applyAccent } from '@schichtplan/ui';
-import { api, errorMessage } from './api';
+import { ApiError, api, errorMessage } from './api';
+import { clearOfflineData, syncOfflineOwner } from './offline';
 import { updateFavicon } from './favicon';
 
 interface PortalState {
@@ -37,8 +38,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     try {
       const [dept, me] = await Promise.all([
         api<DepartmentDto>('/api/departments/current'),
-        api<UserDto>('/api/auth/me').catch(() => null),
+        api<UserDto>('/api/auth/me').catch((err) => {
+          // Nur bei echter Abmeldung (401) Offline-Daten löschen, nicht bei fehlendem Netz
+          if (err instanceof ApiError && err.status === 401) void syncOfflineOwner(null);
+          return null;
+        }),
       ]);
+      if (me) void syncOfflineOwner(me.id);
       setDepartment(dept);
       setUser(me);
       setError(null);
@@ -62,6 +68,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    await clearOfflineData();
     setUser(null);
     window.location.href = '/';
   }, []);
