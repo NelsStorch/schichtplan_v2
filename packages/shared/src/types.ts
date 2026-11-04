@@ -20,6 +20,9 @@ export interface DepartmentDto {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   qrStyle?: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
+  qrCustomColors?: boolean;
+  qrColorPrimary?: string | null;
+  qrColorSecondary?: string | null;
   /** Kontaktperson (Abteilungsleitung oder mit «Personen und Rechte verwalten») */
   contactUserId?: string | null;
   /** Name immer, E-Mail nur für angemeldete Personen */
@@ -82,6 +85,8 @@ export interface EventDto {
   contactVisibility?: EventContactVisibility;
   signupOpensAt?: string | null;
   attendanceMode?: AttendanceMode;
+  checkinEarlyMinutes?: number;
+  checkinLateMinutes?: number;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */
   checkinToken?: string | null;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
@@ -908,6 +913,8 @@ export type ShiftSignupLogAction = 'SIGNUP' | 'SIGNOFF' | 'REPLACE' | 'ATTENDANC
 /** Ergebnis des Selbst-Check-ins per QR-Code */
 export interface CheckinResultDto {
   eventTitle: string;
+  checkinEarlyMinutes?: number;
+  checkinLateMinutes?: number;
   /** Eben (oder schon vorher) als anwesend markierte Schichten */
   checkedIn: Array<{ signupId: string; shiftTitle: string | null; taskTitle: string | null; startTime: string; endTime: string; alreadyPresent: boolean }>;
   /** Nächste eigene Schicht, falls gerade keine im Check-in-Fenster liegt */
