@@ -7,7 +7,9 @@ import {
   Clock,
   Edit,
   HelpCircle,
+  KeyRound,
   Lock,
+  LogIn,
   Mail,
   Phone,
   Repeat,
@@ -29,8 +31,10 @@ import {
   Avatar,
   Badge,
   Button,
+  Callout,
   Dialog,
   SlotMeter,
+  buttonClasses,
   cn,
   slotStatus,
 } from '@schichtplan/ui';
@@ -50,6 +54,7 @@ export interface ShiftDetailsDialogProps {
   blockedReason?: string | null;
   canManage: boolean;
   busy?: boolean;
+  onRedeemLink?: () => void;
   onSignup: (task?: ShiftTaskDto) => void;
   onCancel: (signupId?: string) => void;
   onRemoveHelper: (signupId: string, name: string) => void;
@@ -72,6 +77,7 @@ export function ShiftDetailsDialog({
   blockedReason,
   canManage,
   busy,
+  onRedeemLink,
   onSignup,
   onCancel,
   onRemoveHelper,
@@ -262,6 +268,38 @@ export function ShiftDetailsDialog({
         {/* Freischaltung ausstehend */}
         {event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt) && !canManage && (
           <SignupCountdown opensAt={event.signupOpensAt} autoReload reloadShiftId={shift.id} />
+        )}
+
+        {/* Einladungs-Link Hinweis */}
+        {event.viewer?.pendingLink && !event.viewer.pendingLink.alreadyRedeemed && (
+          event.viewer.pendingLink.isExpired ? (
+            <Callout tone="warning" title="Einladungs-Link abgelaufen">
+              <p>Die Einlösefrist für diesen Zugangs-Link ist abgelaufen. Melde dich beim OK für einen neuen Link.</p>
+            </Callout>
+          ) : event.viewer.pendingLink.isBoundToOther ? (
+            <Callout tone="danger" title="Persönlicher Link bereits vergeben">
+              <p>Dieser persönliche Zugangs-Link wurde bereits von einer anderen Person eingelöst.</p>
+            </Callout>
+          ) : needsLogin ? (
+            <Callout tone="info" title="Du wurdest eingeladen">
+              <p>
+                Melde dich an, um deinen Zugang zu «{event.title}» freizuschalten (ein Cevi-Name ohne Passwort reicht).
+              </p>
+              <a href={loginUrl()} className={buttonClasses({ size: 'sm', className: 'mt-2' })}>
+                <LogIn className="size-3.5" /> Anmelden und Zugang freischalten
+              </a>
+            </Callout>
+          ) : !event.viewer.access?.canSignup && onRedeemLink ? (
+            <Callout tone="info" title="Du wurdest eingeladen">
+              <p>
+                Schalte jetzt deinen Zugang zu «{event.title}» frei
+                {event.viewer.pendingLink.label ? ` («${event.viewer.pendingLink.label}»)` : ''}, um dich für diese Schicht einzutragen.
+              </p>
+              <Button size="sm" loading={busy} onClick={onRedeemLink} className="mt-2">
+                <KeyRound className="size-3.5" /> Jetzt freischalten
+              </Button>
+            </Callout>
+          ) : null
         )}
 
         {/* Schicht voll: Kontaktperson für Fragen */}
@@ -600,12 +638,19 @@ export function ShiftDetailsDialog({
                         <span className="rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted border border-line">
                           Voll besetzt
                         </span>
-                      ) : (blockedReason || (needsLogin && event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt))) ? (
+                      ) : !event.allowPublicSignup ? (
                         <span
-                          title={blockedReason || `Das Eintragen ist erst ab ${formatZurichDateTime(event.signupOpensAt!)} möglich.`}
+                          title="Das Eintragen ist geschlossen."
                           className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted"
                         >
-                          <Lock className="size-3" /> {event.viewer?.access?.reason === 'SIGNUP_NOT_YET_OPEN' || (event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt)) ? 'Noch nicht geöffnet' : 'Für dich nicht freigeschaltet'}
+                          <Lock className="size-3" /> Eintragen geschlossen
+                        </span>
+                      ) : (event.signupOpensAt && !isSignupTimeOpen(event.signupOpensAt)) ? (
+                        <span
+                          title={`Das Eintragen ist erst ab ${formatZurichDateTime(event.signupOpensAt!)} möglich.`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted"
+                        >
+                          <Lock className="size-3" /> Noch nicht geöffnet
                         </span>
                       ) : needsLogin ? (
                         <a
@@ -617,6 +662,39 @@ export function ShiftDetailsDialog({
                             <Lock className="size-3" />
                           </span>
                         </a>
+                      ) : event.viewer?.pendingLink && !event.viewer.pendingLink.alreadyRedeemed && !event.viewer.access?.canSignup ? (
+                        event.viewer.pendingLink.isExpired ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-3 py-1.5 text-xs font-medium text-warning-ink">
+                            <Lock className="size-3" /> Link abgelaufen
+                          </span>
+                        ) : event.viewer.pendingLink.isBoundToOther ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-medium text-danger-ink">
+                            <Lock className="size-3" /> Link vergeben
+                          </span>
+                        ) : onRedeemLink ? (
+                          <button
+                            type="button"
+                            onClick={onRedeemLink}
+                            disabled={busy}
+                            className="group inline-flex items-center gap-2 rounded-full bg-accent py-1.5 pl-3.5 pr-2 text-xs font-semibold text-accent-fg shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+                          >
+                            <span>Zugang freischalten</span>
+                            <span className="flex size-5 items-center justify-center rounded-full bg-black/20 transition-transform duration-200 group-hover:scale-110">
+                              <KeyRound className="size-3" />
+                            </span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted">
+                            <Lock className="size-3" /> Für dich nicht freigeschaltet
+                          </span>
+                        )
+                      ) : blockedReason ? (
+                        <span
+                          title={blockedReason}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg-muted"
+                        >
+                          <Lock className="size-3" /> {event.viewer?.access?.reason === 'SIGNUP_NOT_YET_OPEN' ? 'Noch nicht geöffnet' : 'Für dich nicht freigeschaltet'}
+                        </span>
                       ) : (
                         <button
                           type="button"

@@ -212,3 +212,62 @@ describe('hasValidGrant', () => {
     expect(await hasValidGrant(mockPrisma as unknown as Parameters<typeof hasValidGrant>[0], 'ev-1', 'u-1')).toBe(false);
   });
 });
+
+describe('pendingLink & personal link logic', () => {
+  it('markiert ungebundene persönliche Links nicht als alreadyRedeemed, auch wenn die Person einen Grant hat', () => {
+    const pl = { kind: 'PERSONAL' as const, boundUserId: null };
+    const viewer = { id: 'u-1' };
+    const hasGrant = true;
+
+    const isBoundToMe = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId === viewer.id);
+    const isBoundToOther = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId !== viewer.id);
+    const alreadyRedeemed = pl.kind === 'PERSONAL' ? isBoundToMe : hasGrant;
+
+    expect(isBoundToMe).toBe(false);
+    expect(isBoundToOther).toBe(false);
+    expect(alreadyRedeemed).toBe(false);
+  });
+
+  it('markiert gebundene persönliche Links für unangemeldete Besucher nicht als isBoundToOther', () => {
+    const pl = { kind: 'PERSONAL' as const, boundUserId: 'u-alice' };
+    const viewer = null;
+    const hasGrant = false;
+
+    const isBoundToMe = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId === (viewer as unknown as { id: string })?.id);
+    const isBoundToOther = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId !== (viewer as unknown as { id: string })?.id);
+    const alreadyRedeemed = pl.kind === 'PERSONAL' ? isBoundToMe : hasGrant;
+
+    // Unangemeldete Besucher dürfen nicht als "an andere vergeben" gesperrt werden, sondern müssen Login-Prompt sehen
+    expect(isBoundToOther).toBe(false);
+    expect(isBoundToMe).toBe(false);
+    expect(alreadyRedeemed).toBe(false);
+  });
+
+  it('erkennt korrekt, wenn der persönliche Link an diese Person gebunden ist', () => {
+    const pl = { kind: 'PERSONAL' as const, boundUserId: 'u-alice' };
+    const viewer = { id: 'u-alice' };
+    const hasGrant = true;
+
+    const isBoundToMe = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId === viewer.id);
+    const isBoundToOther = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId !== viewer.id);
+    const alreadyRedeemed = pl.kind === 'PERSONAL' ? isBoundToMe : hasGrant;
+
+    expect(isBoundToMe).toBe(true);
+    expect(isBoundToOther).toBe(false);
+    expect(alreadyRedeemed).toBe(true);
+  });
+
+  it('erkennt korrekt, wenn der persönliche Link an eine andere Person gebunden ist', () => {
+    const pl = { kind: 'PERSONAL' as const, boundUserId: 'u-bob' };
+    const viewer = { id: 'u-alice' };
+    const hasGrant = false;
+
+    const isBoundToMe = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId === viewer.id);
+    const isBoundToOther = Boolean(pl.kind === 'PERSONAL' && pl.boundUserId && viewer && pl.boundUserId !== viewer.id);
+    const alreadyRedeemed = pl.kind === 'PERSONAL' ? isBoundToMe : hasGrant;
+
+    expect(isBoundToMe).toBe(false);
+    expect(isBoundToOther).toBe(true);
+    expect(alreadyRedeemed).toBe(false);
+  });
+});

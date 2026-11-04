@@ -1178,9 +1178,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         onClose={() => setSelectedShiftId(null)}
         currentUser={user}
         needsLogin={needsLogin}
-        blockedReason={!access.canSignup ? access.message : null}
+        blockedReason={
+          !event.allowPublicSignup
+            ? 'Das Eintragen ist geschlossen.'
+            : user && !access.canSignup
+              ? access.message
+              : null
+        }
         canManage={canManageShifts || canManageHelpers}
-        busy={Boolean(selectedShift && busyShift === selectedShift.id)}
+        busy={Boolean(selectedShift && busyShift === selectedShift.id) || redeeming}
+        onRedeemLink={event.viewer.pendingLink ? () => redeemLink() : undefined}
         onSignup={(task) => {
           if (selectedShift) signup(selectedShift, task);
         }}
