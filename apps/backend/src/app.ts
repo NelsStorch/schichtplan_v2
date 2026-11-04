@@ -18,6 +18,8 @@ import departmentRoutes from './routes/departments.js';
 import eventRoutes from './routes/events.js';
 import eventParticipationRoutes from './routes/eventParticipation.js';
 import shiftRoutes from './routes/shifts.js';
+import shiftSignupRoutes from './routes/shiftSignup.js';
+import shiftsMyRoutes from './routes/shiftsMy.js';
 import attendanceRoutes from './routes/attendance.js';
 import replacementRoutes from './routes/replacement.js';
 import eventMessageRoutes from './routes/eventMessages.js';
@@ -168,6 +170,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(eventRoutes);
   await app.register(eventParticipationRoutes);
   await app.register(shiftRoutes);
+  await app.register(shiftSignupRoutes);
+  await app.register(shiftsMyRoutes);
   await app.register(attendanceRoutes);
   await app.register(replacementRoutes);
   await app.register(eventMessageRoutes);
