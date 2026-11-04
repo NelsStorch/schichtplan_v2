@@ -23,8 +23,10 @@ export function isFinderPattern(r: number, c: number, n: number): boolean {
 }
 
 /**
- * Holt ein Abteilungslogo (aus der Datenbank wenn /api/uploads/..., per HTTP wenn URL,
+ * Holt ein Abteilungslogo (aus der Datenbank wenn /api/uploads/...,
  * oder Fallback auf das Standard-Cevi-Logo).
+ * Externe HTTP-Aufrufe sind aus Sicherheitsgründen (SSRF-Schutz) deaktiviert;
+ * es werden ausschliesslich auf dem Server hochgeladene Abteilungslogos verwendet.
  */
 export async function resolveLogo(
   logoUrl?: string | null,
@@ -45,20 +47,6 @@ export async function resolveLogo(
           mimeType: upload.mimeType,
           isCeviDefault: false,
         };
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  // Externe Bild-URL
-  if (/^https?:\/\//i.test(logoUrl)) {
-    try {
-      const res = await fetch(logoUrl, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) {
-        const mimeType = res.headers.get('content-type') || 'image/png';
-        const buffer = Buffer.from(await res.arrayBuffer());
-        return { buffer, mimeType, isCeviDefault: false };
       }
     } catch {
       // Fallback

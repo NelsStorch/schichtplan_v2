@@ -14,17 +14,22 @@ export interface RateLimiter {
 export function createRateLimiter(
   windowMs: number,
   max: number,
-  now: () => number = Date.now
+  now: () => number = Date.now,
+  maxKeys = 10_000
 ): RateLimiter {
   const attempts = new Map<string, number[]>();
   let lastCleanup = now();
 
+  function cleanup(t: number) {
+    for (const [k, times] of attempts) {
+      if (times.every((time) => t - time >= windowMs)) attempts.delete(k);
+    }
+    lastCleanup = t;
+  }
+
   function recent(key: string, t: number): number[] {
     if (t - lastCleanup > windowMs) {
-      for (const [k, times] of attempts) {
-        if (times.every((time) => t - time >= windowMs)) attempts.delete(k);
-      }
-      lastCleanup = t;
+      cleanup(t);
     }
     return (attempts.get(key) ?? []).filter((time) => t - time < windowMs);
   }
@@ -33,6 +38,16 @@ export function createRateLimiter(
     hit(key) {
       const t = now();
       const times = recent(key, t);
+
+      // Verhindere unbegrenztes Speicherwachstum bei Denial-of-Service-Angriffen
+      if (attempts.size >= maxKeys && !attempts.has(key)) {
+        cleanup(t);
+        if (attempts.size >= maxKeys) {
+          const oldestKey = attempts.keys().next().value;
+          if (oldestKey !== undefined) attempts.delete(oldestKey);
+        }
+      }
+
       times.push(t);
       attempts.set(key, times);
       return times.length > max;

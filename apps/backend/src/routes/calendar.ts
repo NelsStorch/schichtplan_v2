@@ -13,10 +13,15 @@ const CalendarTokenResponseSchema = z.object({
   webcalUrl: z.string().describe('Direkter webcal:// Link zum Abonnieren in Kalender-Apps'),
 });
 
-function deriveCalendarUrls(request: { headers: Record<string, any>; protocol: string }, token: string) {
+export function deriveCalendarUrls(request: { headers: Record<string, any>; protocol: string }, token: string) {
+  const root = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '').toLowerCase();
   const forwardedHost = (request.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim();
-  const rawHost = forwardedHost || request.headers.host || (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
-  const host = rawHost.toLowerCase();
+  const rawHost = (forwardedHost || request.headers.host || root).split(':')[0].trim().toLowerCase();
+
+  const allowLocalhost = process.env.NODE_ENV !== 'production';
+  const isLocalHost = allowLocalhost && (rawHost === 'localhost' || rawHost === '127.0.0.1' || rawHost.endsWith('.localhost'));
+  const isValidHost = rawHost === root || rawHost.endsWith(`.${root}`) || isLocalHost;
+  const host = isValidHost ? rawHost : root;
 
   const forwardedProto = (request.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim();
   const isHttps =

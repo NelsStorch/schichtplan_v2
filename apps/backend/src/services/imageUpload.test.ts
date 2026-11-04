@@ -38,6 +38,8 @@ describe('unsafeSvgReason', () => {
     ['<svg><a href="javascript:alert(1)"><text>x</text></a></svg>'],
     ['<svg><foreignObject><div>x</div></foreignObject></svg>'],
     ['<svg><image href="https://evil.example/x.png"/></svg>'],
+    ['<svg><image href=\'https://evil.example/x.png\'/></svg>'],
+    ['<svg><image href=https://evil.example/x.png/></svg>'],
     ['<svg><style>@import "https://evil.example/x.css";</style></svg>'],
     ['<svg><rect style="fill:url(https://evil.example/x)"/></svg>'],
     ['<!DOCTYPE svg [<!ENTITY x "y">]><svg></svg>'],

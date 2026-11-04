@@ -30,8 +30,9 @@ const UNSAFE_SVG: [RegExp, string][] = [
   [/\son[a-z]+\s*=/i, 'Ereignis-Handler'],
   [/javascript\s*:/i, 'javascript-Adressen'],
   [/<!\s*ENTITY/i, 'Entity-Definitionen'],
-  // Verweise nur auf Elemente im selben Dokument (#id) oder eingebettete Bilddaten (data:)
-  [/(?:xlink:)?href\s*=\s*["'](?!\s*(?:#|data:image\/))/i, 'Verweise auf fremde Adressen'],
+  // Verweise nur auf Elemente im selben Dokument (#id) oder eingebettete Bilddaten (data:image/)
+  // Deckt sowohl zitierten ("...", '...') als auch unzitierten Syntax ab
+  [/(?:xlink:)?href\s*=\s*(?:["'](?!\s*(?:#|data:image\/))|(?![#"'\s]|data:image\/))/i, 'Verweise auf fremde Adressen'],
   [/@import|url\(\s*["']?\s*(?!#|data:)/i, 'fremde Stylesheet-Verweise'],
 ];
 

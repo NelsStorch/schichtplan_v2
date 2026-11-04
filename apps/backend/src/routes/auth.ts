@@ -38,6 +38,7 @@ import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
 import { trackUsage } from '../services/usageStats.js';
 import { withoutCeviDbAddress } from '../services/profile.js';
 import { syncCeviDbLeadership } from '../services/departmentLeaders.js';
+import { createRateLimiter } from '../services/rateLimit.js';
 
 import {
   loginFailuresByIp,
@@ -64,6 +65,13 @@ import {
   registrationAccepted,
   trackCeviDbFailure,
 } from '../services/authSession.js';
+
+export function hashVerificationToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/** Höchstens 30 Versuche pro IP in 10 Minuten, ein E-Mail-Token einzulösen */
+const verifyEmailByIp = createRateLimiter(10 * 60 * 1000, 30);
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   const CEVIDB_BASE_URL = process.env.CEVIDB_BASE_URL || 'https://db.cevi.ch';
@@ -856,7 +864,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
     trackUsage('REGISTER', { dim: 'password', departmentId: request.tenant?.id });
 
-    // Token erzeugen & altes löschen
+    // Token erzeugen & altes löschen (in der DB nur der SHA-256-Hash, wie beim Passwort-Reset)
     const verificationToken = crypto.randomBytes(32).toString('hex');
     await fastify.prisma.emailVerificationToken.deleteMany({
       where: { userId: user.id },
@@ -864,7 +872,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     await fastify.prisma.emailVerificationToken.create({
       data: {
         userId: user.id,
-        token: verificationToken,
+        token: hashVerificationToken(verificationToken),
         email: cleanEmail,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 Stunden
       },
@@ -931,7 +939,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     await fastify.prisma.emailVerificationToken.create({
       data: {
         userId: user.id,
-        token: verificationToken,
+        token: hashVerificationToken(verificationToken),
         email: cleanEmail,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
@@ -960,14 +968,19 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
+    if (verifyEmailByIp.hit(request.ip)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
     const parse = VerifyEmailSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({ error: parse.error.issues[0].message });
     }
 
     const { token } = parse.data;
-    const tokenRecord = await fastify.prisma.emailVerificationToken.findUnique({
-      where: { token },
+    const hashed = hashVerificationToken(token);
+    // Unterstützt gehashte Tokens sowie ältere Klartext-Tokens für nahtlose Rückwärtskompatibilität
+    const tokenRecord = await fastify.prisma.emailVerificationToken.findFirst({
+      where: { OR: [{ token: hashed }, { token }] },
       include: { user: true },
     });
 

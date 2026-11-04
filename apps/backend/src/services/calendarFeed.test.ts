@@ -89,3 +89,26 @@ describe('calendarFeed', () => {
     expect(ics.endsWith('\r\n')).toBe(true);
   });
 });
+
+describe('deriveCalendarUrls', () => {
+  it('übernimmt valide Subdomains und fällt bei manipulierten Host-Headern auf die Root-Domain zurück', async () => {
+    const { deriveCalendarUrls } = await import('../routes/calendar.js');
+
+    // Valider Aufruf
+    const valid = deriveCalendarUrls(
+      { headers: { host: 'illnau.cevi-schichtplan.ch' }, protocol: 'https' },
+      'tok123'
+    );
+    expect(valid.httpsUrl).toBe('https://illnau.cevi-schichtplan.ch/api/calendar/tok123.ics');
+    expect(valid.webcalUrl).toBe('webcal://illnau.cevi-schichtplan.ch/api/calendar/tok123.ics');
+
+    // Manipulierter X-Forwarded-Host Header (Host Header Injection / Poisoning)
+    const poisoned = deriveCalendarUrls(
+      { headers: { 'x-forwarded-host': 'evil.com', host: 'illnau.cevi-schichtplan.ch' }, protocol: 'https' },
+      'tok123'
+    );
+    // Verhindert evil.com und fällt sicher auf die Root-Domain zurück
+    expect(poisoned.httpsUrl).toBe('https://cevi-schichtplan.ch/api/calendar/tok123.ics');
+    expect(poisoned.webcalUrl).toBe('webcal://cevi-schichtplan.ch/api/calendar/tok123.ics');
+  });
+});

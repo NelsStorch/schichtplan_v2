@@ -29,4 +29,19 @@ describe('createRateLimiter', () => {
     limiter.reset('b');
     expect(limiter.isBlocked('b')).toBe(false);
   });
+
+  it('verwirft älteste Schlüssel bei Erreichen von maxKeys', () => {
+    // Limiter mit maximal 2 Schlüsseln
+    const limiter = createRateLimiter(10_000, 1, () => 0, 2);
+    limiter.hit('k1');
+    limiter.hit('k2');
+    expect(limiter.isBlocked('k1')).toBe(true);
+    expect(limiter.isBlocked('k2')).toBe(true);
+
+    // Dritter Schlüssel verdrängt k1 (ältesten Schlüssel)
+    limiter.hit('k3');
+    expect(limiter.isBlocked('k3')).toBe(true);
+    expect(limiter.isBlocked('k2')).toBe(true);
+    expect(limiter.isBlocked('k1')).toBe(false);
+  });
 });

@@ -60,7 +60,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         include: { organizers: true },
       });
 
-      if (!event) {
+      if (!event || (request.tenant && event.departmentId !== request.tenant.id)) {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
 
@@ -201,7 +201,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         include: { organizers: true },
       });
 
-      if (!event) {
+      if (!event || (request.tenant && event.departmentId !== request.tenant.id)) {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
       }
 
@@ -351,7 +351,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      if (!shift) {
+      if (!shift || (request.tenant && shift.event.departmentId !== request.tenant.id)) {
         return reply.status(404).send({ error: 'Schicht nicht gefunden' });
       }
 
@@ -522,7 +522,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         include: { event: { include: { organizers: true } } },
       });
 
-      if (!shift) {
+      if (!shift || (request.tenant && shift.event.departmentId !== request.tenant.id)) {
         return reply.status(404).send({ error: 'Schicht nicht gefunden' });
       }
 
@@ -569,7 +569,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      if (!shift) {
+      if (!shift || (request.tenant && shift.event.departmentId !== request.tenant.id)) {
         return reply.status(404).send({ error: 'Schicht nicht gefunden' });
       }
 

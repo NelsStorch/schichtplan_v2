@@ -74,7 +74,9 @@ export async function buildApp(): Promise<FastifyInstance> {
         },
       },
     } : true,
-    trustProxy: true, // Crucial behind Traefik reverse proxy!
+    // Traefik Reverse-Proxy & interne Docker-Netze (schichtplan_prod_proxy, app, data):
+    // Nur private/lokale Netze als Proxies vertrauen (verhindert IP-Spoofing via X-Forwarded-For von extern).
+    trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
   });
 
   // Base plugins
