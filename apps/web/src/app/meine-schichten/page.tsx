@@ -36,17 +36,7 @@ import { AppShell } from '@/components/AppShell';
 import { CalendarSubscribeDialog } from '@/components/CalendarSubscribeDialog';
 import { ReplacementDialog } from '@/components/event/ReplacementDialog';
 import { ApiError, api, errorMessage, loginUrl } from '@/lib/api';
-import {
-  dayKeyToIso,
-  fmtDayMonth,
-  fmtDuration,
-  fmtRelativeDay,
-  fmtTime,
-  fmtTimeRange,
-  fmtWeekday,
-  groupByBusinessDay,
-  hoursBetween,
-} from '@/lib/format';
+import { dayKeyToIso, fmtDayMonth, fmtDuration, fmtRelativeDay, fmtTime, fmtTimeRange, fmtWeekday, groupByBusinessDay, hoursBetween, shiftName } from '@/lib/format';
 import {
   detectClientDevice,
   downloadIcs,
@@ -70,7 +60,7 @@ const toCalendar = (s: MyShift): CalendarEntry => {
   const leaders = s.responsibles?.map((r) => r.displayName).join(', ');
   return {
     uid: s.signupId,
-    title: `${rolePrefix}${s.title}${taskSuffix} (${s.eventTitle})`,
+    title: `${rolePrefix}${s.title?.trim() || s.taskTitle || shiftName(s)}${s.title?.trim() ? taskSuffix : ''} (${s.eventTitle})`,
     description: [
       s.isResponsible ? `Rolle: ${s.responsibleRole || 'Leitung'}` : null,
       s.taskTitle && s.taskTitle !== s.title ? `Arbeit: ${s.taskTitle}` : null,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { shiftDisplayTitle } from '../services/shiftDto.js';
 import { FastifyPluginAsync } from 'fastify';
 import type { Prisma, PrismaClient } from '../db.js';
 import {
@@ -1350,7 +1351,7 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                 helperName: hName,
                 performedByUserId: request.user?.id || null,
                 performedByName: pLabel,
-                shiftTitle: su.shift.title || su.task?.title || 'Schicht',
+                shiftTitle: shiftDisplayTitle(su.shift, su.task),
                 shiftStartTime: su.shift.startTime,
                 shiftEndTime: su.shift.endTime,
                 taskTitle: su.task?.title || null,

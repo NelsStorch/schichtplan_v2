@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtDateRange, fmtDuration, fmtRelativeDay, fmtTime, groupByBusinessDay, hoursBetween } from './format';
+import { fmtDateRange, fmtDuration, fmtRelativeDay, fmtTime, groupByBusinessDay, hoursBetween, shiftName } from './format';
 
 describe('Zeitanzeige in Schweizer Zeit', () => {
   it('rechnet UTC im Sommer und im Winter korrekt um', () => {
@@ -42,5 +42,19 @@ describe('Tage eines Anlasses', () => {
     expect(fmtRelativeDay('2026-10-16T10:00:00Z', now)).toBe('gestern');
     expect(fmtRelativeDay('2026-10-22T10:00:00Z', now)).toBe('in 5 Tagen');
     expect(fmtRelativeDay('2026-10-14T10:00:00Z', now)).toBe('vor 3 Tagen');
+  });
+});
+
+describe('shiftName', () => {
+  const times = { startTime: '2026-10-17T16:00:00Z', endTime: '2026-10-17T20:00:00Z' };
+
+  it('nimmt den Titel, wenn einer gesetzt ist', () => {
+    expect(shiftName({ title: 'Bar', ...times })).toBe('Bar');
+  });
+
+  it('zeigt ohne Titel die Zeitspanne statt «null»', () => {
+    expect(shiftName({ title: null, ...times })).toBe('18:00–22:00');
+    expect(shiftName({ title: '   ', ...times })).toBe('18:00–22:00');
+    expect(shiftName({ ...times })).not.toContain('null');
   });
 });

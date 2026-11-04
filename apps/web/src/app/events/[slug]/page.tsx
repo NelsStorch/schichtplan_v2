@@ -60,17 +60,7 @@ import { replacementOffers, shiftStats, shiftTasks } from '@/components/event/sh
 import { AssignHelperDialog, DayResponsiblesDialog, OrganizerDialog, ShiftFormDialog } from '@/components/ShiftDialogs';
 import { ShiftDetailsDialog } from '@/components/ShiftDetailsDialog';
 import { ApiError, api, departmentSetupUrl, errorMessage, loginUrl, useLoginHref } from '@/lib/api';
-import {
-  businessDayKey,
-  dayKeyToIso,
-  fmtDateRange,
-  fmtDayMonth,
-  fmtShortWeekday,
-  fmtTime,
-  fmtWeekday,
-  groupByBusinessDay,
-  fmtTimeRange,
-} from '@/lib/format';
+import { businessDayKey, dayKeyToIso, fmtDateRange, fmtDayMonth, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay, fmtTimeRange, shiftName } from '@/lib/format';
 import { usePortal } from '@/lib/portal';
 import { useDynamicFavicon } from '@/lib/favicon';
 import type { EventDetails } from '@/lib/types';
@@ -393,7 +383,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         return {
           kind: 'direct',
           label: 'Direkter Anschluss',
-          title: `Direkter Anschluss an deine nächste Schicht «${next.title}» (${fmtTime(next.startTime)})`,
+          title: `Direkter Anschluss an deine nächste Schicht «${shiftName(next)}» (${fmtTime(next.startTime)})`,
         };
       }
       if (diffMins > 0) {
@@ -401,7 +391,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
         return {
           kind: 'break',
           label: `${dur} Pause danach`,
-          title: `${dur} Pause bis zu deiner nächsten Schicht «${next.title}» (${fmtTime(next.startTime)})`,
+          title: `${dur} Pause bis zu deiner nächsten Schicht «${shiftName(next)}» (${fmtTime(next.startTime)})`,
         };
       }
       return null;
@@ -416,7 +406,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       return {
         kind: 'direct',
         label: 'Direkt im Anschluss',
-        title: `Schliesst nahtlos an deine Schicht «${adjacent.title}» (${fmtTimeRange(adjacent.startTime, adjacent.endTime)}) an`,
+        title: `Schliesst nahtlos an deine Schicht «${shiftName(adjacent)}» (${fmtTimeRange(adjacent.startTime, adjacent.endTime)}) an`,
       };
     }
     return null;
@@ -444,11 +434,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
       });
       const handover = findShiftHandover(shift);
       const handoverDesc = handover
-        ? ` (${handover.overlapMinutes} Min. Übergabe mit «${handover.otherShift.title}»)`
+        ? ` (${handover.overlapMinutes} Min. Übergabe mit «${shiftName(handover.otherShift)}»)`
         : '';
+      // Titel sind optional: ohne Titel steht die Arbeit (oder die Zeitspanne) an dessen Stelle
+      const shiftTitle = shift.title?.trim();
+      const signedUpFor = shiftTitle
+        ? `${shiftTitle}${task && task.title !== shiftTitle ? ` · ${task.title}` : ''}`
+        : task?.title || shiftName(shift);
       toast({
         title: replacesSignupId ? 'Du hast die Schicht übernommen!' : 'Du bist eingetragen!',
-        description: `${shift.title}${task && task.title !== shift.title ? ` · ${task.title}` : ''}${handoverDesc}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
+        description: `${signedUpFor}${handoverDesc}, ${fmtWeekday(shift.startTime)} ab ${fmtTime(shift.startTime)}`,
       });
       await load();
     } catch (err) {
@@ -482,7 +477,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     if (conflict) {
       toast({
         title: 'Zeitkollision',
-        description: `Du bist zur gleichen Zeit bereits für die Schicht «${conflict.title}» (${fmtTimeRange(conflict.startTime, conflict.endTime)}) eingetragen.`,
+        description: `Du bist zur gleichen Zeit bereits für die Schicht «${shiftName(conflict)}» (${fmtTimeRange(conflict.startTime, conflict.endTime)}) eingetragen.`,
         tone: 'error',
       });
       return;
@@ -593,8 +588,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
     const ok = await confirm({
       title: name ? `${name} austragen?` : 'Aus Schicht austragen?',
       description: name
-        ? `${name} wird aus "${shift.title}" entfernt.`
-        : `Du wirst aus "${shift.title}" ausgetragen. Der Platz wird für andere frei.`,
+        ? `${name} wird aus "${shiftName(shift)}" entfernt.`
+        : `Du wirst aus "${shiftName(shift)}" ausgetragen. Der Platz wird für andere frei.`,
       confirmLabel: 'Austragen',
       tone: 'danger',
     });

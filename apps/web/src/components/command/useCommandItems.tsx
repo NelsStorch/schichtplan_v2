@@ -37,7 +37,7 @@ import { getCeviDbDataUrl, type EventDto, } from '@schichtplan/shared';
 import { useToast, type BadgeTone } from '@schichtplan/ui';
 import { api, useLoginHref } from '@/lib/api';
 import { eventStatus } from '@/components/EventTile';
-import { fmtShortDate, fmtShortWeekday, fmtTimeRange } from '@/lib/format';
+import { fmtShortDate, fmtShortWeekday, fmtTimeRange, shiftName } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
 import type { EventDetails } from '@/lib/types';
 import { useCommandPalette } from './CommandContext';
@@ -896,7 +896,7 @@ export function useCommandItems(query: string) {
         if (hasShifts) {
           const shiftSummaries = personShifts
             .slice(0, 2)
-            .map((s) => `${s.title} (${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)})`);
+            .map((s) => `${shiftName(s)} (${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)})`);
           subtitleText = `${personShifts.length} ${personShifts.length === 1 ? 'Schicht' : 'Schichten'}: ${shiftSummaries.join(', ')}${personShifts.length > 2 ? ` (+${personShifts.length - 2} weitere)` : ''}`;
         } else if (activeEvent) {
           subtitleText = `Keine Schichten in «${activeEvent.title}» · ${person.ceviName ? `«${person.ceviName}»` : person.role || 'Abteilungsmitglied'}`;
@@ -938,7 +938,7 @@ export function useCommandItems(query: string) {
             // 1. Aktionen für jede einzelne übernommene Schicht
             ...personShifts.map((s) => ({
               id: `person-shift-${s.shiftId}-${s.signupId}`,
-              title: `Schicht: ${s.title}${s.taskTitle ? ` (${s.taskTitle})` : ''}`,
+              title: `Schicht: ${s.title?.trim() || s.taskTitle || shiftName(s)}${s.title?.trim() && s.taskTitle ? ` (${s.taskTitle})` : ''}`,
               subtitle: `${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}${s.category ? ` · ${s.category}` : ''} · ${s.attendance === 'PRESENT' ? 'Eingecheckt' : 'Noch offen'}`,
               icon: <CalendarDays className="size-3.5 text-accent-ink" />,
               onSelect: () => {
@@ -1063,7 +1063,7 @@ export function useCommandItems(query: string) {
                   person.email ? `E-Mail: ${person.email}` : null,
                   person.phone ? `Telefon: ${person.phone}` : null,
                   hasShifts
-                    ? `Schichten in ${activeEvent?.title || 'Anlass'}: ${personShifts.map((s) => `${s.title} (${fmtTimeRange(s.startTime, s.endTime)})`).join(', ')}`
+                    ? `Schichten in ${activeEvent?.title || 'Anlass'}: ${personShifts.map((s) => `${shiftName(s)} (${fmtTimeRange(s.startTime, s.endTime)})`).join(', ')}`
                     : null,
                 ]
                   .filter(Boolean)

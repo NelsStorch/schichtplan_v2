@@ -27,7 +27,7 @@ import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { shiftTasks } from '@/components/event/shift-utils';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtTimeRange, groupByBusinessDay } from '@/lib/format';
+import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtTimeRange, groupByBusinessDay, shiftName } from '@/lib/format';
 import { formatMinutes } from '@/lib/helperStats';
 
 type Status = 'ALL' | 'WITH' | 'WITHOUT' | 'UNDER' | 'DEREGISTERED';
@@ -198,7 +198,7 @@ function HelpersPage() {
   const removeSignup = async (row: PersonRow, s: PersonShift) => {
     const ok = await confirm({
       title: `${row.name} austragen?`,
-      description: `Aus der Schicht «${s.title}».`,
+      description: `Aus der Schicht «${shiftName(s)}».`,
       confirmLabel: 'Austragen',
       tone: 'danger',
     });
@@ -485,7 +485,7 @@ function HelpersPage() {
                                 type="button"
                                 onClick={() => removeSignup(row, s)}
                                 className="shrink-0 rounded p-1 text-fg-subtle hover:bg-danger/10 hover:text-danger-ink"
-                                aria-label={`Aus ${s.title} austragen`}
+                                aria-label={`Aus ${shiftName(s)} austragen`}
                               >
                                 <X className="size-3.5" />
                               </button>
@@ -749,7 +749,7 @@ function AssignPersonToShiftDialog({
       });
       toast({
         title: `${row.name} eingeteilt`,
-        description: `${selectedShift.title}${chosenTask ? ` (${chosenTask.title})` : ''}`,
+        description: `${shiftName(selectedShift)}${chosenTask ? ` (${chosenTask.title})` : ''}`,
       });
       await onAssigned();
     } catch (err) {

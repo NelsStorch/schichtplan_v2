@@ -1,6 +1,6 @@
 import type { AttendanceStatus, EventRosterResponseDto } from '@schichtplan/shared';
 import { downloadCsv } from '@/lib/exportFile';
-import { fmtShortWeekday, fmtTimeRange } from '@/lib/format';
+import { fmtShortWeekday, fmtTimeRange, shiftName } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
 
 export interface HelperShiftInfo {
@@ -428,7 +428,7 @@ export function exportHelperHoursCsv(
     const shiftDetails = h.shifts
       .map(
         (s) =>
-          `${s.title}${s.taskTitle ? ` (${s.taskTitle})` : ''} ${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}`
+          `${shiftName(s)}${s.taskTitle ? ` (${s.taskTitle})` : ''} ${fmtShortWeekday(s.startTime)} ${fmtTimeRange(s.startTime, s.endTime)}`
       )
       .join(' | ');
 

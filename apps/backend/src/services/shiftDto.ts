@@ -33,3 +33,14 @@ export function toResponsiblePersonDto(
     email: allowEmail ? r.user.email : null,
   };
 }
+
+/**
+ * Anzeigename einer Schicht für Meldungen, Protokoll und Mails. Schichttitel sind optional:
+ * ohne Titel steht die Arbeit an dessen Stelle, sonst «Schicht».
+ */
+export function shiftDisplayTitle(
+  shift: { title?: string | null },
+  task?: { title?: string | null } | null
+): string {
+  return shift.title?.trim() || task?.title?.trim() || 'Schicht';
+}

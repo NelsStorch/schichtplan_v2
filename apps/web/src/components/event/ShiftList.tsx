@@ -3,7 +3,7 @@
 import { AlertCircle, Check, ChevronRight, Coffee, Hammer, Plus, Repeat, Timer, Zap } from 'lucide-react';
 import type { ShiftDto } from '@schichtplan/shared';
 import { Badge, Button, cn } from '@schichtplan/ui';
-import { businessDayKey, fmtDayMonth, fmtShortWeekday, fmtTime, fmtTimeRange } from '@/lib/format';
+import { businessDayKey, fmtDayMonth, fmtShortWeekday, fmtTime, fmtTimeRange, shiftName } from '@/lib/format';
 import { STATUS_STYLES, freeLabel, replacementOffers, shiftStats, shiftTasks } from './shift-utils';
 
 export interface ShiftPauseHint {
@@ -136,7 +136,7 @@ export function NeededShifts({
                     <div className="flex items-center gap-1">
                       {handover && (
                         <span
-                          title={`Überschneidet sich um ${handover.overlapMinutes} Min. mit «${handover.otherShift.title}» zur Übergabe`}
+                          title={`Überschneidet sich um ${handover.overlapMinutes} Min. mit «${shiftName(handover.otherShift)}» zur Übergabe`}
                           className="hidden sm:inline-flex items-center rounded-full bg-accent/15 px-1.5 py-0.5 text-2xs font-semibold text-accent-ink"
                         >
                           {handover.overlapMinutes}m
@@ -330,7 +330,7 @@ export function ShiftRows({ shifts, actions }: { shifts: ShiftDto[]; actions: Sh
                     <div className="flex items-center gap-1.5">
                       {handover && (
                         <span
-                          title={`Überschneidet sich um ${handover.overlapMinutes} Min. mit «${handover.otherShift.title}» zur Schichtübergabe`}
+                          title={`Überschneidet sich um ${handover.overlapMinutes} Min. mit «${shiftName(handover.otherShift)}» zur Schichtübergabe`}
                           className="hidden md:inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-2xs font-semibold text-accent-ink"
                         >
                           {handover.overlapMinutes}m Übergabe

@@ -1,4 +1,5 @@
 import { formatZurichDate, formatZurichTimeRange, replacementDeadline } from '@schichtplan/shared';
+import { shiftDisplayTitle } from './shiftDto.js';
 import type { PrismaClient } from '../db.js';
 import { usableEmail } from '../routes/eventMessages.js';
 import { sendReplacementTakenEmail } from './email.js';
@@ -79,7 +80,7 @@ export async function notifyReplacementTaken(
     name: replaced.user.ceviName || replaced.user.firstName,
     takenBy,
     eventTitle: event.title,
-    shiftTitle: shift.title?.trim() || 'Schicht',
+    shiftTitle: shiftDisplayTitle(shift),
     timeRangeFormatted,
     eventUrl: targetUrl,
     departmentName: department?.name,

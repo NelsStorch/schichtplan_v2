@@ -22,7 +22,7 @@ import { trackUsage } from '../services/usageStats.js';
 import { personLabel } from '../services/attendance.js';
 import { notifyReplacementTaken, replacementOpen } from '../services/replacement.js';
 import { EMAIL_REMINDER_MINUTES, PUSH_REMINDER_MINUTES } from '@schichtplan/shared';
-import { pastReminderMinutes, } from '../services/shiftDto.js';
+import { pastReminderMinutes, shiftDisplayTitle } from '../services/shiftDto.js';
 
 const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
   // Zeitkollisionen prüfen (für Eintragen-Vorschau oder Admin-Zuweisung)
@@ -575,7 +575,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
             performedByName: replaced
               ? personLabel(replaced.user, replaced.guestName)
               : isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
-            shiftTitle: shift.title || signup.task?.title || 'Schicht',
+            shiftTitle: shiftDisplayTitle(shift, signup.task),
             shiftStartTime: shift.startTime,
             shiftEndTime: shift.endTime,
             taskTitle: signup.task?.title || null,
@@ -715,7 +715,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
             helperName,
             performedByUserId: request.user?.id || null,
             performedByName: isSelf ? null : (performerName ? `${performerName} (OK)` : 'OK'),
-            shiftTitle: existingSignup.shift.title || existingSignup.task?.title || 'Schicht',
+            shiftTitle: shiftDisplayTitle(existingSignup.shift, existingSignup.task),
             shiftStartTime: existingSignup.shift.startTime,
             shiftEndTime: existingSignup.shift.endTime,
             taskTitle: existingSignup.task?.title || null,

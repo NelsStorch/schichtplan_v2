@@ -42,7 +42,7 @@ export function BulkShiftBar({
     toast({
       title: success.replace('{n}', String(res.updated)),
       description: res.skipped.length
-        ? `Nicht geändert: ${res.skipped.map((s) => `${s.title} (${s.reason})`).join(', ')}`
+        ? `Nicht geändert: ${res.skipped.map((s) => `${s.title?.trim() || "Schicht ohne Titel"} (${s.reason})`).join(', ')}`
         : undefined,
       tone: res.skipped.length ? 'error' : undefined,
     });

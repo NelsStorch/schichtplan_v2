@@ -32,6 +32,10 @@ export function fmtDateRange(startIso: string, endIso: string, cutoff?: string |
   return `${fmtShortDate(start)} bis ${fmtFullDate(end)}`;
 }
 
+/** Anzeigename einer Schicht: der Titel, oder die Zeitspanne wenn keiner gesetzt ist (Titel sind optional) */
+export const shiftName = (s: { title?: string | null; startTime: string; endTime: string }) =>
+  s.title?.trim() || fmtTimeRange(s.startTime, s.endTime);
+
 /** Dauer als "4 h" bzw. "4 h 30" */
 export function fmtDuration(startIso: string, endIso: string) {
   const minutes = Math.max(0, Math.round((+new Date(endIso) - +new Date(startIso)) / 60000));

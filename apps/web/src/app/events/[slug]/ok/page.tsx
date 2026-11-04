@@ -26,7 +26,7 @@ import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { ageWarnings } from '@/components/ok/shiftChecks';
 import { api } from '@/lib/api';
-import { dayKeyToIso, fmtDayMonth, fmtFullDate, fmtTime, fmtWeekday, groupByBusinessDay } from '@/lib/format';
+import { dayKeyToIso, fmtDayMonth, fmtFullDate, fmtTime, fmtWeekday, groupByBusinessDay, shiftName } from '@/lib/format';
 
 type TodoTone = 'warning' | 'info' | 'success';
 
@@ -97,7 +97,7 @@ export default function OkOverviewPage() {
         title: `Jugendschutz: ${warnings.length} Arbeit${warnings.length === 1 ? '' : 'en'} ohne volljährige Person`,
         text: warnings
           .slice(0, 3)
-          .map((w) => `${w.shift.title} (${w.task.title}, ab ${w.task.minAge})`)
+          .map((w) => `${shiftName(w.shift)} (${w.task.title}, ab ${w.task.minAge})`)
           .join(' · '),
         href: `${base}/schichten?warnung=1`,
         action: 'Schichten ansehen',
@@ -140,7 +140,7 @@ export default function OkOverviewPage() {
         title: `${count} Person${count === 1 ? ' sucht' : 'en suchen'} Ersatz`,
         text: replacementWanted
           .slice(0, 3)
-          .map((sh) => `${sh.title} (${fmtWeekday(sh.startTime)} ${fmtTime(sh.startTime)})`)
+          .map((sh) => `${shiftName(sh)} (${fmtWeekday(sh.startTime)} ${fmtTime(sh.startTime)})`)
           .join(' · '),
         href: `/events/${event.slug}`,
         action: 'Im Schichtplan ansehen',

@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
+import { shiftDisplayTitle } from './shiftDto.js';
 import type { ShiftTimeCollision } from '@schichtplan/shared';
 
 export interface CollisionCheckOptions {
@@ -123,7 +124,7 @@ export async function findShiftCollisions(
     return filtered.map((s) => ({
       signupId: s.id,
       shiftId: s.shift.id,
-      shiftTitle: s.shift.title || s.task?.title || 'Schicht',
+      shiftTitle: shiftDisplayTitle(s.shift, s.task),
       taskTitle: s.task?.title || null,
       startTime: s.shift.startTime.toISOString(),
       endTime: s.shift.endTime.toISOString(),
@@ -171,7 +172,7 @@ export async function findShiftCollisions(
     return filtered.map((s) => ({
       signupId: s.id,
       shiftId: s.shift.id,
-      shiftTitle: s.shift.title || s.task?.title || 'Schicht',
+      shiftTitle: shiftDisplayTitle(s.shift, s.task),
       taskTitle: s.task?.title || null,
       startTime: s.shift.startTime.toISOString(),
       endTime: s.shift.endTime.toISOString(),

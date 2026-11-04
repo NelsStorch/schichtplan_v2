@@ -12,7 +12,7 @@ import type {
 } from '@schichtplan/shared';
 import { Avatar, Badge, Button, Callout, Chip, Dialog, Field, Input, Select, Skeleton, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage, ApiError } from '@/lib/api';
-import { fmtShortWeekday, fmtTime, fmtWeekday, fmtTimeRange } from '@/lib/format';
+import { fmtShortWeekday, fmtTime, fmtWeekday, fmtTimeRange, shiftName } from '@/lib/format';
 import { shiftTasks } from '@/components/event/shift-utils';
 
 /* ---------------------------------------------------- Helfer durch OK einteilen */
@@ -587,7 +587,7 @@ function CandidateRow({
             </div>
           )}
         </div>
-        <div className="shrink-0 text-right" title={c.shifts.map((s) => `${s.title} ${fmtShortWeekday(s.startTime)} ${fmtTime(s.startTime)}`).join('\n') || undefined}>
+        <div className="shrink-0 text-right" title={c.shifts.map((s) => `${shiftName(s)} ${fmtShortWeekday(s.startTime)} ${fmtTime(s.startTime)}`).join('\n') || undefined}>
           <p
             className={cn(
               'font-display text-base font-bold leading-none',
