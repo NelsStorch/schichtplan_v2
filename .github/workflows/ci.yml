@@ -1,4 +1,4 @@
-# Typecheck und Tests bei jedem Push und Pull Request.
+# Lint, Typecheck und Tests bei jedem Push und Pull Request, dazu ein Build der vier Frontends.
 # Die API-Tests laufen gegen eine leere Postgres im Service-Container (nur für diesen Lauf).
 name: CI
 
@@ -53,6 +53,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Lint (Biome)
+        run: npm run lint
+
       - name: Migrationen auf die Test-DB
         working-directory: apps/backend
         run: npx prisma migrate deploy
@@ -61,3 +64,30 @@ jobs:
 
       - name: Tests
         run: npm test
+
+  # Die Frontends müssen sich bauen lassen (Typen allein reichen nicht: Next prüft auch Routen und Imports)
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Shared-Paket bauen
+        run: npm run build --workspace=packages/shared
+
+      - name: Frontends bauen
+        run: |
+          npm run build --workspace=apps/web
+          npm run build --workspace=apps/login
+          npm run build --workspace=apps/landing
+          npm run build --workspace=apps/admin
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

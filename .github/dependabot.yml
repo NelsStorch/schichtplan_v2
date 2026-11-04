@@ -1,0 +1,34 @@
+# Automatische Update-Vorschläge. Sie kommen als Pull Request und laufen durch die CI;
+# nichts wird ohne Prüfung übernommen.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 5
+    groups:
+      # Kleine Updates gebündelt, damit nicht jede Woche ein Dutzend Pull Requests entstehen
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: [dependencies]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies]
+
+  - package-ecosystem: docker
+    directories:
+      - /apps/backend
+      - /apps/web
+      - /apps/login
+      - /apps/landing
+      - /apps/admin
+    schedule:
+      interval: monthly
+    labels: [dependencies]
