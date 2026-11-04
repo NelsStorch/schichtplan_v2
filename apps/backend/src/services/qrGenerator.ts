@@ -77,6 +77,8 @@ export interface QrOptions {
   secondaryColor?: string | null;
   qrStyle?: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
   logoUrl?: string | null;
+  checkinEarlyMinutes?: number;
+  checkinLateMinutes?: number;
   prisma?: PrismaClient;
 }
 
@@ -236,7 +238,13 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
       .fillColor('#111827')
       .text(title, 40, 70, { width: 450 });
 
-    const subtitle = options.subtitle || 'Anwesenheit erfassen: Scann den QR-Code vor Beginn deiner Schicht.';
+    const earlyMin = options.checkinEarlyMinutes ?? 30;
+    const lateMin = options.checkinLateMinutes ?? 30;
+    const defaultSubtitle =
+      lateMin > 0
+        ? `Anwesenheit erfassen: Scann den QR-Code ${earlyMin > 0 ? `ab ${earlyMin} Min. vor` : 'ab'} Beginn bis ${lateMin} Min. nach deiner Schicht.`
+        : 'Anwesenheit erfassen: Scann den QR-Code vor Beginn deiner Schicht.';
+    const subtitle = options.subtitle && !options.subtitle.startsWith('Anwesenheit:') ? options.subtitle : defaultSubtitle;
     doc
       .font('Helvetica')
       .fontSize(11.5)
@@ -403,6 +411,10 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
     });
 
     // 5. Zeitfenster-Infobox
+    const earlyText = earlyMin === 0 ? 'bei Schichtbeginn' : `${earlyMin} Minuten vor deinem Schichtbeginn`;
+    const lateText = lateMin === 0 ? 'bis zum Schichtende' : `bis ${lateMin} Minuten nach deinem Schichtende`;
+    const windowText = `Der Selbst-Check-in öffnet jeweils ${earlyText} und bleibt ${lateText} aktiv.`;
+
     const noticeY = 660;
     doc
       .roundedRect(40, noticeY, 515.28, 54, 8)
@@ -419,7 +431,7 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
       .fontSize(9)
       .fillColor('#15803d')
       .text(
-        'Der Selbst-Check-in öffnet jeweils 30 Minuten vor deinem Schichtbeginn und bleibt bis zum Schichtende aktiv.',
+        windowText,
         56,
         noticeY + 28,
         { width: 480 }

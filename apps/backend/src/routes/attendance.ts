@@ -188,7 +188,9 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       const now = new Date();
-      const due = signups.filter((s) => isInCheckinWindow(s.shift.startTime, s.shift.endTime, now));
+      const earlyMin = event.checkinEarlyMinutes ?? 30;
+      const lateMin = event.checkinLateMinutes ?? 30;
+      const due = signups.filter((s) => isInCheckinWindow(s.shift.startTime, s.shift.endTime, now, earlyMin, lateMin));
       const toMark = due.filter((s) => s.attendance !== 'PRESENT');
       const myName = personLabel(me);
 
@@ -223,6 +225,8 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
       const next = due.length === 0 ? signups.find((s) => s.shift.startTime > now) : undefined;
       const result: CheckinResultDto = {
         eventTitle: event.title,
+        checkinEarlyMinutes: earlyMin,
+        checkinLateMinutes: lateMin,
         checkedIn: due.map((s) => ({
           signupId: s.id,
           shiftTitle: s.shift.title,
@@ -321,15 +325,24 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
       const format = request.query.format === 'pdf' ? 'pdf' : 'svg';
       let file: Buffer;
       try {
+        const qrColor = request.tenant.qrCustomColors && request.tenant.qrColorPrimary
+          ? request.tenant.qrColorPrimary
+          : request.tenant.primaryColor;
+        const qrSecondary = request.tenant.qrCustomColors && request.tenant.qrColorSecondary
+          ? request.tenant.qrColorSecondary
+          : request.tenant.secondaryColor;
+
         file = await fetchCeviQrCode(format, {
           text: checkinUrl(request.tenant.slug, event.slug, event.checkinToken),
           title: event.title,
           subtitle: 'Anwesenheit: QR-Code scannen und einchecken',
-          color: request.tenant.primaryColor,
-          secondaryColor: request.tenant.secondaryColor,
+          color: qrColor,
+          secondaryColor: qrSecondary,
           qrStyle: (request.tenant.qrStyle as 'CORNERS' | 'GRADIENT' | 'SOLID') || 'CORNERS',
           logoUrl: event.logoUrl || request.tenant.logoUrl,
           departmentName: request.tenant.name,
+          checkinEarlyMinutes: event.checkinEarlyMinutes ?? 30,
+          checkinLateMinutes: event.checkinLateMinutes ?? 30,
           prisma: fastify.prisma,
         });
       } catch (err) {

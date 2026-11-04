@@ -17,9 +17,18 @@ describe('isInCheckinWindow', () => {
     expect(isInCheckinWindow(start, end, new Date('2030-06-01T17:30:00Z'))).toBe(true);
   });
 
-  it('gilt bis zum Schichtende', () => {
+  it('gilt standardmässig bis 30 Minuten nach Schichtende', () => {
     expect(isInCheckinWindow(start, end, new Date('2030-06-01T22:00:00Z'))).toBe(true);
-    expect(isInCheckinWindow(start, end, new Date('2030-06-01T22:00:01Z'))).toBe(false);
+    expect(isInCheckinWindow(start, end, new Date('2030-06-01T22:30:00Z'))).toBe(true);
+    expect(isInCheckinWindow(start, end, new Date('2030-06-01T22:30:01Z'))).toBe(false);
+  });
+
+  it('berücksichtigt konfigurierte Vorlauf- und Nachlaufzeiten', () => {
+    // 15 Min vor Beginn bis 45 Min nach Ende
+    expect(isInCheckinWindow(start, end, new Date('2030-06-01T17:44:59Z'), 15, 45)).toBe(false);
+    expect(isInCheckinWindow(start, end, new Date('2030-06-01T17:45:00Z'), 15, 45)).toBe(true);
+    expect(isInCheckinWindow(start, end, new Date('2030-06-01T22:45:00Z'), 15, 45)).toBe(true);
+    expect(isInCheckinWindow(start, end, new Date('2030-06-01T22:45:01Z'), 15, 45)).toBe(false);
   });
 });
 

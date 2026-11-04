@@ -13,9 +13,16 @@ export function generateCheckinToken(): string {
 }
 
 /** Liegt `now` im Check-in-Fenster der Schicht (ab 30 Min. vor Beginn bis Schichtende)? */
-export function isInCheckinWindow(startTime: Date, endTime: Date, now: Date = new Date()): boolean {
-  const opens = startTime.getTime() - CHECKIN_EARLY_MINUTES * 60_000;
-  return now.getTime() >= opens && now.getTime() <= endTime.getTime();
+export function isInCheckinWindow(
+  startTime: Date,
+  endTime: Date,
+  now: Date = new Date(),
+  earlyMinutes: number = CHECKIN_EARLY_MINUTES,
+  lateMinutes: number = 30
+): boolean {
+  const opens = startTime.getTime() - earlyMinutes * 60_000;
+  const closes = endTime.getTime() + lateMinutes * 60_000;
+  return now.getTime() >= opens && now.getTime() <= closes;
 }
 
 /** Link im QR-Code: https://<abteilung>.<domain>/events/<slug>/checkin?code=<token> */
@@ -55,6 +62,8 @@ export interface QrCodeInput {
   qrStyle?: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
   logoUrl?: string | null;
   departmentName?: string;
+  checkinEarlyMinutes?: number;
+  checkinLateMinutes?: number;
   prisma?: PrismaClient;
 }
 
