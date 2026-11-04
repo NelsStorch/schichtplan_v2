@@ -104,6 +104,7 @@ model UserStufe {
   stufe     DepartmentStufe @relation(fields: [stufeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, stufeId])
+  @@index([stufeId])
   @@map("user_stufen")
 }
 
@@ -201,6 +202,7 @@ model DepartmentMember {
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([departmentId, userId])
+  @@index([userId])
   @@map("department_members")
 }
 
@@ -274,6 +276,7 @@ model EventAllowedDepartment {
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
   @@id([eventId, departmentId])
+  @@index([departmentId])
   @@map("event_allowed_departments")
 }
 
@@ -284,6 +287,7 @@ model EventAllowedStufe {
   stufe   DepartmentStufe @relation(fields: [stufeId], references: [id], onDelete: Cascade)
 
   @@id([eventId, stufeId])
+  @@index([stufeId])
   @@map("event_allowed_stufen")
 }
 
@@ -304,6 +308,7 @@ model EventQuestion {
   answers   EventAnswer[]
   signupAnswers ShiftSignupAnswer[]
 
+  @@index([eventId])
   @@map("event_questions")
 }
 
@@ -319,6 +324,8 @@ model EventAnswer {
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([questionId, userId])
+  @@index([eventId])
+  @@index([userId])
   @@map("event_answers")
 }
 
@@ -332,6 +339,7 @@ model ShiftSignupAnswer {
   question   EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([signupId, questionId])
+  @@index([questionId])
   @@map("shift_signup_answers")
 }
 
@@ -349,6 +357,7 @@ model EventAccessLink {
   event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   grants      EventAccessGrant[]
 
+  @@index([eventId])
   @@map("event_access_links")
 }
 
@@ -363,6 +372,8 @@ model EventAccessGrant {
   link      EventAccessLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+  @@index([userId])
+  @@index([linkId])
   @@map("event_access_grants")
 }
 
@@ -377,6 +388,7 @@ model EventOrganizer {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+  @@index([userId])
   @@map("event_organizers")
 }
 
@@ -399,6 +411,7 @@ model Shift {
   responsibles    ShiftResponsible[]
   signupLogs      ShiftSignupLog[]
 
+  @@index([eventId, startTime])
   @@map("shifts")
 }
 
@@ -414,6 +427,7 @@ model TaskDefinition {
   department         Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   shiftTasks         ShiftTask[]
 
+  @@index([departmentId])
   @@map("task_definitions")
 }
 
@@ -432,6 +446,8 @@ model ShiftTask {
   taskDefinition     TaskDefinition? @relation(fields: [taskDefinitionId], references: [id], onDelete: SetNull)
   signups            ShiftSignup[]
 
+  @@index([shiftId])
+  @@index([taskDefinitionId])
   @@map("shift_tasks")
 }
 
@@ -469,6 +485,9 @@ model ShiftSignup {
   user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   answers     ShiftSignupAnswer[]
 
+  @@index([shiftId])
+  @@index([userId])
+  @@index([taskId])
   @@map("shift_signups")
 }
 
@@ -488,6 +507,7 @@ model EventTemplate {
   updatedAt             DateTime   @updatedAt
   department            Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
+  @@index([departmentId])
   @@map("event_templates")
 }
 
@@ -503,6 +523,7 @@ model EventDeregistration {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+  @@index([userId])
   @@map("event_deregistrations")
 }
 
@@ -555,6 +576,7 @@ model ShiftResponsible {
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([shiftId, userId])
+  @@index([userId])
   @@map("shift_responsibles")
 }
 
@@ -582,6 +604,7 @@ model EventDayResponsible {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, dayDate, userId])
+  @@index([userId])
   @@map("event_day_responsibles")
 }
 
@@ -609,6 +632,7 @@ model ShiftSignupLog {
   performedByUser   User?     @relation("PerformedByUser", fields: [performedByUserId], references: [id], onDelete: SetNull)
 
   @@index([eventId, createdAt])
+  @@index([shiftId])
   @@map("shift_signup_logs")
 }
 
