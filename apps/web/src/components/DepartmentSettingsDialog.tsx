@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Check, QrCode, Settings2 } from 'lucide-react';
 import type { DepartmentPermission } from '@schichtplan/shared';
 import { Button, Callout, Dialog, Field, Input, Select, Switch, applyAccent, cn, useToast } from '@schichtplan/ui';
@@ -42,14 +42,20 @@ export function DepartmentSettingsDialog({
   initialTab?: TabKey;
 }) {
   const { department, can } = usePortal();
-  const tabs = TABS.filter((t) => t.isAllowed(can));
+  const tabs = useMemo(() => TABS.filter((t) => t.isAllowed(can)), [can]);
   const [tab, setTab] = useState<TabKey>(initialTab ?? tabs[0]?.key ?? 'general');
 
   useEffect(() => {
-    if (initialTab && tabs.some((t) => t.key === initialTab)) {
+    if (!open) return;
+    if (initialTab && TABS.some((t) => t.key === initialTab && t.isAllowed(can))) {
       setTab(initialTab);
+    } else {
+      const firstAllowed = TABS.find((t) => t.isAllowed(can))?.key ?? 'general';
+      setTab(firstAllowed);
     }
-  }, [initialTab, tabs]);
+    // Nur beim Öffnen oder gezielten Wechsel von initialTab synchronisieren
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialTab]);
 
   const activeTab = tabs.some((t) => t.key === tab) ? tab : (tabs[0]?.key ?? 'general');
   const close = () => {
