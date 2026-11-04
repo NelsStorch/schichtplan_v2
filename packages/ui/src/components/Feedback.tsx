@@ -30,6 +30,7 @@ const toastIcon = {
 function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const nextId = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const dismiss = useCallback((id: number) => {
     setToasts((all) => all.filter((t) => t.id !== id));
@@ -40,17 +41,53 @@ function ToastProvider({ children }: { children: ReactNode }) {
       const id = ++nextId.current;
       setToasts((all) => [...all.slice(-2), { ...toast, id }]);
       window.setTimeout(() => dismiss(id), toast.tone === 'error' ? 7000 : 4500);
+
+      // Falls ein nativer <dialog> (Top Layer) aktiv ist, befördert showPopover() die Toasts darüber
+      if (typeof window !== 'undefined') {
+        window.requestAnimationFrame(() => {
+          const el = containerRef.current;
+          if (el && typeof el.showPopover === 'function') {
+            try {
+              if (el.matches && el.matches(':popover-open')) {
+                el.hidePopover();
+              }
+              el.showPopover();
+            } catch {
+              // Browser ohne Popover-API ignorieren
+            }
+          }
+        });
+      }
     },
     [dismiss]
   );
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof el.showPopover !== 'function') return;
+    if (toasts.length === 0) {
+      try {
+        if (el.matches && el.matches(':popover-open')) {
+          el.hidePopover();
+        }
+      } catch {
+        // Ignorieren
+      }
+    }
+  }, [toasts.length]);
+
   return (
     <ToastContext.Provider value={push}>
       {children}
-      {/* Mobile über der Tab-Leiste, Desktop unten rechts */}
+      {/* Mobile über der Tab-Leiste, Desktop unten rechts. popover="manual" hebt Toasts in den Top-Layer über native <dialog> */}
       <div
+        ref={containerRef}
+        popover="manual"
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-toast flex flex-col items-center gap-2 px-4 md:inset-x-auto md:bottom-6 md:right-6 md:items-end"
+        className={cn(
+          'pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-toast flex flex-col items-center gap-2 px-4 md:inset-x-auto md:bottom-6 md:right-6 md:items-end',
+          'm-0 border-0 bg-transparent p-0 overflow-visible'
+        )}
       >
         {toasts.map((t) => (
           <div

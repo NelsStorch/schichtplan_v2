@@ -69,6 +69,13 @@
   --animate-shimmer: shimmer 2.2s linear infinite;
   --animate-ring-fill: ring-fill 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-pop: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shake: shake 0.4s ease-in-out;
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+  }
 
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(12px); }
@@ -124,6 +131,13 @@
   --accent-ink-light: 190 18 60;
   --accent-ink-dark: 251 113 133;
   color-scheme: light;
+}
+
+[popover] {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
 }
 
 @media (prefers-color-scheme: dark) {

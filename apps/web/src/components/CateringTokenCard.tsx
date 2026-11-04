@@ -49,7 +49,7 @@ function getTokenIcon(title: string) {
   return <Ticket className="size-5 shrink-0" />;
 }
 
-const MIN_DRAG_DURATION_MS = 450;
+const MIN_DRAG_DURATION_MS = 350;
 const REDEEM_THRESHOLD = 0.95;
 
 export function CateringTokenCard({
@@ -67,6 +67,14 @@ export function CateringTokenCard({
   const dragStartXRef = useRef<number>(0);
   const dragStartTimeRef = useRef<number>(0);
   const currentProgressRef = useRef<number>(0);
+  const [speedWarning, setSpeedWarning] = useState(false);
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    };
+  }, []);
 
   // Live-Uhrzeit & Countdown für die 2-Minuten-Bestätigung (Screenshot-Prävention)
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -153,6 +161,8 @@ export function CateringTokenCard({
   const handleThumbPointerDown = (e: React.PointerEvent) => {
     if (!token.isAvailableNow || token.status !== 'AVAILABLE' || isRedeeming) return;
     e.stopPropagation();
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    setSpeedWarning(false);
     dragStartXRef.current = e.clientX;
     dragStartTimeRef.current = Date.now();
     currentProgressRef.current = 0;
@@ -186,6 +196,9 @@ export function CateringTokenCard({
       void handleRedeem();
     } else {
       if (finalProgress >= REDEEM_THRESHOLD && elapsedMs < MIN_DRAG_DURATION_MS) {
+        setSpeedWarning(true);
+        if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+        warningTimerRef.current = setTimeout(() => setSpeedWarning(false), 3800);
         toast({
           title: 'Bitte langsam schieben',
           description: 'Zum Schutz vor versehentlichem Entwerten den Regler langsam bis zum Ende ziehen und loslassen.',
@@ -319,20 +332,27 @@ export function CateringTokenCard({
           {token.status === 'AVAILABLE' && (
             <div className="pt-1">
               {token.isAvailableNow ? (
-                <div
-                  ref={sliderTrackRef}
+                <>
+                  <div
+                    ref={sliderTrackRef}
                   className={cn(
-                    'relative select-none touch-none h-13 w-full rounded-full border overflow-hidden flex items-center p-1 transition-colors',
-                    isReadyToRelease
-                      ? 'bg-success/15 border-success/50'
-                      : 'bg-accent/10 border-accent/30'
+                    'relative select-none touch-none h-13 w-full rounded-full border overflow-hidden flex items-center p-1 transition-all',
+                    speedWarning
+                      ? 'bg-warning/20 border-warning ring-2 ring-warning/30 animate-shake'
+                      : isReadyToRelease
+                        ? 'bg-success/15 border-success/50'
+                        : 'bg-accent/10 border-accent/30'
                   )}
                 >
                   {/* Füllbalken der dem Ziehen folgt */}
                   <div
                     className={cn(
                       'absolute left-0 top-0 bottom-0 rounded-full pointer-events-none',
-                      isReadyToRelease ? 'bg-success/25' : 'bg-accent/20',
+                      speedWarning
+                        ? 'bg-warning/30'
+                        : isReadyToRelease
+                          ? 'bg-success/25'
+                          : 'bg-accent/20',
                       !isDragging && 'transition-all duration-300'
                     )}
                     style={{ width: `${Math.min(100, Math.max(12, swipeProgress * 100))}%` }}
@@ -342,16 +362,22 @@ export function CateringTokenCard({
                   <div
                     className={cn(
                       'absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-bold tracking-wide pl-12 pr-4 text-center',
-                      isReadyToRelease ? 'text-success-ink' : 'text-accent-ink'
+                      speedWarning
+                        ? 'text-warning-ink font-extrabold'
+                        : isReadyToRelease
+                          ? 'text-success-ink'
+                          : 'text-accent-ink'
                     )}
                   >
                     {isRedeeming
                       ? 'Wird entwertet…'
-                      : isReadyToRelease
-                        ? 'Jetzt loslassen zum Entwerten!'
-                        : swipeProgress > 0.15
-                          ? `Weiter bis ganz nach rechts ziehen (${Math.round(swipeProgress * 100)}%)…`
-                          : 'Regler links fassen & ganz nach rechts ziehen'}
+                      : speedWarning
+                        ? '⚠️ Zu schnell – bitte langsam nach rechts ziehen!'
+                        : isReadyToRelease
+                          ? 'Jetzt loslassen zum Entwerten!'
+                          : swipeProgress > 0.15
+                            ? `Weiter bis ganz nach rechts ziehen (${Math.round(swipeProgress * 100)}%)…`
+                            : 'Regler links fassen & ganz nach rechts ziehen'}
                   </div>
 
                   {/* Verschiebbarer Schieberegler (Thumb) – NUR hier startet das Ziehen */}
@@ -390,6 +416,13 @@ export function CateringTokenCard({
                     )}
                   </div>
                 </div>
+
+                {speedWarning && (
+                  <div className="mt-2 flex items-center justify-center gap-1.5 rounded-lg bg-warning/15 border border-warning/30 px-3 py-1.5 text-xs font-medium text-warning-ink animate-in fade-up">
+                    <span>⚠️ <strong>Zu schnell geschoben:</strong> Bitte den Knopf langsam und gleichmässig ganz nach rechts ziehen.</span>
+                  </div>
+                )}
+              </>
               ) : (
                 <div className="rounded-lg bg-bg-muted/30 border border-border/50 p-2.5 text-center text-xs text-fg-muted">
                   Gutschein ist am Festtag ab{' '}
