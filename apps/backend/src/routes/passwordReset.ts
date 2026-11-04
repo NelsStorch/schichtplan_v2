@@ -17,7 +17,7 @@ import { RequestPasswordResetSchema, ResetPasswordSchema } from '@schichtplan/sh
 import { sendPasswordResetEmail } from '../services/email.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 import { RATE_LIMIT_ERROR } from '../services/ceviNameLogin.js';
-import { getLoginPortalBaseUrl } from './auth.js';
+import { getLoginPortalBaseUrl } from '../services/authSession.js';
 import { trackUsage } from '../services/usageStats.js';
 
 export const PASSWORD_RESET_TTL_HOURS = 2;

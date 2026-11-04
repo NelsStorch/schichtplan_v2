@@ -11,7 +11,7 @@ import type {
 } from '@schichtplan/shared';
 import { AdminBatchDeleteUsersSchema, normalizePermissions } from '@schichtplan/shared';
 import { hashResetToken } from './passwordReset.js';
-import { getLoginPortalBaseUrl } from './auth.js';
+import { getLoginPortalBaseUrl } from '../services/authSession.js';
 import { toCeviDbStufeDto } from '../services/homeDepartment.js';
 import { recordAdminAction } from '../services/adminAudit.js';
 
