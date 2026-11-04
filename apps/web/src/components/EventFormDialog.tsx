@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
-import { AlertCircle, AlertTriangle, CalendarPlus, Check, ChevronDown, Crown, LifeBuoy, Loader2, Palette, Plus, Shield, Trash2, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CalendarPlus, Check, ChevronDown, Crown, LifeBuoy, Loader2, Palette, Plus, QrCode, Shield, Trash2, Users } from 'lucide-react';
 import {
   ATTENDANCE_MODES,
   REPLACEMENT_CUTOFF_HOURS,
@@ -43,6 +43,8 @@ export interface EventFormValues {
   contactVisibility: EventContactVisibility;
   signupOpensAt: string;
   attendanceMode: AttendanceMode;
+  checkinEarlyMinutes: number;
+  checkinLateMinutes: number;
   /** «Ersatz gesucht» erlaubt, bis so viele Stunden vor Schichtbeginn */
   allowReplacement: boolean;
   replacementCutoffHours: number;
@@ -68,6 +70,8 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     contactVisibility: event.contactVisibility ?? 'BOTH',
     signupOpensAt: event.signupOpensAt ? toZurichInput(event.signupOpensAt) : '',
     attendanceMode: event.attendanceMode ?? 'OFF',
+    checkinEarlyMinutes: event.checkinEarlyMinutes ?? 30,
+    checkinLateMinutes: event.checkinLateMinutes ?? 30,
     allowReplacement: event.allowReplacement ?? true,
     replacementCutoffHours: event.replacementCutoffHours ?? 0,
     access: {
@@ -121,6 +125,8 @@ const EMPTY: EventFormValues = {
   contactVisibility: 'BOTH',
   signupOpensAt: '',
   attendanceMode: 'OFF',
+  checkinEarlyMinutes: 30,
+  checkinLateMinutes: 30,
   allowReplacement: true,
   replacementCutoffHours: 0,
   access: EMPTY_ACCESS,
@@ -385,6 +391,8 @@ export function EventForm({
           contactVisibility: form.contactVisibility,
           signupOpensAt: form.signupOpensAt ? zurichInputToIso(form.signupOpensAt) : null,
           attendanceMode: form.attendanceMode,
+          checkinEarlyMinutes: form.checkinEarlyMinutes,
+          checkinLateMinutes: form.checkinLateMinutes,
           allowReplacement: form.allowReplacement,
           replacementCutoffHours: form.replacementCutoffHours,
           ...accessPayload(form.access),
@@ -540,6 +548,8 @@ export function EventForm({
         contactVisibility: form.contactVisibility,
         signupOpensAt: form.signupOpensAt ? zurichInputToIso(form.signupOpensAt) : null,
         attendanceMode: form.attendanceMode,
+        checkinEarlyMinutes: form.checkinEarlyMinutes,
+        checkinLateMinutes: form.checkinLateMinutes,
         allowReplacement: form.allowReplacement,
         replacementCutoffHours: form.replacementCutoffHours,
         ...accessPayload(form.access, mode === 'create'),
@@ -1192,7 +1202,7 @@ export function EventForm({
       >
         <Field
           label="Anwesenheitsliste"
-          hint="Das OK hakt pro Schicht ab, wer da war. Mit QR-Code checken sich die Helfenden zusätzlich selbst ein (ab 30 Minuten vor Schichtbeginn bis Schichtende)."
+          hint="Das OK hakt pro Schicht ab, wer da war. Mit QR-Code checken sich die Helfenden zusätzlich selbst ein."
         >
           <Select
             value={form.attendanceMode}
@@ -1205,6 +1215,56 @@ export function EventForm({
             ))}
           </Select>
         </Field>
+
+        {form.attendanceMode === 'OK_AND_QR' && (
+          <div className="mt-4 space-y-4 rounded-xl border border-line bg-surface-2/40 p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-fg">
+              <QrCode className="size-4 text-accent-ink" />
+              <span>QR-Code Selbst-Check-in Zeitfenster</span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field
+                label="Check-in vor Schichtbeginn"
+                hint="Ab wann vor Beginn sich Helfende einchecken dürfen."
+              >
+                <Select
+                  value={String(form.checkinEarlyMinutes)}
+                  onChange={(e) => set('checkinEarlyMinutes', Number(e.target.value))}
+                >
+                  <option value="0">Erst ab Schichtbeginn (0 Min.)</option>
+                  <option value="15">15 Minuten vorher</option>
+                  <option value="30">30 Minuten vorher (Standard)</option>
+                  <option value="45">45 Minuten vorher</option>
+                  <option value="60">1 Stunde vorher</option>
+                  <option value="90">1.5 Stunden vorher</option>
+                  <option value="120">2 Stunden vorher</option>
+                  <option value="180">3 Stunden vorher</option>
+                </Select>
+              </Field>
+
+              <Field
+                label="Check-in nach Schichtende"
+                hint="Bis wann nach Schichtende man sich noch eintragen kann."
+              >
+                <Select
+                  value={String(form.checkinLateMinutes)}
+                  onChange={(e) => set('checkinLateMinutes', Number(e.target.value))}
+                >
+                  <option value="0">Genau bis Schichtende (0 Min.)</option>
+                  <option value="15">Bis 15 Minuten danach</option>
+                  <option value="30">Bis 30 Minuten danach (Standard)</option>
+                  <option value="45">Bis 45 Minuten danach</option>
+                  <option value="60">Bis 1 Stunde danach</option>
+                  <option value="90">Bis 1.5 Stunden danach</option>
+                  <option value="120">Bis 2 Stunden danach</option>
+                </Select>
+              </Field>
+            </div>
+            <p className="text-xs text-fg-subtle">
+              Das ausdruckbare A4-Aushangplakat übernimmt diese Zeiten automatisch in der Hinweisbox für die Helfenden.
+            </p>
+          </div>
+        )}
 
       </S>
 

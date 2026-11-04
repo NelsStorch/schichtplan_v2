@@ -30,7 +30,14 @@ export default function CheckinPage({ params }: { params: Promise<{ slug: string
       return;
     }
     started.current = true;
-    const code = new URLSearchParams(window.location.search).get('code') ?? '';
+    const code = (new URLSearchParams(window.location.search).get('code') ?? '').trim();
+    if (!code || code.length < 10) {
+      setState({
+        kind: 'error',
+        message: 'Im Link fehlt ein gültiger Check-in-Code. Bitte scanne den offiziellen QR-Code direkt auf dem Plakat am Anlass vor Ort.',
+      });
+      return;
+    }
     api<CheckinResultDto>(`/api/events/${slug}/checkin`, { method: 'POST', json: { code } })
       .then((result) => setState({ kind: 'done', result }))
       .catch((err) => setState({ kind: 'error', message: errorMessage(err) }));
@@ -96,7 +103,13 @@ function CheckinResult({ slug, result, name }: { slug: string; result: CheckinRe
         title={result.nextShift ? 'Deine Schicht hat noch nicht begonnen' : 'Gerade keine Schicht für dich'}
         description={
           result.nextShift
-            ? `Deine nächste Schicht${result.nextShift.shiftTitle?.trim() ? ` «${result.nextShift.shiftTitle}»` : ''} beginnt ${fmtWeekday(result.nextShift.startTime)} um ${fmtTime(result.nextShift.startTime)}. Einchecken geht ab 30 Minuten vorher: scann den QR-Code dann nochmals.`
+            ? `Deine nächste Schicht${result.nextShift.shiftTitle?.trim() ? ` «${result.nextShift.shiftTitle}»` : ''} beginnt ${fmtWeekday(result.nextShift.startTime)} um ${fmtTime(result.nextShift.startTime)}. ${(() => {
+            const early = result.checkinEarlyMinutes ?? 30;
+            const late = result.checkinLateMinutes ?? 30;
+            const earlyPart = early === 0 ? 'ab Schichtbeginn' : `ab ${early} Minuten vorher`;
+            const latePart = late === 0 ? 'bis Schichtende' : `bis ${late} Minuten nach Schichtende`;
+            return `Einchecken geht ${earlyPart} ${latePart}: scann den QR-Code dann nochmals.`;
+          })()}`
             : `Du bist bei «${result.eventTitle}» in keiner laufenden oder kommenden Schicht eingetragen. Melde dich beim OK, wenn du trotzdem hilfst.`
         }
         action={actions}

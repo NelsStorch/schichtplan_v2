@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { Check, Settings2 } from 'lucide-react';
+import { Check, QrCode, Settings2 } from 'lucide-react';
 import type { DepartmentPermission } from '@schichtplan/shared';
 import { Button, Callout, Dialog, Field, Input, Select, Switch, applyAccent, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
@@ -97,6 +97,9 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
     secondaryColor: department?.secondaryColor ?? '#003d8f',
     qrStyle: (department?.qrStyle as 'CORNERS' | 'GRADIENT' | 'SOLID') ?? 'CORNERS',
     enableTwoTone: Boolean(department?.secondaryColor),
+    qrCustomColors: department?.qrCustomColors ?? false,
+    qrColorPrimary: department?.qrColorPrimary ?? '#0f172a',
+    qrColorSecondary: department?.qrColorSecondary ?? '#e11d48',
     membersOnly: department?.membersOnly ?? true,
   });
   const [saving, setSaving] = useState(false);
@@ -118,6 +121,14 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
     setForm((f) => ({ ...f, secondaryColor: color }));
   };
 
+  const pickQrPrimaryColor = (color: string) => {
+    setForm((f) => ({ ...f, qrColorPrimary: color }));
+  };
+
+  const pickQrSecondaryColor = (color: string) => {
+    setForm((f) => ({ ...f, qrColorSecondary: color }));
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -131,7 +142,10 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
           contactUserId: form.contactUserId || null,
           primaryColor: form.primaryColor,
           secondaryColor: form.enableTwoTone ? (form.secondaryColor.trim() || null) : null,
-          qrStyle: form.enableTwoTone ? form.qrStyle : 'SOLID',
+          qrStyle: form.qrCustomColors || form.enableTwoTone ? form.qrStyle : 'SOLID',
+          qrCustomColors: form.qrCustomColors,
+          qrColorPrimary: form.qrCustomColors ? (form.qrColorPrimary.trim() || null) : null,
+          qrColorSecondary: form.qrCustomColors ? (form.qrColorSecondary.trim() || null) : null,
           membersOnly: form.membersOnly,
         },
       });
@@ -148,44 +162,42 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
     <form onSubmit={submit} className="space-y-6">
       {error && <Callout tone="danger">{error}</Callout>}
 
-      <Field label="Name der Abteilung" required>
-        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <Field label="Name der Abteilung" hint="z. B. Cevi Uster">
+        <Input
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          required
+          maxLength={80}
+        />
       </Field>
-
-      <ImageUpload
-        label="Logo der Abteilung"
-        hint="Leer lassen für das Cevi-Logo"
-        value={form.logoUrl}
-        onChange={(url) => setForm({ ...form, logoUrl: url ?? '' })}
-        showCeviFallback={true}
-      />
 
       <Field
         label="Kontaktperson"
-        hint="Abteilungsleitung oder wer «Personen und Rechte verwalten» darf. Angemeldete sehen auch die E-Mail."
+        hint="Wird im Hilfebereich und bei Fragen als Ansprechperson angezeigt. Wählbar sind die Abteilungsleitung und Personen mit dem Recht «Personen und Rechte verwalten»."
       >
         <Select
           value={form.contactUserId}
-          disabled={candidates === null}
-          onChange={(e) => setForm({ ...form, contactUserId: e.target.value })}
+          onChange={(e) => setForm((f) => ({ ...f, contactUserId: e.target.value }))}
         >
-          <option value="">Keine Kontaktperson</option>
+          <option value="">Keine Kontaktperson ausgewählt</option>
           {candidates?.map((c) => (
             <option key={c.userId} value={c.userId}>
-              {c.displayName}
-              {c.isLeader ? ' (Abteilungsleitung)' : ''}
+              {c.displayName} {c.isLeader ? '(Abteilungsleitung)' : ''}
             </option>
           ))}
-          {/* Bisherige Kontaktperson, die die Voraussetzung nicht mehr erfüllt */}
-          {candidates && form.contactUserId && !candidates.some((c) => c.userId === form.contactUserId) && (
-            <option value={form.contactUserId}>{department?.contactPerson?.displayName ?? 'Bisherige Kontaktperson'}</option>
-          )}
         </Select>
       </Field>
 
+      <ImageUpload
+        label="Abteilungslogo"
+        hint="Quadratisches PNG oder JPEG, max. 5 MB. Erscheint in der Navigation, auf Aushängen und zentriert in QR-Codes."
+        value={form.logoUrl}
+        onChange={(url) => setForm((f) => ({ ...f, logoUrl: url ?? '' }))}
+      />
+
       <Switch
         checked={form.membersOnly}
-        onChange={(v) => setForm({ ...form, membersOnly: v })}
+        onChange={(v) => setForm((f) => ({ ...f, membersOnly: v }))}
         label="Startseite nur für Mitglieder"
         description="Aussenstehende sehen die Liste der Anlässe nicht. Öffentliche Anlässe bleiben über ihren Link erreichbar, interne nur mit Zugangs-Link."
       />
@@ -197,7 +209,7 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
         {/* 1. Primärfarbe */}
         <div className="space-y-2">
           <label className="block text-xs font-semibold text-fg">
-            Hauptfarbe (Buttons, Akzente & QR-Code)
+            Hauptfarbe der Abteilung (Portal, Buttons & Akzente)
           </label>
           <div className="flex flex-wrap items-center gap-2.5">
             {SWATCHES_PRIMARY.map((color) => (
@@ -242,110 +254,283 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
           </div>
         </div>
 
-        {/* 2. Schalter Zweifarbiges Design */}
-        <div className="border-t border-line/70 pt-4">
+        {/* 2. QR-Code Farben Modus */}
+        <div className="border-t border-line/70 pt-4 space-y-4">
           <Switch
-            checked={form.enableTwoTone}
+            checked={form.qrCustomColors}
             onChange={(v) =>
               setForm((f) => ({
                 ...f,
-                enableTwoTone: v,
-                secondaryColor: v && !f.secondaryColor ? '#003d8f' : f.secondaryColor,
+                qrCustomColors: v,
+                qrColorPrimary: v && !f.qrColorPrimary ? '#0f172a' : f.qrColorPrimary,
+                qrColorSecondary: v && !f.qrColorSecondary ? f.primaryColor : f.qrColorSecondary,
               }))
             }
-            label="Zweifarbiges Design für QR-Codes & Branding"
-            description="Färbt die drei Positions-Ecken oder erzeugt einen Farbverlauf für einen markanten Wiedererkennungswert."
+            label="Eigene Farben für den QR-Code verwenden"
+            description="Erlaubt zwei komplett unabhängige Farben für den QR-Code (z. B. Marineblau & Gold), losgelöst von der Abteilungsfarbe."
           />
-        </div>
 
-        {/* 3. Zweitfarbe & Stil (wenn zweifarbig aktiv) */}
-        {form.enableTwoTone && (
-          <div className="space-y-4 rounded-xl border border-line/60 bg-surface-2/40 p-3.5">
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-fg">
-                Zweitfarbe (Positions-Ecken oder Verlauf)
-              </label>
-              <div className="flex flex-wrap items-center gap-2.5">
-                {SWATCHES_SECONDARY.map((color) => (
+          {/* FALL A: Eigene QR-Code Farben */}
+          {form.qrCustomColors ? (
+            <div className="space-y-4 rounded-xl border border-line/70 bg-surface-2/40 p-3.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-fg">
+                <QrCode className="size-4 text-accent-ink" />
+                <span>QR-Code Farbpalette</span>
+              </div>
+
+              {/* QR-Hauptfarbe */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-fg">
+                  QR-Code Hauptfarbe (Körper)
+                </label>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {SWATCHES_PRIMARY.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`QR-Hauptfarbe ${color}`}
+                      aria-pressed={form.qrColorPrimary.toLowerCase() === color.toLowerCase()}
+                      onClick={() => pickQrPrimaryColor(color)}
+                      style={{ backgroundColor: color }}
+                      className={cn(
+                        'flex size-9 items-center justify-center rounded-full text-white ring-2 ring-offset-2 ring-offset-surface transition',
+                        form.qrColorPrimary.toLowerCase() === color.toLowerCase() ? 'ring-fg' : 'ring-transparent hover:scale-105'
+                      )}
+                    >
+                      {form.qrColorPrimary.toLowerCase() === color.toLowerCase() && <Check className="size-4" />}
+                    </button>
+                  ))}
+                  <label
+                    className="relative flex size-9 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-line-strong text-xs font-bold text-fg-subtle hover:border-fg"
+                    title="Eigene QR-Hauptfarbe wählen"
+                  >
+                    <span aria-hidden>+</span>
+                    <input
+                      type="color"
+                      value={form.qrColorPrimary.startsWith('#') && form.qrColorPrimary.length === 7 ? form.qrColorPrimary : '#0f172a'}
+                      onChange={(e) => pickQrPrimaryColor(e.target.value)}
+                      aria-label="Eigene QR-Hauptfarbe wählen"
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                    />
+                  </label>
+                  <div className="w-28">
+                    <Input
+                      value={form.qrColorPrimary}
+                      onChange={(e) => pickQrPrimaryColor(e.target.value)}
+                      placeholder="#0f172a"
+                      maxLength={7}
+                      className="h-9 font-mono text-xs uppercase"
+                      aria-label="Hex-Wert QR-Hauptfarbe"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* QR-Zweitfarbe */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-fg">
+                  QR-Code Zweitfarbe (Positions-Ecken oder Verlauf)
+                </label>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {SWATCHES_SECONDARY.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`QR-Zweitfarbe ${color}`}
+                      aria-pressed={form.qrColorSecondary.toLowerCase() === color.toLowerCase()}
+                      onClick={() => pickQrSecondaryColor(color)}
+                      style={{ backgroundColor: color }}
+                      className={cn(
+                        'flex size-9 items-center justify-center rounded-full text-white ring-2 ring-offset-2 ring-offset-surface transition',
+                        form.qrColorSecondary.toLowerCase() === color.toLowerCase() ? 'ring-fg' : 'ring-transparent hover:scale-105'
+                      )}
+                    >
+                      {form.qrColorSecondary.toLowerCase() === color.toLowerCase() && <Check className="size-4" />}
+                    </button>
+                  ))}
+                  <label
+                    className="relative flex size-9 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-line-strong text-xs font-bold text-fg-subtle hover:border-fg"
+                    title="Eigene QR-Zweitfarbe wählen"
+                  >
+                    <span aria-hidden>+</span>
+                    <input
+                      type="color"
+                      value={form.qrColorSecondary.startsWith('#') && form.qrColorSecondary.length === 7 ? form.qrColorSecondary : '#e11d48'}
+                      onChange={(e) => pickQrSecondaryColor(e.target.value)}
+                      aria-label="Eigene QR-Zweitfarbe wählen"
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                    />
+                  </label>
+                  <div className="w-28">
+                    <Input
+                      value={form.qrColorSecondary}
+                      onChange={(e) => pickQrSecondaryColor(e.target.value)}
+                      placeholder="#e11d48"
+                      maxLength={7}
+                      className="h-9 font-mono text-xs uppercase"
+                      aria-label="Hex-Wert QR-Zweitfarbe"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stil-Auswahl: CORNERS vs GRADIENT vs SOLID */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-fg">QR-Code Stil</label>
+                <div className="grid grid-cols-3 gap-2">
                   <button
-                    key={color}
                     type="button"
-                    aria-label={`Zweitfarbe ${color}`}
-                    aria-pressed={form.secondaryColor.toLowerCase() === color.toLowerCase()}
-                    onClick={() => pickSecondaryColor(color)}
-                    style={{ backgroundColor: color }}
+                    onClick={() => setForm((f) => ({ ...f, qrStyle: 'CORNERS' }))}
                     className={cn(
-                      'flex size-9 items-center justify-center rounded-full text-white ring-2 ring-offset-2 ring-offset-surface transition',
-                      form.secondaryColor.toLowerCase() === color.toLowerCase() ? 'ring-fg' : 'ring-transparent hover:scale-105'
+                      'rounded-xl border p-2 text-left transition',
+                      form.qrStyle === 'CORNERS'
+                        ? 'border-accent bg-accent/10 text-fg shadow-xs'
+                        : 'border-line bg-surface text-fg-muted hover:border-fg-subtle'
                     )}
                   >
-                    {form.secondaryColor.toLowerCase() === color.toLowerCase() && <Check className="size-4" />}
+                    <span className="block text-xs font-bold text-fg">Ecken abgesetzt</span>
+                    <span className="block text-[11px] text-fg-subtle mt-0.5">
+                      Scanner-Ecken in Zweitfarbe
+                    </span>
                   </button>
-                ))}
-                <label
-                  className="relative flex size-9 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-line-strong text-xs font-bold text-fg-subtle hover:border-fg"
-                  title="Eigene Zweitfarbe wählen"
-                >
-                  <span aria-hidden>+</span>
-                  <input
-                    type="color"
-                    value={form.secondaryColor.startsWith('#') && form.secondaryColor.length === 7 ? form.secondaryColor : '#003d8f'}
-                    onChange={(e) => pickSecondaryColor(e.target.value)}
-                    aria-label="Eigene Zweitfarbe wählen"
-                    className="absolute inset-0 cursor-pointer opacity-0"
-                  />
-                </label>
-                <div className="w-28">
-                  <Input
-                    value={form.secondaryColor}
-                    onChange={(e) => pickSecondaryColor(e.target.value)}
-                    placeholder="#003d8f"
-                    maxLength={7}
-                    className="h-9 font-mono text-xs uppercase"
-                    aria-label="Hex-Wert Zweitfarbe"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, qrStyle: 'GRADIENT' }))}
+                    className={cn(
+                      'rounded-xl border p-2 text-left transition',
+                      form.qrStyle === 'GRADIENT'
+                        ? 'border-accent bg-accent/10 text-fg shadow-xs'
+                        : 'border-line bg-surface text-fg-muted hover:border-fg-subtle'
+                    )}
+                  >
+                    <span className="block text-xs font-bold text-fg">Farbverlauf</span>
+                    <span className="block text-[11px] text-fg-subtle mt-0.5">
+                      Diagonaler Farbfluss
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, qrStyle: 'SOLID' }))}
+                    className={cn(
+                      'rounded-xl border p-2 text-left transition',
+                      form.qrStyle === 'SOLID'
+                        ? 'border-accent bg-accent/10 text-fg shadow-xs'
+                        : 'border-line bg-surface text-fg-muted hover:border-fg-subtle'
+                    )}
+                  >
+                    <span className="block text-xs font-bold text-fg">Einfarbig</span>
+                    <span className="block text-[11px] text-fg-subtle mt-0.5">
+                      Nur Hauptfarbe
+                    </span>
+                  </button>
                 </div>
               </div>
             </div>
+          ) : (
+            /* FALL B: Erbt Abteilungsfarben */
+            <>
+              <Switch
+                checked={form.enableTwoTone}
+                onChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    enableTwoTone: v,
+                    secondaryColor: v && !f.secondaryColor ? '#003d8f' : f.secondaryColor,
+                  }))
+                }
+                label="Zweifarbiges Design der Abteilung übernehmen"
+                description="Färbt die Positions-Ecken oder erzeugt einen Farbverlauf für einen markanten Wiedererkennungswert."
+              />
 
-            {/* Stil-Auswahl: CORNERS vs GRADIENT */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-fg">QR-Code Stil</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, qrStyle: 'CORNERS' }))}
-                  className={cn(
-                    'rounded-xl border p-2.5 text-left transition',
-                    form.qrStyle === 'CORNERS'
-                      ? 'border-accent bg-accent/10 text-fg shadow-xs'
-                      : 'border-line bg-surface text-fg-muted hover:border-fg-subtle'
-                  )}
-                >
-                  <span className="block text-xs font-bold text-fg">Ecken hervorgehoben</span>
-                  <span className="block text-[11px] text-fg-subtle mt-0.5">
-                    Positions-Ecken in Zweitfarbe (optimal für Scanner)
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, qrStyle: 'GRADIENT' }))}
-                  className={cn(
-                    'rounded-xl border p-2.5 text-left transition',
-                    form.qrStyle === 'GRADIENT'
-                      ? 'border-accent bg-accent/10 text-fg shadow-xs'
-                      : 'border-line bg-surface text-fg-muted hover:border-fg-subtle'
-                  )}
-                >
-                  <span className="block text-xs font-bold text-fg">Farbverlauf</span>
-                  <span className="block text-[11px] text-fg-subtle mt-0.5">
-                    Diagonaler Übergang von Haupt- zu Zweitfarbe
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+              {form.enableTwoTone && (
+                <div className="space-y-4 rounded-xl border border-line/60 bg-surface-2/40 p-3.5">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-fg">
+                      Zweitfarbe der Abteilung
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {SWATCHES_SECONDARY.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          aria-label={`Zweitfarbe ${color}`}
+                          aria-pressed={form.secondaryColor.toLowerCase() === color.toLowerCase()}
+                          onClick={() => pickSecondaryColor(color)}
+                          style={{ backgroundColor: color }}
+                          className={cn(
+                            'flex size-9 items-center justify-center rounded-full text-white ring-2 ring-offset-2 ring-offset-surface transition',
+                            form.secondaryColor.toLowerCase() === color.toLowerCase() ? 'ring-fg' : 'ring-transparent hover:scale-105'
+                          )}
+                        >
+                          {form.secondaryColor.toLowerCase() === color.toLowerCase() && <Check className="size-4" />}
+                        </button>
+                      ))}
+                      <label
+                        className="relative flex size-9 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-line-strong text-xs font-bold text-fg-subtle hover:border-fg"
+                        title="Eigene Zweitfarbe wählen"
+                      >
+                        <span aria-hidden>+</span>
+                        <input
+                          type="color"
+                          value={form.secondaryColor.startsWith('#') && form.secondaryColor.length === 7 ? form.secondaryColor : '#003d8f'}
+                          onChange={(e) => pickSecondaryColor(e.target.value)}
+                          aria-label="Eigene Zweitfarbe wählen"
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                        />
+                      </label>
+                      <div className="w-28">
+                        <Input
+                          value={form.secondaryColor}
+                          onChange={(e) => pickSecondaryColor(e.target.value)}
+                          placeholder="#003d8f"
+                          maxLength={7}
+                          className="h-9 font-mono text-xs uppercase"
+                          aria-label="Hex-Wert Zweitfarbe"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-fg">QR-Code Stil</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, qrStyle: 'CORNERS' }))}
+                        className={cn(
+                          'rounded-xl border p-2.5 text-left transition',
+                          form.qrStyle === 'CORNERS'
+                            ? 'border-accent bg-accent/10 text-fg shadow-xs'
+                            : 'border-line bg-surface text-fg-muted hover:border-fg-subtle'
+                        )}
+                      >
+                        <span className="block text-xs font-bold text-fg">Ecken hervorgehoben</span>
+                        <span className="block text-[11px] text-fg-subtle mt-0.5">
+                          Positions-Ecken in Zweitfarbe (optimal für Scanner)
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, qrStyle: 'GRADIENT' }))}
+                        className={cn(
+                          'rounded-xl border p-2.5 text-left transition',
+                          form.qrStyle === 'GRADIENT'
+                            ? 'border-accent bg-accent/10 text-fg shadow-xs'
+                            : 'border-line bg-surface text-fg-muted hover:border-fg-subtle'
+                        )}
+                      >
+                        <span className="block text-xs font-bold text-fg">Farbverlauf</span>
+                        <span className="block text-[11px] text-fg-subtle mt-0.5">
+                          Diagonaler Übergang von Haupt- zu Zweitfarbe
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Live-Vorschau mit Kontrast-Check für beide Farben */}
         <DepartmentBrandingPreview
@@ -353,7 +538,10 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
           logoUrl={form.logoUrl}
           primaryColor={form.primaryColor}
           secondaryColor={form.enableTwoTone ? form.secondaryColor : null}
-          qrStyle={form.enableTwoTone ? form.qrStyle : 'SOLID'}
+          qrStyle={form.qrCustomColors ? form.qrStyle : (form.enableTwoTone ? form.qrStyle : 'SOLID')}
+          qrCustomColors={form.qrCustomColors}
+          qrColorPrimary={form.qrColorPrimary}
+          qrColorSecondary={form.qrColorSecondary}
         />
       </fieldset>
 

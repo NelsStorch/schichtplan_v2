@@ -21,24 +21,41 @@ export function DepartmentBrandingPreview({
   primaryColor,
   secondaryColor,
   qrStyle = 'CORNERS',
+  qrCustomColors = false,
+  qrColorPrimary,
+  qrColorSecondary,
 }: {
   name: string;
   logoUrl?: string | null;
   primaryColor: string;
   secondaryColor?: string | null;
   qrStyle?: 'CORNERS' | 'GRADIENT' | 'SOLID';
+  qrCustomColors?: boolean;
+  qrColorPrimary?: string | null;
+  qrColorSecondary?: string | null;
 }) {
-  const primaryContrast = useMemo(() => evaluateContrast(primaryColor), [primaryColor]);
-  const hasSecondary = Boolean(secondaryColor?.trim());
-  const secondaryContrast = useMemo(
-    () => (hasSecondary ? evaluateContrast(secondaryColor) : null),
-    [hasSecondary, secondaryColor]
+  const uiPrimaryContrast = useMemo(() => evaluateContrast(primaryColor), [primaryColor]);
+  const hasUiSecondary = Boolean(secondaryColor?.trim());
+  const uiSecondaryContrast = useMemo(
+    () => (hasUiSecondary && secondaryColor ? evaluateContrast(secondaryColor) : null),
+    [hasUiSecondary, secondaryColor]
+  );
+
+  // Effektive Farben für den QR-Code
+  const effectiveQrPrimary = qrCustomColors && qrColorPrimary?.trim() ? qrColorPrimary : primaryColor;
+  const effectiveQrSecondary = qrCustomColors ? qrColorSecondary : secondaryColor;
+
+  const qrPrimaryContrast = useMemo(() => evaluateContrast(effectiveQrPrimary), [effectiveQrPrimary]);
+  const hasQrSecondary = Boolean(effectiveQrSecondary?.trim());
+  const qrSecondaryContrast = useMemo(
+    () => (hasQrSecondary && effectiveQrSecondary ? evaluateContrast(effectiveQrSecondary) : null),
+    [hasQrSecondary, effectiveQrSecondary]
   );
 
   const isTwoTone =
-    hasSecondary &&
-    secondaryContrast &&
-    secondaryContrast.qrSafeHex !== primaryContrast.qrSafeHex &&
+    hasQrSecondary &&
+    qrSecondaryContrast &&
+    qrSecondaryContrast.qrSafeHex !== qrPrimaryContrast.qrSafeHex &&
     qrStyle !== 'SOLID';
 
   // QR-Code SVG-Pfade berechnen
@@ -95,8 +112,8 @@ export function DepartmentBrandingPreview({
     }
   }, [isTwoTone, qrStyle]);
 
-  const cornerColor = secondaryContrast?.qrSafeHex || primaryContrast.qrSafeHex;
-  const strokeColor = isTwoTone ? cornerColor : primaryContrast.qrSafeHex;
+  const cornerColor = qrSecondaryContrast?.qrSafeHex || qrPrimaryContrast.qrSafeHex;
+  const strokeColor = isTwoTone ? cornerColor : qrPrimaryContrast.qrSafeHex;
 
   return (
     <div className="rounded-2xl border border-line bg-surface-2/60 p-4 space-y-4">
@@ -108,38 +125,38 @@ export function DepartmentBrandingPreview({
         <div className="flex items-center gap-1.5 flex-wrap">
           <Badge
             tone={
-              primaryContrast.level === 'optimal'
+              qrPrimaryContrast.level === 'optimal'
                 ? 'success'
-                : primaryContrast.level === 'sufficient'
+                : qrPrimaryContrast.level === 'sufficient'
                 ? 'warning'
                 : 'danger'
             }
             className="gap-1 text-[11px]"
           >
-            {primaryContrast.level === 'poor' ? (
+            {qrPrimaryContrast.level === 'poor' ? (
               <AlertTriangle className="size-3" />
             ) : (
               <CheckCircle2 className="size-3" />
             )}
-            Haupt: {primaryContrast.ratioAgainstWhite}:1
+            QR-Haupt: {qrPrimaryContrast.ratioAgainstWhite}:1
           </Badge>
-          {secondaryContrast && (
+          {qrSecondaryContrast && (
             <Badge
               tone={
-                secondaryContrast.level === 'optimal'
+                qrSecondaryContrast.level === 'optimal'
                   ? 'success'
-                  : secondaryContrast.level === 'sufficient'
+                  : qrSecondaryContrast.level === 'sufficient'
                   ? 'warning'
                   : 'danger'
               }
               className="gap-1 text-[11px]"
             >
-              {secondaryContrast.level === 'poor' ? (
+              {qrSecondaryContrast.level === 'poor' ? (
                 <AlertTriangle className="size-3" />
               ) : (
                 <CheckCircle2 className="size-3" />
               )}
-              Zweit: {secondaryContrast.ratioAgainstWhite}:1
+              QR-Zweit: {qrSecondaryContrast.ratioAgainstWhite}:1
             </Badge>
           )}
         </div>
@@ -150,12 +167,12 @@ export function DepartmentBrandingPreview({
         <div className="space-y-3">
           <div className="rounded-xl border border-line/80 bg-surface p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-fg-muted">Button & Tags:</span>
+              <span className="text-xs font-medium text-fg-muted">Portal-Design:</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   tabIndex={-1}
-                  style={{ backgroundColor: primaryColor, color: primaryContrast.textOnAccent }}
+                  style={{ backgroundColor: primaryColor, color: uiPrimaryContrast.textOnAccent }}
                   className="rounded-full px-3 py-1 text-xs font-semibold shadow-sm pointer-events-none"
                 >
                   Schicht eintragen
@@ -164,7 +181,7 @@ export function DepartmentBrandingPreview({
                   <span
                     style={{
                       backgroundColor: secondaryColor,
-                      color: secondaryContrast ? secondaryContrast.textOnAccent : '#ffffff',
+                      color: uiSecondaryContrast ? uiSecondaryContrast.textOnAccent : '#ffffff',
                     }}
                     className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold shadow-sm"
                   >
@@ -174,27 +191,29 @@ export function DepartmentBrandingPreview({
               </div>
             </div>
             <div className="flex items-center justify-between gap-2 text-xs text-fg-subtle">
-              <span>QR-Code Stil:</span>
+              <span>QR-Code Modus:</span>
               <span className="font-medium text-fg">
+                {qrCustomColors ? 'Eigene QR-Farben' : 'Erbt Abteilungsfarben'}
+                {' · '}
                 {!isTwoTone
                   ? 'Einfarbig'
                   : qrStyle === 'CORNERS'
-                  ? 'Zweifarbig (Ecken hervorgehoben)'
-                  : 'Zweifarbig (Farbverlauf)'}
+                  ? 'Ecken abgesetzt'
+                  : 'Farbverlauf'}
               </span>
             </div>
           </div>
 
-          {primaryContrast.level === 'poor' || (secondaryContrast && secondaryContrast.level === 'poor') ? (
+          {qrPrimaryContrast.level === 'poor' || (qrSecondaryContrast && qrSecondaryContrast.level === 'poor') ? (
             <Callout tone="warning" className="text-xs">
-              Mindestens eine gewählte Farbe ist sehr hell. Für QR-Codes dunkeln wir sie auf Plakaten automatisch
-              ab, damit Kameras und Barcodescanner den Check-in zuverlässig erfassen können.
+              Mindestens eine gewählte QR-Farbe ist sehr hell. Für Plakate und Check-in-Aushänge wird sie automatisch
+              abgedunkelt, damit Barcodescanner den Code sofort erfassen können.
             </Callout>
           ) : (
             <p className="text-xs text-fg-muted">
               {isTwoTone
-                ? 'Beide Farben erfüllen die Kontrastvorgaben. Der zweifarbige QR-Code sieht markant aus und scannt optimal.'
-                : 'Die Farbe erfüllt die Kontrastanforderungen. Dein QR-Code wird auf Plakaten und Bildschirmen fehlerfrei gescannt.'}
+                ? 'Beide QR-Farben bieten optimalen Kontrast. Der zweifarbige QR-Code scannt zuverlässig auf allen Smartphones.'
+                : 'Die Farbe erfüllt alle Kontrastanforderungen für Plakate und Bildschirme.'}
             </p>
           )}
         </div>
@@ -215,14 +234,14 @@ export function DepartmentBrandingPreview({
                 {isTwoTone && qrStyle === 'GRADIENT' && (
                   <defs>
                     <linearGradient id="prev-qr-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={primaryContrast.qrSafeHex} />
+                      <stop offset="0%" stopColor={qrPrimaryContrast.qrSafeHex} />
                       <stop offset="100%" stopColor={cornerColor} />
                     </linearGradient>
                   </defs>
                 )}
                 <rect width={qrData.total} height={qrData.total} fill="#ffffff" />
                 <path
-                  fill={isTwoTone && qrStyle === 'GRADIENT' ? 'url(#prev-qr-grad)' : primaryContrast.qrSafeHex}
+                  fill={isTwoTone && qrStyle === 'GRADIENT' ? 'url(#prev-qr-grad)' : qrPrimaryContrast.qrSafeHex}
                   d={qrData.bodyPaths}
                 />
                 {qrData.cornerPaths && <path fill={cornerColor} d={qrData.cornerPaths} />}
