@@ -22,6 +22,7 @@ import {
   resolveCeviDbPlacement,
   syncCeviDbHomeDepartment,
   syncCeviDbStufen,
+  toCeviDbStufeDto,
 } from '../services/homeDepartment.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
 import { sendAccountExistsEmail, sendVerificationEmail } from '../services/email.js';
@@ -1274,6 +1275,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: targetUserId },
+        include: {
+          homeDepartment: {
+            select: { id: true, name: true, slug: true },
+          },
+          ceviDbStufen: {
+            select: { groupId: true, groupName: true, kind: true, roleNames: true, isPrimary: true },
+            orderBy: [{ isPrimary: 'desc' }, { groupName: 'asc' }],
+          },
+        },
       });
 
       if (!user) {
@@ -1293,6 +1303,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           ceviDbId: user.ceviDbId,
           ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
           hasCeviDb: Boolean(user.ceviDbId),
+          ceviDbOrtsgruppeId: user.ceviDbOrtsgruppeId,
+          ceviDbOrtsgruppeName: user.ceviDbOrtsgruppeName,
+          ceviDbDepartmentLeader: user.ceviDbDepartmentLeader,
+          ceviDbLeaderGroupName: user.ceviDbLeaderGroupName,
+          ceviDbLeaderGroupIds: user.ceviDbLeaderGroupIds,
+          ceviDbJungscharIds: user.ceviDbJungscharIds,
+          homeDepartment: user.homeDepartment,
+          homeDepartmentSource: user.homeDepartmentSource,
+          ceviDbStufen: user.ceviDbStufen.map(toCeviDbStufeDto),
         },
         hasCeviDb: Boolean(user.ceviDbId),
         ceviDbData: user.ceviDbData ?? null,

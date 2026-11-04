@@ -67,7 +67,9 @@ describe('withoutCeviDbAddress', () => {
         zip_code: '8307',
         town: 'Effretikon',
         country: 'CH',
-        _userInfo: { sub: '1', address: 'Hauptstrasse 1', postal_code: '8307' },
+        company_name: 'Firma AG',
+        company: true,
+        _userInfo: { sub: '1', address: 'Hauptstrasse 1', postal_code: '8307', company: false },
       })
     ).toEqual({ id: 1, nickname: 'Falk', _userInfo: { sub: '1' } });
     expect(withoutCeviDbAddress('x')).toBe('x');

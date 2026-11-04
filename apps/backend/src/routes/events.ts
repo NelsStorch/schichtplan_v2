@@ -322,6 +322,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
                       lastName: true,
                       ceviName: true,
                       birthDate: true,
+                      phone: true,
+                      email: true,
                       homeDepartment: { select: { id: true, name: true } },
                       stufen: {
                         select: { stufe: { select: { id: true, name: true, sortOrder: true } } },
@@ -518,6 +520,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
               guestName: showName ? su.guestName : null,
               guestEmail: access.isManager ? su.guestEmail : null,
               guestPhone: access.isManager ? su.guestPhone : null,
+              userEmail: access.isManager ? su.user?.email || null : null,
+              userPhone: access.isManager ? su.user?.phone || null : null,
               displayName,
               userFirstName: showName ? su.user?.firstName || null : null,
               userLastName: showName ? su.user?.lastName || null : null,

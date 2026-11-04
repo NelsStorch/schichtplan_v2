@@ -37,7 +37,13 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { getCeviDbDataUrl, type EventDto, type ShiftDto, type ShiftSignupDto } from '@schichtplan/shared';
+import {
+  getCeviDbDataUrl,
+  type DepartmentPersonDto,
+  type EventDto,
+  type ShiftDto,
+  type ShiftSignupDto,
+} from '@schichtplan/shared';
 import { useToast, type BadgeTone } from '@schichtplan/ui';
 import { api, errorMessage, useLoginHref } from '@/lib/api';
 import { eventStatus } from '@/components/EventTile';
@@ -59,12 +65,14 @@ const THEME_STORAGE_KEY = 'schichtplan.theme';
 
 interface DepartmentPerson {
   id: string;
+  userId: string;
   firstName: string;
   lastName?: string | null;
   ceviName?: string | null;
   email?: string | null;
   phone?: string | null;
   role?: string;
+  departmentRole?: string | null;
   stufen?: { name: string }[];
 }
 
@@ -95,8 +103,16 @@ export function useCommandItems(query: string) {
   const canViewPeople = can('PEOPLE_VIEW') || isDeptAdmin;
   useEffect(() => {
     if (!canViewPeople || !department) return;
-    api<DepartmentPerson[]>('/api/departments/current/people?alle=1')
-      .then((data) => setPeople(data || []))
+    api<Array<DepartmentPersonDto & { id?: string }>>('/api/departments/current/people?alle=1')
+      .then((data) => {
+        const mapped: DepartmentPerson[] = (data || []).map((p) => ({
+          ...p,
+          id: p.userId || p.id || '',
+          userId: p.userId || p.id || '',
+          role: p.departmentRole || undefined,
+        }));
+        setPeople(mapped);
+      })
       .catch(() => setPeople([]));
   }, [canViewPeople, department]);
 
@@ -165,7 +181,12 @@ export function useCommandItems(query: string) {
   };
 
   const openWhatsAppDirect = (phone: string, firstName?: string) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '').replace(/^0/, '41');
+    let cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('00')) {
+      cleanPhone = cleanPhone.slice(2);
+    } else if (cleanPhone.startsWith('0')) {
+      cleanPhone = '41' + cleanPhone.slice(1);
+    }
     const greeting = firstName ? `Hallo ${firstName}! ` : 'Hallo! ';
     const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(greeting)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -1009,6 +1030,29 @@ export function useCommandItems(query: string) {
                 onSelect: () => toggleAttendance(su.id, su.displayName, isPres ? 'PRESENT' : null),
               });
             }
+
+            // Einzelne Helfer der Schicht direkt per WhatsApp anschreiben
+            for (const su of shift.signups) {
+              const matchedPerson = people.find((p) => p.userId === su.userId || p.id === su.userId);
+              const helperPhone = su.guestPhone || su.userPhone || matchedPerson?.phone;
+              shiftSubActions.push({
+                id: `wa-helper-${su.id}`,
+                title: `WhatsApp an ${su.displayName} schreiben`,
+                subtitle: helperPhone ? `Direktchat mit ${helperPhone} öffnen` : 'Handynummer eingeben & Direktchat starten',
+                icon: <MessageSquare className="size-3.5 text-success-ink" />,
+                closeOnSelect: false,
+                onSelect: () => {
+                  if (helperPhone) {
+                    openWhatsAppDirect(helperPhone, su.userFirstName || su.displayName);
+                  } else {
+                    const input = window.prompt(`Handynummer für ${su.displayName} eingeben (z. B. 079 123 45 67):`);
+                    if (input && input.trim()) {
+                      openWhatsAppDirect(input.trim(), su.userFirstName || su.displayName);
+                    }
+                  }
+                },
+              });
+            }
           }
 
           // 4. Direktaktion: WhatsApp-Aufruf für diese Schicht
@@ -1295,6 +1339,24 @@ export function useCommandItems(query: string) {
       });
     }
 
+    // Direkter WhatsApp-Chat per Handynummer
+    list.push({
+      id: 'action-direct-whatsapp',
+      title: 'WhatsApp-Nachricht an Handynummer senden',
+      subtitle: 'Direktchat öffnen (Handynummer eingeben)',
+      section: 'ACTIONS',
+      icon: <MessageSquare className="size-4 text-success-ink" />,
+      keywords: ['whatsapp', 'chat', 'nachricht', 'schreiben', 'direktchat', 'kontakt', 'handy', 'wa', 'message'],
+      closeOnSelect: false,
+      onSelect: () => {
+        recordRecentCommand('action-direct-whatsapp');
+        const input = window.prompt('Handynummer für WhatsApp-Direktchat eingeben (z. B. 079 123 45 67):');
+        if (input && input.trim()) {
+          openWhatsAppDirect(input.trim());
+        }
+      },
+    });
+
     // =========================================================================
     // 3. ANLÄSSE DER ABTEILUNG (MIT KALENDER, WHATSAPP, TEILEN & EXPORT)
     // =========================================================================
@@ -1556,6 +1618,28 @@ export function useCommandItems(query: string) {
         });
       }
 
+      // 3. Weitere angemeldete Helfende des aktuellen Anlasses (falls nicht in people)
+      for (const [userId, shifts] of eventSignupsByHelper.entries()) {
+        if (!unifiedPeople.some((p) => p.id === userId)) {
+          const firstSignup = detailedEvent?.shifts
+            ?.flatMap((s) => s.signups ?? [])
+            .find((su) => su.userId === userId);
+          if (firstSignup) {
+            unifiedPeople.push({
+              id: userId,
+              name: firstSignup.displayName,
+              firstName: firstSignup.userFirstName || firstSignup.displayName,
+              lastName: firstSignup.userLastName,
+              ceviName: firstSignup.userCeviName,
+              email: firstSignup.userEmail || null,
+              phone: firstSignup.userPhone || null,
+              role: 'Helfer*in',
+              shifts,
+            });
+          }
+        }
+      }
+
       // Sortieren: Helfer mit Schichten im aktuellen Anlass ZUERST!
       unifiedPeople.sort((a, b) => {
         if (a.shifts.length > 0 && b.shifts.length === 0) return -1;
@@ -1662,7 +1746,7 @@ export function useCommandItems(query: string) {
           }
         }
 
-        // 3. Direkte Kommunikation
+        // 3. Direkte Kommunikation (WhatsApp immer an erster Stelle)
         if (person.phone) {
           personSubActions.push({
             id: 'wa-chat',
@@ -1697,6 +1781,22 @@ export function useCommandItems(query: string) {
             closeOnSelect: false,
             onSelect: () => copyToClipboard(person.phone!, 'Telefonnummer'),
           });
+        } else {
+          personSubActions.push({
+            id: 'wa-chat-prompt',
+            title: `WhatsApp-Nachricht an ${person.firstName || person.name} senden`,
+            subtitle: 'Keine Handynummer hinterlegt (klicken für Direkteingabe)',
+            icon: <MessageSquare className="size-3.5 text-success-ink" />,
+            closeOnSelect: false,
+            onSelect: () => {
+              const input = window.prompt(
+                `Handynummer für ${person.firstName || person.name} eingeben (z. B. 079 123 45 67):`
+              );
+              if (input && input.trim()) {
+                openWhatsAppDirect(input.trim(), person.firstName);
+              }
+            },
+          });
         }
 
         if (person.email) {
@@ -1719,30 +1819,7 @@ export function useCommandItems(query: string) {
           });
         }
 
-        // 4. Kontaktdaten als Text kopieren
-        personSubActions.push({
-          id: 'copy-contact-all',
-          title: 'Kontaktdaten in Zwischenablage kopieren',
-          subtitle: 'Name, Cevi-Name, Telefon, E-Mail und Schichten',
-          icon: <Copy className="size-3.5" />,
-          closeOnSelect: false,
-          onSelect: () => {
-            const lines = [
-              person.name,
-              person.ceviName ? `Cevi-Name: ${person.ceviName}` : null,
-              person.email ? `E-Mail: ${person.email}` : null,
-              person.phone ? `Telefon: ${person.phone}` : null,
-              hasShifts
-                ? `Schichten in «${activeEvent?.title || 'Anlass'}»: ${personShifts.map((s) => `${shiftName(s)} (${fmtTimeRange(s.startTime, s.endTime)})`).join(', ')}`
-                : null,
-            ]
-              .filter(Boolean)
-              .join('\n');
-            copyToClipboard(lines, 'Kontaktdaten');
-          },
-        });
-
-        // 5. Navigation & Einteilung
+        // 4. Navigation & Einteilung
         if (activeSlug && canManageCurrent) {
           personSubActions.push({
             id: 'assign-shift',
@@ -1772,15 +1849,27 @@ export function useCommandItems(query: string) {
         }
 
         // QuickActions für Desktop-Vorschau
-        const personQuickActions: CommandQuickAction[] = [];
-        if (person.phone) {
-          personQuickActions.push({
+        const personQuickActions: CommandQuickAction[] = [
+          {
             id: 'p-wa',
             label: 'WhatsApp',
             icon: <MessageSquare className="size-3.5" />,
             tone: 'success',
-            onClick: () => openWhatsAppDirect(person.phone!, person.firstName),
-          });
+            onClick: () => {
+              if (person.phone) {
+                openWhatsAppDirect(person.phone, person.firstName);
+              } else {
+                const input = window.prompt(
+                  `Handynummer für ${person.firstName || person.name} eingeben (z. B. 079 123 45 67):`
+                );
+                if (input && input.trim()) {
+                  openWhatsAppDirect(input.trim(), person.firstName);
+                }
+              }
+            },
+          },
+        ];
+        if (person.phone) {
           personQuickActions.push({
             id: 'p-call',
             label: 'Anrufen',
@@ -1800,21 +1889,6 @@ export function useCommandItems(query: string) {
             },
           });
         }
-        personQuickActions.push({
-          id: 'p-copy',
-          label: 'Kopieren',
-          icon: <Copy className="size-3.5" />,
-          onClick: () => {
-            const lines = [
-              person.name,
-              person.phone ? `Tel: ${person.phone}` : null,
-              person.email ? `E-Mail: ${person.email}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ');
-            copyToClipboard(lines, 'Kontaktdaten');
-          },
-        });
 
         const item: CommandItem = {
           id: `person-${person.id}`,
@@ -1833,6 +1907,13 @@ export function useCommandItems(query: string) {
           keywords: [
             'person',
             'helfer',
+            'whatsapp',
+            'wa',
+            'chat',
+            'nachricht',
+            'sms',
+            'telefon',
+            'kontakt',
             person.name,
             person.firstName || '',
             person.lastName || '',

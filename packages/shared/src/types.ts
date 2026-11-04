@@ -185,6 +185,9 @@ export interface ShiftSignupDto {
   guestName?: string | null;
   guestEmail?: string | null;
   guestPhone?: string | null;
+  /** Nur für das Event-OK: Kontaktdaten des angemeldeten Benutzers */
+  userEmail?: string | null;
+  userPhone?: string | null;
   displayName: string;
   userFirstName?: string | null;
   userLastName?: string | null;
@@ -280,6 +283,22 @@ export interface UserDto {
   homeDepartment?: HomeDepartmentDto | null;
   /** Abteilung kommt aus Cevi.DB und ist dort festgelegt */
   homeDepartmentFromCeviDb?: boolean;
+  /** Quelle der Heimabteilung ("CEVIDB", "SELF", "CONFIRMED") */
+  homeDepartmentSource?: string | null;
+  /** Cevi.DB Ortsgruppen-ID */
+  ceviDbOrtsgruppeId?: number | null;
+  /** Cevi.DB Ortsgruppen-Name */
+  ceviDbOrtsgruppeName?: string | null;
+  /** Hat eine Leitungsrolle laut Cevi.DB */
+  ceviDbDepartmentLeader?: boolean;
+  /** Gruppe der Leitungsrolle */
+  ceviDbLeaderGroupName?: string | null;
+  /** IDs aller Gruppen mit Leitungsrolle */
+  ceviDbLeaderGroupIds?: number[];
+  /** Verknüpfte Jungschar-Gruppen */
+  ceviDbJungscharIds?: number[];
+  /** Cevi.DB Stufen der Person */
+  ceviDbStufen?: CeviDbStufeDto[];
   stufen?: UserStufeDto[];
   /** Hat die Abteilung noch nicht angegeben (auch nicht «keine») */
   needsDepartmentSetup?: boolean;
@@ -353,6 +372,9 @@ export interface DepartmentPersonDto {
   lastName: string | null;
   /** Heimabteilung ist diese Abteilung (sonst nur wegen einer Rolle in der Liste) */
   isHomeDepartment: boolean;
+  /** Kontaktdaten (für Personen mit PEOPLE_VIEW Berechtigung) */
+  email?: string | null;
+  phone?: string | null;
   /** CONFIRMED: selbst gewählt, von der Abteilungsleitung bestätigt (zählt bei Cevi.DB-Anlässen) */
   source: 'SELF' | 'CEVIDB' | 'CONFIRMED' | null;
   /** Kann die angemeldete Person die Zugehörigkeit bestätigen? (nur Abteilungsleitung, Cevi.DB-Konto derselben Ortsgruppe) */

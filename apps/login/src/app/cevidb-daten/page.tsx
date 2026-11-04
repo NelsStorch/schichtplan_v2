@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  Building2,
   Calendar,
   Check,
   ChevronDown,
@@ -17,6 +18,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Phone,
   RefreshCw,
   Search,
   ShieldAlert,
@@ -575,6 +577,13 @@ export default function CeviDbDataPage() {
                     value={profile?.email || data.user.email}
                   />
                   <FactRow
+                    label="Handynummer"
+                    field="phone (Schichtplan)"
+                    icon={Phone}
+                    value={data.user.phone}
+                    badge={data.user.phone ? 'Im Schichtplan' : undefined}
+                  />
+                  <FactRow
                     label="Geburtsdatum"
                     field="birthday"
                     icon={Calendar}
@@ -613,51 +622,91 @@ export default function CeviDbDataPage() {
                 </div>
               </div>
 
-              {/* Box 2: Kontakt & Anschrift */}
+              {/* Box 2: Abteilung & Cevi.DB-Ableitung */}
               <div className="rounded-2xl border border-line/70 bg-surface-1 p-6 shadow-sm">
                 <h2 className="flex items-center gap-2 font-display text-lg font-bold text-fg">
-                  <MapPin className="size-5 text-accent" /> Adresse & Organisation
+                  <Building2 className="size-5 text-accent" /> Abteilung & Cevi.DB-Ableitung
                 </h2>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Wohnadresse und Firma aus Cevi.DB.
+                  Aus Rollen und Gruppenstruktur abgeleitete Daten.
                 </p>
                 <div className="mt-4">
                   <FactRow
-                    label="Strasse / Adresse"
-                    field="address"
-                    value={profile?.address}
+                    label="Heimabteilung"
+                    field="homeDepartment"
+                    icon={Building2}
+                    value={data.user.homeDepartment?.name || data.user.homeDepartment?.slug || null}
+                    badge={data.user.homeDepartmentSource ? `Quelle: ${data.user.homeDepartmentSource}` : undefined}
                   />
                   <FactRow
-                    label="Postleitzahl"
-                    field="zip_code"
-                    value={profile?.zip_code}
+                    label="Cevi.DB Ortsgruppe"
+                    field="cevidb_ortsgruppe_id / field"
+                    value={
+                      data.user.ceviDbOrtsgruppeName
+                        ? `${data.user.ceviDbOrtsgruppeName} (#${data.user.ceviDbOrtsgruppeId ?? '–'})`
+                        : data.user.ceviDbOrtsgruppeId
+                          ? `#${data.user.ceviDbOrtsgruppeId}`
+                          : profile?.ortsgruppe_id
+                            ? `#${profile.ortsgruppe_id}`
+                            : null
+                    }
                   />
                   <FactRow
-                    label="Ort / Stadt"
-                    field="town"
-                    value={profile?.town}
+                    label="Abteilungsleitung"
+                    field="cevidb_department_leader"
+                    icon={ShieldCheck}
+                    value={
+                      data.user.ceviDbDepartmentLeader
+                        ? data.user.ceviDbLeaderGroupName
+                          ? `Ja (${data.user.ceviDbLeaderGroupName})`
+                          : 'Ja'
+                        : 'Nein'
+                    }
+                    badge={data.user.ceviDbDepartmentLeader ? 'ADMIN Berechtigung' : undefined}
                   />
                   <FactRow
-                    label="Land"
-                    field="country"
-                    value={profile?.country}
+                    label="Leitungs-Gruppen"
+                    field="cevidb_leader_group_ids"
+                    value={
+                      data.user.ceviDbLeaderGroupIds && data.user.ceviDbLeaderGroupIds.length > 0
+                        ? data.user.ceviDbLeaderGroupIds.map((id) => `#${id}`).join(', ')
+                        : null
+                    }
                   />
                   <FactRow
-                    label="Firma / Unternehmen"
-                    field="company_name"
-                    value={profile?.company_name}
+                    label="Zugeordnete Jungscharen"
+                    field="cevidb_jungschar_ids"
+                    value={
+                      data.user.ceviDbJungscharIds && data.user.ceviDbJungscharIds.length > 0
+                        ? data.user.ceviDbJungscharIds.map((id) => `#${id}`).join(', ')
+                        : null
+                    }
                   />
                   <FactRow
-                    label="Ist Firma"
-                    field="company"
-                    value={profile?.company !== undefined ? String(profile.company) : null}
+                    label="Stufen laut Cevi.DB"
+                    field="user_cevidb_stufen"
+                    value={
+                      data.user.ceviDbStufen && data.user.ceviDbStufen.length > 0
+                        ? data.user.ceviDbStufen
+                            .map(
+                              (s) =>
+                                `${s.groupName} (${s.kind === 'LEITUNG' ? 'Leitung' : s.kind === 'TEILNEHMER' ? 'Teilnehmer*in' : 'Mitglied'}${s.isPrimary ? ', Hauptstufe' : ''})`
+                            )
+                            .join('; ')
+                        : null
+                    }
                   />
                 </div>
 
                 <div className="mt-6 rounded-xl border border-line/50 bg-surface-2 p-4 text-xs text-fg-muted">
-                  <p className="font-semibold text-fg">💡 Verwendung im Schichtplan:</p>
+                  <p className="font-semibold text-fg flex items-center gap-1.5">
+                    <ShieldCheck className="size-3.5 text-accent" /> Datenschutz & Datensparsamkeit:
+                  </p>
                   <p className="mt-1">
-                    Cevi-Name und Name werden automatisch für Schichtanmeldungen hinterlegt. Das Geburtsdatum wird serverseitig für Schichten mit Mindestalter (z. B. Bar ab 18 Jahren) geprüft.
+                    Wohnadressen (Strasse, Hausnummer, PLZ, Ort) sowie Firmenangaben werden bewusst weder von der Cevi.DB synchronisiert noch in der Schichtplan-Datenbank gespeichert.
+                  </p>
+                  <p className="mt-1 text-fg-subtle">
+                    Telefonnummern werden direkt im Schichtplan gepflegt. Falls ein Anlass Adressdaten verlangt, wird dies über temporäre Anmeldefragen mit definierter Löschfrist abgefragt.
                   </p>
                 </div>
               </div>

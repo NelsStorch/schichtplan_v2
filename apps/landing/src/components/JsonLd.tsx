@@ -46,8 +46,8 @@ export function JsonLd({ origin }: JsonLdProps) {
     ],
     author: {
       '@type': 'Organization',
-      name: 'Cevi Schweiz',
-      url: 'https://cevi.ch',
+      name: 'Cevi Schichtplan',
+      url: origin,
     },
     creator: {
       '@type': 'Organization',

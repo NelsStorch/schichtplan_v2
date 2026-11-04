@@ -464,6 +464,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           ceviDbId: true,
           ceviDbOrtsgruppeId: true,
           homeDepartmentConfirmedAt: true,
+          email: true,
+          phone: true,
           homeDepartmentConfirmedBy: { select: { ceviName: true, firstName: true, lastName: true } },
           memberships: {
             where: { departmentId: tenant.id },
@@ -490,6 +492,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           isHomeDepartment: isHome,
           source: isHome ? homeSource(u.homeDepartmentSource) : null,
           canConfirmHome: canConfirmHome(access, request.user.id, u, tenant.id, ortsgruppeId),
+          email: u.email,
+          phone: u.phone,
           confirmedAt: isHome ? (u.homeDepartmentConfirmedAt?.toISOString() ?? null) : null,
           confirmedBy: isHome && u.homeDepartmentConfirmedBy ? personLabel(u.homeDepartmentConfirmedBy) : null,
           departmentRole: role,

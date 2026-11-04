@@ -444,7 +444,7 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
       .fontSize(8.5)
       .fillColor('#9ca3af')
       .text(
-        'Cevi Schichtplan · Ein Gemeinschaftsdienst von Cevi Schweiz · cevi-schichtplan.ch',
+        'Cevi Schichtplan · cevi-schichtplan.ch',
         40,
         742,
         { align: 'center', width: 515.28 }

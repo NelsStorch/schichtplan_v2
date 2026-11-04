@@ -41,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
       'Helferbörse',
       'Helferkoordination Schweiz',
     ],
-    authors: [{ name: 'Cevi Schweiz & Verein Cevi Schichtplan', url: 'https://cevi-schichtplan.ch' }],
+    authors: [{ name: 'Cevi Schichtplan', url: 'https://cevi-schichtplan.ch' }],
     creator: 'Cevi Schichtplan Team',
     publisher: 'Cevi Schichtplan',
     formatDetection: {

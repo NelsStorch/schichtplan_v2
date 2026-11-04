@@ -52,6 +52,8 @@ const CEVIDB_ADDRESS_KEYS = [
   'town',
   'country',
   'additional_addresses',
+  'company_name',
+  'company',
 ];
 
 /**
