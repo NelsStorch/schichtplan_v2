@@ -194,6 +194,8 @@ export const CreateEventSchema = z.object({
   signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
+  checkinEarlyMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
+  checkinLateMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -224,6 +226,8 @@ export const UpdateEventSchema = z.object({
   signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
+  checkinEarlyMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional(),
+  checkinLateMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -354,6 +358,9 @@ export const UpdateDepartmentSchema = z.object({
   primaryColor: HexColorSchema.optional().nullable(),
   secondaryColor: HexColorSchema.optional().nullable(),
   qrStyle: z.enum(['CORNERS', 'GRADIENT', 'SOLID']).optional().nullable(),
+  qrCustomColors: z.boolean().optional(),
+  qrColorPrimary: HexColorSchema.optional().nullable(),
+  qrColorSecondary: HexColorSchema.optional().nullable(),
   contactUserId: z.string().uuid().optional().nullable(),
   membersOnly: z.boolean().optional(),
 });
@@ -509,6 +516,8 @@ export const InstantiateTemplateSchema = z.object({
   signupOpensAt: z.string().datetime().nullable().optional(),
   cancelDeadlineDays: z.number().int().min(0).max(365).nullable().optional(),
   attendanceMode: z.enum(ATTENDANCE_MODE_KEYS).optional(),
+  checkinEarlyMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
+  checkinLateMinutes: z.number().int().min(0, 'Minuten dürfen nicht negativ sein').max(1440, 'Maximal 24 Stunden (1440 Min)').optional().default(30),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -530,7 +539,7 @@ export const SetAttendanceSchema = z.object({
 export type SetAttendanceInput = z.infer<typeof SetAttendanceSchema>;
 
 export const CheckinSchema = z.object({
-  code: z.string().trim().min(10).max(100),
+  code: z.string().trim().min(10, 'Ungültiger oder fehlender Check-in-Code').max(100, 'Ungültiger Check-in-Code'),
 });
 
 export type CheckinInput = z.infer<typeof CheckinSchema>;

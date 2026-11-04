@@ -20,6 +20,9 @@ model Department {
   primaryColor   String?            @default("#e11d48")
   secondaryColor String?            @map("secondary_color")
   qrStyle        String?            @default("CORNERS") @map("qr_style")
+  qrCustomColors Boolean            @default(false) @map("qr_custom_colors")
+  qrColorPrimary String?            @map("qr_color_primary")
+  qrColorSecondary String?          @map("qr_color_secondary")
   // Kontaktperson der Abteilung: Abteilungsleitung oder jemand mit dem Recht «Personen und Rechte verwalten»
   contactUserId String?           @map("contact_user_id")
   contactUser   User?             @relation("DepartmentContactUser", fields: [contactUserId], references: [id], onDelete: SetNull)
@@ -243,6 +246,9 @@ model Event {
   overlapToleranceMinutes Int         @default(15) @map("overlap_tolerance_minutes")
   // Anwesenheit: "OFF", "OK_ONLY" (nur das OK hakt ab) oder "OK_AND_QR" (zusätzlich Selbst-Check-in per QR-Code)
   attendanceMode    String            @default("OFF") @map("attendance_mode")
+  // Check-in Zeitfenster: wie viele Minuten vor Schichtbeginn und nach Schichtende man sich per QR eintragen kann (Standard je 30)
+  checkinEarlyMinutes Int             @default(30) @map("checkin_early_minutes")
+  checkinLateMinutes  Int             @default(30) @map("checkin_late_minutes")
   // Geheimer Code im QR-Link für den Selbst-Check-in (erneuerbar, alte Plakate werden damit ungültig)
   checkinToken      String?           @unique @map("checkin_token")
   // «Ersatz gesucht»: Eingetragene dürfen ihre Schicht zur Übernahme anbieten
