@@ -17,7 +17,6 @@ import {
   audienceLabel,
   checkRules,
   managerFlags,
-  type AccessEvent,
   type AccessUser,
 } from '../services/eventAccess.js';
 import { personLabel } from '../services/profile.js';

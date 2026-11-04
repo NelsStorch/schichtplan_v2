@@ -9,11 +9,9 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Compass,
   Copy,
   Home,
   RefreshCw,
-  Sparkles,
   Utensils,
 } from 'lucide-react';
 import { cn } from '../utils/cn';

@@ -6,7 +6,6 @@ import {
   toZurichInput,
   zurichInputToIso,
   isSignupTimeOpen,
-  SIGNUP_OPEN_GRACE_MS,
   addDaysToDayKey,
   ageAt,
   businessDayKey,

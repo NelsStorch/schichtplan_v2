@@ -7,7 +7,6 @@ import {
   Award,
   Compass,
   Flame,
-  Home,
   RefreshCw,
   Sparkles,
 } from 'lucide-react';

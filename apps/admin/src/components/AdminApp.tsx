@@ -10,7 +10,6 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
-  Search,
   ShieldAlert,
   Users,
 } from 'lucide-react';

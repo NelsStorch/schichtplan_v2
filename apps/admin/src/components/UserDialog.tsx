@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Building2, CalendarClock, Copy, GitMerge, History, KeyRound, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowUpRight, Building2, CalendarClock, GitMerge, History, KeyRound, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
 import {
   Avatar,
   Badge,

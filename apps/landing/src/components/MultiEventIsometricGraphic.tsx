@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export function MultiEventIsometricGraphic({ className = '' }: { className?: string }) {
   return (

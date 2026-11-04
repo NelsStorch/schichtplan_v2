@@ -136,7 +136,9 @@ export async function rollUpRequestStats(prisma: PrismaClient, now = new Date())
     agg.count += row.count;
     agg.totalMs += row.totalMs;
     agg.maxMs = Math.max(agg.maxMs, row.maxMs);
-    row.buckets.forEach((n, i) => (agg.buckets[i] = (agg.buckets[i] ?? 0) + n));
+    row.buckets.forEach((n, i) => {
+      agg.buckets[i] = (agg.buckets[i] ?? 0) + n;
+    });
   }
 
   await prisma.$transaction(async (tx) => {

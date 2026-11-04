@@ -8,7 +8,7 @@ export interface CalendarEntry {
 }
 
 const stamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-const escape = (text: string) => text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (m) => `\\${m}`);
+const escapeText = (text: string) => text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (m) => `\\${m}`);
 
 /**
  * Erzeugt eine direkte URL für Google Kalender mit Zeitzone Europe/Zurich für einen Einzeleinsatz.
@@ -73,13 +73,13 @@ export function downloadIcs(filename: string, entries: CalendarEntry[]) {
       `DTSTAMP:${stamp(new Date().toISOString())}`,
       `DTSTART:${stamp(e.start)}`,
       `DTEND:${stamp(e.end)}`,
-      `SUMMARY:${escape(e.title)}`,
-      ...(e.description ? [`DESCRIPTION:${escape(e.description)}`] : []),
-      ...(e.location ? [`LOCATION:${escape(e.location)}`] : []),
+      `SUMMARY:${escapeText(e.title)}`,
+      ...(e.description ? [`DESCRIPTION:${escapeText(e.description)}`] : []),
+      ...(e.location ? [`LOCATION:${escapeText(e.location)}`] : []),
       'BEGIN:VALARM',
       'TRIGGER:-PT2H',
       'ACTION:DISPLAY',
-      `DESCRIPTION:${escape(e.title)}`,
+      `DESCRIPTION:${escapeText(e.title)}`,
       'END:VALARM',
       'END:VEVENT',
     ]),

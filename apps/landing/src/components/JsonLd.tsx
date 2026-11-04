@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { FAQ_ITEMS } from '@/data/faqData';
 
 interface JsonLdProps {

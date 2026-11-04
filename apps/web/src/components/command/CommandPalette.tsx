@@ -1,24 +1,18 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  CalendarDays,
   Check,
   ChevronRight,
   Clock,
-  Command,
   CornerDownLeft,
-  HelpCircle,
   Mail,
   Phone,
   Search,
-  Sparkles,
-  Ticket,
   Trash2,
   UserRound,
-  Users,
   X,
 } from 'lucide-react';
 import { Avatar, Badge, SlotMeter, cn } from '@schichtplan/ui';
@@ -26,7 +20,6 @@ import { useCommandPalette } from './CommandContext';
 import { HighlightText } from './HighlightText';
 import { clearRecentCommands } from './recentCommands';
 import { useCommandItems } from './useCommandItems';
-import type { CommandItem, CommandSubAction } from './types';
 
 export function CommandPalette() {
   const { isOpen, close, activeSubActionItem, setActiveSubActionItem } = useCommandPalette();

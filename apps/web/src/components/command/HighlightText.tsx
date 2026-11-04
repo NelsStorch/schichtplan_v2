@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 
 export function HighlightText({ text, query }: { text: string; query: string }) {
   if (!query || !text) return <>{text}</>;

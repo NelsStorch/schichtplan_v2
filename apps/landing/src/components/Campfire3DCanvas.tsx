@@ -32,8 +32,10 @@ export function Campfire3DCanvas() {
     }
 
     let animationFrameId: number;
-    let width = (canvas.width = canvas.parentElement?.clientWidth || window.innerWidth);
-    let height = (canvas.height = canvas.parentElement?.clientHeight || window.innerHeight);
+    let width = canvas.parentElement?.clientWidth || window.innerWidth;
+    let height = canvas.parentElement?.clientHeight || window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
 
     const handleResize = () => {
       if (!canvas || !canvas.parentElement) return;

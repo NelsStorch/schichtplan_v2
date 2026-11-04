@@ -201,7 +201,9 @@ async function doFlush(prisma: PrismaClient) {
         current.count += agg.count;
         current.totalMs += agg.totalMs;
         current.maxMs = Math.max(current.maxMs, agg.maxMs);
-        agg.buckets.forEach((n, i) => (current.buckets[i] += n));
+        agg.buckets.forEach((n, i) => {
+          current.buckets[i] += n;
+        });
       }
       throw err;
     }

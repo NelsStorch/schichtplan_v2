@@ -5,17 +5,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   CalendarDays,
   CalendarPlus,
-  Check,
   CheckCircle2,
-  ChevronRight,
   ClipboardCheck,
-  Clock,
   Copy,
   Download,
   ExternalLink,
-  HelpCircle,
-  History,
-  Info,
   Keyboard,
   LayoutDashboard,
   LifeBuoy,
@@ -25,7 +19,6 @@ import {
   Moon,
   Phone,
   Printer,
-  QrCode,
   RotateCcw,
   Search,
   Settings,
@@ -39,18 +32,17 @@ import {
   UserRound,
   Users,
   Wrench,
-  XCircle,
 } from 'lucide-react';
-import { getCeviDbDataUrl, type EventDto, type ShiftDto, type ShiftSignupDto } from '@schichtplan/shared';
+import { getCeviDbDataUrl, type EventDto, } from '@schichtplan/shared';
 import { useToast, type BadgeTone } from '@schichtplan/ui';
 import { api, useLoginHref } from '@/lib/api';
 import { eventStatus } from '@/components/EventTile';
-import { fmtDayMonth, fmtShortDate, fmtShortWeekday, fmtTimeRange } from '@/lib/format';
+import { fmtShortDate, fmtShortWeekday, fmtTimeRange } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
 import type { EventDetails } from '@/lib/types';
 import { useCommandPalette } from './CommandContext';
 import { getRecentCommandIds, recordRecentCommand } from './recentCommands';
-import type { CommandItem, CommandSection, CommandSubAction, CommandPreviewData } from './types';
+import type { CommandItem, CommandSection, } from './types';
 
 const THEME_STORAGE_KEY = 'schichtplan.theme';
 

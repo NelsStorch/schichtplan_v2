@@ -9,7 +9,6 @@ import {
   ResendVerificationSchema,
   CeviNameQuickLoginSchema,
   CeviNameRegisterSchema,
-  PLACEHOLDER_LAST_NAME,
   SetHomeDepartmentSchema,
   UpdateProfileSchema,
   safeReturnTo,

@@ -1,0 +1,79 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+	"root": true,
+	"files": {
+		"includes": [
+			"apps/*/src/**/*.{ts,tsx}",
+			"apps/*/test/**/*.ts",
+			"packages/*/src/**/*.{ts,tsx}",
+			"!**/generated/**",
+			"!**/node_modules/**",
+			"!**/.next/**",
+			"!**/dist/**"
+		]
+	},
+	"formatter": {
+		"enabled": false
+	},
+	"assist": {
+		"enabled": false
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"a11y": {
+				"useSemanticElements": "warn",
+				"noLabelWithoutControl": "warn",
+				"useKeyWithClickEvents": "warn",
+				"noStaticElementInteractions": "warn",
+				"noSvgWithoutTitle": "warn",
+				"noNoninteractiveElementToInteractiveRole": "warn",
+				"noAriaHiddenOnFocusable": "warn",
+				"useAriaPropsSupportedByRole": "warn"
+			},
+			"correctness": {
+				"useExhaustiveDependencies": "warn",
+				"noUnusedVariables": "warn",
+				"noUnusedFunctionParameters": "warn",
+				"noUnusedImports": "error"
+			},
+			"suspicious": {
+				"noArrayIndexKey": "warn",
+				"noExplicitAny": "warn",
+				"noGlobalIsNan": "off",
+				"noPrototypeBuiltins": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off",
+				"useImportType": "off",
+				"useTemplate": "off",
+				"useNodejsImportProtocol": "off",
+				"useExponentiationOperator": "off"
+			},
+			"performance": {
+				"noImgElement": "off"
+			},
+			"complexity": {
+				"useLiteralKeys": "off",
+				"noUselessUndefinedInitialization": "off",
+				"noUselessEscapeInRegex": "off"
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": [
+				"apps/landing/src/components/JsonLd.tsx",
+				"packages/ui/src/theme/ThemeScript.tsx"
+			],
+			"linter": {
+				"rules": {
+					"security": {
+						"noDangerouslySetInnerHtml": "off"
+					}
+				}
+			}
+		}
+	]
+}

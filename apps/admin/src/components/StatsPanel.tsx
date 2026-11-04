@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Download, RefreshCw, ShieldCheck, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { RefreshCw, ShieldCheck, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Button, Callout, Chip, ChipRow, Select, Skeleton, cn } from '@schichtplan/ui';
 import {
   STATS_RANGES,
@@ -19,7 +19,6 @@ import {
   type UsageMetricKey,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
-import { downloadCsv } from '../lib/csv';
 import { formatDateTime } from '../lib/format';
 import { Breakdown, ChartCard, DailyBars, StatGrid, StatTile, fmtNumber, formatBytes } from './stats/Charts';
 

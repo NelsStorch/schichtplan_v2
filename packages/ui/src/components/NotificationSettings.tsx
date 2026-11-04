@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, BellRing, Check, Mail, Send, Smartphone } from 'lucide-react';
+import { BellRing, Check, Mail, Send, Smartphone } from 'lucide-react';
 import {
   DEFAULT_EMAIL_REMINDER_MINUTES,
   DEFAULT_PUSH_REMINDER_MINUTES,

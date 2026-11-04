@@ -11,22 +11,18 @@ import {
   Minus,
   Plus,
   Shield,
-  Ticket,
   Trash2,
   UserPlus,
 } from 'lucide-react';
 import {
-  DEFAULT_SHIFT_CATEGORIES,
   toZurichInput,
   zurichInputToIso,
   type ShiftDto,
-  type ShiftTaskDto,
   type TaskDefinitionDto,
   type AgeRequirementType,
 } from '@schichtplan/shared';
 
 import {
-  Avatar,
   Badge,
   Button,
   Callout,
@@ -40,7 +36,7 @@ import {
   useConfirm,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
-import { fmtDayMonth, fmtTimeRange, fmtWeekday } from '@/lib/format';
+import { fmtTimeRange, } from '@/lib/format';
 import type { EventDetails, EventOrganizer } from '@/lib/types';
 
 /** ISO -> Wert für <input type="datetime-local"> in Schweizer Zeit */

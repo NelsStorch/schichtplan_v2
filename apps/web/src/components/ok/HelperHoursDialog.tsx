@@ -6,29 +6,19 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  Download,
   FileSpreadsheet,
-  Filter,
-  Layers,
   LifeBuoy,
   Medal,
   Search,
   SlidersHorizontal,
-  TrendingUp,
   Trophy,
   Users,
-  Wrench,
-  X,
 } from 'lucide-react';
 import { helpUrl, type EventRosterResponseDto } from '@schichtplan/shared';
 import {
   Avatar,
-  Badge,
   Button,
-  Card,
-  Chip,
   Dialog,
-  Field,
   Input,
   cn,
   trackUi,
@@ -39,9 +29,7 @@ import {
   computeStufenStats,
   exportHelperHoursCsv,
   exportStufenRankingCsv,
-  formatMinutes,
   type HelperStatsConfig,
-  type HelperStufenStat,
 } from '@/lib/helperStats';
 import type { EventDetails } from '@/lib/types';
 

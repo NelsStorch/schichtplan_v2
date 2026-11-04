@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShieldCheck, UserCheck, KeyRound, Sparkles } from 'lucide-react';
+
+import { ShieldCheck, UserCheck, } from 'lucide-react';
 
 export function CeviDbIsometricGraphic({ className = '' }: { className?: string }) {
   return (

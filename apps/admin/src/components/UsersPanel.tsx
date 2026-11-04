@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Download, RotateCw, Search, SearchX, ShieldCheck, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCw, Search, SearchX, ShieldCheck, Trash2, X } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -484,7 +484,9 @@ export function UsersPanel({
                         } else {
                           setSelectedIds((prev) => {
                             const next = new Set(prev);
-                            selectable.forEach((id) => next.delete(id));
+                            selectable.forEach((id) => {
+                              next.delete(id);
+                            });
                             return next;
                           });
                         }

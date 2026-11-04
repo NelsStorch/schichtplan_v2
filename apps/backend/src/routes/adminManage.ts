@@ -29,7 +29,7 @@ import { notifyAdminChange, recordAdminAction } from '../services/adminAudit.js'
 import { sendServerAlert } from '../services/serverAlert.js';
 import { recordDepartmentAction, toDepartmentAuditDto } from '../services/departmentAudit.js';
 import { contactCandidateWhere } from './departments.js';
-import { findDuplicateUsers, loginMethods, toListItem, userSelect } from './admin.js';
+import { loginMethods, toListItem, userSelect } from './admin.js';
 
 const EventListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -519,7 +519,7 @@ const adminManageRoutes: FastifyPluginAsync = async (fastify) => {
       if (isCeviNameProfile(leader)) return reply.status(400).send({ error: CEVINAME_ROLE_ERROR });
     }
 
-    let created;
+    let created: { id: string; name: string; slug: string };
     try {
       created = await fastify.prisma.department.create({
         data: {

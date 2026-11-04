@@ -14,7 +14,6 @@ import {
   type DepartmentDto,
   type DepartmentPermission,
   type DepartmentStufeDto,
-  type StufeSuggestionDto,
 } from '@schichtplan/shared';
 import { autoCreateAllCeviDbDepartmentStufen, autoCreateCeviDbDepartmentStufen, backfillCeviDbStufen, ceviDbGroupPeople, departmentOrtsgruppeId, NO_HOME_CONFIRMATION } from '../services/homeDepartment.js';
 import { personLabel } from '../services/profile.js';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { ArrowUpRight, Building2, Download, FileText, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, X } from 'lucide-react';
+import { ArrowUpRight, Building2, FileText, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, X } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -31,7 +31,6 @@ import {
   type DepartmentPermission,
 } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
-import { downloadCsv } from '../lib/csv';
 import { ACCESS_OPTIONS, CUSTOM_ACCESS, accessLabel, accessPayload, accessValue } from '../lib/access';
 import { formatDate, formatDateTime, fullName } from '../lib/format';
 import { EventRows } from './EventsPanel';

@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import {
   AlertCircle,
-  Calendar,
   Check,
   Clock,
   Edit,
@@ -16,7 +15,6 @@ import {
   UserCheck,
   UserMinus,
   UserPlus,
-  Users,
   X,
 } from 'lucide-react';
 import {
@@ -83,6 +81,23 @@ export function ShiftDetailsDialog({
   onWithdrawReplacement,
   onTakeOver,
 }: ShiftDetailsDialogProps) {
+  // Hooks müssen vor dem frühen return stehen (sonst wechselt die Hook-Anzahl, wenn shift gesetzt wird)
+  const conflictingShift = useMemo(() => {
+    if (!currentUser || !shift || !event?.shifts) return null;
+    const sStart = new Date(shift.startTime).getTime();
+    const sEnd = new Date(shift.endTime).getTime();
+    return (
+      event.shifts.find((other) => {
+        if (other.id === shift.id) return false;
+        const isSignedUp = (other.signups ?? []).some((su) => su.userId === currentUser.id);
+        if (!isSignedUp) return false;
+        const otherStart = new Date(other.startTime).getTime();
+        const otherEnd = new Date(other.endTime).getTime();
+        return sStart < otherEnd && sEnd > otherStart;
+      }) || null
+    );
+  }, [currentUser, shift, event?.shifts]);
+
   if (!shift) return null;
 
   const signups = shift.signups ?? [];
@@ -102,22 +117,6 @@ export function ShiftDetailsDialog({
     event.allowReplacement !== false &&
     Date.now() < replacementDeadline(shift.startTime, event.replacementCutoffHours ?? 0).getTime();
   const offerCount = signups.filter((s) => s.replacementWantedAt).length;
-
-  const conflictingShift = useMemo(() => {
-    if (!currentUser || !shift || !event?.shifts) return null;
-    const sStart = new Date(shift.startTime).getTime();
-    const sEnd = new Date(shift.endTime).getTime();
-    return (
-      event.shifts.find((other) => {
-        if (other.id === shift.id) return false;
-        const isSignedUp = (other.signups ?? []).some((su) => su.userId === currentUser.id);
-        if (!isSignedUp) return false;
-        const otherStart = new Date(other.startTime).getTime();
-        const otherEnd = new Date(other.endTime).getTime();
-        return sStart < otherEnd && sEnd > otherStart;
-      }) || null
-    );
-  }, [currentUser, shift, event?.shifts]);
 
   const tasks =
     shift.tasks && shift.tasks.length > 0

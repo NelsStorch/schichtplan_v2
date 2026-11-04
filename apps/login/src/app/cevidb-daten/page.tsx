@@ -8,7 +8,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Clock,
   Copy,
   Database,
   ExternalLink,
@@ -22,7 +21,6 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   User,
   UserCheck,
   Users,
@@ -37,7 +35,6 @@ import {
   Skeleton,
   ThemeToggle,
   buttonClasses,
-  cn,
 } from '@schichtplan/ui';
 import type { CeviDbDebugResponseDto, CeviDbRoleDto, CeviDbUserSummaryDto } from '@schichtplan/shared';
 

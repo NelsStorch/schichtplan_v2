@@ -14,7 +14,6 @@ import {
   LogIn,
   LogOut,
   Smartphone,
-  Sparkles,
   Ticket,
   Trash2,
   UserRound,
@@ -32,7 +31,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, departmentRoleLabel, getCeviDbDataUrl, getLandingUrl, helpUrl, statusUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
+import { PRIVACY_URL, departmentRoleLabel, getCeviDbDataUrl, helpUrl, statusUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
 import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { clearOfflineData, useInstallPrompt } from '@/lib/offline';

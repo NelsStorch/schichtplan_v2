@@ -116,8 +116,8 @@ export function eventCapabilities(access: DepartmentAccess, organizerRole: strin
   for (const cap of EVENT_CAPABILITIES) {
     if (access.permissions.has(CAPABILITY_PERMISSION[cap])) caps.add(cap);
   }
-  if (organizerRole === 'OK_LEAD') OK_LEAD_CAPABILITIES.forEach((c) => caps.add(c));
-  else if (organizerRole) OK_MEMBER_CAPABILITIES.forEach((c) => caps.add(c));
+  if (organizerRole === 'OK_LEAD') for (const c of OK_LEAD_CAPABILITIES) caps.add(c);
+  else if (organizerRole) for (const c of OK_MEMBER_CAPABILITIES) caps.add(c);
   if (caps.size > 0) caps.add('VIEW');
   return caps;
 }

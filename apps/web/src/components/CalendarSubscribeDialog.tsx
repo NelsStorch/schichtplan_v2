@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import {
-  Calendar,
   CalendarPlus,
   CalendarSync,
   Check,
@@ -10,14 +9,12 @@ import {
   Download,
   ExternalLink,
   HelpCircle,
-  Laptop,
   Mail,
   RefreshCw,
   Smartphone,
-  Sparkles,
 } from 'lucide-react';
 import { helpUrl } from '@schichtplan/shared';
-import { Badge, Button, Card, Dialog, buttonClasses, cn, useToast } from '@schichtplan/ui';
+import { Badge, Button, Dialog, buttonClasses, cn, useToast } from '@schichtplan/ui';
 import {
   downloadIcs,
   googleCalendarSubscribeUrl,

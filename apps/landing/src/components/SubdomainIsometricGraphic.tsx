@@ -1,5 +1,5 @@
-import React from 'react';
-import { Lock, Globe, ExternalLink, Calendar, Users } from 'lucide-react';
+
+import { Lock, Calendar, Users } from 'lucide-react';
 import { CeviLogo } from './CeviLogo';
 
 export function SubdomainIsometricGraphic({ className = '' }: { className?: string }) {

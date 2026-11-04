@@ -24,7 +24,7 @@ import {
   type UserDto,
 } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
-import { Avatar, Button, ThemeToggle, buttonClasses } from '@schichtplan/ui';
+import { Avatar, ThemeToggle, buttonClasses } from '@schichtplan/ui';
 import { Campfire3DCanvas } from '@/components/Campfire3DCanvas';
 import { Hero3DStage } from '@/components/Hero3DStage';
 import { ComparisonTable } from '@/components/ComparisonTable';

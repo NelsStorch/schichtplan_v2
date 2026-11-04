@@ -25,6 +25,7 @@
     "hilfe:preview": "npm --prefix hilfe run preview"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.4",
     "typescript": "^7.0.2"
   },
   "allowScripts": {
@@ -39,4 +40,3 @@
     "postcss-selector-parser": "^7.1.6"
   }
 }
-
