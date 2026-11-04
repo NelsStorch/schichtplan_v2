@@ -181,13 +181,20 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
 
   const [redeeming, setRedeeming] = useState(false);
 
-  const dismissPendingLink = () => {
+  const dismissPendingLink = useCallback(() => {
     const url = new URL(window.location.href);
     url.searchParams.delete('zugang');
     window.history.replaceState(null, '', url);
     setPendingToken(null);
     setEvent((prev) => (prev ? { ...prev, viewer: { ...prev.viewer, pendingLink: null } } : prev));
-  };
+  }, []);
+
+  // Wenn die Person bereits freigeschaltet ist, ?zugang= entfernen und direkt den Schichtplan zeigen
+  useEffect(() => {
+    if (event?.viewer.pendingLink?.alreadyRedeemed) {
+      dismissPendingLink();
+    }
+  }, [event?.viewer.pendingLink?.alreadyRedeemed, dismissPendingLink]);
 
   const redeemLink = async (tokenToRedeem?: string) => {
     const token = tokenToRedeem || event?.viewer.pendingLink?.token || pendingToken;

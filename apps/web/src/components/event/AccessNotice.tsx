@@ -11,15 +11,7 @@ export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedI
   const loginHref = useLoginHref();
   const { access } = event.viewer;
 
-  if (access.via === 'MANAGER' || access.via === 'RULES') return null;
-
-  if (access.via === 'LINK') {
-    return (
-      <Callout tone="success" title="Du bist über einen Zugangs-Link freigeschaltet">
-        Du kannst dich eintragen, auch wenn der Anlass sonst nur für {event.audience} ist.
-      </Callout>
-    );
-  }
+  if (access.via === 'MANAGER' || access.via === 'RULES' || access.via === 'LINK') return null;
 
   const linkHint = 'Hast du vom OK einen persönlichen Link bekommen? Öffne ihn, dann geht es.';
 
