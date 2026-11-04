@@ -717,14 +717,14 @@ function Timeline({
                       )}
                     />
                     <div className="rounded-card border border-line bg-surface p-4 sm:p-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                         <div className="tabular shrink-0 font-mono sm:w-28">
                           <p className="text-xl font-semibold text-fg">{fmtTime(s.startTime)}</p>
                           <p className="text-xs text-fg-subtle">bis {fmtTime(s.endTime)}</p>
                           <p className="text-xs text-fg-subtle">{fmtDuration(s.startTime, s.endTime)}</p>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             {s.category && <Badge>{s.category}</Badge>}
                             {s.isResponsible && (
                               <Badge tone="accent">
@@ -740,14 +740,18 @@ function Timeline({
                               </Badge>
                             )}
                           </div>
-                          <p className="font-bold text-fg">{s.title}</p>
-                          <Link href={`/events/${s.eventSlug}`} className="text-sm text-fg-muted hover:text-fg">
-                            {s.eventTitle}
-                          </Link>
+                          <div>
+                            <p className="font-bold text-base sm:text-lg text-fg">
+                              {s.title?.trim() || s.taskTitle || 'Schicht'}
+                            </p>
+                            <Link href={`/events/${s.eventSlug}`} className="text-sm font-medium text-fg-muted hover:text-fg transition-colors">
+                              {s.eventTitle}
+                            </Link>
+                          </div>
 
                           {/* Kompakte Kurz-Zusammenfassung (Leitung & Team) direkt sichtbar */}
                           {hasBriefing && !isExpanded && (
-                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted pt-1">
                               {leaders && (
                                 <span className="inline-flex items-center gap-1">
                                   <Shield className="size-3 text-accent-ink" /> Leitung:{' '}
@@ -772,14 +776,25 @@ function Timeline({
                             </div>
                           )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                      </div>
+
+                      {s.replacementWantedAt && (
+                        <p className="mt-3 rounded-field border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-ink">
+                          Du suchst Ersatz{s.replacementNote ? ` («${s.replacementNote}»)` : ''}. Bis jemand übernimmt,
+                          bist du eingetragen. Du bekommst eine Mail, sobald es so weit ist.
+                        </p>
+                      )}
+
+                      {/* Untere Aktionsleiste */}
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2.5 border-t border-line/70 pt-3">
+                        <div className="flex flex-wrap items-center gap-2">
                           {s.cateringTokensEnabled && onOpenCatering && (
                             <Button
                               variant="secondary"
                               size="sm"
                               onClick={() => onOpenCatering(s.eventSlug, s.eventTitle)}
                               title="Deine digitalen Verpflegungs- & Getränke-Bons öffnen"
-                              className="border-accent/40 text-accent-ink hover:bg-accent/10"
+                              className="border-accent/40 text-accent-ink hover:bg-accent/10 font-semibold"
                             >
                               <UtensilsCrossed className="size-4" /> Verpflegungs-Bons
                             </Button>
@@ -792,10 +807,13 @@ function Timeline({
                               title="Einsatz-Briefing, Beschreibung und Kontakte ein-/ausblenden"
                             >
                               <FileText className="size-4" />
-                              <span className="hidden md:inline">Briefing</span>
+                              <span className="hidden sm:inline">Briefing</span>
                               {isExpanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                             </Button>
                           )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
                           <a
                             href={googleCalendarUrl(toCalendar(s))}
                             target="_blank"
@@ -856,16 +874,9 @@ function Timeline({
                         </div>
                       </div>
 
-                      {s.replacementWantedAt && (
-                        <p className="mt-3 rounded-field border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-ink">
-                          Du suchst Ersatz{s.replacementNote ? ` («${s.replacementNote}»)` : ''}. Bis jemand übernimmt,
-                          bist du eingetragen. Du bekommst eine Mail, sobald es so weit ist.
-                        </p>
-                      )}
-
                       {/* Aufgeklapptes Einsatz-Briefing */}
                       {isExpanded && hasBriefing && (
-                        <div className="mt-4 border-t border-line/70 pt-3.5">
+                        <div className="mt-3.5 border-t border-line/70 pt-3.5">
                           <ShiftBriefingPanel shift={s} />
                         </div>
                       )}
