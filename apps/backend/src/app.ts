@@ -61,7 +61,7 @@ export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalho
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    bodyLimit: 15 * 1024 * 1024, // 15 MB für Bild-Uploads (Base64)
+    bodyLimit: 2 * 1024 * 1024, // Normale JSON-Anfragen sind klein; nur /api/uploads erlaubt mehr (siehe routes/uploads.ts)
     logger: process.env.NODE_ENV === 'development' && hasPinoPretty() ? {
       transport: {
         target: 'pino-pretty',

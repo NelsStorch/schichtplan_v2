@@ -1,6 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { canUploadImages } from '../services/departmentVisibility.js';
+import { detectImageType, unsafeSvgReason } from '../services/imageUpload.js';
+import { createRateLimiter } from '../services/rateLimit.js';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/png',
@@ -12,6 +14,10 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 const MAX_FILE_SIZE = 6 * 1024 * 1024; // 6 MB
+// Base64 braucht 4/3 der Grösse, dazu etwas JSON drumherum. Nur diese Route darf so grosse Bodies annehmen.
+const UPLOAD_BODY_LIMIT = Math.ceil((MAX_FILE_SIZE * 4) / 3) + 64 * 1024;
+// Pro Person höchstens 30 Uploads pro Stunde (Logos und Banner ändern sich selten)
+const uploadLimiter = createRateLimiter(60 * 60 * 1000, 30);
 
 const UploadRequestBodySchema = z.object({
   filename: z.string().optional().describe('Dateiname des Bildes (z. B. logo.png)'),
@@ -87,12 +93,17 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           200: UploadResponseSchema,
         },
       },
+      bodyLimit: UPLOAD_BODY_LIMIT,
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
       // Hochladen nur für wer Logos und Banner setzen kann (sonst füllt jedes Gratis-Profil die DB)
       if (!(await canUploadImages(fastify.prisma, request.user.id))) {
         return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder ein Event-OK kann Bilder hochladen' });
+      }
+
+      if (uploadLimiter.hit(request.user.id)) {
+        return reply.status(429).send({ error: 'Zu viele Uploads. Bitte versuche es später wieder.' });
       }
 
       const body = request.body || {};
@@ -137,12 +148,12 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      let buffer: Buffer;
-      try {
-        buffer = Buffer.from(rawBase64, 'base64');
-      } catch {
-        return reply.status(400).send({ error: 'Ungültige Base64-Codierung' });
+      // Vor dem Dekodieren prüfen, damit keine riesigen Puffer entstehen
+      if (rawBase64.length > Math.ceil((MAX_FILE_SIZE * 4) / 3) + 4) {
+        return reply.status(400).send({ error: 'Datei ist zu gross. Maximal erlaubt: 6 MB.' });
       }
+
+      const buffer = Buffer.from(rawBase64, 'base64');
 
       if (buffer.length === 0) {
         return reply.status(400).send({ error: 'Die hochgeladene Datei ist leer' });
@@ -152,6 +163,18 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({
           error: `Datei ist zu gross (${(buffer.length / 1024 / 1024).toFixed(1)} MB). Maximal erlaubt: 6 MB.`,
         });
+      }
+
+      // Der Inhalt muss zum angegebenen Format passen (sonst z. B. HTML als «image/png»)
+      const detected = detectImageType(buffer);
+      if (!detected || detected !== mimeType) {
+        return reply.status(400).send({ error: 'Der Dateiinhalt passt nicht zum Bildformat.' });
+      }
+      if (detected === 'image/svg+xml') {
+        const reason = unsafeSvgReason(buffer.toString('utf8'));
+        if (reason) {
+          return reply.status(400).send({ error: `Dieses SVG ist nicht erlaubt (${reason}). Bitte als PNG oder ein einfaches SVG hochladen.` });
+        }
       }
 
       const upload = await fastify.prisma.upload.create({

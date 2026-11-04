@@ -219,7 +219,8 @@ describe.skipIf(!hasTestDb)('Sicherheit der API', () => {
   });
 
   describe('Uploads', () => {
-    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>').toString('base64');
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4"/></svg>').toString('base64');
+    const evilSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>').toString('base64');
 
     it('erlaubt Uploads nur Planenden', async () => {
       const helper = await createUser(app);
@@ -230,6 +231,35 @@ describe.skipIf(!hasTestDb)('Sicherheit der API', () => {
         payload: { filename: 'x.svg', mimeType: 'image/svg+xml', base64: svg },
       });
       expect(res.statusCode).toBe(403);
+    });
+
+    it('lehnt SVGs mit Skripten und getarnte Dateien ab', async () => {
+      const department = await createDepartment(app);
+      const admin = await createUser(app);
+      await addMember(app, department.id, admin.id, 'ADMIN');
+      const upload = (payload: object) =>
+        inject(app, { method: 'POST', url: '/api/uploads', cookie: authCookie(app, admin), payload });
+
+      expect((await upload({ filename: 'x.svg', mimeType: 'image/svg+xml', base64: evilSvg })).statusCode).toBe(400);
+      const html = Buffer.from('<html><script>alert(1)</script></html>').toString('base64');
+      expect((await upload({ filename: 'x.png', mimeType: 'image/png', base64: html })).statusCode).toBe(400);
+      // Gültiges SVG, aber als PNG ausgegeben
+      expect((await upload({ filename: 'x.png', mimeType: 'image/png', base64: svg })).statusCode).toBe(400);
+      expect(await app.prisma.upload.count()).toBe(0);
+    });
+
+    it('nimmt grosse Bodies nur auf der Upload-Route an', async () => {
+      const department = await createDepartment(app);
+      const admin = await createUser(app);
+      await addMember(app, department.id, admin.id, 'ADMIN');
+      const res = await inject(app, {
+        method: 'PATCH',
+        url: '/api/departments/current',
+        tenant: department.slug,
+        cookie: authCookie(app, admin),
+        payload: { name: 'x'.repeat(3 * 1024 * 1024) },
+      });
+      expect(res.statusCode).toBe(413);
     });
 
     it('liefert hochgeladene Bilder in einer Sandbox aus', async () => {
