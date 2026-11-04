@@ -326,6 +326,8 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
           title: event.title,
           subtitle: 'Anwesenheit: QR-Code scannen und einchecken',
           color: request.tenant.primaryColor,
+          secondaryColor: request.tenant.secondaryColor,
+          qrStyle: (request.tenant.qrStyle as 'CORNERS' | 'GRADIENT' | 'SOLID') || 'CORNERS',
           logoUrl: event.logoUrl || request.tenant.logoUrl,
           departmentName: request.tenant.name,
           prisma: fastify.prisma,

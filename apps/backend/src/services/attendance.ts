@@ -51,6 +51,8 @@ export interface QrCodeInput {
   title?: string;
   subtitle?: string;
   color?: string | null;
+  secondaryColor?: string | null;
+  qrStyle?: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
   logoUrl?: string | null;
   departmentName?: string;
   prisma?: PrismaClient;

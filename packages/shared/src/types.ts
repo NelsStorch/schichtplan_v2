@@ -18,6 +18,8 @@ export interface DepartmentDto {
   slug: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
+  secondaryColor?: string | null;
+  qrStyle?: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
   /** Kontaktperson (Abteilungsleitung oder mit «Personen und Rechte verwalten») */
   contactUserId?: string | null;
   /** Name immer, E-Mail nur für angemeldete Personen */
@@ -719,6 +721,8 @@ export interface AdminDepartmentListItemDto {
   slug: string;
   logoUrl: string | null;
   primaryColor: string | null;
+  secondaryColor: string | null;
+  qrStyle: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
   contactUserId: string | null;
   contactName: string | null;
   ceviDbGroupId: number | null;

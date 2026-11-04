@@ -16,6 +16,13 @@ export interface ResolvedLogo {
 }
 
 /**
+ * Prüft, ob ein QR-Modul zu einem der drei Finder Patterns (Positions-Ecken) gehört.
+ */
+export function isFinderPattern(r: number, c: number, n: number): boolean {
+  return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+}
+
+/**
  * Holt ein Abteilungslogo (aus der Datenbank wenn /api/uploads/..., per HTTP wenn URL,
  * oder Fallback auf das Standard-Cevi-Logo).
  */
@@ -44,7 +51,7 @@ export async function resolveLogo(
     }
   }
 
-  // Externe Bild-URL (z. B. auf abteilungseigener Webseite)
+  // Externe Bild-URL
   if (/^https?:\/\//i.test(logoUrl)) {
     try {
       const res = await fetch(logoUrl, { signal: AbortSignal.timeout(2000) });
@@ -67,19 +74,29 @@ export interface QrOptions {
   subtitle?: string;
   departmentName?: string;
   color?: string | null;
+  secondaryColor?: string | null;
+  qrStyle?: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
   logoUrl?: string | null;
   prisma?: PrismaClient;
 }
 
 /**
  * Erzeugt einen QR-Code als SVG-String mit:
- * - Abteilungsfarbe (mit automatischem Kontrast-Schutz gegen Weiss)
+ * - Ein- oder zweifarbigem Design (Ecken, Farbverlauf oder einfarbig)
  * - Zentrierter Plakette mit Abteilungslogo (oder Cevi-Logo)
  * - Level H Fehlerkorrektur (höchste Scan-Sicherheit)
  */
 export async function generateQrSvg(options: QrOptions): Promise<string> {
-  const contrast: ContrastEvaluation = evaluateContrast(options.color);
-  const qrColor = contrast.qrSafeHex;
+  const primaryContrast: ContrastEvaluation = evaluateContrast(options.color);
+  const primaryQrColor = primaryContrast.qrSafeHex;
+
+  const hasSecondary = Boolean(options.secondaryColor?.trim());
+  const secondaryContrast = hasSecondary ? evaluateContrast(options.secondaryColor) : primaryContrast;
+  const secondaryQrColor = secondaryContrast.qrSafeHex;
+
+  const style = options.qrStyle || (hasSecondary ? 'CORNERS' : 'SOLID');
+  const isTwoTone = hasSecondary && secondaryQrColor !== primaryQrColor && style !== 'SOLID';
+
   const logo = await resolveLogo(options.logoUrl, options.prisma);
 
   const qr = QRCode.create(options.text, { errorCorrectionLevel: 'H' });
@@ -93,18 +110,24 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
   const badgeStart = (n - badgeModules) / 2;
   const badgeEnd = badgeStart + badgeModules;
 
-  // Pfade für dunkle Module zusammensetzen
-  let paths = '';
+  let bodyPaths = '';
+  let cornerPaths = '';
+
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
-      // Zentrum aussparen, damit das Logo keine QR-Punkte überdeckt
+      // Zentrum aussparen für Plakette
       if (r >= badgeStart && r < badgeEnd && c >= badgeStart && c < badgeEnd) {
         continue;
       }
       if (qr.modules.get(r, c)) {
         const x = c + quietZone;
         const y = r + quietZone;
-        paths += `M${x} ${y}h1v1h-1z `;
+        const p = `M${x} ${y}h1v1h-1z `;
+        if (isTwoTone && style === 'CORNERS' && isFinderPattern(r, c, n)) {
+          cornerPaths += p;
+        } else {
+          bodyPaths += p;
+        }
       }
     }
   }
@@ -121,7 +144,6 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
     const dataUri = `data:${logo.mimeType};base64,${logo.buffer.toString('base64')}`;
     logoSvg = `<image href="${dataUri}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet" />`;
   } else {
-    // Offizielles Cevi-Logo (SVG-Vektorpfade)
     const scale = logoSize / 500;
     logoSvg = `<g transform="translate(${logoX}, ${logoY}) scale(${scale})">
       <path d="${CEVI_LOGO_PATH_RED}" fill="#e20031" />
@@ -129,106 +151,179 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
     </g>`;
   }
 
+  let defs = '';
+  let bodyFill = primaryQrColor;
+  let strokeColor = primaryQrColor;
+
+  if (isTwoTone && style === 'GRADIENT') {
+    defs = `<defs>
+      <linearGradient id="qr-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${primaryQrColor}" />
+        <stop offset="100%" stop-color="${secondaryQrColor}" />
+      </linearGradient>
+    </defs>`;
+    bodyFill = 'url(#qr-grad)';
+    strokeColor = secondaryQrColor;
+  } else if (isTwoTone && style === 'CORNERS') {
+    strokeColor = secondaryQrColor;
+  }
+
+  const cornerSvg = cornerPaths ? `<path fill="${secondaryQrColor}" d="${cornerPaths.trim()}" />` : '';
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges">
+  ${defs}
   <rect width="${total}" height="${total}" fill="#ffffff" />
-  <path fill="${qrColor}" d="${paths.trim()}" />
-  <rect x="${badgeX - 0.2}" y="${badgeY - 0.2}" width="${badgeModules + 0.4}" height="${badgeModules + 0.4}" rx="1.2" fill="#ffffff" stroke="${qrColor}" stroke-width="0.15" />
+  <path fill="${bodyFill}" d="${bodyPaths.trim()}" />
+  ${cornerSvg}
+  <rect x="${badgeX - 0.2}" y="${badgeY - 0.2}" width="${badgeModules + 0.4}" height="${badgeModules + 0.4}" rx="1.2" fill="#ffffff" stroke="${strokeColor}" stroke-width="0.15" />
   ${logoSvg}
 </svg>`;
 }
 
 /**
  * Erzeugt einen sauberen, hochauflösenden A4-Check-in-Aushang als PDF-Dokument.
+ * Im modernen Schweizer Plakat-Design (Bento-Struktur, grosser QR-Code, nummerierte Schritte).
  */
 export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
-  const contrast: ContrastEvaluation = evaluateContrast(options.color);
-  const qrColor = contrast.qrSafeHex;
+  const primaryContrast = evaluateContrast(options.color);
+  const primaryColor = primaryContrast.qrSafeHex;
+
+  const hasSecondary = Boolean(options.secondaryColor?.trim());
+  const secondaryContrast = hasSecondary ? evaluateContrast(options.secondaryColor) : primaryContrast;
+  const secondaryColor = secondaryContrast.qrSafeHex;
+
+  const style = options.qrStyle || (hasSecondary ? 'CORNERS' : 'SOLID');
+  const isTwoTone = hasSecondary && secondaryColor !== primaryColor && style !== 'SOLID';
+
   const logo = await resolveLogo(options.logoUrl, options.prisma);
 
   return new Promise((resolve, reject) => {
     // A4: 595.28 x 841.89 pt
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 36 });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    // 1. Akzentleiste ganz oben
-    doc.rect(0, 0, 595.28, 12).fill(qrColor);
+    // 1. Akzentleiste ganz oben (Gradient bei Zweifarbigkeit)
+    if (isTwoTone) {
+      const topGrad = doc.linearGradient(0, 0, 595.28, 0);
+      topGrad.stop(0, primaryColor).stop(1, secondaryColor);
+      doc.rect(0, 0, 595.28, 10).fill(topGrad);
+    } else {
+      doc.rect(0, 0, 595.28, 10).fill(primaryColor);
+    }
 
     // 2. Kopfbereich
-    let y = 46;
-    if (options.departmentName) {
-      doc
-        .font('Helvetica')
-        .fontSize(12)
-        .fillColor('#6b7280')
-        .text(options.departmentName.toUpperCase(), 40, y, { align: 'center', width: 515 });
-      y += 18;
-    }
+    const deptName = options.departmentName || 'Cevi Schichtplan';
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(9.5)
+      .fillColor('#6b7280')
+      .text('CEVI SCHICHTPLAN  ·  OFFIZIELLER HELFER-AUSHANG', 40, 36);
+
+    doc
+      .font('Helvetica')
+      .fontSize(13)
+      .fillColor('#374151')
+      .text(deptName, 40, 52);
 
     const title = options.title || 'Helfer-Check-in';
     doc
       .font('Helvetica-Bold')
       .fontSize(26)
       .fillColor('#111827')
-      .text(title, 40, y, { align: 'center', width: 515 });
-    y += 34;
+      .text(title, 40, 70, { width: 450 });
 
-    const subtitle = options.subtitle || 'Anwesenheit: QR-Code scannen und einchecken';
+    const subtitle = options.subtitle || 'Anwesenheit erfassen: Scann den QR-Code vor Beginn deiner Schicht.';
     doc
       .font('Helvetica')
-      .fontSize(14)
+      .fontSize(11.5)
       .fillColor('#4b5563')
-      .text(subtitle, 40, y, { align: 'center', width: 515 });
-    y += 26;
+      .text(subtitle, 40, 104, { width: 460 });
 
-    // Feine Trennlinie
-    doc.strokeColor('#e5e7eb').lineWidth(1).moveTo(80, y).lineTo(515, y).stroke();
-    y += 24;
+    // Logo oben rechts (38x38 pt)
+    const headerLogoX = 512;
+    const headerLogoY = 40;
+    const headerLogoSize = 42;
+    if (!logo.isCeviDefault && logo.buffer && logo.mimeType && (logo.mimeType.includes('png') || logo.mimeType.includes('jpeg'))) {
+      try {
+        doc.image(logo.buffer, headerLogoX, headerLogoY, {
+          fit: [headerLogoSize, headerLogoSize],
+          align: 'right',
+          valign: 'center',
+        });
+      } catch {
+        drawCeviLogoVector(doc, headerLogoX, headerLogoY, headerLogoSize);
+      }
+    } else {
+      drawCeviLogoVector(doc, headerLogoX, headerLogoY, headerLogoSize);
+    }
 
-    // 3. QR-Code im Zentrum zeichnen (Vektor-Präzision)
+    // Trennlinie
+    doc.strokeColor('#e5e7eb').lineWidth(1).moveTo(40, 126).lineTo(555, 126).stroke();
+
+    // 3. Hero Card für den QR-Code (gross und aufgeräumt)
+    const cardY = 138;
+    const cardH = 358;
+    doc
+      .roundedRect(40, cardY, 515.28, cardH, 14)
+      .fillAndStroke('#ffffff', '#e5e7eb');
+
+    const badgeLabelColor = isTwoTone ? secondaryColor : primaryColor;
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor(badgeLabelColor)
+      .text('QR-CODE SCANNEN ZUM EINCHECKEN', 40, cardY + 16, { align: 'center', width: 515.28 });
+
+    // QR-Code im Zentrum
     const qr = QRCode.create(options.text, { errorCorrectionLevel: 'H' });
     const n = qr.modules.size;
-    const qrPixelSize = 300; // 300 pt (ca. 10.6 cm, aus 1-2m problemlos lesbar)
+    const qrPixelSize = 256;
     const qrX = (595.28 - qrPixelSize) / 2;
-    const qrY = y;
-    const moduleSize = qrPixelSize / n;
+    const qrY = cardY + 38;
+    const mSize = qrPixelSize / n;
 
-    // Plakette berechnen
     let badgeModules = Math.round(n * 0.24);
     if ((n - badgeModules) % 2 !== 0) badgeModules += 1;
     const badgeStart = (n - badgeModules) / 2;
     const badgeEnd = badgeStart + badgeModules;
 
-    // Weisse Unterlage mit feinem Rahmen
-    doc
-      .roundedRect(qrX - 12, qrY - 12, qrPixelSize + 24, qrPixelSize + 24, 12)
-      .fillAndStroke('#ffffff', '#e5e7eb');
+    // Gradient für QR-Code vorbereiten, falls gewählt
+    let qrGradient: PDFKit.PDFLinearGradient | null = null;
+    if (isTwoTone && style === 'GRADIENT') {
+      qrGradient = doc.linearGradient(qrX, qrY, qrX + qrPixelSize, qrY + qrPixelSize);
+      qrGradient.stop(0, primaryColor).stop(1, secondaryColor);
+    }
 
-    // Module zeichnen
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
         if (r >= badgeStart && r < badgeEnd && c >= badgeStart && c < badgeEnd) {
           continue; // Aussparung für Logo
         }
         if (qr.modules.get(r, c)) {
-          doc
-            .rect(qrX + c * moduleSize, qrY + r * moduleSize, moduleSize, moduleSize)
-            .fill(qrColor);
+          if (qrGradient) {
+            doc.rect(qrX + c * mSize, qrY + r * mSize, mSize, mSize).fill(qrGradient);
+          } else if (isTwoTone && style === 'CORNERS' && isFinderPattern(r, c, n)) {
+            doc.rect(qrX + c * mSize, qrY + r * mSize, mSize, mSize).fill(secondaryColor);
+          } else {
+            doc.rect(qrX + c * mSize, qrY + r * mSize, mSize, mSize).fill(primaryColor);
+          }
         }
       }
     }
 
     // Zentrierte Plakette
-    const badgePt = badgeModules * moduleSize;
-    const badgeX = qrX + badgeStart * moduleSize;
-    const badgeY = qrY + badgeStart * moduleSize;
+    const badgePt = badgeModules * mSize;
+    const badgeX = qrX + badgeStart * mSize;
+    const badgeY = qrY + badgeStart * mSize;
+    const strokeBorder = isTwoTone ? secondaryColor : primaryColor;
 
     doc
-      .roundedRect(badgeX - 2, badgeY - 2, badgePt + 4, badgePt + 4, 8)
-      .fillAndStroke('#ffffff', qrColor);
+      .roundedRect(badgeX - 2, badgeY - 2, badgePt + 4, badgePt + 4, 7)
+      .fillAndStroke('#ffffff', strokeBorder);
 
     const logoPadding = badgePt * 0.12;
     const logoX = badgeX + logoPadding;
@@ -243,46 +338,105 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
           valign: 'center',
         });
       } catch {
-        // Fallback aufs Cevi-Logo bei Bilddekodierungsfehler
         drawCeviLogoVector(doc, logoX, logoY, logoInner);
       }
     } else {
       drawCeviLogoVector(doc, logoX, logoY, logoInner);
     }
 
-    y = qrY + qrPixelSize + 36;
-
-    // 4. Anleitungskarte unten
+    // URL unter dem QR-Code
     doc
-      .roundedRect(60, y, 475.28, 120, 10)
-      .fillAndStroke('#f9fafb', '#e5e7eb');
+      .font('Helvetica')
+      .fontSize(8.5)
+      .fillColor('#9ca3af')
+      .text(options.text, 40, cardY + cardH - 24, { align: 'center', width: 515.28 });
+
+    // 4. Drei Bento-Schritte zur Anleitung
+    const stepsY = 512;
+    const stepH = 134;
+    const colW = (515.28 - 2 * 14) / 3;
+    const steps = [
+      {
+        n: '1',
+        title: 'Kamera öffnen',
+        text: 'Smartphone-Kamera oder QR-Scanner auf den Code richten und den Link öffnen.',
+      },
+      {
+        n: '2',
+        title: 'Bestätigen',
+        text: 'Mit deinem Cevi Schichtplan-Konto anmelden oder als Gast deinen Namen bestätigen.',
+      },
+      {
+        n: '3',
+        title: 'Eingecheckt!',
+        text: 'Deine Anwesenheit wird sofort erfasst. Du bist für deinen Helfereinsatz startklar!',
+      },
+    ];
+
+    steps.forEach((s, i) => {
+      const colX = 40 + i * (colW + 14);
+      doc
+        .roundedRect(colX, stepsY, colW, stepH, 10)
+        .fillAndStroke('#f9fafb', '#e5e7eb');
+
+      // Nummernbadge im Schritt
+      const badgeFill = i === 1 && isTwoTone ? secondaryColor : primaryColor;
+      doc.circle(colX + 22, stepsY + 22, 11).fill(badgeFill);
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(11)
+        .fillColor('#ffffff')
+        .text(s.n, colX + 11, stepsY + 17, { width: 22, align: 'center' });
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(11.5)
+        .fillColor('#111827')
+        .text(s.title, colX + 42, stepsY + 16, { width: colW - 50 });
+
+      doc
+        .font('Helvetica')
+        .fontSize(9.5)
+        .lineGap(2.5)
+        .fillColor('#4b5563')
+        .text(s.text, colX + 14, stepsY + 44, { width: colW - 28 });
+    });
+
+    // 5. Zeitfenster-Infobox
+    const noticeY = 660;
+    doc
+      .roundedRect(40, noticeY, 515.28, 54, 8)
+      .fillAndStroke('#f0fdf4', '#bbf7d0');
 
     doc
       .font('Helvetica-Bold')
-      .fontSize(12)
-      .fillColor('#111827')
-      .text('So checkst du für deine Schicht ein:', 80, y + 16);
-
-    doc
-      .font('Helvetica')
-      .fontSize(11)
-      .fillColor('#374151')
-      .text('1. Öffne die Kamera-App auf deinem Smartphone und scanne den Code.', 80, y + 36)
-      .text('2. Melde dich mit deinem Schichtplan-Konto an oder bestätige deinen Namen.', 80, y + 54)
-      .text('3. Deine Anwesenheit wird automatisch für deine Schichten vermerkt.', 80, y + 72);
-
-    doc
-      .font('Helvetica-Oblique')
       .fontSize(10)
-      .fillColor('#6b7280')
-      .text('Hinweis: Der Check-in ist jeweils ab 30 Minuten vor Schichtbeginn möglich.', 80, y + 94);
+      .fillColor('#166534')
+      .text('ZEITFENSTER FÜR DEN CHECK-IN', 56, noticeY + 12);
 
-    // 5. Fusszeile
     doc
       .font('Helvetica')
       .fontSize(9)
+      .fillColor('#15803d')
+      .text(
+        'Der Selbst-Check-in öffnet jeweils 30 Minuten vor deinem Schichtbeginn und bleibt bis zum Schichtende aktiv.',
+        56,
+        noticeY + 28,
+        { width: 480 }
+      );
+
+    // 6. Fusszeile
+    doc.strokeColor('#e5e7eb').lineWidth(1).moveTo(40, 730).lineTo(555, 730).stroke();
+    doc
+      .font('Helvetica')
+      .fontSize(8.5)
       .fillColor('#9ca3af')
-      .text('Cevi Schichtplan · cevi-schichtplan.ch', 40, 805, { align: 'center', width: 515 });
+      .text(
+        'Cevi Schichtplan · Ein Gemeinschaftsdienst von Cevi Schweiz · cevi-schichtplan.ch',
+        40,
+        742,
+        { align: 'center', width: 515.28 }
+      );
 
     doc.end();
   });

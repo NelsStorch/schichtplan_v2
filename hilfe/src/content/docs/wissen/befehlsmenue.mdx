@@ -1,0 +1,90 @@
+---
+title: Befehlsmenü & Schnellsuche (Command Palette)
+description: Mit ⌘K oder Strg+K blitzschnell im Schichtplan navigieren, Schichten finden, Helfende einteilen und Aktionen ausführen.
+audience: [helfer, ok, abteilung]
+sidebar:
+  label: Befehlsmenü (⌘K)
+---
+
+import Btn from '../../../components/Btn.astro';
+
+Das **Befehlsmenü** (auch *Command Palette*) ist die universelle Schaltzentrale im Cevi Schichtplan. Damit kannst du das gesamte Portal ohne Maus bedienen, zwischen Anlässen springen, Schichten suchen, Helfende einteilen und Einstellungen blitzschnell ändern.
+
+:::tip[Tastenkürzel]
+Drücke jederzeit <kbd>⌘K</kbd> (Mac) oder <kbd>Strg</kbd>+<kbd>K</kbd> (Windows/Linux), um das Befehlsmenü zu öffnen.
+Auf dem Smartphone findest du in der Kopfzeile das Lupen-Symbol <Btn>Suchen...</Btn>.
+:::
+
+---
+
+## Tastaturnavigation
+
+Das Befehlsmenü ist komplett auf schnelles Arbeiten mit der Tastatur ausgelegt:
+
+| Taste | Funktion |
+| --- | --- |
+| <kbd>⌘K</kbd> / <kbd>Strg</kbd>+<kbd>K</kbd> | Befehlsmenü öffnen oder schliessen |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Durch die Trefferliste navigieren |
+| <kbd>↵ Enter</kbd> | Ausgewählten Befehl oder Eintrag sofort ausführen |
+| <kbd>⇥ Tab</kbd> | **Unteraktionen** zum aktuellen Eintrag öffnen (z. B. Link kopieren, Anrufen, Einteilen) |
+| <kbd>Esc</kbd> | Unteraktionen verlassen oder Menü schliessen |
+| <kbd>⌫ Backspace</kbd> | Bei leerem Textfeld einen gesetzten Filter-Präfix entfernen |
+
+---
+
+## Sofort-Filter mit Präfixen
+
+Wenn du ein bestimmtes Zeichen am Anfang deiner Eingabe tippst, filtert das Befehlsmenü sofort nach dieser Kategorie:
+
+| Präfix | Bereich | Beispiel | Was passiert |
+| --- | --- | --- | --- |
+| `@` | **Personen & Kontakte** | `@falk` oder `@leitung` | Durchsucht Helfende, Cevi-Namen, Stufen und Rollen deiner Abteilung. |
+| `#` oder `>` | **Anlässe** | `#chilbi` oder `>lager` | Zeigt ausschliesslich Anlässe deiner Abteilung an. |
+| `:` oder `!` | **Schichten & Aufgaben** | `:grill` oder `!kasse` | Findet Schichten, Arbeiten und freie Plätze im aktuellen Anlass. |
+| `?` | **Hilfe & Shortcuts** | `?` | Zeigt eine Übersicht aller Tastenkürzel und Menü-Befehle an. |
+
+Tippst du ohne Präfix, durchsucht das Menü alle Bereiche gleichzeitig.
+
+---
+
+## Kontextbezogene Aktionen
+
+Das Befehlsmenü weiss, wo du dich gerade aufhältst. Wenn du dich in einem Anlass befindest, erscheinen automatisch passende Aktionen ganz oben:
+
+### Für alle Helfenden
+- **Zur Helfer-Ansicht wechseln**: Schichtübersicht des Anlasses öffnen.
+- **Link kopieren**: Den direkten Link zum Anlass in die Zwischenablage legen.
+- **Freie Schichten finden**: Zeigt sofort an, welche Arbeiten noch Verstärkung brauchen.
+
+### Für das OK & die Leitung
+- **Zum OK-Bereich wechseln**: Zwischen öffentlicher Ansicht und Planungszentrale umschalten.
+- **Lücken-Finder (Offene Schichten)**: Listet alle unbesetzten Schichten mit der Anzahl fehlender Helfer\*innen auf.
+- **Neue Schicht erfassen**: Öffnet direkt das Erfassungsformular.
+- **Helfende einteilen**: Öffnet das Schnelleinteilungs-Fenster.
+- **Anwesenheit & Check-in**: Springt zur Check-in-Liste am Anlasstag.
+- **Schichtplan drucken**: Öffnet die Druckansicht für Schichtlisten und Aushänge.
+
+---
+
+## Unteraktionen & Detail-Vorschau (Inspector)
+
+Jeder Eintrag im Befehlsmenü bietet oft mehr als nur einen einfachen Klick:
+
+1. **Detail-Vorschau**: Auf grösseren Bildschirmen siehst du rechts sofort Zusatzinformationen:
+   - Bei **Schichten**: Die genaue Uhrzeit, den Fortschrittsbalken der Belegung und wer bereits eingetragen ist.
+   - Bei **Personen**: Telefonnummer, E-Mail-Adresse, Stufenzugehörigkeit und die Schichten der Person.
+   - Bei **Anlässen**: Datum, Status und Planungsstand.
+2. **Unteraktionen (<kbd>Tab</kbd>)**:
+   - Drücke bei einem Eintrag die Taste <kbd>Tab</kbd> (oder tippe auf den Pfeil rechts), um spezifische Unteraktionen aufzurufen.
+   - Beispiel bei einer Person: Direkt die Telefonnummer wählen (`tel:`), eine E-Mail schreiben oder die Anwesenheit abhaken.
+   - Beispiel bei einer Schicht: Direkt zur Bearbeitung springen oder Helfende zuteilen.
+
+---
+
+## Allgemeine Aktionen & Design
+
+Über das Befehlsmenü kannst du auch globale Einstellungen und Navigation steuern:
+
+- **Farbschema**: Tippe `hell`, `dunkel` oder `system`, um das Design der App anzupassen.
+- **Schnellsprung**: Wechsle zu *Meine Schichten*, deinem *Profil*, den *Abteilungseinstellungen* oder zur *Cevi.DB-Synchronisation*.
+- **Verlauf (Zuletzt verwendet)**: Die zuletzt ausgeführten Befehle und geöffneten Anlässe erscheinen beim Öffnen direkt zuoberst, sodass du mit zwei Tastenanschlägen wieder dort bist, wo du aufgehört hast.

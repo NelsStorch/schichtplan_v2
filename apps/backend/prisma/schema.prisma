@@ -17,7 +17,9 @@ model Department {
   name         String
   slug         String             @unique
   logoUrl      String?
-  primaryColor String?            @default("#e11d48")
+  primaryColor   String?            @default("#e11d48")
+  secondaryColor String?            @map("secondary_color")
+  qrStyle        String?            @default("CORNERS") @map("qr_style")
   // Kontaktperson der Abteilung: Abteilungsleitung oder jemand mit dem Recht «Personen und Rechte verwalten»
   contactUserId String?           @map("contact_user_id")
   contactUser   User?             @relation("DepartmentContactUser", fields: [contactUserId], references: [id], onDelete: SetNull)

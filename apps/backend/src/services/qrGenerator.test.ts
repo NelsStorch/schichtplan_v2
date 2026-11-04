@@ -17,6 +17,30 @@ describe('qrGenerator', () => {
     expect(svg).toContain('</svg>');
   });
 
+  it('erzeugt einen zweifarbigen QR-Code mit hervorgehobenen Ecken (CORNERS)', async () => {
+    const svg = await generateQrSvg({
+      text: 'https://example.com/checkin?code=123',
+      color: '#e11d48', // Primärfarbe (Datenpunkte)
+      secondaryColor: '#003d8f', // Zweitfarbe (Ecken)
+      qrStyle: 'CORNERS',
+    });
+
+    expect(svg).toContain('#e11d48');
+    expect(svg).toContain('#003d8f');
+  });
+
+  it('erzeugt einen zweifarbigen QR-Code mit linearem Farbverlauf (GRADIENT)', async () => {
+    const svg = await generateQrSvg({
+      text: 'https://example.com/checkin?code=123',
+      color: '#e11d48',
+      secondaryColor: '#003d8f',
+      qrStyle: 'GRADIENT',
+    });
+
+    expect(svg).toContain('<linearGradient id="qr-grad"');
+    expect(svg).toContain('url(#qr-grad)');
+  });
+
   it('dunkelt zu helle Farben im SVG automatisch ab (Kontrast-Schutz)', async () => {
     const svg = await generateQrSvg({
       text: 'https://example.com/checkin?code=123',
@@ -53,17 +77,19 @@ describe('qrGenerator', () => {
     expect(svg).toContain('data:image/png;base64,');
   });
 
-  it('erzeugt ein gültiges A4-PDF-Dokument', async () => {
+  it('erzeugt ein gültiges A4-PDF-Dokument mit Bento-Schritten und Zweifarbigkeit', async () => {
     const pdfBuf = await generateCheckinPdf({
       text: 'https://example.com/checkin?code=123',
       title: 'Chilbi Illnau',
       subtitle: 'Helfer-Check-in',
       departmentName: 'Cevi Illnau-Effretikon',
-      color: '#2563eb',
+      color: '#e11d48',
+      secondaryColor: '#003d8f',
+      qrStyle: 'CORNERS',
     });
 
     expect(pdfBuf).toBeInstanceOf(Buffer);
     expect(pdfBuf.subarray(0, 4).toString('utf8')).toBe('%PDF');
-    expect(pdfBuf.length).toBeGreaterThan(1000);
+    expect(pdfBuf.length).toBeGreaterThan(5000);
   });
 });

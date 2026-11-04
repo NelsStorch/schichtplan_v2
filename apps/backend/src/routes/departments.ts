@@ -159,6 +159,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
       slug: request.tenant.slug,
       logoUrl: request.tenant.logoUrl,
       primaryColor: request.tenant.primaryColor,
+      secondaryColor: request.tenant.secondaryColor,
+      qrStyle: request.tenant.qrStyle as 'CORNERS' | 'GRADIENT' | 'SOLID' | null,
       contactUserId: request.tenant.contactUserId,
       contactPerson: await loadContactPerson(fastify.prisma, request.tenant.contactUserId, Boolean(request.user)),
       ceviDbGroupId: request.tenant.ceviDbGroupId,
@@ -1142,6 +1144,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           name: parse.data.name !== undefined ? parse.data.name : undefined,
           logoUrl: parse.data.logoUrl !== undefined ? parse.data.logoUrl : undefined,
           primaryColor: parse.data.primaryColor !== undefined ? parse.data.primaryColor : undefined,
+          secondaryColor: parse.data.secondaryColor !== undefined ? parse.data.secondaryColor : undefined,
+          qrStyle: parse.data.qrStyle !== undefined ? parse.data.qrStyle : undefined,
           contactUserId,
           membersOnly: parse.data.membersOnly,
         },
@@ -1153,6 +1157,8 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
         slug: updated.slug,
         logoUrl: updated.logoUrl,
         primaryColor: updated.primaryColor,
+        secondaryColor: updated.secondaryColor,
+        qrStyle: updated.qrStyle as 'CORNERS' | 'GRADIENT' | 'SOLID' | null,
         contactUserId: updated.contactUserId,
       };
     }

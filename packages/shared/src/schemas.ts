@@ -352,6 +352,8 @@ export const UpdateDepartmentSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   logoUrl: ImageUrlSchema.optional().nullable(),
   primaryColor: HexColorSchema.optional().nullable(),
+  secondaryColor: HexColorSchema.optional().nullable(),
+  qrStyle: z.enum(['CORNERS', 'GRADIENT', 'SOLID']).optional().nullable(),
   contactUserId: z.string().uuid().optional().nullable(),
   membersOnly: z.boolean().optional(),
 });

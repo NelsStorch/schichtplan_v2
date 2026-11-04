@@ -121,7 +121,7 @@ export default defineConfig({
         },
         {
           label: 'Nachschlagen',
-          items: ['wissen/faq', 'wissen/wer-sieht-was', 'wissen/glossar', 'wissen/kontakt'],
+          items: ['wissen/befehlsmenue', 'wissen/faq', 'wissen/wer-sieht-was', 'wissen/glossar', 'wissen/kontakt'],
         },
       ],
     }),
