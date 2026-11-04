@@ -1049,22 +1049,25 @@ export interface CheckinResultDto {
   cateringTokens?: CateringTokenDto[];
 }
 
-/** Digitaler Verpflegungs- oder Getränkegutschein für Helfende */
+/** Digitaler Verpflegungs- oder Getränkegutschein für Helfende & Schichtleitung */
 export interface CateringTokenDto {
   id: string;
-  shiftSignupId: string;
+  shiftSignupId: string | null;
+  shiftId?: string | null;
   shiftTitle: string | null;
   taskTitle: string | null;
   shiftStartTime: string;
   shiftEndTime: string;
   title: string;
   status: CateringTokenStatus;
-  /** Kann der Bon im Moment eingelöst werden? (Kulanz-Fenster erreicht oder anwesend) */
+  /** Kann der Bon im Moment eingelöst werden? (Kulanz-Fenster erreicht, immer gültig oder anwesend) */
   isAvailableNow: boolean;
   /** Ab wann der Bon frühestens einlösbar ist (ISO-String) */
   availableFrom: string;
   redeemedAt: string | null;
   redeemedByName: string | null;
+  isResponsible?: boolean;
+  helperName?: string;
 }
 
 /** Übersicht der ausgegebenen Verpflegungs-Bons für das OK */
@@ -1086,6 +1089,10 @@ export interface CateringTokensOverviewDto {
     helperName: string;
     redeemedAt: string;
     shiftTitle: string | null;
+  }>;
+  tokens: Array<CateringTokenDto & {
+    helperName: string;
+    isResponsible: boolean;
   }>;
 }
 

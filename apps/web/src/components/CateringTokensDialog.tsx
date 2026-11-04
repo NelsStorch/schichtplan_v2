@@ -28,8 +28,10 @@ export function CateringTokensDialog({
     setLoading(true);
     setError(null);
     try {
-      const data = await api<CateringTokenDto[]>(`/api/events/${eventSlug}/my-catering-tokens`);
-      setTokens(data);
+      const data = await api<CateringTokenDto[] | { tokens?: CateringTokenDto[] }>(
+        `/api/events/${eventSlug}/my-catering-tokens`
+      );
+      setTokens(Array.isArray(data) ? data : (data.tokens ?? []));
     } catch (err) {
       setError(errorMessage(err));
     } finally {

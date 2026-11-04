@@ -170,6 +170,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                     cancelDeadlineDays: true,
                     allowReplacement: true,
                     replacementCutoffHours: true,
+                    cateringTokensEnabled: true,
                     department: { select: { name: true, slug: true } },
                   },
                 },
@@ -189,6 +190,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                     slug: true,
                     startDate: true,
                     cancelDeadlineDays: true,
+                    cateringTokensEnabled: true,
                     department: { select: { name: true, slug: true } },
                   },
                 },
@@ -206,6 +208,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                 slug: true,
                 startDate: true,
                 cancelDeadlineDays: true,
+                cateringTokensEnabled: true,
                 department: { select: { name: true, slug: true } },
                 shifts: true,
               },
@@ -229,6 +232,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
         eventSlug: string;
         eventStartDate: string;
         cancelDeadlineDays: number | null;
+        cateringTokensEnabled?: boolean;
         /** «Ersatz gesucht»: erlaubt, Frist und eigener Stand (nur bei eigener Eintragung) */
         allowReplacement?: boolean;
         replacementCutoffHours?: number;
@@ -266,6 +270,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
           eventSlug: su.shift.event.slug,
           eventStartDate: su.shift.event.startDate.toISOString(),
           cancelDeadlineDays: su.shift.event.cancelDeadlineDays,
+          cateringTokensEnabled: su.shift.event.cateringTokensEnabled,
           allowReplacement: su.shift.event.allowReplacement,
           replacementCutoffHours: su.shift.event.replacementCutoffHours,
           replacementWantedAt: su.replacementWantedAt?.toISOString() ?? null,
@@ -300,6 +305,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
             eventSlug: sr.shift.event.slug,
             eventStartDate: sr.shift.event.startDate.toISOString(),
             cancelDeadlineDays: sr.shift.event.cancelDeadlineDays,
+            cateringTokensEnabled: sr.shift.event.cateringTokensEnabled,
             departmentName: sr.shift.event.department.name,
             departmentSlug: sr.shift.event.department.slug,
             createdAt: sr.createdAt.toISOString(),
@@ -336,6 +342,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                 eventSlug: dr.event.slug,
                 eventStartDate: dr.event.startDate.toISOString(),
                 cancelDeadlineDays: dr.event.cancelDeadlineDays,
+                cateringTokensEnabled: dr.event.cateringTokensEnabled,
                 departmentName: dr.event.department.name,
                 departmentSlug: dr.event.department.slug,
                 createdAt: dr.createdAt.toISOString(),

@@ -20,6 +20,7 @@ import {
   Settings,
   Shield,
   Users,
+  UtensilsCrossed,
   Wrench,
   type LucideProps,
 } from 'lucide-react';
@@ -69,6 +70,7 @@ const NAV: NavGroup[] = [
     label: 'Am Anlass',
     items: [
       { path: 'anwesenheit', label: 'Anwesenheit', icon: ClipboardCheck, capability: 'ATTENDANCE' },
+      { path: 'verpflegung', label: 'Verpflegungs-Bons', icon: UtensilsCrossed, capability: 'ATTENDANCE' },
       { path: 'export', label: 'Export & Drucken', icon: Download, capability: 'EXPORT' },
     ],
   },

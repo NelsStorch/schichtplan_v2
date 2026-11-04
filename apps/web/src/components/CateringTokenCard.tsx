@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Check,
   CheckCircle2,
+  ChevronsRight,
   Clock,
   CupSoda,
   Sparkles,
   Ticket,
-  Utensils,
   UtensilsCrossed,
 } from 'lucide-react';
-import type { CateringTokenDto } from '@schichtplan/shared';
+import { SWISS_TIMEZONE, type CateringTokenDto } from '@schichtplan/shared';
 import { Badge, Card, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { fmtTime, fmtWeekday } from '@/lib/format';
@@ -26,14 +26,31 @@ interface CateringTokenCardProps {
 /** Erkennt anhand des Titels das passende Icon */
 function getTokenIcon(title: string) {
   const t = title.toLowerCase();
-  if (t.includes('getränk') || t.includes('trinken') || t.includes('bier') || t.includes('cola') || t.includes('mineral')) {
+  if (
+    t.includes('getränk') ||
+    t.includes('trinken') ||
+    t.includes('bier') ||
+    t.includes('cola') ||
+    t.includes('mineral') ||
+    t.includes('kaffee')
+  ) {
     return <CupSoda className="size-5 shrink-0" />;
   }
-  if (t.includes('menü') || t.includes('essen') || t.includes('burger') || t.includes('bratwurst') || t.includes('kuchen')) {
+  if (
+    t.includes('menü') ||
+    t.includes('essen') ||
+    t.includes('burger') ||
+    t.includes('bratwurst') ||
+    t.includes('kuchen') ||
+    t.includes('pommes')
+  ) {
     return <UtensilsCrossed className="size-5 shrink-0" />;
   }
   return <Ticket className="size-5 shrink-0" />;
 }
+
+const MIN_DRAG_DURATION_MS = 450;
+const REDEEM_THRESHOLD = 0.95;
 
 export function CateringTokenCard({
   token: initialToken,
@@ -47,6 +64,9 @@ export function CateringTokenCard({
   const [swipeProgress, setSwipeProgress] = useState(0); // 0 bis 1
   const [isDragging, setIsDragging] = useState(false);
   const sliderTrackRef = useRef<HTMLDivElement>(null);
+  const dragStartXRef = useRef<number>(0);
+  const dragStartTimeRef = useRef<number>(0);
+  const currentProgressRef = useRef<number>(0);
 
   // Live-Uhrzeit & Countdown für die 2-Minuten-Bestätigung (Screenshot-Prävention)
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -85,23 +105,22 @@ export function CateringTokenCard({
     return () => clearInterval(timer);
   }, [countdownSeconds]);
 
-  // Swipe-Logik für Touch und Maus
-  const handleRedeem = async (force: boolean = false) => {
+  const handleRedeem = async () => {
     if (isRedeeming || token.status === 'REDEEMED') return;
     setIsRedeeming(true);
     try {
       if (typeof window !== 'undefined' && 'vibrate' in navigator) {
         try {
-          navigator.vibrate([100, 50, 100]);
+          navigator.vibrate([100, 50, 120]);
         } catch {}
       }
-      const updated = await api<CateringTokenDto>(
+      const res = await api<{ token?: CateringTokenDto } & CateringTokenDto>(
         `/api/events/${slug}/catering-tokens/${token.id}/redeem`,
         {
           method: 'POST',
-          json: { force },
         }
       );
+      const updated = res.token ?? res;
       setToken(updated);
       setCountdownSeconds(120);
       onRedeemed?.(updated);
@@ -118,46 +137,72 @@ export function CateringTokenCard({
       });
     } finally {
       setIsRedeeming(false);
+      currentProgressRef.current = 0;
       setSwipeProgress(0);
       setIsDragging(false);
     }
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  /**
+   * Schwerfälliger Schieber:
+   * - Muss direkt am linken Schieber-Knopf (Thumb) gepackt werden (kein Klick-Sprung in der Spur).
+   * - Nichtlineare Widerstandskurve (`Math.pow(raw, 1.55)`), damit man spürbar bis ganz zum Anschlag ziehen muss.
+   * - Mindest-Ziehdauer (`MIN_DRAG_DURATION_MS`), damit schnelles versehentliches Wischen beim Scrollen ignoriert wird.
+   * - Löst erst beim bewussten Loslassen (`onPointerUp`) am rechten Anschlag (`>= 95%`) aus.
+   */
+  const handleThumbPointerDown = (e: React.PointerEvent) => {
     if (!token.isAvailableNow || token.status !== 'AVAILABLE' || isRedeeming) return;
+    e.stopPropagation();
+    dragStartXRef.current = e.clientX;
+    dragStartTimeRef.current = Date.now();
+    currentProgressRef.current = 0;
+    setSwipeProgress(0);
     setIsDragging(true);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
+  const handleThumbPointerMove = (e: React.PointerEvent) => {
     if (!isDragging || !sliderTrackRef.current) return;
     const rect = sliderTrackRef.current.getBoundingClientRect();
-    const trackWidth = rect.width - 48; // Abzug der Daumen-Breite
-    if (trackWidth <= 0) return;
+    const usableWidth = rect.width - 52; // Abzug der Thumb-Breite + Padding
+    if (usableWidth <= 0) return;
 
-    const currentX = e.clientX - rect.left - 24;
-    const progress = Math.max(0, Math.min(1, currentX / trackWidth));
-    setSwipeProgress(progress);
+    const deltaX = Math.max(0, e.clientX - dragStartXRef.current);
+    // Zusätzlicher Ziehweg + progressive Widerstandskurve (schwerfälliges Gefühl)
+    const rawLinear = Math.max(0, Math.min(1, deltaX / (usableWidth * 1.06)));
+    const heavyProgress = Math.pow(rawLinear, 1.55);
 
-    // Ab 80% automatischer Abschluss
-    if (progress >= 0.85 && !isRedeeming) {
-      setIsDragging(false);
-      void handleRedeem(false);
-    }
+    currentProgressRef.current = heavyProgress;
+    setSwipeProgress(heavyProgress);
   };
 
-  const handlePointerUp = () => {
+  const handleThumbPointerUp = () => {
     if (!isDragging) return;
     setIsDragging(false);
-    if (swipeProgress < 0.85) {
-      setSwipeProgress(0); // Federt zurück
+    const elapsedMs = Date.now() - dragStartTimeRef.current;
+    const finalProgress = currentProgressRef.current;
+
+    if (finalProgress >= REDEEM_THRESHOLD && elapsedMs >= MIN_DRAG_DURATION_MS && !isRedeeming) {
+      void handleRedeem();
+    } else {
+      if (finalProgress >= REDEEM_THRESHOLD && elapsedMs < MIN_DRAG_DURATION_MS) {
+        toast({
+          title: 'Bitte langsam schieben',
+          description: 'Zum Schutz vor versehentlichem Entwerten den Regler langsam bis zum Ende ziehen und loslassen.',
+          tone: 'info',
+        });
+      }
+      currentProgressRef.current = 0;
+      setSwipeProgress(0);
     }
   };
 
   const isRecentlyRedeemed = countdownSeconds !== null && countdownSeconds > 0;
+  const isReadyToRelease = swipeProgress >= REDEEM_THRESHOLD;
 
-  // Formatierung der Live-Uhrzeit mit Sekunden
+  // Formatierung der Live-Uhrzeit mit Sekunden in Europe/Zurich
   const timeString = currentTime.toLocaleTimeString('de-CH', {
+    timeZone: SWISS_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -204,7 +249,12 @@ export function CateringTokenCard({
               {timeString}
             </p>
             <p className="text-xs font-medium text-fg-muted">
-              Live-Gültigkeit: noch <span className="font-bold text-fg font-mono">{Math.floor(countdownSeconds / 60)}:{(countdownSeconds % 60).toString().padStart(2, '0')}</span> Min
+              Live-Gültigkeit: noch{' '}
+              <span className="font-bold text-fg font-mono">
+                {Math.floor(countdownSeconds / 60)}:
+                {(countdownSeconds % 60).toString().padStart(2, '0')}
+              </span>{' '}
+              Min
             </p>
           </div>
 
@@ -265,51 +315,78 @@ export function CateringTokenCard({
             )}
           </div>
 
-          {/* SWIPE-SLIDER ZUM ENTWERTEN (Nur wenn einlösbar und offen) */}
+          {/* SCHWERFÄLLIGER SWIPE-SLIDER ZUM ENTWERTEN (Nur wenn einlösbar und offen) */}
           {token.status === 'AVAILABLE' && (
             <div className="pt-1">
               {token.isAvailableNow ? (
                 <div
                   ref={sliderTrackRef}
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerUp}
-                  className="relative select-none touch-none h-12 w-full rounded-full bg-accent/10 border border-accent/25 overflow-hidden flex items-center cursor-grab active:cursor-grabbing p-1"
+                  className={cn(
+                    'relative select-none touch-none h-13 w-full rounded-full border overflow-hidden flex items-center p-1 transition-colors',
+                    isReadyToRelease
+                      ? 'bg-success/15 border-success/50'
+                      : 'bg-accent/10 border-accent/30'
+                  )}
                 >
-                  {/* Füllbalken der dem Wischen folgt */}
+                  {/* Füllbalken der dem Ziehen folgt */}
                   <div
-                    className="absolute left-0 top-0 bottom-0 bg-accent/20 transition-all duration-75 rounded-full pointer-events-none"
+                    className={cn(
+                      'absolute left-0 top-0 bottom-0 rounded-full pointer-events-none',
+                      isReadyToRelease ? 'bg-success/25' : 'bg-accent/20',
+                      !isDragging && 'transition-all duration-300'
+                    )}
                     style={{ width: `${Math.min(100, Math.max(12, swipeProgress * 100))}%` }}
                   />
 
                   {/* Führungstext im Hintergrund */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-bold text-accent-ink tracking-wide px-12 text-center">
-                    {isRedeeming
-                      ? 'Wird entwertet…'
-                      : swipeProgress > 0.4
-                        ? 'Loslassen zum Entwerten!'
-                        : 'Vor dem Personal nach rechts wischen 👉'}
-                  </div>
-
-                  {/* Verschiebbarer Schieberegler (Thumb) */}
                   <div
                     className={cn(
-                      'relative z-10 size-10 rounded-full bg-accent text-accent-fg flex items-center justify-center shadow-md font-bold text-sm transition-transform duration-75',
-                      !isDragging && 'transition-all duration-300'
+                      'absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-bold tracking-wide pl-12 pr-4 text-center',
+                      isReadyToRelease ? 'text-success-ink' : 'text-accent-ink'
+                    )}
+                  >
+                    {isRedeeming
+                      ? 'Wird entwertet…'
+                      : isReadyToRelease
+                        ? 'Jetzt loslassen zum Entwerten!'
+                        : swipeProgress > 0.15
+                          ? `Weiter bis ganz nach rechts ziehen (${Math.round(swipeProgress * 100)}%)…`
+                          : 'Regler links fassen & ganz nach rechts ziehen'}
+                  </div>
+
+                  {/* Verschiebbarer Schieberegler (Thumb) – NUR hier startet das Ziehen */}
+                  <div
+                    role="slider"
+                    aria-label={`${token.title} entwerten`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(swipeProgress * 100)}
+                    tabIndex={0}
+                    onPointerDown={handleThumbPointerDown}
+                    onPointerMove={handleThumbPointerMove}
+                    onPointerUp={handleThumbPointerUp}
+                    onPointerCancel={handleThumbPointerUp}
+                    className={cn(
+                      'relative z-10 size-11 rounded-full flex items-center justify-center shadow-md font-bold text-sm cursor-grab active:cursor-grabbing touch-none',
+                      isReadyToRelease
+                        ? 'bg-success text-success-fg ring-2 ring-success/40'
+                        : 'bg-accent text-accent-fg',
+                      !isDragging && 'transition-transform duration-300'
                     )}
                     style={{
                       transform: `translateX(${
                         sliderTrackRef.current
-                          ? swipeProgress * (sliderTrackRef.current.clientWidth - 48)
+                          ? swipeProgress * (sliderTrackRef.current.clientWidth - 52)
                           : 0
                       }px)`,
                     }}
                   >
                     {isRedeeming ? (
                       <div className="size-4 animate-spin rounded-full border-2 border-accent-fg border-t-transparent" />
+                    ) : isReadyToRelease ? (
+                      <Check className="size-5" />
                     ) : (
-                      '👉'
+                      <ChevronsRight className="size-5" />
                     )}
                   </div>
                 </div>
@@ -328,7 +405,7 @@ export function CateringTokenCard({
             <div className="pt-1 text-right">
               <button
                 type="button"
-                onClick={() => void handleRedeem(true)}
+                onClick={() => void handleRedeem()}
                 className="text-[11px] text-accent-ink hover:underline font-semibold"
               >
                 Als OK vorzeitig entwerten (Kulanz)

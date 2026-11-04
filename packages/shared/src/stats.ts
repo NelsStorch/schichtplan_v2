@@ -59,6 +59,7 @@ export const OK_PAGES = {
   fragen: 'Fragen',
   nachrichten: 'Nachrichten',
   anwesenheit: 'Anwesenheit',
+  verpflegung: 'Verpflegung',
   export: 'Export',
   einstellungen: 'Einstellungen',
   protokoll: 'Protokoll',

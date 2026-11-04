@@ -206,7 +206,7 @@ export const CreateEventSchema = z.object({
   cateringEarlyHours: z
     .number()
     .int()
-    .min(0, 'Stunden dürfen nicht negativ sein')
+    .min(-1, 'Ungültige Vorlaufzeit')
     .max(72, 'Maximal 72 Stunden Vorlaufzeit')
     .optional()
     .default(2),
@@ -251,7 +251,7 @@ export const UpdateEventSchema = z.object({
   cateringEarlyHours: z
     .number()
     .int()
-    .min(0, 'Stunden dürfen nicht negativ sein')
+    .min(-1, 'Ungültige Vorlaufzeit')
     .max(72, 'Maximal 72 Stunden Vorlaufzeit')
     .optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
@@ -554,7 +554,7 @@ export const InstantiateTemplateSchema = z.object({
   cateringEarlyHours: z
     .number()
     .int()
-    .min(0, 'Stunden dürfen nicht negativ sein')
+    .min(-1, 'Ungültige Vorlaufzeit')
     .max(72, 'Maximal 72 Stunden Vorlaufzeit')
     .optional()
     .default(2),

@@ -20,6 +20,7 @@ import {
   Shield,
   UserPlus,
   Users,
+  UtensilsCrossed,
   X,
   Zap,
 } from 'lucide-react';
@@ -55,6 +56,7 @@ import { AccessNotice } from '@/components/event/AccessNotice';
 import { SignupCountdown } from '@/components/SignupCountdown';
 import { ParticipationDialog } from '@/components/event/ParticipationDialog';
 import { ReplacementDialog } from '@/components/event/ReplacementDialog';
+import { CateringTokensDialog } from '@/components/CateringTokensDialog';
 import { ShiftGrid } from '@/components/event/ShiftGrid';
 import { NeededShifts, ShiftRows, type ShiftActions, type ShiftPauseHint } from '@/components/event/ShiftList';
 import { replacementOffers, shiftStats, shiftTasks } from '@/components/event/shift-utils';
@@ -113,6 +115,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const [editingShift, setEditingShift] = useState<ShiftDto | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showOkForm, setShowOkForm] = useState(false);
+  const [showCatering, setShowCatering] = useState(false);
   const [dayResponsiblesTarget, setDayResponsiblesTarget] = useState<{ dayDate: string; dayLabel: string } | null>(null);
 
   // Deep-Link (?schicht=ID), Einladungs-Link (?zugang=TOKEN) und gespeicherte Ansicht
@@ -297,6 +300,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const showSignup = access.canSignup || (access.reason === 'LOGIN_REQUIRED' && isSignupTimeOpenNow);
   const isMine = (shift: ShiftDto) => Boolean(user && shift.signups?.some((s) => s.userId === user.id));
   const myShiftCount = event.shifts.filter(isMine).length;
+  const isEventResponsible = Boolean(
+    user &&
+      (event.shifts.some((sh) => sh.responsibles?.some((r) => r.id === user.id)) ||
+        Object.values(event.dayResponsibles ?? {}).some((list) => list.some((r) => r.id === user.id)))
+  );
 
   const total = event.shifts.reduce((sum, s) => sum + s.requiredSlots, 0);
   const filled = event.shifts.reduce((sum, s) => sum + shiftStats(s).filled, 0);
@@ -767,13 +775,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                 <p className="tabular mt-2 text-xs text-white/60">
                   {filled} von {total} besetzt
                 </p>
-                {myShiftCount > 0 && (
-                  <Link
-                    href="/meine-schichten"
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-success/25 px-3 py-1 text-xs font-semibold text-white transition hover:bg-success/35"
-                  >
-                    <Check className="size-3.5" /> Du bist {myShiftCount}× eingetragen
-                  </Link>
+                {(myShiftCount > 0 || (event.cateringTokensEnabled && isEventResponsible)) && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {myShiftCount > 0 && (
+                      <Link
+                        href="/meine-schichten"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-success/25 px-3 py-1 text-xs font-semibold text-white transition hover:bg-success/35"
+                      >
+                        <Check className="size-3.5" /> Du bist {myShiftCount}× eingetragen
+                      </Link>
+                    )}
+                    {event.cateringTokensEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => setShowCatering(true)}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-fg shadow-sm transition hover:brightness-110"
+                      >
+                        <UtensilsCrossed className="size-3.5" /> Verpflegungs-Bons
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -1260,6 +1281,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
           setShowOkForm(false);
           await load();
         }}
+      />
+      <CateringTokensDialog
+        open={showCatering}
+        onClose={() => setShowCatering(false)}
+        eventSlug={event.slug}
+        eventTitle={event.title}
       />
       <DayResponsiblesDialog
         open={Boolean(dayResponsiblesTarget)}

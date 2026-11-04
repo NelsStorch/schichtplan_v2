@@ -1296,7 +1296,7 @@ export function EventForm({
                 <span className="text-[13px] font-semibold text-fg">Verpflegungs- & Getränke-Tokens</span>
               </div>
               <p className="text-xs text-fg-muted mt-0.5">
-                Generiert für Helfende digitale Bons, die sie vor Ort am Stand per Wisch-Geste entwerten können.
+                Generiert für Helfende und die Schichtleitung digitale Bons (abrufbar über «Meine Schichten», die Anlass-Seite und den Check-in), die am Stand per Schieber entwertet werden.
               </p>
             </div>
             <Switch
@@ -1357,13 +1357,14 @@ export function EventForm({
               </Field>
 
               <Field
-                label="Kulanz-Fenster (Vorlaufzeit für Einlösung)"
-                hint="Ab wie vielen Stunden vor Schichtbeginn Helfende ihren Bon bereits einlösen dürfen (z. B. für Mittagessen vor einer Nachmittagsschicht)."
+                label="Gültigkeit & Kulanz-Fenster"
+                hint="Wann dürfen Helfende und Schichtleitung ihre Bons einlösen? «Immer gültig» schaltet die Bons sofort ohne Zeitfenster frei."
               >
                 <Select
                   value={String(form.cateringEarlyHours)}
                   onChange={(e) => set('cateringEarlyHours', Number(e.target.value))}
                 >
+                  <option value="-1">Immer gültig (sofort einlösbar, ohne Zeitfenster)</option>
                   <option value="0">Erst ab Schichtbeginn / Check-in (0 Std.)</option>
                   <option value="1">1 Stunde vor Schichtbeginn</option>
                   <option value="2">2 Stunden vorher (Standard)</option>
@@ -1371,6 +1372,7 @@ export function EventForm({
                   <option value="4">4 Stunden vorher</option>
                   <option value="6">6 Stunden vorher</option>
                   <option value="12">12 Stunden vorher</option>
+                  <option value="24">24 Stunden vorher</option>
                 </Select>
               </Field>
             </div>

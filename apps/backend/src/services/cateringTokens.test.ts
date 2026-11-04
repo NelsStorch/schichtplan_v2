@@ -1,41 +1,58 @@
-import { describe, expect, it } from 'vitest';
-import { isTokenAvailableNow, tokenAvailableFrom } from './cateringTokens.js';
+import { describe, it, expect } from 'vitest';
+import { isTokenAvailableNow, availableFromTime } from './cateringTokens.js';
 
-describe('cateringTokens', () => {
-  const shiftStart = new Date('2026-06-20T14:00:00Z');
+describe('cateringTokens service', () => {
+  const shiftStart = new Date('2026-08-29T18:00:00.000Z');
 
-  describe('tokenAvailableFrom', () => {
-    it('berechnet den Beginn des Kulanzfensters anhand von earlyHours', () => {
-      const from2h = tokenAvailableFrom(shiftStart, 2);
-      expect(from2h.toISOString()).toBe('2026-06-20T12:00:00.000Z');
-
-      const from0h = tokenAvailableFrom(shiftStart, 0);
-      expect(from0h.toISOString()).toBe('2026-06-20T14:00:00.000Z');
-    });
+  it('berechnet den frühesten Einlösezeitpunkt anhand der Kulanz-Stunden', () => {
+    const from = availableFromTime(shiftStart, 2);
+    expect(from.toISOString()).toBe('2026-08-29T16:00:00.000Z');
   });
 
-  describe('isTokenAvailableNow', () => {
-    it('ist verfügbar wenn Helfer bereits als PRESENT eingecheckt ist', () => {
-      // 5 Stunden vor Schichtbeginn
-      const wayEarlier = new Date('2026-06-20T09:00:00Z');
-      expect(isTokenAvailableNow(shiftStart, 'PRESENT', 2, wayEarlier)).toBe(true);
-    });
+  it('gibt bei "Immer gültig" (earlyHours = -1) sofort frei, unabhängig vom Schichtbeginn', () => {
+    expect(
+      isTokenAvailableNow({
+        shiftStartTime: shiftStart,
+        earlyHours: -1,
+        attendance: null,
+        now: new Date('2026-08-01T10:00:00.000Z'),
+      })
+    ).toBe(true);
+  });
 
-    it('ist verfügbar wenn die aktuelle Zeit innerhalb des Kulanzfensters liegt', () => {
-      // 1.5 Stunden vor Schichtbeginn bei 2h Kulanz
-      const inWindow = new Date('2026-06-20T12:30:00Z');
-      expect(isTokenAvailableNow(shiftStart, null, 2, inWindow)).toBe(true);
-    });
+  it('erlaubt das Einlösen sofort, wenn die Person bereits als PRESENT eingecheckt ist', () => {
+    const wayBeforeShift = new Date('2026-08-29T08:00:00.000Z');
+    expect(
+      isTokenAvailableNow({
+        shiftStartTime: shiftStart,
+        earlyHours: 2,
+        attendance: 'PRESENT',
+        now: wayBeforeShift,
+      })
+    ).toBe(true);
+  });
 
-    it('ist nicht verfügbar vor dem Kulanzfenster ohne PRESENT-Status', () => {
-      // 3 Stunden vor Schichtbeginn bei 2h Kulanz
-      const tooEarly = new Date('2026-06-20T11:00:00Z');
-      expect(isTokenAvailableNow(shiftStart, null, 2, tooEarly)).toBe(false);
-    });
+  it('blockiert das Einlösen vor dem Kulanz-Fenster, wenn noch nicht eingecheckt', () => {
+    const beforeWindow = new Date('2026-08-29T15:59:59.000Z');
+    expect(
+      isTokenAvailableNow({
+        shiftStartTime: shiftStart,
+        earlyHours: 2,
+        attendance: null,
+        now: beforeWindow,
+      })
+    ).toBe(false);
+  });
 
-    it('ist exakt auf die Minute des Kulanzbeginns verfügbar', () => {
-      const exactStart = new Date('2026-06-20T12:00:00Z');
-      expect(isTokenAvailableNow(shiftStart, null, 2, exactStart)).toBe(true);
-    });
+  it('erlaubt das Einlösen ab Beginn des Kulanz-Fensters auch ohne Check-in', () => {
+    const atWindowStart = new Date('2026-08-29T16:00:00.000Z');
+    expect(
+      isTokenAvailableNow({
+        shiftStartTime: shiftStart,
+        earlyHours: 2,
+        attendance: null,
+        now: atWindowStart,
+      })
+    ).toBe(true);
   });
 });

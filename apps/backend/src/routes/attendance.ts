@@ -4,6 +4,8 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import {
   CheckinSchema,
+  DEFAULT_CATERING_EARLY_HOURS,
+  DEFAULT_CATERING_TOKEN_ITEMS,
   SetAttendanceSchema,
   type AttendanceStatus,
   type CheckinResultDto,
@@ -108,7 +110,11 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (status === 'PRESENT' && event.cateringTokensEnabled) {
         try {
-          await ensureCateringTokensForSignups(fastify.prisma, event.id, [signup.id]);
+          await ensureCateringTokensForSignups(fastify.prisma, {
+            signupIds: [signup.id],
+            enabled: event.cateringTokensEnabled,
+            tokenItems: event.cateringTokenItems ?? [...DEFAULT_CATERING_TOKEN_ITEMS],
+          });
         } catch (catErr) {
           request.log.error(catErr, 'Fehler beim Erzeugen von Verpflegungs-Tokens');
         }
@@ -237,14 +243,14 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
       let cateringTokens = undefined;
       if (event.cateringTokensEnabled) {
         try {
-          if (due.length > 0) {
-            await ensureCateringTokensForSignups(
-              fastify.prisma,
-              event.id,
-              due.map((s) => s.id)
-            );
-          }
-          cateringTokens = await getHelperCateringTokens(fastify.prisma, event.id, request.user.id, now);
+          cateringTokens = await getHelperCateringTokens(fastify.prisma, {
+            eventId: event.id,
+            userId: request.user.id,
+            enabled: event.cateringTokensEnabled,
+            tokenItems: event.cateringTokenItems ?? [...DEFAULT_CATERING_TOKEN_ITEMS],
+            earlyHours: event.cateringEarlyHours ?? DEFAULT_CATERING_EARLY_HOURS,
+            now,
+          });
         } catch (catErr) {
           request.log.error(catErr, 'Fehler beim Laden von Verpflegungs-Tokens beim Check-in');
         }

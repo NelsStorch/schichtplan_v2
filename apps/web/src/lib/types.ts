@@ -26,6 +26,7 @@ export interface MyShift {
   eventSlug: string;
   eventStartDate?: string;
   cancelDeadlineDays?: number | null;
+  cateringTokensEnabled?: boolean;
   /** «Ersatz gesucht»: erlaubt, Frist und eigener Stand */
   allowReplacement?: boolean;
   replacementCutoffHours?: number;

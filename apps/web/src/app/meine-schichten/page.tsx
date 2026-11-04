@@ -23,6 +23,7 @@ import {
   Ticket,
   UserMinus,
   Users,
+  UtensilsCrossed,
   Zap,
 } from 'lucide-react';
 import {
@@ -360,6 +361,15 @@ export default function MyShiftsPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {next.cateringTokensEnabled && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setCateringFor({ slug: next.eventSlug, title: next.eventTitle })}
+                      >
+                        <UtensilsCrossed className="size-4" /> Verpflegungs-Bons
+                      </Button>
+                    )}
                     <a
                       href={googleCalendarUrl(toCalendar(next))}
                       target="_blank"
@@ -411,6 +421,7 @@ export default function MyShiftsPage() {
                   onCancel={cancel}
                   onOfferReplacement={setReplacementFor}
                   onWithdrawReplacement={withdrawReplacement}
+                  onOpenCatering={(slug, title) => setCateringFor({ slug, title })}
                 />
               </section>
             )}
@@ -511,6 +522,13 @@ export default function MyShiftsPage() {
         busy={Boolean(replacementFor && busy === replacementFor.signupId)}
         onClose={() => setReplacementFor(null)}
         onSubmit={offerReplacement}
+      />
+
+      <CateringTokensDialog
+        open={Boolean(cateringFor)}
+        onClose={() => setCateringFor(null)}
+        eventSlug={cateringFor?.slug ?? ''}
+        eventTitle={cateringFor?.title ?? ''}
       />
     </AppShell>
   );
@@ -755,6 +773,17 @@ function Timeline({
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                          {s.cateringTokensEnabled && onOpenCatering && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => onOpenCatering(s.eventSlug, s.eventTitle)}
+                              title="Deine digitalen Verpflegungs- & Getränke-Bons öffnen"
+                              className="border-accent/40 text-accent-ink hover:bg-accent/10"
+                            >
+                              <UtensilsCrossed className="size-4" /> Verpflegungs-Bons
+                            </Button>
+                          )}
                           {hasContactOrDesc && (
                             <Button
                               variant="ghost"

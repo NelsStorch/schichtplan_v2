@@ -186,6 +186,7 @@ model User {
   helperSignupLogs        ShiftSignupLog[]   @relation("HelperUser")
   performedSignupLogs     ShiftSignupLog[]   @relation("PerformedByUser")
   pushSubscriptions       PushSubscription[]
+  cateringTokens          CateringToken[]
 
   @@index([lastSeenOn])
   @@map("users")
@@ -422,6 +423,7 @@ model Shift {
   signups         ShiftSignup[]
   responsibles    ShiftResponsible[]
   signupLogs      ShiftSignupLog[]
+  cateringTokens  CateringToken[]
 
   @@index([eventId, startTime])
   @@map("shifts")
@@ -766,17 +768,23 @@ model StatsSnapshot {
   @@map("stats_snapshots")
 }
 
-// Digitaler Verpflegungs- oder Getränkegutschein für Helfende
+// Digitaler Verpflegungs- oder Getränkegutschein für Helfende & Schichtleitung
 model CateringToken {
-  id             String      @id @default(uuid())
-  shiftSignupId  String      @map("shift_signup_id")
+  id             String       @id @default(uuid())
+  shiftSignupId  String?      @map("shift_signup_id")
+  shiftId        String?      @map("shift_id")
+  userId         String?      @map("user_id")
   title          String
-  status         String      @default("AVAILABLE")
-  redeemedAt     DateTime?   @map("redeemed_at")
-  redeemedByName String?     @map("redeemed_by_name")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  signup         ShiftSignup @relation(fields: [shiftSignupId], references: [id], onDelete: Cascade)
+  status         String       @default("AVAILABLE")
+  redeemedAt     DateTime?    @map("redeemed_at")
+  redeemedByName String?      @map("redeemed_by_name")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  signup         ShiftSignup? @relation(fields: [shiftSignupId], references: [id], onDelete: Cascade)
+  shift          Shift?       @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([shiftSignupId])
+  @@index([shiftId])
+  @@index([userId])
   @@map("catering_tokens")
 }
