@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Building2, CalendarPlus, CalendarX2, Clock, Lock, LogIn, Plus, Settings2 } from 'lucide-react';
+import { ArrowRight, BarChart3, Building2, CalendarPlus, CalendarX2, Clock, Lock, LogIn, Plus, Settings2 } from 'lucide-react';
 import type { EventDto } from '@schichtplan/shared';
 import { Button, Card, EmptyState, NotFoundView, Skeleton, buttonClasses } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
@@ -25,7 +25,7 @@ export default function DepartmentHomePage() {
   const [nextShift, setNextShift] = useState<MyShift | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [showDeptForm, setShowDeptForm] = useState(false);
-  const [initialDeptTab, setInitialDeptTab] = useState<'general' | 'stufen' | 'people'>('general');
+  const [initialDeptTab, setInitialDeptTab] = useState<'general' | 'stufen' | 'people' | 'stats'>('general');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -42,6 +42,9 @@ export default function DepartmentHomePage() {
         setShowDeptForm(true);
       } else if (params.has('settings')) {
         setInitialDeptTab('general');
+        setShowDeptForm(true);
+      } else if (params.has('stats')) {
+        setInitialDeptTab('stats');
         setShowDeptForm(true);
       }
     }
@@ -108,9 +111,16 @@ export default function DepartmentHomePage() {
                 Such dir einen Anlass aus und trag dich in eine Schicht ein. Jede helfende Hand zählt.
               </p>
               {canOpenDepartment && (
-                <Button variant="secondary" size="sm" className="mt-6" onClick={() => setShowDeptForm(true)}>
-                  <Settings2 /> Abteilung
-                </Button>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => { setInitialDeptTab('general'); setShowDeptForm(true); }}>
+                    <Settings2 /> Abteilung
+                  </Button>
+                  {(can('PEOPLE_VIEW') || can('DEPARTMENT_SETTINGS')) && (
+                    <Button variant="secondary" size="sm" onClick={() => { setInitialDeptTab('stats'); setShowDeptForm(true); }}>
+                      <BarChart3 /> Statistik & GV
+                    </Button>
+                  )}
+                </div>
               )}
             </>
           )}

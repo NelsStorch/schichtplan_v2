@@ -22,6 +22,7 @@ import { canGrantPermissions, departmentAccess, type DepartmentAccess } from '..
 import { recordDepartmentAction, toDepartmentAuditDto } from '../services/departmentAudit.js';
 import { usableEmail } from './eventMessages.js';
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../services/ceviNameLogin.js';
+import { computeDepartmentStats } from '../services/departmentStats.js';
 
 const toStufeDto = (s: {
   id: string;
@@ -947,6 +948,59 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
           ? `${m.user.ceviName} (${m.user.firstName} ${m.user.lastName})`
           : `${m.user.firstName} ${m.user.lastName}`,
       }));
+    }
+  );
+
+  // Statistiken und Jahresrückblick für die Abteilung (z. B. für GV / Helferstunden)
+  fastify.get<{
+    Querystring: {
+      year?: string;
+      countAttendedOnly?: 'true' | 'false';
+      includeSetupTeardown?: 'true' | 'false';
+    };
+  }>(
+    '/api/departments/current/stats',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Statistiken & Jahresrückblick der Abteilung abrufen',
+        description: 'Liefert aggregierte Helferstunden, Anlass-Auswertungen, Stufen-Beteiligung und Top-Helfende für die GV.',
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({
+          year: z.string().optional().describe('Kalenderjahr (z. B. 2026) oder "ALL" für alle Jahre'),
+          countAttendedOnly: z.enum(['true', 'false']).optional().describe('Nur bestätigte Anwesenheiten zählen'),
+          includeSetupTeardown: z.enum(['true', 'false']).optional().describe('Auf-/Abbau-Schichten einbeziehen'),
+        }),
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      const access = await departmentAccess(fastify.prisma, request.tenant.id, request.user.id);
+      if (!access.permissions.has('PEOPLE_VIEW') && !access.permissions.has('DEPARTMENT_SETTINGS')) {
+        return reply.status(403).send({ error: 'Keine Berechtigung zum Einsehen der Abteilungsstatistik.' });
+      }
+
+      reply.header('Cache-Control', 'no-store');
+
+      const queryYear = request.query.year;
+      let year: number | 'ALL' | undefined;
+      if (queryYear === 'ALL') {
+        year = 'ALL';
+      } else if (queryYear && /^\d{4}$/.test(queryYear)) {
+        year = parseInt(queryYear, 10);
+      }
+
+      const countAttendedOnly = request.query.countAttendedOnly === 'true';
+      const includeSetupTeardown = request.query.includeSetupTeardown !== 'false';
+
+      return computeDepartmentStats(fastify.prisma, request.tenant.id, {
+        year,
+        countAttendedOnly,
+        includeSetupTeardown,
+      });
     }
   );
 

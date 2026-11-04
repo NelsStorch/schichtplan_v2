@@ -363,6 +363,88 @@ export interface StufeSuggestionDto {
   personCount: number;
 }
 
+
+/** Zusammenfassung der Abteilungs-Statistiken (z. B. für ein Kalenderjahr oder gesamt) */
+export interface DepartmentStatsSummaryDto {
+  totalHours: number;
+  totalMinutes: number;
+  formattedTime: string;
+  totalHelpers: number;
+  totalShifts: number;
+  totalEvents: number;
+  totalRequiredSlots: number;
+  totalFilledSlots: number;
+  fillRatePct: number;
+  attendedHours: number;
+  attendedRatePct: number;
+  setupHours: number;
+  eventHours: number;
+  averageHoursPerHelper: number;
+}
+
+/** Statistik eines einzelnen Anlasses der Abteilung */
+export interface DepartmentEventStatDto {
+  id: string;
+  title: string;
+  slug: string;
+  startDate: string;
+  endDate: string;
+  isPublished: boolean;
+  helpersCount: number;
+  totalShifts: number;
+  totalSlots: number;
+  filledSlots: number;
+  fillRatePct: number;
+  totalHours: number;
+  totalMinutes: number;
+  attendedHours: number;
+  attendedRatePct: number;
+  setupHours: number;
+  eventHours: number;
+}
+
+/** Statistik einer Stufe (Cevi-Gruppe) innerhalb der Abteilung */
+export interface DepartmentStufeStatDto {
+  id: string;
+  name: string;
+  helpersCount: number;
+  totalHours: number;
+  totalMinutes: number;
+  totalShifts: number;
+  percentageOfTotal: number;
+}
+
+/** Fleissigste Helfende der Abteilung (für die Generalversammlung / Ehrentafel) */
+export interface DepartmentTopHelperDto {
+  userId?: string | null;
+  displayName: string;
+  firstName?: string;
+  lastName?: string | null;
+  ceviName?: string | null;
+  hours: number;
+  minutes: number;
+  formattedTime: string;
+  shiftCount: number;
+  eventCount: number;
+  attendedShiftCount: number;
+  stufen: string[];
+  isGuest: boolean;
+}
+
+/** Gesamtergebnis der Abteilungs-Statistik */
+export interface DepartmentStatsResponseDto {
+  year: number | 'ALL';
+  availableYears: number[];
+  filter: {
+    countAttendedOnly: boolean;
+    includeSetupTeardown: boolean;
+  };
+  summary: DepartmentStatsSummaryDto;
+  events: DepartmentEventStatDto[];
+  stufen: DepartmentStufeStatDto[];
+  topHelpers: DepartmentTopHelperDto[];
+}
+
 /** Person, die eine Abteilung als Heimabteilung angegeben hat (Sicht der Abteilungsleitung) */
 export interface DepartmentPersonDto {
   userId: string;

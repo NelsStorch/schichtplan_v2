@@ -8,6 +8,7 @@ import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 import { DepartmentAuditPanel } from './DepartmentAuditPanel';
 import { DepartmentPeoplePanel } from './DepartmentPeoplePanel';
+import { DepartmentStatsPanel } from './DepartmentStatsPanel';
 import { DepartmentStufenPanel } from './DepartmentStufenPanel';
 import { ImageUpload } from './ImageUpload';
 import { DepartmentBrandingPreview } from './DepartmentBrandingPreview';
@@ -17,11 +18,16 @@ const SWATCHES_PRIMARY = ['#e11d48', '#dc2626', '#ea580c', '#d97706', '#16a34a',
 const SWATCHES_SECONDARY = ['#003d8f', '#1e293b', '#e11d48', '#16a34a', '#d97706', '#4f46e5', '#0f766e', '#be123c'];
 
 // Jeder Reiter braucht sein Recht (die Abteilungsleitung hat alle)
-const TABS: { key: 'general' | 'stufen' | 'people' | 'audit'; label: string; permission: DepartmentPermission }[] = [
-  { key: 'general', label: 'Allgemein', permission: 'DEPARTMENT_SETTINGS' },
-  { key: 'stufen', label: 'Stufen', permission: 'STUFEN_MANAGE' },
-  { key: 'people', label: 'Personen', permission: 'PEOPLE_VIEW' },
-  { key: 'audit', label: 'Protokoll', permission: 'PEOPLE_MANAGE' },
+const TABS: {
+  key: 'general' | 'stufen' | 'people' | 'stats' | 'audit';
+  label: string;
+  isAllowed: (can: (p: DepartmentPermission) => boolean) => boolean;
+}[] = [
+  { key: 'general', label: 'Allgemein', isAllowed: (can) => can('DEPARTMENT_SETTINGS') },
+  { key: 'stufen', label: 'Stufen', isAllowed: (can) => can('STUFEN_MANAGE') },
+  { key: 'people', label: 'Personen', isAllowed: (can) => can('PEOPLE_VIEW') },
+  { key: 'stats', label: 'Statistik & GV', isAllowed: (can) => can('PEOPLE_VIEW') || can('DEPARTMENT_SETTINGS') },
+  { key: 'audit', label: 'Protokoll', isAllowed: (can) => can('PEOPLE_MANAGE') },
 ];
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -36,7 +42,7 @@ export function DepartmentSettingsDialog({
   initialTab?: TabKey;
 }) {
   const { department, can } = usePortal();
-  const tabs = TABS.filter((t) => can(t.permission));
+  const tabs = TABS.filter((t) => t.isAllowed(can));
   const [tab, setTab] = useState<TabKey>(initialTab ?? tabs[0]?.key ?? 'general');
 
   useEffect(() => {
@@ -57,11 +63,12 @@ export function DepartmentSettingsDialog({
       open={open}
       onClose={close}
       size="lg"
+      className={activeTab === 'stats' ? 'sm:max-w-4xl' : undefined}
       icon={<Settings2 />}
       title="Abteilung"
       description="Name, Logo, Farbe, Stufen und Rechte gelten für alle Anlässe dieser Abteilung."
     >
-      <div role="tablist" aria-label="Bereiche" className="-mt-1 mb-6 flex gap-1 rounded-full bg-surface-2 p-1">
+      <div role="tablist" aria-label="Bereiche" className="-mt-1 mb-6 flex gap-1 rounded-full bg-surface-2 p-1 overflow-x-auto">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -70,7 +77,7 @@ export function DepartmentSettingsDialog({
             aria-selected={activeTab === t.key}
             onClick={() => setTab(t.key)}
             className={cn(
-              'h-9 flex-1 rounded-full text-sm font-semibold transition',
+              'h-9 flex-1 whitespace-nowrap px-3 rounded-full text-sm font-semibold transition',
               activeTab === t.key ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
             )}
           >
@@ -81,6 +88,7 @@ export function DepartmentSettingsDialog({
       {activeTab === 'general' && can('DEPARTMENT_SETTINGS') && <DepartmentForm onDone={onClose} onCancel={close} />}
       {activeTab === 'stufen' && can('STUFEN_MANAGE') && <DepartmentStufenPanel />}
       {activeTab === 'people' && can('PEOPLE_VIEW') && <DepartmentPeoplePanel />}
+      {activeTab === 'stats' && (can('PEOPLE_VIEW') || can('DEPARTMENT_SETTINGS')) && <DepartmentStatsPanel />}
       {activeTab === 'audit' && can('PEOPLE_MANAGE') && <DepartmentAuditPanel />}
     </Dialog>
   );

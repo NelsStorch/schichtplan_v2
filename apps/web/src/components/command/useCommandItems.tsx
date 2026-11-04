@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  BarChart3,
   CalendarDays,
   CalendarPlus,
   Check,
@@ -1312,6 +1313,22 @@ export function useCommandItems(query: string) {
         onSelect: () => {
           recordRecentCommand('action-manage-people');
           router.push('/?people=1');
+          close();
+        },
+      });
+    }
+
+    if (can('PEOPLE_VIEW') || can('DEPARTMENT_SETTINGS') || isDeptAdmin) {
+      list.push({
+        id: 'action-dept-stats',
+        title: 'Abteilungsstatistik & Jahresrückblick (GV)',
+        subtitle: 'Helferstunden, Stufenauswertung und Ehrentafel für den GV-Jahresbericht',
+        section: 'ACTIONS',
+        icon: <BarChart3 className="size-4 text-accent-ink" />,
+        keywords: ['statistik', 'gv', 'jahresbericht', 'helferstunden', 'ehrentafel', 'stufen', 'ranking', 'auswertung', 'stunden'],
+        onSelect: () => {
+          recordRecentCommand('action-dept-stats');
+          router.push('/?stats=1');
           close();
         },
       });

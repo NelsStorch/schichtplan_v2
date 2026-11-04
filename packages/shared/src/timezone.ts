@@ -237,3 +237,14 @@ export function cancelDeadlineText(deadline: Date, cancelDeadlineDays: number): 
     ? 'seit Anlassbeginn'
     : `seit dem ${formatZurichDateTime(deadline)} (${formatDays(cancelDeadlineDays)} vor Anlassbeginn)`;
 }
+
+/** Formatiert eine Minutenzahl lesbar, z. B. '4h 30m', '2h', '45m' oder '0h' */
+export function formatMinutes(totalMinutes: number): string {
+  const rounded = Math.round(totalMinutes);
+  const hours = Math.floor(rounded / 60);
+  const mins = rounded % 60;
+  if (hours === 0 && mins === 0) return '0h';
+  if (mins === 0) return `${hours}h`;
+  if (hours === 0) return `${mins}m`;
+  return `${hours}h ${mins}m`;
+}
