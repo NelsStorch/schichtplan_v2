@@ -56,6 +56,125 @@ export async function resolveLogo(
   return { isCeviDefault: true };
 }
 
+export type QrStyle = 'CORNERS' | 'GRADIENT' | 'SOLID';
+
+/** Druckfarben eines QR-Codes (kontrastsicher) und ob er zweifarbig gezeichnet wird */
+export interface QrPalette {
+  primary: string;
+  secondary: string;
+  style: QrStyle;
+  isTwoTone: boolean;
+}
+
+export function resolveQrPalette(
+  color?: string | null,
+  secondaryColor?: string | null,
+  qrStyle?: QrStyle | null
+): QrPalette {
+  const primary = evaluateContrast(color).qrSafeHex;
+  const hasSecondary = Boolean(secondaryColor?.trim());
+  const secondary = hasSecondary ? evaluateContrast(secondaryColor).qrSafeHex : primary;
+  const style = qrStyle || (hasSecondary ? 'CORNERS' : 'SOLID');
+  return { primary, secondary, style, isTwoTone: hasSecondary && secondary !== primary && style !== 'SOLID' };
+}
+
+/** Logo einmal ins PDF laden und danach beliebig oft zeichnen (sonst wird es pro Bon neu eingebettet) */
+export interface PdfLogo {
+  image: unknown | null;
+}
+
+export function preparePdfLogo(doc: PDFKit.PDFDocument, logo: ResolvedLogo): PdfLogo {
+  if (logo.isCeviDefault || !logo.buffer || !logo.mimeType) return { image: null };
+  if (!logo.mimeType.includes('png') && !logo.mimeType.includes('jpeg')) return { image: null };
+  try {
+    return { image: (doc as unknown as { openImage(src: Buffer): unknown }).openImage(logo.buffer) };
+  } catch {
+    return { image: null };
+  }
+}
+
+export function drawPdfLogo(doc: PDFKit.PDFDocument, logo: PdfLogo, x: number, y: number, size: number) {
+  if (logo.image) {
+    try {
+      doc.image(logo.image as Buffer, x, y, { fit: [size, size], align: 'center', valign: 'center' });
+      return;
+    } catch {
+      // Fallback aufs Cevi-Logo
+    }
+  }
+  drawCeviLogoVector(doc, x, y, size);
+}
+
+/**
+ * Zeichnet einen QR-Code im Abteilungsdesign direkt ins PDF: Abteilungsfarben (Ecken, Verlauf oder
+ * einfarbig), Plakette mit Logo in der Mitte und Fehlerkorrektur H. Gleiches Design wie der
+ * Check-in-Aushang.
+ */
+export function drawBrandedQrPdf(
+  doc: PDFKit.PDFDocument,
+  options: {
+    text: string;
+    x: number;
+    y: number;
+    size: number;
+    palette: QrPalette;
+    logo: PdfLogo;
+    /** Anteil der Logo-Plakette an der Kantenlänge (Standard 0.24 wie beim Check-in-Aushang) */
+    badgeRatio?: number;
+  }
+) {
+  const { text, x, y, size, palette, logo, badgeRatio = 0.24 } = options;
+  const qr = QRCode.create(text, { errorCorrectionLevel: 'H' });
+  const n = qr.modules.size;
+  const m = size / n;
+
+  let badgeModules = Math.round(n * badgeRatio);
+  if ((n - badgeModules) % 2 !== 0) badgeModules += 1;
+  const badgeStart = (n - badgeModules) / 2;
+  const badgeEnd = badgeStart + badgeModules;
+
+  const corners = palette.isTwoTone && palette.style === 'CORNERS';
+  const gradient = palette.isTwoTone && palette.style === 'GRADIENT';
+
+  // Alle Module einer Farbe als ein Pfad: deutlich kleineres PDF als ein Füllbefehl pro Modul
+  const drawModules = (wanted: (r: number, c: number) => boolean) => {
+    let any = false;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (r >= badgeStart && r < badgeEnd && c >= badgeStart && c < badgeEnd) continue;
+        if (!qr.modules.get(r, c) || !wanted(r, c)) continue;
+        doc.rect(x + c * m, y + r * m, m, m);
+        any = true;
+      }
+    }
+    return any;
+  };
+
+  if (gradient) {
+    const grad = doc.linearGradient(x, y, x + size, y + size);
+    grad.stop(0, palette.primary).stop(1, palette.secondary);
+    if (drawModules(() => true)) doc.fill(grad);
+  } else {
+    if (drawModules((r, c) => !(corners && isFinderPattern(r, c, n)))) doc.fill(palette.primary);
+    if (corners && drawModules((r, c) => isFinderPattern(r, c, n))) doc.fill(palette.secondary);
+  }
+
+  const badgePt = badgeModules * m;
+  const badgeX = x + badgeStart * m;
+  const badgeY = y + badgeStart * m;
+  const border = palette.isTwoTone ? palette.secondary : palette.primary;
+  const gap = Math.max(0.6, m * 0.4);
+  doc.save();
+  doc
+    .lineWidth(Math.max(0.5, m * 0.15))
+    .roundedRect(badgeX - gap, badgeY - gap, badgePt + gap * 2, badgePt + gap * 2, Math.max(2, m * 1.2))
+    .fillAndStroke('#ffffff', border);
+  doc.restore();
+
+  const pad = badgePt * 0.12;
+  drawPdfLogo(doc, logo, badgeX + pad, badgeY + pad, badgePt - pad * 2);
+}
+
 export interface QrOptions {
   text: string;
   title?: string;
@@ -175,15 +294,8 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
  * Im modernen Schweizer Plakat-Design (Bento-Struktur, grosser QR-Code, nummerierte Schritte).
  */
 export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
-  const primaryContrast = evaluateContrast(options.color);
-  const primaryColor = primaryContrast.qrSafeHex;
-
-  const hasSecondary = Boolean(options.secondaryColor?.trim());
-  const secondaryContrast = hasSecondary ? evaluateContrast(options.secondaryColor) : primaryContrast;
-  const secondaryColor = secondaryContrast.qrSafeHex;
-
-  const style = options.qrStyle || (hasSecondary ? 'CORNERS' : 'SOLID');
-  const isTwoTone = hasSecondary && secondaryColor !== primaryColor && style !== 'SOLID';
+  const palette = resolveQrPalette(options.color, options.secondaryColor, options.qrStyle);
+  const { primary: primaryColor, secondary: secondaryColor, isTwoTone } = palette;
 
   const logo = await resolveLogo(options.logoUrl, options.prisma);
 
@@ -239,23 +351,9 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
       .fillColor('#4b5563')
       .text(subtitle, 40, 104, { width: 460 });
 
-    // Logo oben rechts (38x38 pt)
-    const headerLogoX = 512;
-    const headerLogoY = 40;
-    const headerLogoSize = 42;
-    if (!logo.isCeviDefault && logo.buffer && logo.mimeType && (logo.mimeType.includes('png') || logo.mimeType.includes('jpeg'))) {
-      try {
-        doc.image(logo.buffer, headerLogoX, headerLogoY, {
-          fit: [headerLogoSize, headerLogoSize],
-          align: 'right',
-          valign: 'center',
-        });
-      } catch {
-        drawCeviLogoVector(doc, headerLogoX, headerLogoY, headerLogoSize);
-      }
-    } else {
-      drawCeviLogoVector(doc, headerLogoX, headerLogoY, headerLogoSize);
-    }
+    // Logo oben rechts
+    const pdfLogo = preparePdfLogo(doc, logo);
+    drawPdfLogo(doc, pdfLogo, 512, 40, 42);
 
     // Trennlinie
     doc.strokeColor('#e5e7eb').lineWidth(1).moveTo(40, 126).lineTo(555, 126).stroke();
@@ -275,70 +373,15 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
       .text('QR-CODE SCANNEN ZUM EINCHECKEN', 40, cardY + 16, { align: 'center', width: 515.28 });
 
     // QR-Code im Zentrum
-    const qr = QRCode.create(options.text, { errorCorrectionLevel: 'H' });
-    const n = qr.modules.size;
     const qrPixelSize = 256;
-    const qrX = (595.28 - qrPixelSize) / 2;
-    const qrY = cardY + 38;
-    const mSize = qrPixelSize / n;
-
-    let badgeModules = Math.round(n * 0.24);
-    if ((n - badgeModules) % 2 !== 0) badgeModules += 1;
-    const badgeStart = (n - badgeModules) / 2;
-    const badgeEnd = badgeStart + badgeModules;
-
-    // Gradient für QR-Code vorbereiten, falls gewählt
-    let qrGradient: PDFKit.PDFLinearGradient | null = null;
-    if (isTwoTone && style === 'GRADIENT') {
-      qrGradient = doc.linearGradient(qrX, qrY, qrX + qrPixelSize, qrY + qrPixelSize);
-      qrGradient.stop(0, primaryColor).stop(1, secondaryColor);
-    }
-
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        if (r >= badgeStart && r < badgeEnd && c >= badgeStart && c < badgeEnd) {
-          continue; // Aussparung für Logo
-        }
-        if (qr.modules.get(r, c)) {
-          if (qrGradient) {
-            doc.rect(qrX + c * mSize, qrY + r * mSize, mSize, mSize).fill(qrGradient);
-          } else if (isTwoTone && style === 'CORNERS' && isFinderPattern(r, c, n)) {
-            doc.rect(qrX + c * mSize, qrY + r * mSize, mSize, mSize).fill(secondaryColor);
-          } else {
-            doc.rect(qrX + c * mSize, qrY + r * mSize, mSize, mSize).fill(primaryColor);
-          }
-        }
-      }
-    }
-
-    // Zentrierte Plakette
-    const badgePt = badgeModules * mSize;
-    const badgeX = qrX + badgeStart * mSize;
-    const badgeY = qrY + badgeStart * mSize;
-    const strokeBorder = isTwoTone ? secondaryColor : primaryColor;
-
-    doc
-      .roundedRect(badgeX - 2, badgeY - 2, badgePt + 4, badgePt + 4, 7)
-      .fillAndStroke('#ffffff', strokeBorder);
-
-    const logoPadding = badgePt * 0.12;
-    const logoX = badgeX + logoPadding;
-    const logoY = badgeY + logoPadding;
-    const logoInner = badgePt - logoPadding * 2;
-
-    if (!logo.isCeviDefault && logo.buffer && logo.mimeType && (logo.mimeType.includes('png') || logo.mimeType.includes('jpeg'))) {
-      try {
-        doc.image(logo.buffer, logoX, logoY, {
-          fit: [logoInner, logoInner],
-          align: 'center',
-          valign: 'center',
-        });
-      } catch {
-        drawCeviLogoVector(doc, logoX, logoY, logoInner);
-      }
-    } else {
-      drawCeviLogoVector(doc, logoX, logoY, logoInner);
-    }
+    drawBrandedQrPdf(doc, {
+      text: options.text,
+      x: (595.28 - qrPixelSize) / 2,
+      y: cardY + 38,
+      size: qrPixelSize,
+      palette,
+      logo: pdfLogo,
+    });
 
     // URL unter dem QR-Code
     doc

@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import {
   DEFAULT_CATERING_EARLY_HOURS,
   DEFAULT_CATERING_TOKEN_ITEMS,
@@ -25,8 +25,73 @@ import {
   CreateCateringBatchSchema,
   RedeemPhysicalTokenSchema,
 } from '@schichtplan/shared';
+import { timingSafeEqual } from 'node:crypto';
+import { eventUrl } from '../services/shiftReminders.js';
+import { createRateLimiter } from '../services/rateLimit.js';
+
+/** Falsche Stand-PINs pro IP und Anlass: 10 Versuche in 15 Minuten (ein 4-stelliger PIN ist schnell durchprobiert) */
+const staffPinLimiter = createRateLimiter(15 * 60 * 1000, 10);
+
+function samePin(given: string, expected: string): boolean {
+  const a = Buffer.from(given.trim());
+  const b = Buffer.from(expected.trim());
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
+  /**
+   * Darf diese Anfrage physische Bons am Stand prüfen und entwerten?
+   * - Eingeloggt mit Anwesenheits-Recht (OK) → ja, unter eigenem Namen
+   * - Sonst nur mit dem Stand-PIN des Anlasses. Ohne gesetzten PIN gibt es keinen anonymen Zugang,
+   *   sonst könnte jede Person mit einem Papier-Bon ihn mit der Handykamera selbst entwerten.
+   * Schickt bei Ablehnung selbst die Antwort und gibt dann null zurück.
+   */
+  async function authorizeStaff(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    event: { id: string; title: string; cateringStaffPin: string | null } & Parameters<typeof managerFlags>[1],
+    givenPin: string | undefined
+  ): Promise<{ name: string } | null> {
+    if (request.user) {
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (flags.isManager || flags.can.ATTENDANCE) {
+        const staffUser = await fastify.prisma.user.findUnique({
+          where: { id: request.user.id },
+          select: { ceviName: true, firstName: true },
+        });
+        return { name: staffUser?.ceviName || staffUser?.firstName || 'OK' };
+      }
+    }
+
+    const expected = event.cateringStaffPin?.trim();
+    if (!expected) {
+      reply.status(request.user ? 403 : 401).send({
+        error: request.user
+          ? 'Nur das OK oder Standpersonal mit Stand-PIN kann Bons entwerten.'
+          : 'Bitte melde dich an. Für diesen Anlass ist kein Stand-PIN gesetzt.',
+        needsLogin: true,
+        eventTitle: event.title,
+      });
+      return null;
+    }
+
+    const limitKey = `${request.ip}:${event.id}`;
+    if (staffPinLimiter.isBlocked(limitKey)) {
+      reply.status(429).send({ error: 'Zu viele falsche PIN-Versuche. Bitte warte ein paar Minuten.' });
+      return null;
+    }
+    if (!givenPin || !samePin(givenPin, expected)) {
+      if (givenPin) staffPinLimiter.hit(limitKey);
+      reply.status(401).send({
+        error: givenPin ? 'Stand-PIN ist falsch' : 'Stand-PIN erforderlich',
+        needsPin: true,
+        eventTitle: event.title,
+      });
+      return null;
+    }
+    return { name: 'Standpersonal' };
+  }
+
   async function findEvent(tenantId: string | undefined, slug: string, fallbackUserId?: string) {
     if (tenantId) {
       const byTenant = await fastify.prisma.event.findUnique({
@@ -489,16 +554,35 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung' });
       }
 
-      const host = request.headers.host || 'cevi-schichtplan.ch';
-      const proto = (request.headers['x-forwarded-proto'] as string) || 'https';
-      const baseUrl = `${proto}://${host}`;
+      if (!request.tenant) {
+        return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      const tenant = request.tenant;
 
-      const pdfBuffer = await generateBatchPdf(fastify.prisma, {
-        eventId: event.id,
-        batchId: request.params.batchId,
-        baseUrl,
-      });
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await generateBatchPdf(fastify.prisma, {
+          eventId: event.id,
+          batchId: request.params.batchId,
+          eventUrl: eventUrl(tenant.slug, event.slug),
+          // Gleiche Farben, gleicher Stil und gleiches Logo wie der Check-in-QR-Code
+          branding: {
+            color: tenant.qrCustomColors && tenant.qrColorPrimary ? tenant.qrColorPrimary : tenant.primaryColor,
+            secondaryColor:
+              tenant.qrCustomColors && tenant.qrColorSecondary ? tenant.qrColorSecondary : tenant.secondaryColor,
+            qrStyle: (tenant.qrStyle as 'CORNERS' | 'GRADIENT' | 'SOLID') || 'CORNERS',
+            logoUrl: event.logoUrl || tenant.logoUrl,
+          },
+        });
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Tranche nicht gefunden') {
+          return reply.status(404).send({ error: err.message });
+        }
+        throw err;
+      }
 
+      // Enthält einlösbare Bon-Codes: nicht zwischenspeichern
+      reply.header('Cache-Control', 'no-store');
       reply.header('Content-Type', 'application/pdf');
       reply.header(
         'Content-Disposition',
@@ -535,61 +619,34 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // Kartendaten beim Kamerascan abrufen (für Standpersonal)
-  fastify.get<{ Params: { slug: string }; Querystring: { code: string; pin?: string } }>(
+  fastify.get<{ Params: { slug: string }; Querystring: { code?: string } }>(
     '/api/events/:slug/catering-scan',
     {
       schema: {
         tags: ['Verpflegung'],
         summary: 'Physischen Bon per Scan-Code abrufen',
       },
+      // Anmeldung ist freiwillig: Standpersonal ohne Konto kommt mit dem Stand-PIN rein
+      preHandler: [fastify.optionalAuthenticate],
     },
     async (request, reply) => {
-      const event = await fastify.prisma.event.findFirst({
-        where: { slug: request.params.slug },
-        include: { organizers: true },
-      });
+      reply.header('Cache-Control', 'no-store');
+      if (!request.tenant) return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      const event = await findEvent(request.tenant.id, request.params.slug);
       if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
 
-      let isAuthorized = false;
+      const staff = await authorizeStaff(
+        request,
+        reply,
+        event,
+        request.headers['x-staff-pin'] as string | undefined
+      );
+      if (!staff) return reply;
 
-      try {
-        await fastify.authenticate(request, reply);
-        if (request.user) {
-          const flags = await managerFlags(fastify.prisma, event, request.user);
-          if (flags.isManager || flags.can.ATTENDANCE) {
-            isAuthorized = true;
-          }
-        }
-      } catch {
-        // Nicht eingeloggt
-      }
-
-      if (!isAuthorized) {
-        const staffPin =
-          (request.headers['x-staff-pin'] as string | undefined) || request.query.pin;
-
-        if (event.cateringStaffPin && event.cateringStaffPin.trim().length > 0) {
-          if (!staffPin || staffPin.trim() !== event.cateringStaffPin.trim()) {
-            return reply.status(401).send({
-              error: 'Stand-PIN erforderlich oder falsch',
-              needsPin: true,
-              eventTitle: event.title,
-            });
-          }
-          isAuthorized = true;
-        } else {
-          isAuthorized = true;
-        }
-      }
-
-      const code = request.query.code;
+      const code = request.query.code?.trim();
       if (!code) return reply.status(400).send({ error: 'Code fehlt' });
 
-      const card = await getPhysicalCardByCode(fastify.prisma, {
-        eventId: event.id,
-        code,
-      });
-
+      const card = await getPhysicalCardByCode(fastify.prisma, { eventId: event.id, code });
       if (!card) {
         return reply.status(404).send({ error: 'Ungültiger oder unbekannter Bon-Code' });
       }
@@ -606,12 +663,11 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['Verpflegung'],
         summary: 'Artikel eines physischen Bons entwerten',
       },
+      preHandler: [fastify.optionalAuthenticate],
     },
     async (request, reply) => {
-      const event = await fastify.prisma.event.findFirst({
-        where: { slug: request.params.slug },
-        include: { organizers: true },
-      });
+      if (!request.tenant) return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      const event = await findEvent(request.tenant.id, request.params.slug);
       if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
 
       const parsed = RedeemPhysicalTokenSchema.safeParse(request.body);
@@ -619,53 +675,22 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parsed.error.issues[0]?.message || 'Ungültige Eingabe' });
       }
 
-      let isAuthorized = false;
-      let authorizedName = 'Standpersonal';
+      const staff = await authorizeStaff(
+        request,
+        reply,
+        event,
+        (request.headers['x-staff-pin'] as string | undefined) || parsed.data.staffPin
+      );
+      if (!staff) return reply;
 
       try {
-        await fastify.authenticate(request, reply);
-        if (request.user) {
-          const flags = await managerFlags(fastify.prisma, event, request.user);
-          if (flags.isManager || flags.can.ATTENDANCE) {
-            isAuthorized = true;
-            const staffUser = await fastify.prisma.user.findUnique({
-              where: { id: request.user.id },
-              select: { ceviName: true, firstName: true },
-            });
-            authorizedName = staffUser?.ceviName || staffUser?.firstName || 'OK';
-          }
-        }
-      } catch {
-        // Nicht eingeloggt
-      }
-
-      if (!isAuthorized) {
-        const staffPin =
-          (request.headers['x-staff-pin'] as string | undefined) || parsed.data.staffPin;
-
-        if (event.cateringStaffPin && event.cateringStaffPin.trim().length > 0) {
-          if (!staffPin || staffPin.trim() !== event.cateringStaffPin.trim()) {
-            return reply.status(401).send({
-              error: 'Stand-PIN erforderlich oder falsch',
-              needsPin: true,
-            });
-          }
-          isAuthorized = true;
-        } else {
-          isAuthorized = true;
-        }
-      }
-
-      try {
-        const updated = await redeemPhysicalTokens(fastify.prisma, {
+        return await redeemPhysicalTokens(fastify.prisma, {
           eventId: event.id,
           code: parsed.data.code,
           tokenId: parsed.data.tokenId,
           redeemAll: parsed.data.redeemAll,
-          redeemedByName: authorizedName,
+          redeemedByName: staff.name,
         });
-
-        return updated;
       } catch (err) {
         return reply.status(400).send({
           error: err instanceof Error ? err.message : 'Entwertung fehlgeschlagen',

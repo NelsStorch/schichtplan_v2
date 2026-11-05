@@ -73,11 +73,11 @@ export function PhysicalBonsManager({
     try {
       const created = await api<CateringBatchDto>(`/api/events/${eventSlug}/catering-batches`, {
         method: 'POST',
-        body: JSON.stringify({
+        json: {
           title: customTitle.trim() || undefined,
           mode,
           cardCount,
-        }),
+        },
       });
 
       toast({

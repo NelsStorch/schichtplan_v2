@@ -17,8 +17,8 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import type { PhysicalCardScanResultDto } from '@schichtplan/shared';
-import { Badge, Button, Card, Input, cn, useToast } from '@schichtplan/ui';
-import { api, errorMessage } from '@/lib/api';
+import { Badge, Button, Card, Input, buttonClasses, cn, useToast } from '@schichtplan/ui';
+import { ApiError, api, errorMessage, useLoginHref } from '@/lib/api';
 
 function getTokenIcon(title: string) {
   const t = title.toLowerCase();
@@ -65,12 +65,17 @@ function BonScanContent() {
   const slug = params.slug;
   const code = searchParams.get('code') || '';
   const toast = useToast();
+  const loginHref = useLoginHref();
 
   const pinStorageKey = `sp_staff_pin_${slug}`;
 
   const [pin, setPin] = useState<string>('');
+  /** Erst laden, wenn der gespeicherte PIN gelesen ist (sonst kommt zuerst ein unnötiges 401) */
+  const [pinReady, setPinReady] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [needsPin, setNeedsPin] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
 
   const [loading, setLoading] = useState(true);
@@ -85,6 +90,7 @@ function BonScanContent() {
       const savedPin = localStorage.getItem(pinStorageKey) || '';
       setPin(savedPin);
     }
+    setPinReady(true);
   }, [pinStorageKey]);
 
   // Bon-Daten abrufen
@@ -109,14 +115,21 @@ function BonScanContent() {
       setCard(data);
       setEventTitle(data.eventTitle);
       setNeedsPin(false);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.needsPin) {
+      setNeedsLogin(false);
+      setPinError(null);
+    } catch (err) {
+      const data = err instanceof ApiError ? err.data : {};
+      if (typeof data.eventTitle === 'string') setEventTitle(data.eventTitle);
+      if (data.needsLogin) {
+        setNeedsLogin(true);
+        setNeedsPin(false);
+      } else if (data.needsPin) {
         setNeedsPin(true);
-        if (err?.eventTitle) setEventTitle(err.eventTitle);
-        // Falls ein ungültiger PIN gespeichert war, entfernen
+        // Ein falscher gespeicherter PIN wird vergessen
         if (currentPin) {
           localStorage.removeItem(pinStorageKey);
           setPin('');
+          setPinError(errorMessage(err));
         }
       } else {
         setError(errorMessage(err) || 'Bon nicht gefunden oder ungültig.');
@@ -127,18 +140,20 @@ function BonScanContent() {
   };
 
   useEffect(() => {
-    void loadCard();
-  }, [slug, code, pin]);
+    if (pinReady) void loadCard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, code, pin, pinReady]);
 
-  // PIN absenden & dauerhaft speichern
+  // PIN absenden & dauerhaft speichern (der Effekt oben lädt den Bon danach neu)
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = pinInput.trim();
     if (!clean) return;
     localStorage.setItem(pinStorageKey, clean);
-    setPin(clean);
+    setPinError(null);
     setPinInput('');
-    void loadCard(clean);
+    if (clean === pin) void loadCard(clean);
+    else setPin(clean);
   };
 
   // PIN manuell zurücksetzen / abmelden
@@ -171,12 +186,12 @@ function BonScanContent() {
         {
           method: 'POST',
           headers,
-          body: JSON.stringify({
+          json: {
             code,
             tokenId,
             redeemAll: all,
             staffPin: pin || undefined,
-          }),
+          },
         }
       );
 
@@ -187,6 +202,14 @@ function BonScanContent() {
         tone: 'success',
       });
     } catch (err) {
+      // PIN inzwischen geändert: neu eingeben lassen
+      if (err instanceof ApiError && err.data.needsPin) {
+        localStorage.removeItem(pinStorageKey);
+        setPin('');
+        setPinError(errorMessage(err));
+        setNeedsPin(true);
+        return;
+      }
       toast({
         title: 'Entwertung fehlgeschlagen',
         description: errorMessage(err),
@@ -238,15 +261,42 @@ function BonScanContent() {
                 autoFocus
                 className="text-center text-xl font-mono tracking-widest font-bold h-12"
               />
+              {pinError && <p className="text-xs font-semibold text-danger-ink">{pinError}</p>}
               <Button type="submit" variant="primary" className="w-full h-11" disabled={!pinInput.trim()}>
                 PIN bestätigen &amp; Bon öffnen
               </Button>
             </form>
+            <p className="text-xs text-fg-muted">
+              Im OK?{' '}
+              <a href={loginHref} className="font-semibold text-accent-ink hover:underline">
+                Anmelden
+              </a>{' '}
+              geht auch ohne PIN.
+            </p>
+          </Card>
+        )}
+
+        {/* 1b. ANMELDUNG (kein Stand-PIN gesetzt) */}
+        {needsLogin && (
+          <Card className="p-5 sm:p-6 text-center space-y-4 shadow-md border-accent/40 animate-in fade-in">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent/15 text-accent-ink">
+              <KeyRound className="size-6" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-bold text-fg">Anmeldung nötig</h2>
+              <p className="text-xs text-fg-muted mt-1">
+                Bons entwerten kann nur das OK. Wer ohne Konto am Stand arbeitet, braucht einen Stand-PIN. Den legt das
+                OK in den Einstellungen unter «Verpflegung &amp; Bons» fest.
+              </p>
+            </div>
+            <a href={loginHref} className={buttonClasses({ className: 'w-full h-11' })}>
+              Anmelden
+            </a>
           </Card>
         )}
 
         {/* 2. LADE-ZUSTAND */}
-        {loading && !needsPin && (
+        {loading && !needsPin && !needsLogin && (
           <div className="p-12 text-center space-y-3">
             <div className="size-8 mx-auto animate-spin rounded-full border-2 border-accent border-t-transparent" />
             <p className="text-xs text-fg-muted">Bon wird geprüft…</p>
@@ -254,7 +304,7 @@ function BonScanContent() {
         )}
 
         {/* 3. FEHLER-ZUSTAND */}
-        {error && !loading && !needsPin && (
+        {error && !loading && !needsPin && !needsLogin && (
           <Card className="p-6 text-center space-y-3 border-danger/40 bg-danger/5 shadow-md animate-in fade-in">
             <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-danger text-danger-fg shadow-md shadow-danger/20">
               <Ban className="size-6" />
@@ -274,7 +324,7 @@ function BonScanContent() {
         )}
 
         {/* 4. BON-DETAILS */}
-        {card && !loading && !needsPin && (
+        {card && !loading && !needsPin && !needsLogin && (
           <div className="space-y-3 animate-in fade-in duration-200">
             {/* Status-Banner */}
             <div

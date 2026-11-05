@@ -1,7 +1,14 @@
 import crypto from 'node:crypto';
 import PDFDocument from 'pdfkit';
-import QRCode from 'qrcode';
 import type { PrismaClient } from '../generated/prisma/client.js';
+import {
+  drawBrandedQrPdf,
+  drawPdfLogo,
+  preparePdfLogo,
+  resolveLogo,
+  resolveQrPalette,
+  type QrStyle,
+} from './qrGenerator.js';
 import {
   DEFAULT_CATERING_TOKEN_ITEMS,
   type CateringBatchDto,
@@ -276,14 +283,16 @@ export async function redeemPhysicalTokens(
     if (target.status === 'REDEEMED') throw new Error('Dieser Artikel wurde bereits entwertet');
     if (target.status === 'BLOCKED') throw new Error('Dieser Artikel ist gesperrt');
 
-    await prisma.cateringToken.update({
-      where: { id: tokenId },
+    // Nur entwerten, wenn noch offen: zwei gleichzeitige Scans dürfen denselben Artikel nicht doppelt einlösen
+    const { count } = await prisma.cateringToken.updateMany({
+      where: { id: tokenId, qrCode: code, eventId, status: 'AVAILABLE' },
       data: {
         status: 'REDEEMED',
         redeemedAt: now,
         redeemedByName,
       },
     });
+    if (count === 0) throw new Error('Dieser Artikel wurde bereits entwertet');
   } else {
     throw new Error('Kein Artikel zum Entwerten angegeben');
   }
@@ -300,15 +309,24 @@ export async function redeemPhysicalTokens(
  * - Hochauflösender QR-Code mit Scan-URL.
  * - Schweizer Rechtschreibung & modernes Cevi-Design.
  */
+export interface BatchPdfBranding {
+  color?: string | null;
+  secondaryColor?: string | null;
+  qrStyle?: QrStyle | null;
+  logoUrl?: string | null;
+}
+
 export async function generateBatchPdf(
   prisma: PrismaClient,
   params: {
     eventId: string;
     batchId: string;
-    baseUrl: string;
+    /** Adresse der Anlass-Seite, z. B. https://illnau.cevi-schichtplan.ch/events/sommerfest */
+    eventUrl: string;
+    branding?: BatchPdfBranding;
   }
 ): Promise<Buffer> {
-  const { eventId, batchId, baseUrl } = params;
+  const { eventId, batchId, eventUrl, branding = {} } = params;
 
   const batch = await prisma.cateringBatch.findFirst({
     where: { id: batchId, eventId },
@@ -381,6 +399,13 @@ export async function generateBatchPdf(
 
   const totalPages = Math.ceil(cards.length / cardsPerPage);
 
+  // Gleiches Design wie der Check-in-Aushang: Abteilungsfarben, QR-Stil und Logo in der Mitte
+  const palette = resolveQrPalette(branding.color, branding.secondaryColor, branding.qrStyle);
+  const logo = preparePdfLogo(doc, await resolveLogo(branding.logoUrl, prisma));
+  const accent = palette.isTwoTone ? palette.secondary : palette.primary;
+  const label = batch.mode === 'COMBI' ? 'KOMBI-GUTSCHEIN' : 'HELFER-BON';
+  const departmentLine = `${batch.event.department.name} · ${batch.title}`.toUpperCase();
+
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
     if (pageIdx > 0) doc.addPage();
 
@@ -398,105 +423,125 @@ export async function generateBatchPdf(
 
       // Gestrichelter Schnittrahmen
       doc.save();
-      doc.rect(x, y, w, h);
-      doc.lineWidth(0.6);
-      doc.dash(3, { space: 3 });
-      doc.strokeColor('#94A3B8');
-      doc.stroke();
+      doc.rect(x, y, w, h).lineWidth(0.6).dash(3, { space: 3 }).strokeColor('#94A3B8').stroke();
       doc.restore();
 
-      // Kleines Schnitt-Scheren-Symbol in der Ecke
-      doc.fontSize(7).fillColor('#94A3B8').text('✂', x + 3, y + 2);
-
-      // Karten-Inhalt mit Innenabstand (Padding 8pt)
+      // Karte mit Innenabstand
       const pad = 10;
-      const innerX = x + pad;
-      const innerY = y + pad;
-      const innerW = w - pad * 2;
-      const innerH = h - pad * 2;
+      const cx = x + pad;
+      const cy = y + pad;
+      const cw = w - pad * 2;
+      const ch = h - pad * 2;
 
-      // 1. Kopfzeile: Event-Titel & Tranche / Bon-Nr.
-      doc.fontSize(7).fillColor('#64748B').text(
-        `${batch.event.department.name.toUpperCase()} · ${batch.title.toUpperCase()}`,
-        innerX,
-        innerY,
-        { width: innerW - 40, ellipsis: true }
-      );
+      doc.save();
+      doc.roundedRect(cx, cy, cw, ch, 8).lineWidth(0.8).fillAndStroke('#ffffff', '#E5E7EB');
+      doc.restore();
 
-      doc.fontSize(8).fillColor('#0F172A').font('Helvetica-Bold').text(
-        batch.event.title,
-        innerX,
-        innerY + 10,
-        { width: innerW - 45, ellipsis: true }
-      );
-
-      // Bon-Nummer oben rechts
-      const cardNumStr = `#${(card.cardNumber ?? i + 1).toString().padStart(3, '0')}`;
-      doc.fontSize(8).fillColor('#0F172A').font('Courier-Bold').text(
-        cardNumStr,
-        innerX + innerW - 40,
-        innerY,
-        { width: 40, align: 'right' }
-      );
-
-      // 2. QR-Code erzeugen (URL für Smartphone-Kamera)
-      const scanUrl = `${baseUrl}/events/${batch.event.slug}/bons/scan?code=${card.qrCode}`;
-      const qrBuffer = await QRCode.toBuffer(scanUrl, {
-        margin: 0,
-        errorCorrectionLevel: 'M',
-        width: 140,
-        color: { dark: '#000000', light: '#FFFFFF' },
-      });
-
-      const qrSize = 64;
-      const qrX = innerX + innerW - qrSize;
-      const qrY = innerY + 22;
-
-      doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
-
-      // 3. Gutschein-Inhalt links neben dem QR-Code
-      const contentW = innerW - qrSize - 8;
-      const contentY = innerY + 24;
-
-      if (batch.mode === 'COMBI') {
-        doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#0369A1').text('KOMBI-GUTSCHEIN', innerX, contentY);
-
-        let itemY = contentY + 11;
-        for (const itemTitle of card.items) {
-          doc.fontSize(9).font('Helvetica-Bold').fillColor('#0F172A').text(
-            `• ${itemTitle}`,
-            innerX,
-            itemY,
-            { width: contentW, ellipsis: true }
-          );
-          itemY += 13;
-        }
+      // Akzentleiste oben (Verlauf bei zwei Farben)
+      doc.save();
+      doc.roundedRect(cx, cy, cw, ch, 8).clip();
+      if (palette.isTwoTone) {
+        const grad = doc.linearGradient(cx, 0, cx + cw, 0);
+        grad.stop(0, palette.primary).stop(1, palette.secondary);
+        doc.rect(cx, cy, cw, 4).fill(grad);
       } else {
-        const singleTitle = card.items[0] || '1x Verpflegung';
-        doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#0369A1').text('HELFER-BON', innerX, contentY);
+        doc.rect(cx, cy, cw, 4).fill(palette.primary);
+      }
+      doc.restore();
 
-        doc.fontSize(11).font('Helvetica-Bold').fillColor('#0F172A').text(
-          singleTitle,
-          innerX,
-          contentY + 13,
-          { width: contentW, ellipsis: true }
-        );
+      const qrSize = 96;
+      const ip = 9;
+      const ix = cx + ip;
+      const iy = cy + 4 + ip;
+      const iw = cw - ip * 2;
+      const qrX = cx + cw - ip - qrSize;
+      const qrY = cy + ch - ip - qrSize;
+      const textW = qrX - ix - 10;
+
+      // Kopf: Logo, Abteilung/Tranche, Anlass, Bon-Nummer
+      const headerLogo = 18;
+      drawPdfLogo(doc, logo, ix, iy, headerLogo);
+      const headX = ix + headerLogo + 6;
+      const numberW = 34;
+      const headW = iw - headerLogo - 6 - numberW - 4;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(6)
+        .fillColor('#6B7280')
+        .text(departmentLine, headX, iy + 1, { width: headW, lineBreak: false, ellipsis: true });
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9.5)
+        .fillColor('#111827')
+        .text(batch.event.title, headX, iy + 8.5, { width: headW, lineBreak: false, ellipsis: true });
+      doc
+        .font('Courier-Bold')
+        .fontSize(8.5)
+        .fillColor('#111827')
+        .text(`#${(card.cardNumber ?? i + 1).toString().padStart(3, '0')}`, ix + iw - numberW, iy + 1, {
+          width: numberW,
+          align: 'right',
+          lineBreak: false,
+        });
+
+      // Gutschein-Inhalt links vom QR-Code
+      let ty = iy + headerLogo + 9;
+      doc.font('Helvetica-Bold').fontSize(7).fillColor(accent).text(label, ix, ty, {
+        width: textW,
+        characterSpacing: 0.6,
+        lineBreak: false,
+      });
+      ty += 12;
+
+      const maxLines = 4;
+      const items = card.items.length > maxLines ? card.items.slice(0, maxLines - 1) : card.items;
+      const itemSize = batch.mode === 'COMBI' ? (items.length > 2 ? 9.5 : 11) : 13;
+      for (const itemTitle of items) {
+        doc.circle(ix + 2.5, ty + itemSize * 0.42, 2.2).fill(palette.primary);
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(itemSize)
+          .fillColor('#111827')
+          .text(itemTitle, ix + 9, ty, { width: textW - 9, lineBreak: false, ellipsis: true });
+        ty += itemSize + 5;
+      }
+      if (card.items.length > maxLines) {
+        doc
+          .font('Helvetica')
+          .fontSize(8)
+          .fillColor('#6B7280')
+          .text(`+ ${card.items.length - items.length} weitere`, ix + 9, ty, { width: textW - 9, lineBreak: false });
       }
 
-      // 4. Fusszeile der Karte
-      doc.fontSize(6).font('Helvetica').fillColor('#94A3B8').text(
-        'Mit Smartphone-Kamera scannen · Am Feststand vorweisen',
-        innerX,
-        innerY + innerH - 8,
-        { width: innerW }
-      );
+      // Hinweis unten links
+      doc
+        .font('Helvetica')
+        .fontSize(6.5)
+        .fillColor('#9CA3AF')
+        .text('Am Stand vorweisen und scannen lassen', ix, cy + ch - ip - 7, {
+          width: textW,
+          lineBreak: false,
+          ellipsis: true,
+        });
+
+      // QR-Code im Abteilungsdesign
+      drawBrandedQrPdf(doc, {
+        text: `${eventUrl}/bons/scan?code=${encodeURIComponent(card.qrCode)}`,
+        x: qrX,
+        y: qrY,
+        size: qrSize,
+        palette,
+        logo,
+        // Der Bon-Code ist kleiner und dichter als der Check-in-Aushang: kleinere Plakette, damit er sicher scannt
+        badgeRatio: 0.16,
+      });
     }
   }
 
-  doc.end();
-
-  return await new Promise<Buffer>((resolve, reject) => {
+  const done = new Promise<Buffer>((resolve, reject) => {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
   });
+  doc.end();
+  return done;
 }

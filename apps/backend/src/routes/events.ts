@@ -474,6 +474,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         cateringTokensEnabled: event.cateringTokensEnabled,
         cateringTokenItems: event.cateringTokenItems,
         cateringEarlyHours: event.cateringEarlyHours ?? 2,
+        // Der Stand-PIN öffnet das Entwerten von Papier-Bons: nur für das OK
+        cateringStaffPin: access.isManager ? event.cateringStaffPin : null,
+        cateringRemindersEnabled: event.cateringRemindersEnabled,
         allowReplacement: event.allowReplacement,
         replacementCutoffHours: event.replacementCutoffHours,
         checkinToken: access.isManager ? event.checkinToken : null,
@@ -682,6 +685,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         cateringTokensEnabled,
         cateringTokenItems,
         cateringEarlyHours,
+        cateringStaffPin,
+        cateringRemindersEnabled,
         allowReplacement,
         replacementCutoffHours,
         allowedDepartmentIds,
@@ -809,6 +814,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             cateringTokensEnabled: cateringTokensEnabled ?? false,
             cateringTokenItems: cateringTokenItems ?? ['1x Helfermenü', '1x Getränk'],
             cateringEarlyHours: cateringEarlyHours ?? 2,
+            cateringStaffPin: cateringStaffPin?.trim() || null,
+            cateringRemindersEnabled: cateringRemindersEnabled ?? true,
             allowReplacement: allowReplacement ?? true,
             replacementCutoffHours: replacementCutoffHours ?? 0,
             organizers: {
@@ -949,6 +956,10 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
             cateringTokensEnabled: body.cateringTokensEnabled !== undefined ? body.cateringTokensEnabled : undefined,
             cateringTokenItems: body.cateringTokenItems !== undefined ? body.cateringTokenItems : undefined,
             cateringEarlyHours: body.cateringEarlyHours !== undefined ? body.cateringEarlyHours : undefined,
+            cateringStaffPin:
+              body.cateringStaffPin !== undefined ? body.cateringStaffPin?.trim() || null : undefined,
+            cateringRemindersEnabled:
+              body.cateringRemindersEnabled !== undefined ? body.cateringRemindersEnabled : undefined,
             allowReplacement: body.allowReplacement,
             replacementCutoffHours: body.replacementCutoffHours,
             // Beim ersten Einschalten des Selbst-Check-ins einen Code erzeugen; der bestehende bleibt sonst gültig
@@ -980,6 +991,8 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
         cateringTokensEnabled: updated.cateringTokensEnabled,
         cateringTokenItems: updated.cateringTokenItems,
         cateringEarlyHours: updated.cateringEarlyHours,
+        cateringStaffPin: updated.cateringStaffPin,
+        cateringRemindersEnabled: updated.cateringRemindersEnabled,
         allowReplacement: updated.allowReplacement,
         replacementCutoffHours: updated.replacementCutoffHours,
       };

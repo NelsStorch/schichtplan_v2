@@ -1373,9 +1373,7 @@ export function EventForm({
                           }
                         }}
                         className="text-xs h-8"
-                      >
-                        <UtensilsCrossed className="size-3 text-fg-muted" />
-                      </Input>
+                      />
                       <Button
                         type="button"
                         variant="secondary"
@@ -1413,7 +1411,7 @@ export function EventForm({
 
                   <Field
                     label="Stand-PIN für Bar &amp; Essensausgabe"
-                    hint="4-stelliger Code für Standpersonal, das nicht im Schichtplan eingeloggt ist. Bleibt am Stand-Handy gemerkt."
+                    hint="Code für Standpersonal ohne Konto. Ohne PIN können nur angemeldete OK-Mitglieder Papier-Bons entwerten. Bleibt am Stand-Handy gemerkt."
                   >
                     <Input
                       placeholder="z. B. 4821 (optional)"
