@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useEffect, useState, type FormEvent } from 'react';
 import { Bell, Building2, Database, Trash2 } from 'lucide-react';
 import {
@@ -163,9 +165,17 @@ export default function DepartmentProfilePage() {
             </section>
 
             <section className="rounded-card border border-line bg-surface p-5">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-subtle">
-                <Bell className="size-4" /> Benachrichtigungen &amp; Erinnerungen
-              </h2>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">
+                  <Bell className="size-4" /> Benachrichtigungen &amp; Erinnerungen
+                </h2>
+                <Link
+                  href="/profil/benachrichtigungen"
+                  className="text-xs font-semibold text-accent-ink hover:underline"
+                >
+                  Als eigene Seite öffnen →
+                </Link>
+              </div>
               <NotificationSettings user={user} onUserChange={(u) => setUser(u)} />
             </section>
 

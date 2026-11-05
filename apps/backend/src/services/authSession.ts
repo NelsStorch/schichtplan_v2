@@ -198,6 +198,10 @@ export async function loadUserDto(
     pushReminderMinutes: user.pushReminderMinutes ?? [60, 1440],
     pushNotifyReplacement: user.pushNotifyReplacement ?? true,
     pushNotifyMessages: user.pushNotifyMessages ?? true,
+    emailNotifyCateringTokens: user.emailNotifyCateringTokens ?? true,
+    pushNotifyCateringTokens: user.pushNotifyCateringTokens ?? true,
+    emailNotifyReplacement: user.emailNotifyReplacement ?? true,
+    emailNotifyMessages: user.emailNotifyMessages ?? true,
     pushSubscriptionCount: user._count?.pushSubscriptions ?? 0,
   };
 }

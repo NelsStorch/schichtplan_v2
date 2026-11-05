@@ -499,5 +499,13 @@ export async function sendDueShiftReminders(
     }
   }
 
+  try {
+    const { sendDueCateringReminders } = await import('./cateringReminders.js');
+    const cateringSent = await sendDueCateringReminders(prisma, now);
+    sentCount += cateringSent;
+  } catch (err) {
+    // Fehler bei Bon-Erinnerung bricht den Job nicht ab
+  }
+
   return sentCount;
 }

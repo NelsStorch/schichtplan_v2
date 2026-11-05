@@ -96,6 +96,10 @@ export interface EventDto {
   cateringTokenItems?: string[];
   /** Kulanz-Vorlaufzeit in Stunden vor Schichtbeginn */
   cateringEarlyHours?: number;
+  /** 4-stelliger PIN für Bar- & Standpersonal zum schnellen Entwerten */
+  cateringStaffPin?: string | null;
+  /** Automatische Erinnerung vor Schicht- und Festende bei offenen Bons */
+  cateringRemindersEnabled?: boolean;
   dayResponsibles?: Record<string, ResponsiblePersonDto[]>;
   cancelDeadlineDays?: number | null;
   overlapToleranceMinutes?: number;
@@ -323,6 +327,14 @@ export interface UserDto {
   pushNotifyReplacement?: boolean;
   /** Browser-Push bei neuen Nachrichten vom OK */
   pushNotifyMessages?: boolean;
+  /** E-Mail bei noch offenen Verpflegungs-Bons */
+  emailNotifyCateringTokens?: boolean;
+  /** Browser-Push bei noch offenen Verpflegungs-Bons */
+  pushNotifyCateringTokens?: boolean;
+  /** E-Mail, wenn jemand die eigene angebotene Schicht übernimmt («Ersatz gefunden») */
+  emailNotifyReplacement?: boolean;
+  /** E-Mail bei neuen Mitteilungen vom OK */
+  emailNotifyMessages?: boolean;
   /** Anzahl aktivierter Browser-Push-Geräte dieses Kontos */
   pushSubscriptionCount?: number;
 }
@@ -1093,6 +1105,39 @@ export interface CateringTokensOverviewDto {
   tokens: Array<CateringTokenDto & {
     helperName: string;
     isResponsible: boolean;
+  }>;
+}
+
+export type CateringBatchMode = 'COMBI' | 'SINGLE';
+
+export interface CateringBatchDto {
+  id: string;
+  eventId: string;
+  batchNumber: number;
+  title: string;
+  mode: CateringBatchMode;
+  cardCount: number;
+  tokenCount: number;
+  isBlocked: boolean;
+  createdAt: string;
+  redeemedTokensCount: number;
+}
+
+export interface PhysicalCardScanResultDto {
+  code: string;
+  eventId: string;
+  eventTitle: string;
+  batchTitle: string;
+  batchNumber: number;
+  cardNumber: number | null;
+  mode: CateringBatchMode;
+  isBlocked: boolean;
+  items: Array<{
+    id: string;
+    title: string;
+    status: CateringTokenStatus;
+    redeemedAt: string | null;
+    redeemedByName: string | null;
   }>;
 }
 

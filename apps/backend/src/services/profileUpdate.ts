@@ -48,6 +48,10 @@ export async function applyProfileUpdate(
   }
   if (input.pushNotifyReplacement !== undefined) data.pushNotifyReplacement = input.pushNotifyReplacement;
   if (input.pushNotifyMessages !== undefined) data.pushNotifyMessages = input.pushNotifyMessages;
+  if (input.emailNotifyCateringTokens !== undefined) data.emailNotifyCateringTokens = input.emailNotifyCateringTokens;
+  if (input.pushNotifyCateringTokens !== undefined) data.pushNotifyCateringTokens = input.pushNotifyCateringTokens;
+  if (input.emailNotifyReplacement !== undefined) data.emailNotifyReplacement = input.emailNotifyReplacement;
+  if (input.emailNotifyMessages !== undefined) data.emailNotifyMessages = input.emailNotifyMessages;
   if (input.birthDate !== undefined) {
     const date = new Date(`${input.birthDate}T00:00:00Z`);
     if (isNaN(date.getTime()) || date > new Date()) return { error: 'Ungültiges Geburtsdatum', status: 400 };

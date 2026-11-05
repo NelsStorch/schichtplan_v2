@@ -162,6 +162,14 @@ model User {
   pushNotifyReplacement Boolean          @default(true) @map("push_notify_replacement")
   /// Browser-Push bei neuen Nachrichten vom OK
   pushNotifyMessages    Boolean          @default(true) @map("push_notify_messages")
+  /// E-Mail-Benachrichtigung bei noch offenen Verpflegungs-Bons
+  emailNotifyCateringTokens Boolean       @default(true) @map("email_notify_catering_tokens")
+  /// Browser-Push bei noch offenen Verpflegungs-Bons
+  pushNotifyCateringTokens  Boolean       @default(true) @map("push_notify_catering_tokens")
+  /// E-Mail, wenn jemand eine zur Übernahme angebotene Schicht übernimmt
+  emailNotifyReplacement   Boolean        @default(true) @map("email_notify_replacement")
+  /// E-Mail bei neuen Mitteilungen vom OK
+  emailNotifyMessages      Boolean        @default(true) @map("email_notify_messages")
   /// Geheimer Token für den persönlichen Webcal/iCal-Kalenderfeed
   calendarToken       String?            @unique @map("calendar_token")
   /// Letzter Tag mit Nutzung (nur das Datum, ohne Uhrzeit). Höchstens ein Schreibzugriff pro Person und Tag (plugins/jwt.ts)
@@ -256,6 +264,12 @@ model Event {
   cateringTokensEnabled Boolean       @default(false) @map("catering_tokens_enabled")
   cateringTokenItems    String[]      @default(["1x Helfermenü", "1x Getränk"]) @map("catering_token_items")
   cateringEarlyHours    Int           @default(2) @map("catering_early_hours")
+  // Stand-PIN für Bar & Verpflegung (z. B. 4 Ziffern)
+  cateringStaffPin        String?           @map("catering_staff_pin")
+  // Bon-Erinnerung vor Schicht-/Festende aktivieren
+  cateringRemindersEnabled Boolean          @default(true) @map("catering_reminders_enabled")
+  cateringBatches         CateringBatch[]
+  cateringTokens          CateringToken[]
   // «Ersatz gesucht»: Eingetragene dürfen ihre Schicht zur Übernahme anbieten
   allowReplacement  Boolean           @default(true) @map("allow_replacement")
   // Bis wie viele Stunden vor Schichtbeginn (0 = bis Schichtbeginn)
@@ -769,23 +783,53 @@ model StatsSnapshot {
   @@map("stats_snapshots")
 }
 
-// Digitaler Verpflegungs- oder Getränkegutschein für Helfende & Schichtleitung
+// Druck-Tranche für physische Papier-Bons eines Anlasses
+model CateringBatch {
+  id          String   @id @default(uuid())
+  eventId     String   @map("event_id")
+  batchNumber Int      @map("batch_number")
+  title       String
+  mode        String   @default("COMBI") // "COMBI" (1 QR-Code für alle Artikel) oder "SINGLE" (1 QR-Code pro Artikel)
+  cardCount   Int      @map("card_count")
+  tokenCount  Int      @map("token_count")
+  isBlocked   Boolean  @default(false) @map("is_blocked")
+  createdAt   DateTime @default(now()) @map("created_at")
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tokens      CateringToken[]
+
+  @@unique([eventId, batchNumber])
+  @@index([eventId])
+  @@map("catering_batches")
+}
+
+// Digitaler oder physischer Verpflegungs- oder Getränkegutschein
 model CateringToken {
-  id             String       @id @default(uuid())
-  shiftSignupId  String?      @map("shift_signup_id")
-  shiftId        String?      @map("shift_id")
-  userId         String?      @map("user_id")
+  id             String         @id @default(uuid())
+  shiftSignupId  String?        @map("shift_signup_id")
+  shiftId        String?        @map("shift_id")
+  userId         String?        @map("user_id")
+  eventId        String?        @map("event_id")
+  batchId        String?        @map("batch_id")
+  qrCode         String?        @map("qr_code")
+  cardNumber     Int?           @map("card_number")
+  isPhysical     Boolean        @default(false) @map("is_physical")
   title          String
-  status         String       @default("AVAILABLE")
-  redeemedAt     DateTime?    @map("redeemed_at")
-  redeemedByName String?      @map("redeemed_by_name")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  signup         ShiftSignup? @relation(fields: [shiftSignupId], references: [id], onDelete: Cascade)
-  shift          Shift?       @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         String         @default("AVAILABLE") // "AVAILABLE", "REDEEMED", "BLOCKED"
+  redeemedAt     DateTime?      @map("redeemed_at")
+  redeemedByName String?        @map("redeemed_by_name")
+  reminderSentAt DateTime?      @map("reminder_sent_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  signup         ShiftSignup?   @relation(fields: [shiftSignupId], references: [id], onDelete: Cascade)
+  shift          Shift?         @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event          Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  batch          CateringBatch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([shiftSignupId])
   @@index([shiftId])
   @@index([userId])
+  @@index([eventId])
+  @@index([batchId])
+  @@index([qrCode])
   @@map("catering_tokens")
 }

@@ -454,11 +454,12 @@ export const CHECKIN_EARLY_MINUTES = 30;
 export const CATERING_TOKEN_STATUS = {
   AVAILABLE: 'AVAILABLE',
   REDEEMED: 'REDEEMED',
+  BLOCKED: 'BLOCKED',
   CANCELLED: 'CANCELLED',
 } as const;
 
 export type CateringTokenStatus = (typeof CATERING_TOKEN_STATUS)[keyof typeof CATERING_TOKEN_STATUS];
-export const CATERING_TOKEN_STATUS_KEYS = ['AVAILABLE', 'REDEEMED', 'CANCELLED'] as const;
+export const CATERING_TOKEN_STATUS_KEYS = ['AVAILABLE', 'REDEEMED', 'BLOCKED', 'CANCELLED'] as const;
 
 /** Standard-Tokens pro Schicht */
 export const DEFAULT_CATERING_TOKEN_ITEMS = ['1x Helfermenü', '1x Getränk'] as const;

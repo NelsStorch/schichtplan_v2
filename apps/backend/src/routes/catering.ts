@@ -13,6 +13,18 @@ import {
   getHelperCateringTokens,
   isTokenAvailableNow,
 } from '../services/cateringTokens.js';
+import {
+  createCateringBatch,
+  generateBatchPdf,
+  getEventCateringBatches,
+  getPhysicalCardByCode,
+  redeemPhysicalTokens,
+  toggleBatchBlocked,
+} from '../services/cateringBatches.js';
+import {
+  CreateCateringBatchSchema,
+  RedeemPhysicalTokenSchema,
+} from '@schichtplan/shared';
 
 export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
   async function findEvent(tenantId: string | undefined, slug: string, fallbackUserId?: string) {
@@ -356,6 +368,309 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         tokenItems: event.cateringTokenItems ?? [...DEFAULT_CATERING_TOKEN_ITEMS],
         earlyHours: event.cateringEarlyHours ?? DEFAULT_CATERING_EARLY_HOURS,
       });
+    }
+  );
+
+  // Helfer-Anzahl für die automatische Tranchen-Berechnung ermitteln
+  fastify.get<{ Params: { slug: string } }>(
+    '/api/events/:slug/catering-batches/count-helpers',
+    {
+      schema: {
+        tags: ['Verpflegung'],
+        summary: 'Anzahl angemeldeter Helfenden und Schichtleitungen ermitteln',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      const event = await findEvent(request.tenant?.id, request.params.slug, request.user.id);
+      if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.can.ATTENDANCE && !flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung' });
+      }
+
+      const [signupsCount, responsiblesCount] = await Promise.all([
+        fastify.prisma.shiftSignup.count({
+          where: { shift: { eventId: event.id } },
+        }),
+        fastify.prisma.shiftResponsible.count({
+          where: { shift: { eventId: event.id } },
+        }),
+      ]);
+
+      return {
+        totalHelpersCount: signupsCount + responsiblesCount,
+        signupsCount,
+        responsiblesCount,
+      };
+    }
+  );
+
+  // Alle Tranchen eines Anlasses abrufen
+  fastify.get<{ Params: { slug: string } }>(
+    '/api/events/:slug/catering-batches',
+    {
+      schema: {
+        tags: ['Verpflegung'],
+        summary: 'Alle Druck-Tranchen physischer Bons abrufen',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      const event = await findEvent(request.tenant?.id, request.params.slug, request.user.id);
+      if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.can.ATTENDANCE && !flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung' });
+      }
+
+      return getEventCateringBatches(fastify.prisma, event.id);
+    }
+  );
+
+  // Neue Tranche anlegen
+  fastify.post<{ Params: { slug: string }; Body: unknown }>(
+    '/api/events/:slug/catering-batches',
+    {
+      schema: {
+        tags: ['Verpflegung'],
+        summary: 'Neue Druck-Tranche für physische Bons generieren',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      const event = await findEvent(request.tenant?.id, request.params.slug, request.user.id);
+      if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.can.ATTENDANCE && !flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung' });
+      }
+
+      const parsed = CreateCateringBatchSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.issues[0]?.message || 'Ungültige Eingabe' });
+      }
+
+      const host = request.headers.host || 'cevi-schichtplan.ch';
+      const proto = (request.headers['x-forwarded-proto'] as string) || 'https';
+      const baseUrl = `${proto}://${host}`;
+
+      const created = await createCateringBatch(fastify.prisma, {
+        eventId: event.id,
+        title: parsed.data.title,
+        mode: parsed.data.mode,
+        cardCount: parsed.data.cardCount,
+        baseUrl,
+      });
+
+      return reply.status(201).send(created);
+    }
+  );
+
+  // A4-PDF einer Tranche herunterladen
+  fastify.get<{ Params: { slug: string; batchId: string } }>(
+    '/api/events/:slug/catering-batches/:batchId/pdf',
+    {
+      schema: {
+        tags: ['Verpflegung'],
+        summary: 'A4-Druckbogen als PDF herunterladen',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      const event = await findEvent(request.tenant?.id, request.params.slug, request.user.id);
+      if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.can.ATTENDANCE && !flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung' });
+      }
+
+      const host = request.headers.host || 'cevi-schichtplan.ch';
+      const proto = (request.headers['x-forwarded-proto'] as string) || 'https';
+      const baseUrl = `${proto}://${host}`;
+
+      const pdfBuffer = await generateBatchPdf(fastify.prisma, {
+        eventId: event.id,
+        batchId: request.params.batchId,
+        baseUrl,
+      });
+
+      reply.header('Content-Type', 'application/pdf');
+      reply.header(
+        'Content-Disposition',
+        `inline; filename="bons-${event.slug}-${request.params.batchId.slice(0, 8)}.pdf"`
+      );
+      return reply.send(pdfBuffer);
+    }
+  );
+
+  // Tranche sperren / entsperren
+  fastify.patch<{ Params: { slug: string; batchId: string } }>(
+    '/api/events/:slug/catering-batches/:batchId/toggle-block',
+    {
+      schema: {
+        tags: ['Verpflegung'],
+        summary: 'Tranche sperren oder wieder freigeben',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      const event = await findEvent(request.tenant?.id, request.params.slug, request.user.id);
+      if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
+      const flags = await managerFlags(fastify.prisma, event, request.user);
+      if (!flags.can.ATTENDANCE && !flags.isManager) {
+        return reply.status(403).send({ error: 'Keine Berechtigung' });
+      }
+
+      return toggleBatchBlocked(fastify.prisma, {
+        eventId: event.id,
+        batchId: request.params.batchId,
+      });
+    }
+  );
+
+  // Kartendaten beim Kamerascan abrufen (für Standpersonal)
+  fastify.get<{ Params: { slug: string }; Querystring: { code: string; pin?: string } }>(
+    '/api/events/:slug/catering-scan',
+    {
+      schema: {
+        tags: ['Verpflegung'],
+        summary: 'Physischen Bon per Scan-Code abrufen',
+      },
+    },
+    async (request, reply) => {
+      const event = await fastify.prisma.event.findFirst({
+        where: { slug: request.params.slug },
+        include: { organizers: true },
+      });
+      if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
+
+      let isAuthorized = false;
+
+      try {
+        await fastify.authenticate(request, reply);
+        if (request.user) {
+          const flags = await managerFlags(fastify.prisma, event, request.user);
+          if (flags.isManager || flags.can.ATTENDANCE) {
+            isAuthorized = true;
+          }
+        }
+      } catch {
+        // Nicht eingeloggt
+      }
+
+      if (!isAuthorized) {
+        const staffPin =
+          (request.headers['x-staff-pin'] as string | undefined) || request.query.pin;
+
+        if (event.cateringStaffPin && event.cateringStaffPin.trim().length > 0) {
+          if (!staffPin || staffPin.trim() !== event.cateringStaffPin.trim()) {
+            return reply.status(401).send({
+              error: 'Stand-PIN erforderlich oder falsch',
+              needsPin: true,
+              eventTitle: event.title,
+            });
+          }
+          isAuthorized = true;
+        } else {
+          isAuthorized = true;
+        }
+      }
+
+      const code = request.query.code;
+      if (!code) return reply.status(400).send({ error: 'Code fehlt' });
+
+      const card = await getPhysicalCardByCode(fastify.prisma, {
+        eventId: event.id,
+        code,
+      });
+
+      if (!card) {
+        return reply.status(404).send({ error: 'Ungültiger oder unbekannter Bon-Code' });
+      }
+
+      return card;
+    }
+  );
+
+  // Artikel einer physischen Karte entwerten
+  fastify.post<{ Params: { slug: string }; Body: unknown }>(
+    '/api/events/:slug/catering-scan/redeem',
+    {
+      schema: {
+        tags: ['Verpflegung'],
+        summary: 'Artikel eines physischen Bons entwerten',
+      },
+    },
+    async (request, reply) => {
+      const event = await fastify.prisma.event.findFirst({
+        where: { slug: request.params.slug },
+        include: { organizers: true },
+      });
+      if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
+
+      const parsed = RedeemPhysicalTokenSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.issues[0]?.message || 'Ungültige Eingabe' });
+      }
+
+      let isAuthorized = false;
+      let authorizedName = 'Standpersonal';
+
+      try {
+        await fastify.authenticate(request, reply);
+        if (request.user) {
+          const flags = await managerFlags(fastify.prisma, event, request.user);
+          if (flags.isManager || flags.can.ATTENDANCE) {
+            isAuthorized = true;
+            const staffUser = await fastify.prisma.user.findUnique({
+              where: { id: request.user.id },
+              select: { ceviName: true, firstName: true },
+            });
+            authorizedName = staffUser?.ceviName || staffUser?.firstName || 'OK';
+          }
+        }
+      } catch {
+        // Nicht eingeloggt
+      }
+
+      if (!isAuthorized) {
+        const staffPin =
+          (request.headers['x-staff-pin'] as string | undefined) || parsed.data.staffPin;
+
+        if (event.cateringStaffPin && event.cateringStaffPin.trim().length > 0) {
+          if (!staffPin || staffPin.trim() !== event.cateringStaffPin.trim()) {
+            return reply.status(401).send({
+              error: 'Stand-PIN erforderlich oder falsch',
+              needsPin: true,
+            });
+          }
+          isAuthorized = true;
+        } else {
+          isAuthorized = true;
+        }
+      }
+
+      try {
+        const updated = await redeemPhysicalTokens(fastify.prisma, {
+          eventId: event.id,
+          code: parsed.data.code,
+          tokenId: parsed.data.tokenId,
+          redeemAll: parsed.data.redeemAll,
+          redeemedByName: authorizedName,
+        });
+
+        return updated;
+      } catch (err) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : 'Entwertung fehlgeschlagen',
+        });
+      }
     }
   );
 };

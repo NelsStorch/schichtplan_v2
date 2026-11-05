@@ -31,6 +31,7 @@ const SECTIONS = [
   ['zugang', 'Zugang & Angaben'],
   ['zustaendigkeiten', 'Zuständigkeiten'],
   ['anwesenheit', 'Anwesenheit'],
+  ['catering', 'Verpflegung & Bons'],
   ['design', 'Design'],
 ] as const;
 

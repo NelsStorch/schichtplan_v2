@@ -8,6 +8,7 @@ import {
   Clock,
   Download,
   Loader2,
+  Printer,
   RefreshCw,
   RotateCcw,
   Search,
@@ -16,6 +17,7 @@ import {
   Ticket,
   UtensilsCrossed,
 } from 'lucide-react';
+import { PhysicalBonsManager } from '@/components/ok/PhysicalBonsManager';
 import type { CateringTokensOverviewDto } from '@schichtplan/shared';
 import {
   Badge,
@@ -50,6 +52,7 @@ export default function OkCateringPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
   const [itemFilter, setItemFilter] = useState<string>('ALL');
+  const [activeTab, setActiveTab] = useState<'digital' | 'physical'>('digital');
 
   const loadOverview = useCallback(async () => {
     if (!event) return;
@@ -245,7 +248,41 @@ export default function OkCateringPage() {
         }
       />
 
-      {loading && !data ? (
+      {/* Reiter-Auswahl */}
+      <div className="flex border-b border-line gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('digital')}
+          className={cn(
+            'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition',
+            activeTab === 'digital'
+              ? 'border-accent text-accent-ink'
+              : 'border-transparent text-fg-muted hover:text-fg'
+          )}
+        >
+          <UtensilsCrossed className="size-4" /> Digitale Bons &amp; Live-Auswertung
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('physical')}
+          className={cn(
+            'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition',
+            activeTab === 'physical'
+              ? 'border-accent text-accent-ink'
+              : 'border-transparent text-fg-muted hover:text-fg'
+          )}
+        >
+          <Printer className="size-4" /> Physische Bons (A4-Druckbögen)
+        </button>
+      </div>
+
+      {activeTab === 'physical' ? (
+        <PhysicalBonsManager
+          eventSlug={event.slug}
+          eventTitle={event.title}
+          items={event.cateringTokenItems ?? ['1x Helfermenü', '1x Getränk']}
+        />
+      ) : loading && !data ? (
         <div className="py-16 text-center text-fg-muted flex flex-col items-center justify-center gap-2">
           <Loader2 className="size-6 animate-spin text-accent-ink" />
           <p className="text-sm">Bons und Statistiken werden geladen…</p>

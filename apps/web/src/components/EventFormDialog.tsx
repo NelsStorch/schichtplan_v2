@@ -22,6 +22,7 @@ import { EMPTY_ACCESS, EventAccessFields, accessPayload, type EventAccessValues 
 import { ImageUpload } from './ImageUpload';
 import { questionDraft } from './ok/QuestionsEditor';
 import { SectionBody, useSection } from './ok/SettingsSections';
+import { PhysicalBonsManager } from './ok/PhysicalBonsManager';
 
 export interface EventFormValues {
   title: string;
@@ -48,6 +49,8 @@ export interface EventFormValues {
   cateringTokensEnabled: boolean;
   cateringTokenItems: string[];
   cateringEarlyHours: number;
+  cateringStaffPin: string;
+  cateringRemindersEnabled: boolean;
   /** «Ersatz gesucht» erlaubt, bis so viele Stunden vor Schichtbeginn */
   allowReplacement: boolean;
   replacementCutoffHours: number;
@@ -78,6 +81,8 @@ export function eventFormInitial(event: EventDetails): Partial<EventFormValues> 
     cateringTokensEnabled: event.cateringTokensEnabled ?? false,
     cateringTokenItems: event.cateringTokenItems ?? ['1x Helfermenü', '1x Getränk'],
     cateringEarlyHours: event.cateringEarlyHours ?? 2,
+    cateringStaffPin: event.cateringStaffPin ?? '',
+    cateringRemindersEnabled: event.cateringRemindersEnabled ?? true,
     allowReplacement: event.allowReplacement ?? true,
     replacementCutoffHours: event.replacementCutoffHours ?? 0,
     access: {
@@ -136,6 +141,8 @@ const EMPTY: EventFormValues = {
   cateringTokensEnabled: false,
   cateringTokenItems: ['1x Helfermenü', '1x Getränk'],
   cateringEarlyHours: 2,
+  cateringStaffPin: '',
+  cateringRemindersEnabled: true,
   allowReplacement: true,
   replacementCutoffHours: 0,
   access: EMPTY_ACCESS,
@@ -415,6 +422,8 @@ export function EventForm({
           cateringTokensEnabled: form.cateringTokensEnabled,
           cateringTokenItems: form.cateringTokenItems,
           cateringEarlyHours: form.cateringEarlyHours,
+          cateringStaffPin: form.cateringStaffPin.trim() || null,
+          cateringRemindersEnabled: form.cateringRemindersEnabled,
           allowReplacement: form.allowReplacement,
           replacementCutoffHours: form.replacementCutoffHours,
           ...accessPayload(form.access),
@@ -1288,15 +1297,32 @@ export function EventForm({
           </div>
         )}
 
-        <div className="mt-6 pt-5 border-t border-line space-y-4">
+
+
+      </S>
+
+      <S
+        id="catering"
+        title="Verpflegung & Helfer-Bons"
+        description="Digitale Gutscheine für Helfende und druckbare A4-Bögen mit QR-Code."
+        summary={
+          form.cateringTokensEnabled
+            ? `${form.cateringTokenItems.length} Gutschein-Arten · ${
+                form.cateringEarlyHours < 0 ? 'Immer gültig' : `${form.cateringEarlyHours}h Vorlauf`
+              }`
+            : 'Deaktiviert'
+        }
+      >
+        <div className="space-y-6">
+          {/* Hauptschalter */}
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
                 <UtensilsCrossed className="size-4 text-accent-ink" />
-                <span className="text-[13px] font-semibold text-fg">Verpflegungs- & Getränke-Tokens</span>
+                <span className="text-[13px] font-semibold text-fg">Verpflegungs- &amp; Getränke-Bons aktivieren</span>
               </div>
               <p className="text-xs text-fg-muted mt-0.5">
-                Generiert für Helfende und die Schichtleitung digitale Bons (abrufbar über «Meine Schichten», die Anlass-Seite und den Check-in), die am Stand per Schieber entwertet werden.
+                Generiert für Helfende und Schichtleitende digitale Bons (abrufbar über «Meine Schichten», Anlass-Seite und QR-Check-in) und ermöglicht A4-Druckbögen für physische Bons.
               </p>
             </div>
             <Switch
@@ -1307,80 +1333,136 @@ export function EventForm({
           </div>
 
           {form.cateringTokensEnabled && (
-            <div className="space-y-4 rounded-xl border border-line bg-surface-2/40 p-4 animate-in fade-in">
-              <Field
-                label="Bons pro Schicht"
-                hint="Diese Gutscheine erhält jede helfende Person pro Schicht."
-              >
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    {form.cateringTokenItems.map((item, idx) => (
-                      <Badge key={idx} tone="neutral" className="pl-2.5 pr-1.5 py-1 text-xs gap-1.5 font-medium">
-                        {item}
-                        <button
-                          type="button"
-                          onClick={() => removeCateringItem(idx)}
-                          className="hover:text-danger-ink focus:outline-none p-0.5 rounded"
-                          title="Entfernen"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
+            <div className="space-y-6 animate-in fade-in">
+              {/* 1. DIGITALE BONS EINSTELLUNGEN */}
+              <div className="space-y-4 rounded-xl border border-line bg-surface p-4 sm:p-5">
+                <h4 className="font-display text-xs font-bold uppercase tracking-wider text-fg-subtle">
+                  Gutscheine pro Schicht &amp; Gültigkeit
+                </h4>
 
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="z. B. 1x Kaffee & Kuchen"
-                      value={newCateringItem}
-                      onChange={(e) => setNewCateringItem(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addCateringItem();
-                        }
-                      }}
-                      className="text-xs h-8"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={addCateringItem}
-                      disabled={!newCateringItem.trim()}
-                      className="shrink-0 h-8"
-                    >
-                      <Plus className="size-3.5 mr-1" /> Hinzufügen
-                    </Button>
-                  </div>
-                </div>
-              </Field>
-
-              <Field
-                label="Gültigkeit & Kulanz-Fenster"
-                hint="Wann dürfen Helfende und Schichtleitung ihre Bons einlösen? «Immer gültig» schaltet die Bons sofort ohne Zeitfenster frei."
-              >
-                <Select
-                  value={String(form.cateringEarlyHours)}
-                  onChange={(e) => set('cateringEarlyHours', Number(e.target.value))}
+                <Field
+                  label="Gutscheine pro Schicht"
+                  hint="Diese Gutscheine erhält jede helfende Person pro Schicht (beliebige Bezeichnungen möglich)."
                 >
-                  <option value="-1">Immer gültig (sofort einlösbar, ohne Zeitfenster)</option>
-                  <option value="0">Erst ab Schichtbeginn / Check-in (0 Std.)</option>
-                  <option value="1">1 Stunde vor Schichtbeginn</option>
-                  <option value="2">2 Stunden vorher (Standard)</option>
-                  <option value="3">3 Stunden vorher</option>
-                  <option value="4">4 Stunden vorher</option>
-                  <option value="6">6 Stunden vorher</option>
-                  <option value="12">12 Stunden vorher</option>
-                  <option value="24">24 Stunden vorher</option>
-                </Select>
-              </Field>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {form.cateringTokenItems.map((item, idx) => (
+                        <Badge key={idx} tone="neutral" className="pl-2.5 pr-1.5 py-1 text-xs gap-1.5 font-medium">
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => removeCateringItem(idx)}
+                            className="hover:text-danger-ink focus:outline-none p-0.5 rounded"
+                            title="Entfernen"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="z. B. 1x Kaffee & Kuchen oder 1x Glacé"
+                        value={newCateringItem}
+                        onChange={(e) => setNewCateringItem(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addCateringItem();
+                          }
+                        }}
+                        className="text-xs h-8"
+                      >
+                        <UtensilsCrossed className="size-3 text-fg-muted" />
+                      </Input>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={addCateringItem}
+                        disabled={!newCateringItem.trim()}
+                        className="shrink-0 h-8"
+                      >
+                        <Plus className="size-3.5 mr-1" /> Hinzufügen
+                      </Button>
+                    </div>
+                  </div>
+                </Field>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <Field
+                    label="Gültigkeit &amp; Kulanz-Fenster"
+                    hint="Wann dürfen Helfende ihre Bons einlösen? «Immer gültig» schaltet die Bons sofort ohne Zeitfenster frei."
+                  >
+                    <Select
+                      value={String(form.cateringEarlyHours)}
+                      onChange={(e) => set('cateringEarlyHours', Number(e.target.value))}
+                    >
+                      <option value="-1">Immer gültig (sofort einlösbar, ohne Zeitfenster)</option>
+                      <option value="0">Erst ab Schichtbeginn / Check-in (0 Std.)</option>
+                      <option value="1">1 Stunde vor Schichtbeginn</option>
+                      <option value="2">2 Stunden vorher (Standard)</option>
+                      <option value="3">3 Stunden vorher</option>
+                      <option value="4">4 Stunden vorher</option>
+                      <option value="6">6 Stunden vorher</option>
+                      <option value="12">12 Stunden vorher</option>
+                      <option value="24">24 Stunden vorher</option>
+                    </Select>
+                  </Field>
+
+                  <Field
+                    label="Stand-PIN für Bar &amp; Essensausgabe"
+                    hint="4-stelliger Code für Standpersonal, das nicht im Schichtplan eingeloggt ist. Bleibt am Stand-Handy gemerkt."
+                  >
+                    <Input
+                      placeholder="z. B. 4821 (optional)"
+                      maxLength={10}
+                      value={form.cateringStaffPin}
+                      onChange={(e) => set('cateringStaffPin', e.target.value)}
+                      className="font-mono"
+                    />
+                  </Field>
+                </div>
+
+                <div className="border-t border-line pt-3">
+                  <Switch
+                    checked={form.cateringRemindersEnabled}
+                    onChange={(checked) => set('cateringRemindersEnabled', checked)}
+                    label="Automatische Bon-Erinnerung vor Schicht- und Festende"
+                    description="Erinnert Helfende ca. 30 Min. nach Schichtende sowie 1 Std. vor Festende per Push/E-Mail, falls noch Bons offen sind."
+                  />
+                </div>
+              </div>
+
+              {/* 2. UNTERABSCHNITT: PHYSISCHE BONS (A4-DRUCKBÖGEN & TRANCHEN) */}
+              <div className="space-y-3 rounded-xl border border-line bg-surface-2/40 p-4 sm:p-5">
+                <div className="flex items-center gap-2">
+                  <QrCode className="size-4 text-accent-ink" />
+                  <h4 className="font-display text-sm font-bold text-fg">
+                    Physische Bons (A4-Druckbögen &amp; Tranchen)
+                  </h4>
+                </div>
+                <p className="text-xs text-fg-muted">
+                  Als Rückfallebene für Helfende ohne Smartphone oder Kinder: Druckt unpersönliche Papier-Gutscheine mit QR-Code zum Zerschneiden. Das Standpersonal scannt den Bon einfach mit der normalen Handykamera.
+                </p>
+
+                {eventSlug ? (
+                  <PhysicalBonsManager
+                    eventSlug={eventSlug}
+                    eventTitle={form.title}
+                    items={form.cateringTokenItems}
+                  />
+                ) : (
+                  <div className="rounded-lg border border-dashed border-line p-4 text-center text-xs text-fg-muted">
+                    Physische Druck-Tranchen können nach dem ersten Speichern des Anlasses generiert werden.
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
-
       </S>
-
       <S
         id="design"
         title="Design"

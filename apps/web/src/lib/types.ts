@@ -101,6 +101,8 @@ export interface EventDetails {
   cateringTokensEnabled?: boolean;
   cateringTokenItems?: string[];
   cateringEarlyHours?: number;
+  cateringStaffPin?: string | null;
+  cateringRemindersEnabled?: boolean;
   allowReplacement?: boolean;
   replacementCutoffHours?: number;
   /** Nur für das OK: geheimer Code im QR-Link für den Selbst-Check-in */

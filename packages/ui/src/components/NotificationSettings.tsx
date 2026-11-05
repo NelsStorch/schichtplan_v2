@@ -396,6 +396,29 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
             </div>
           </div>
         )}
+
+        {!compact && hasRealEmail && user.emailVerified && (
+          <div className="space-y-2.5 border-t border-line pt-3">
+            <Switch
+              checked={user.emailNotifyCateringTokens !== false}
+              onChange={(v) => void patchProfile({ emailNotifyCateringTokens: v })}
+              label="E-Mail bei offenen Verpflegungs-Bons"
+              description="Erinnerung nach Schichtende und vor Festende, falls du noch nicht eingelöste Bons hast."
+            />
+            <Switch
+              checked={user.emailNotifyReplacement !== false}
+              onChange={(v) => void patchProfile({ emailNotifyReplacement: v })}
+              label="E-Mail bei «Ersatz gefunden»"
+              description="Informieren, wenn jemand deine angebotene Schicht übernimmt."
+            />
+            <Switch
+              checked={user.emailNotifyMessages !== false}
+              onChange={(v) => void patchProfile({ emailNotifyMessages: v })}
+              label="E-Mail bei Mitteilungen vom OK"
+              description="Wichtige Infos und Rundschreiben zu deinen eingetragenen Anlässen."
+            />
+          </div>
+        )}
       </div>
 
       {/* 2. Browser-Push-Benachrichtigungen */}
@@ -471,7 +494,13 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
             </div>
 
             {!compact && (
-              <div className="space-y-2 border-t border-line pt-3">
+              <div className="space-y-2.5 border-t border-line pt-3">
+                <Switch
+                  checked={user.pushNotifyCateringTokens !== false}
+                  onChange={(v) => void patchProfile({ pushNotifyCateringTokens: v })}
+                  label="Push bei offenen Verpflegungs-Bons"
+                  description="Mitteilung auf dein Handy nach Schichtende oder vor Festende bei offenen Bons."
+                />
                 <Switch
                   checked={user.pushNotifyReplacement !== false}
                   onChange={(v) => void patchProfile({ pushNotifyReplacement: v })}

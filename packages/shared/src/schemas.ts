@@ -210,6 +210,8 @@ export const CreateEventSchema = z.object({
     .max(72, 'Maximal 72 Stunden Vorlaufzeit')
     .optional()
     .default(2),
+  cateringStaffPin: z.string().trim().max(20).nullable().optional(),
+  cateringRemindersEnabled: z.boolean().optional().default(true),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -254,6 +256,8 @@ export const UpdateEventSchema = z.object({
     .min(-1, 'Ungültige Vorlaufzeit')
     .max(72, 'Maximal 72 Stunden Vorlaufzeit')
     .optional(),
+  cateringStaffPin: z.string().trim().max(20).nullable().optional(),
+  cateringRemindersEnabled: z.boolean().optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
   allowReplacement: z.boolean().optional(),
   replacementCutoffHours: ReplacementCutoffSchema.optional(),
@@ -319,6 +323,10 @@ export const UpdateProfileSchema = z.object({
   pushNotifyReplacement: z.boolean().optional(),
   /** Browser-Push bei neuen Nachrichten vom OK */
   pushNotifyMessages: z.boolean().optional(),
+  emailNotifyCateringTokens: z.boolean().optional(),
+  pushNotifyCateringTokens: z.boolean().optional(),
+  emailNotifyReplacement: z.boolean().optional(),
+  emailNotifyMessages: z.boolean().optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
@@ -752,3 +760,18 @@ export const AdminUpdateEventSchema = z.object({
   isPublished: z.boolean().optional(),
   allowPublicSignup: z.boolean().optional(),
 });
+
+export const CreateCateringBatchSchema = z.object({
+  title: z.string().trim().max(100).optional(),
+  mode: z.enum(['COMBI', 'SINGLE']).default('COMBI'),
+  cardCount: z.number().int().min(1, 'Mindestens 1 Karte erforderlich').max(1000, 'Maximal 1000 Karten pro Tranche'),
+});
+export type CreateCateringBatchInput = z.infer<typeof CreateCateringBatchSchema>;
+
+export const RedeemPhysicalTokenSchema = z.object({
+  code: z.string().trim().min(1, 'Code erforderlich'),
+  tokenId: z.string().uuid().optional(),
+  redeemAll: z.boolean().optional(),
+  staffPin: z.string().trim().optional(),
+});
+export type RedeemPhysicalTokenInput = z.infer<typeof RedeemPhysicalTokenSchema>;
