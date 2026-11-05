@@ -426,6 +426,7 @@ model Shift {
   cateringTokens  CateringToken[]
 
   @@index([eventId, startTime])
+  @@index([startTime])
   @@map("shifts")
 }
 
@@ -475,8 +476,8 @@ model ShiftSignup {
   guestPhone  String?
   isConfirmed Boolean    @default(true)
   notes       String?
-  /// Erinnerungs-Mail verschickt (oder vergeben, siehe services/shiftReminders.ts)
-  reminderSentAt DateTime? @map("reminder_sent_at")
+
+
   /// Bereits verschickte E-Mail-Erinnerungs-Stufen (Minuten vor Schichtbeginn, z. B. [1440, 120])
   sentEmailReminders Int[] @default([]) @map("sent_email_reminders")
   /// Bereits verschickte Browser-Push-Erinnerungs-Stufen (Minuten vor Schichtbeginn, z. B. [60])

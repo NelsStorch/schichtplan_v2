@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CalendarDays, CheckSquare, Filter, LayoutList, Plus, Rows3, Search, Sparkles } from 'lucide-react';
 import type { ShiftDto, ShiftTaskDto } from '@schichtplan/shared';
-import { Badge, Button, Chip, EmptyState, Input, Select, cn, trackUi, useConfirm, useToast } from '@schichtplan/ui';
+import { Badge, Button, Chip, Dialog, EmptyState, Input, Select, cn, trackUi, useConfirm, useToast } from '@schichtplan/ui';
 import { BulkShiftBar } from '@/components/ok/BulkShiftBar';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
@@ -44,6 +44,8 @@ function ShiftsPage() {
   const [duplicatingShift, setDuplicatingShift] = useState<ShiftDto | null>(null);
   const [assigning, setAssigning] = useState<{ shift: ShiftDto; task: ShiftTaskDto } | null>(null);
   const [dayTarget, setDayTarget] = useState<{ dayDate: string; dayLabel: string } | null>(null);
+  const [shiftToDelete, setShiftToDelete] = useState<ShiftDto | null>(null);
+  const [notifyHelpers, setNotifyHelpers] = useState(true);
 
   useEffect(() => {
     try {
@@ -145,25 +147,11 @@ function ShiftsPage() {
     setShowShiftForm(true);
   };
 
-  const deleteShift = async (shift: ShiftDto) => {
-    const count = shift.signups?.length ?? 0;
-    const ok = await confirm({
-      title: `Schicht «${shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime)}» löschen?`,
-      description: count
-        ? `Dabei werden auch ${count} Eintragung${count === 1 ? '' : 'en'} gelöscht.`
-        : 'Das lässt sich nicht rückgängig machen.',
-      confirmLabel: 'Schicht löschen',
-      tone: 'danger',
-    });
-    if (!ok) return;
-    try {
-      await api(`/api/shifts/${shift.id}`, { method: 'DELETE' });
-      toast({ title: 'Schicht gelöscht', description: shift.title?.trim() || fmtTimeRange(shift.startTime, shift.endTime) });
-      await reload();
-    } catch (err) {
-      toast({ title: 'Löschen fehlgeschlagen', description: errorMessage(err), tone: 'error' });
-    }
+  const deleteShift = (shift: ShiftDto) => {
+    setNotifyHelpers(true);
+    setShiftToDelete(shift);
   };
+
 
   const removeSignup = async (shift: ShiftDto, signupId: string, name: string) => {
     const ok = await confirm({
@@ -501,6 +489,67 @@ function ShiftsPage() {
           await reload();
         }}
       />
+      {shiftToDelete && (
+        <Dialog
+          open
+          onClose={() => setShiftToDelete(null)}
+          size="sm"
+          title={`Schicht «${shiftToDelete.title?.trim() || fmtTimeRange(shiftToDelete.startTime, shiftToDelete.endTime)}» löschen?`}
+          description={
+            <div className="space-y-4 pt-1 text-left">
+              <p className="text-sm text-fg-muted">
+                {shiftToDelete.signups?.length
+                  ? `Dabei werden auch ${shiftToDelete.signups.length} Eintragung${shiftToDelete.signups.length === 1 ? '' : 'en'} unwiderruflich gelöscht.`
+                  : 'Das lässt sich nicht rückgängig machen.'}
+              </p>
+              {(shiftToDelete.signups?.length ?? 0) > 0 && (
+                <label className="flex items-start gap-2.5 rounded-field border border-line bg-surface-2 p-3 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={notifyHelpers}
+                    onChange={(e) => setNotifyHelpers(e.target.checked)}
+                    className="mt-0.5 size-4 rounded border-line text-accent focus:ring-accent"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold text-fg block">
+                      Eingetragene Helfende per E-Mail benachrichtigen
+                    </span>
+                    <span className="text-xs text-fg-muted block">
+                      Informiert die betroffenen Helfenden automatisch darüber, dass ihre Schicht abgesagt wurde.
+                    </span>
+                  </div>
+                </label>
+              )}
+            </div>
+          }
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setShiftToDelete(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  const s = shiftToDelete;
+                  setShiftToDelete(null);
+                  try {
+                    await api(`/api/shifts/${s.id}?notify=${notifyHelpers}`, { method: 'DELETE' });
+                    toast({
+                      title: 'Schicht gelöscht',
+                      description: s.title?.trim() || fmtTimeRange(s.startTime, s.endTime),
+                    });
+                    await reload();
+                  } catch (err) {
+                    toast({ title: 'Löschen fehlgeschlagen', description: errorMessage(err), tone: 'error' });
+                  }
+                }}
+              >
+                Schicht löschen
+              </Button>
+            </>
+          }
+        />
+      )}
     </div>
   );
 }

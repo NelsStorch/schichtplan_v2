@@ -34,6 +34,7 @@ export const MAIL_KINDS = {
   PASSWORD_RESET: 'Passwort zurücksetzen',
   ACCOUNT_EXISTS: 'Konto existiert schon',
   SHIFT_REMINDER: 'Schicht-Erinnerung',
+  SHIFT_CANCELLED: 'Schicht abgesagt',
   REPLACEMENT_TAKEN: 'Ersatz gefunden',
   OK_MESSAGE: 'Nachricht vom OK',
   ADMIN_NOTICE: 'Admin-Hinweis',

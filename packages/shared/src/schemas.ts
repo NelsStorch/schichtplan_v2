@@ -619,7 +619,10 @@ export type SendEventMessageInput = z.infer<typeof SendEventMessageSchema>;
 export const BulkShiftsSchema = z.object({
   shiftIds: z.array(z.string().uuid()).min(1, 'Keine Schicht ausgewählt').max(500),
   action: z.discriminatedUnion('type', [
-    z.object({ type: z.literal('DELETE') }),
+    z.object({
+      type: z.literal('DELETE'),
+      notify: z.boolean().optional(),
+    }),
     /**
      * Beginn und Ende verschieben (negativ = früher). Ganze Tage behalten die Uhrzeit in Schweizer Zeit,
      * die Minuten kommen danach dazu.

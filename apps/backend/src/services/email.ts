@@ -72,6 +72,8 @@ export interface EmailTemplateOptions {
   };
   ctaText?: string;
   ctaUrl?: string;
+  secondaryCtaText?: string;
+  secondaryCtaUrl?: string;
   footerNote?: string;
   /** Dynamischer Untertitel im Header (z. B. Abteilungsname statt Standardtext) */
   headerSubtitle?: string;
@@ -190,6 +192,33 @@ export function buildShiftIcsAttachment({
 }
 
 /**
+ * Erzeugt einen Web-Direktlink zu Google Calendar für 1-Klick-Import auf Mobilgeräten.
+ */
+export function buildGoogleCalendarUrl({
+  title,
+  startTime,
+  endTime,
+  description,
+  location,
+}: {
+  title: string;
+  startTime: Date;
+  endTime: Date;
+  description?: string;
+  location?: string;
+}): string {
+  const formatUtc = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${formatUtc(startTime)}/${formatUtc(endTime)}`,
+  });
+  if (description) params.set('details', description);
+  if (location) params.set('location', location);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/**
  * High-End HTML-E-Mail-Renderer im warmen «Lagerfeuer»-Design-System (@schichtplan/ui).
  * - Warm-Stone Farbpalette (#f5f4f2 Canvas, #fefefd Surface, #1c1917 Ink)
  * - Dynamischer Abteilungs-Kontext & Akzentfarbe
@@ -206,6 +235,8 @@ export function renderEmailTemplate({
   calloutBox,
   ctaText,
   ctaUrl,
+  secondaryCtaText,
+  secondaryCtaUrl,
   footerNote,
   headerSubtitle,
   signatureName,
@@ -430,14 +461,25 @@ export function renderEmailTemplate({
                     ${
                       ctaText && ctaUrl
                         ? `
-                    <!-- Pill CTA Button -->
+                    <!-- Pill CTA Buttons -->
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 28px 0 22px 0;">
                       <tr>
                         <td align="left" style="border-radius: 9999px; background-color: ${brandColor};">
-                          <a href="${escapeHtml(ctaUrl)}" target="_blank" style="display: inline-block; padding: 13px 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 9999px; letter-spacing: -0.01em;">
+                          <a href="${escapeHtml(ctaUrl)}" target="_blank" style="display: inline-block; padding: 13px 26px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 9999px; letter-spacing: -0.01em;">
                             ${escapeHtml(ctaText)} &nbsp;&rarr;
                           </a>
                         </td>
+                        ${
+                          secondaryCtaText && secondaryCtaUrl
+                            ? `
+                        <td style="width: 12px;"></td>
+                        <td align="left" style="border-radius: 9999px; border: 1px solid #d6d3d0; background-color: #ffffff;">
+                          <a href="${escapeHtml(secondaryCtaUrl)}" target="_blank" style="display: inline-block; padding: 12px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 600; color: #1c1917; text-decoration: none; border-radius: 9999px; letter-spacing: -0.01em;">
+                            ${escapeHtml(secondaryCtaText)}
+                          </a>
+                        </td>`
+                            : ''
+                        }
                       </tr>
                     </table>
 
@@ -762,6 +804,7 @@ export async function sendShiftReminderEmail({
   leadMinutes,
   reminderNote,
   isResponsible = false,
+  isGuest = false,
 }: {
   to: string;
   name?: string | null;
@@ -781,6 +824,8 @@ export async function sendShiftReminderEmail({
   reminderNote?: string | null;
   /** Ist die Person als Schichtleitung eingeteilt? */
   isResponsible?: boolean;
+  /** Anmeldung als Gast ohne Benutzerkonto */
+  isGuest?: boolean;
 }): Promise<boolean> {
   const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
   const leadLabel =
@@ -839,27 +884,54 @@ export async function sendShiftReminderEmail({
     { label: 'Zeit', value: timeRangeFormatted },
   ];
 
+  const googleCalendarUrl =
+    startTime && endTime
+      ? buildGoogleCalendarUrl({
+          title: `${shiftTitle} (${eventTitle})`,
+          startTime,
+          endTime,
+          description: `Schicht: ${shiftTitle}\nAnlass: ${eventTitle}${departmentName ? `\nAbteilung: ${departmentName}` : ''}${cleanNote ? `\nHinweis: ${cleanNote}` : ''}${shiftUrl ? `\n${shiftUrl}` : ''}`,
+          location: departmentName || undefined,
+        })
+      : undefined;
+
+  const calloutBox = isGuest
+    ? {
+        title: 'Kurzfristig verhindert?',
+        text: 'Melde dich bitte direkt beim OK des Anlasses oder der Abteilungsleitung, damit deine Schicht neu vergeben werden kann.',
+        tone: 'neutral' as const,
+      }
+    : {
+        title: 'Kurzfristig verhindert?',
+        text: 'Öffne den Schichtplan und klicke bei deiner Schicht auf «Ersatz suchen», damit jemand deinen Platz übernehmen kann.',
+        tone: 'neutral' as const,
+      };
+
+  const footerNote = isGuest
+    ? `Du erhältst diese Erinnerung für deine Helfer-Eintragung bei «${eventTitle}».`
+    : leadMinutes !== undefined
+      ? `Du erhältst diese Erinnerung gemäss deinen Einstellungen (${leadLabel.replace(/^in /, '')} vor Schichtbeginn).`
+      : 'Du erhältst diese Erinnerung vor Beginn deiner eingetragenen Schicht.';
+
+  const unsubscribeUrl = isGuest ? undefined : profileUrl;
+  const unsubscribeLabel = isGuest ? undefined : 'Erinnerungen im Profil anpassen';
+
   const html = renderEmailTemplate({
     preheader,
     eyebrow,
     title,
     contentHtml,
     details,
-    calloutBox: {
-      title: 'Kurzfristig verhindert?',
-      text: 'Öffne den Schichtplan und klicke bei deiner Schicht auf «Ersatz suchen», damit jemand deinen Platz übernehmen kann.',
-      tone: 'neutral',
-    },
+    calloutBox,
     ctaText: shiftUrl ? 'Zum Schichtplan' : undefined,
     ctaUrl: shiftUrl,
+    secondaryCtaText: googleCalendarUrl ? '📅 Zu Google Kalender' : undefined,
+    secondaryCtaUrl: googleCalendarUrl,
     headerSubtitle: departmentName || undefined,
     accentColor,
-    footerNote:
-      leadMinutes !== undefined
-        ? `Du erhältst diese Erinnerung gemäss deinen Einstellungen (${leadLabel.replace(/^in /, '')} vor Schichtbeginn).`
-        : 'Du erhältst diese Erinnerung vor Beginn deiner eingetragenen Schicht.',
-    unsubscribeUrl: profileUrl,
-    unsubscribeLabel: 'Erinnerungen im Profil anpassen',
+    footerNote,
+    unsubscribeUrl,
+    unsubscribeLabel,
   });
 
   const textLines = [
@@ -874,12 +946,18 @@ export async function sendShiftReminderEmail({
     `• Zeit: ${timeRangeFormatted}`,
     ...(cleanNote ? ['', `Hinweis vom OK (${eventTitle}):`, cleanNote] : []),
     ...(shiftUrl ? ['', `Zum Schichtplan: ${shiftUrl}`] : []),
+    ...(googleCalendarUrl ? [`Zu Google Kalender: ${googleCalendarUrl}`] : []),
     '',
-    'Kurzfristig verhindert? Öffne den Schichtplan und klicke bei deiner Schicht auf «Ersatz suchen».',
+    ...(isGuest
+      ? ['Kurzfristig verhindert? Bitte melde dich direkt beim OK des Anlasses oder der Abteilungsleitung.']
+      : [
+          'Kurzfristig verhindert? Öffne den Schichtplan und klicke bei deiner Schicht auf «Ersatz suchen».',
+          '',
+          `Erinnerungen anpassen: ${profileUrl}`,
+        ]),
     '',
     'Herzliche Grüsse',
-    'Dein Cevi Schichtplan Team',
-    `Erinnerungen anpassen: ${profileUrl}`,
+    departmentName || 'Dein Cevi Schichtplan Team',
   ];
 
   const icsContent =
@@ -901,9 +979,92 @@ export async function sendShiftReminderEmail({
     html,
     text: textLines.join('\n'),
     fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – Cevi Schichtplan`,
-    unsubscribeUrl: profileUrl,
+    unsubscribeUrl,
     icalEvent: icsContent ? { filename: 'schicht.ics', method: 'PUBLISH', content: icsContent } : undefined,
     kind: 'SHIFT_REMINDER',
+  });
+}
+
+/**
+ * 4. Schicht abgesagt: Eine Schicht wurde gelöscht, eingetragene Personen werden informiert.
+ */
+export async function sendShiftCancelledEmail({
+  to,
+  name,
+  eventTitle,
+  shiftTitle,
+  timeRangeFormatted,
+  eventUrl,
+  departmentName,
+  accentColor,
+}: {
+  to: string;
+  name?: string | null;
+  eventTitle: string;
+  shiftTitle: string;
+  timeRangeFormatted: string;
+  eventUrl?: string;
+  departmentName?: string;
+  accentColor?: string | null;
+}): Promise<boolean> {
+  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
+  const subject = `Schicht abgesagt: «${shiftTitle}» (${eventTitle})`;
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hallo <strong class="email-signature" style="color: #1c1917;">${escapeHtml(displayName)}</strong>,</p>
+    <p style="margin: 0;">die Schicht <strong class="email-signature" style="color: #1c1917;">«${escapeHtml(shiftTitle)}»</strong> beim Anlass <strong class="email-signature" style="color: #1c1917;">${escapeHtml(eventTitle)}</strong> wurde leider abgesagt und aus dem Schichtplan entfernt. Dein Einsatz für diese Schicht entfällt.</p>
+  `;
+
+  const details: EmailDetailRow[] = [
+    { label: 'Anlass', value: eventTitle },
+    ...(departmentName ? [{ label: 'Abteilung', value: departmentName }] : []),
+    { label: 'Schicht', value: shiftTitle, highlight: true },
+    { label: 'Ursprüngliche Zeit', value: timeRangeFormatted },
+    { label: 'Status', value: 'Abgesagt / Entfällt' },
+  ];
+
+  const html = renderEmailTemplate({
+    preheader: `Deine Schicht «${shiftTitle}» bei ${eventTitle} wurde abgesagt.`,
+    eyebrow: 'Schicht abgesagt',
+    title: 'Deine Schicht entfällt',
+    contentHtml,
+    details,
+    calloutBox: {
+      title: 'Was bedeutet das für dich?',
+      text: 'Du musst zu dieser Schicht nicht antreten. Falls du stattdessen eine andere Schicht übernehmen möchtest, kannst du dich im Schichtplan neu eintragen.',
+      tone: 'warning',
+    },
+    ctaText: eventUrl ? 'Zum Schichtplan' : undefined,
+    ctaUrl: eventUrl,
+    headerSubtitle: departmentName || undefined,
+    accentColor,
+    footerNote: `Du erhältst diese Benachrichtigung, weil du für diese Schicht bei «${eventTitle}» eingetragen warst.`,
+  });
+
+  const textLines = [
+    `Hallo ${displayName},`,
+    '',
+    `die Schicht «${shiftTitle}» (${timeRangeFormatted}) beim Anlass «${eventTitle}» wurde leider abgesagt und aus dem Schichtplan entfernt. Dein Einsatz für diese Schicht entfällt.`,
+    '',
+    `• Anlass: ${eventTitle}`,
+    ...(departmentName ? [`• Abteilung: ${departmentName}`] : []),
+    `• Schicht: ${shiftTitle}`,
+    `• Zeit: ${timeRangeFormatted}`,
+    '• Status: Abgesagt / Entfällt',
+    '',
+    'Was bedeutet das für dich? Du musst zu dieser Schicht nicht antreten. Falls du stattdessen eine andere Schicht übernehmen möchtest, kannst du dich im Schichtplan neu eintragen.',
+    ...(eventUrl ? ['', `Zum Schichtplan: ${eventUrl}`] : []),
+    '',
+    'Herzliche Grüsse',
+    departmentName || 'Dein Cevi Schichtplan Team',
+  ];
+
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text: textLines.join('\n'),
+    fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – Cevi Schichtplan`,
+    kind: 'SHIFT_CANCELLED',
   });
 }
 

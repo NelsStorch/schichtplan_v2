@@ -42,7 +42,7 @@ export async function moveEventByDays(db: Db, event: { id: string; startDate: Da
   }
   await db.shiftSignup.updateMany({
     where: { shift: { eventId: event.id } },
-    data: { reminderSentAt: null, sentEmailReminders: [], sentPushReminders: [] },
+    data: { sentEmailReminders: [], sentPushReminders: [] },
   });
   await db.shiftResponsible.updateMany({
     where: { shift: { eventId: event.id } },

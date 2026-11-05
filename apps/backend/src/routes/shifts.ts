@@ -14,8 +14,10 @@ import {
 } from '../services/eventAccess.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
 import { syncEventRange } from '../services/eventRange.js';
-import { EMAIL_REMINDER_MINUTES, PUSH_REMINDER_MINUTES } from '@schichtplan/shared';
+import { EMAIL_REMINDER_MINUTES, PUSH_REMINDER_MINUTES, PLACEHOLDER_EMAIL_REGEX } from '@schichtplan/shared';
 import { pastReminderMinutes, toResponsiblePersonDto } from '../services/shiftDto.js';
+import { formatShiftTime, eventUrl } from '../services/shiftReminders.js';
+import { sendShiftCancelledEmail } from '../services/email.js';
 
 const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   // Schicht erstellen (Admin, Planner oder Event-OK)
@@ -452,6 +454,30 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         await syncEventRange(fastify.prisma, shift.eventId);
       }
 
+      if (startTime && new Date(startTime).getTime() !== shift.startTime.getTime()) {
+        const newStart = new Date(startTime);
+        const pastEmail = pastReminderMinutes(newStart, EMAIL_REMINDER_MINUTES);
+        const pastPush = pastReminderMinutes(newStart, PUSH_REMINDER_MINUTES);
+
+        await fastify.prisma.shiftSignup.updateMany({
+          where: { shiftId },
+          data: {
+            sentEmailReminders: pastEmail,
+            sentPushReminders: pastPush,
+          },
+        });
+
+        if (responsibleUserIds === undefined) {
+          await fastify.prisma.shiftResponsible.updateMany({
+            where: { shiftId },
+            data: {
+              sentEmailReminders: pastEmail,
+              sentPushReminders: pastPush,
+            },
+          });
+        }
+      }
+
       if (responsibleUserIds !== undefined) {
         await fastify.prisma.shiftResponsible.deleteMany({ where: { shiftId } });
         if (responsibleUserIds.length > 0) {
@@ -500,26 +526,43 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // Schicht löschen (Admin, Planner oder Event-OK)
-  fastify.delete<{ Params: { id: string } }>(
+  fastify.delete<{ Params: { id: string }; Querystring: { notify?: string } }>(
     '/api/shifts/:id',
     {
       schema: {
         tags: ['Schichten'],
         summary: 'Schicht löschen',
-        description: 'Löscht eine Schicht samt Aufgaben und Eintragungen.',
+        description: 'Löscht eine Schicht samt Aufgaben und Eintragungen. Helfende können optional per E-Mail informiert werden.',
         security: [{ bearerAuth: [] }],
         params: z.object({
           id: z.string().uuid().describe('ID der Schicht'),
+        }),
+        querystring: z.object({
+          notify: z.string().optional().describe('Helfende per E-Mail benachrichtigen ("true" oder "false", Standard: true)'),
         }),
       },
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
       const shiftId = request.params.id;
+      const notify = request.query.notify !== 'false';
 
       const shift = await fastify.prisma.shift.findUnique({
         where: { id: shiftId },
-        include: { event: { include: { organizers: true } } },
+        include: {
+          event: {
+            include: {
+              organizers: true,
+              department: { select: { slug: true, name: true, primaryColor: true } },
+            },
+          },
+          signups: {
+            include: {
+              user: { select: { id: true, email: true, emailVerified: true, ceviName: true, firstName: true } },
+              task: { select: { title: true } },
+            },
+          },
+        },
       });
 
       if (!shift || (request.tenant && shift.event.departmentId !== request.tenant.id)) {
@@ -531,6 +574,42 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!flags.can.SHIFTS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Schicht' });
+      }
+
+      // Helfende benachrichtigen, wenn notify aktiv ist
+      if (notify && shift.signups.length > 0) {
+        const timeFormatted = formatShiftTime(shift.startTime, shift.endTime);
+        const targetUrl = eventUrl(shift.event.department.slug, shift.event.slug);
+
+        for (const s of shift.signups) {
+          const shiftTitle = shift.title?.trim()
+            ? (s.task?.title && s.task.title !== shift.title ? `${shift.title} · ${s.task.title}` : shift.title)
+            : (s.task?.title || 'Schicht');
+
+          if (s.user?.email && s.user.emailVerified && !PLACEHOLDER_EMAIL_REGEX.test(s.user.email)) {
+            void sendShiftCancelledEmail({
+              to: s.user.email,
+              name: s.user.ceviName || s.user.firstName,
+              eventTitle: shift.event.title,
+              shiftTitle,
+              timeRangeFormatted: timeFormatted,
+              eventUrl: targetUrl,
+              departmentName: shift.event.department.name,
+              accentColor: shift.event.department.primaryColor,
+            }).catch((err) => request.log.error(err, 'Absage-Mail fehlgeschlagen'));
+          } else if (!s.userId && s.guestEmail?.trim() && s.guestEmail.includes('@')) {
+            void sendShiftCancelledEmail({
+              to: s.guestEmail.trim(),
+              name: s.guestName?.trim() || 'Helfer*in',
+              eventTitle: shift.event.title,
+              shiftTitle,
+              timeRangeFormatted: timeFormatted,
+              eventUrl: targetUrl,
+              departmentName: shift.event.department.name,
+              accentColor: shift.event.department.primaryColor,
+            }).catch((err) => request.log.error(err, 'Gast-Absage-Mail fehlgeschlagen'));
+          }
+        }
       }
 
       await fastify.prisma.shift.delete({
@@ -661,7 +740,10 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const event = await fastify.prisma.event.findUnique({
         where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
-        include: { organizers: true },
+        include: {
+          organizers: true,
+          department: { select: { slug: true, name: true, primaryColor: true } },
+        },
       });
       if (!event) {
         return reply.status(404).send({ error: 'Event nicht gefunden' });
@@ -691,6 +773,49 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
 
       await fastify.prisma.$transaction(async (tx) => {
         if (action.type === 'DELETE') {
+          if (action.notify !== false) {
+            const signupsToNotify = await tx.shiftSignup.findMany({
+              where: { shiftId: { in: shiftIds } },
+              include: {
+                shift: true,
+                user: { select: { id: true, email: true, emailVerified: true, ceviName: true, firstName: true } },
+                task: { select: { title: true } },
+              },
+            });
+            if (signupsToNotify.length > 0) {
+              const targetUrl = eventUrl(event.department.slug, event.slug);
+              for (const s of signupsToNotify) {
+                const shiftTitle = s.shift.title?.trim()
+                  ? (s.task?.title && s.task.title !== s.shift.title ? `${s.shift.title} · ${s.task.title}` : s.shift.title)
+                  : (s.task?.title || 'Schicht');
+                const timeFormatted = formatShiftTime(s.shift.startTime, s.shift.endTime);
+
+                if (s.user?.email && s.user.emailVerified && !PLACEHOLDER_EMAIL_REGEX.test(s.user.email)) {
+                  void sendShiftCancelledEmail({
+                    to: s.user.email,
+                    name: s.user.ceviName || s.user.firstName,
+                    eventTitle: event.title,
+                    shiftTitle,
+                    timeRangeFormatted: timeFormatted,
+                    eventUrl: targetUrl,
+                    departmentName: event.department.name,
+                    accentColor: event.department.primaryColor,
+                  }).catch((err) => request.log.error(err, 'Bulk-Absage-Mail fehlgeschlagen'));
+                } else if (!s.userId && s.guestEmail?.trim() && s.guestEmail.includes('@')) {
+                  void sendShiftCancelledEmail({
+                    to: s.guestEmail.trim(),
+                    name: s.guestName?.trim() || 'Helfer*in',
+                    eventTitle: event.title,
+                    shiftTitle,
+                    timeRangeFormatted: timeFormatted,
+                    eventUrl: targetUrl,
+                    departmentName: event.department.name,
+                    accentColor: event.department.primaryColor,
+                  }).catch((err) => request.log.error(err, 'Bulk-Gast-Absage-Mail fehlgeschlagen'));
+                }
+              }
+            }
+          }
           updated = (await tx.shift.deleteMany({ where: { id: { in: shiftIds } } })).count;
         } else if (action.type === 'MOVE') {
           const move = (d: Date) => new Date(addZurichDays(d, action.days).getTime() + action.minutes * 60 * 1000);
@@ -701,7 +826,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             });
             await tx.shiftSignup.updateMany({
               where: { shiftId: shift.id },
-              data: { reminderSentAt: null, sentEmailReminders: [], sentPushReminders: [] },
+              data: { sentEmailReminders: [], sentPushReminders: [] },
             });
             await tx.shiftResponsible.updateMany({
               where: { shiftId: shift.id },

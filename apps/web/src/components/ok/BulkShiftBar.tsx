@@ -30,6 +30,8 @@ export function BulkShiftBar({
   const toast = useToast();
   const confirm = useConfirm();
   const [mode, setMode] = useState<Mode>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [notifyHelpers, setNotifyHelpers] = useState(true);
   const count = selectedIds.size;
   const selected = shifts.filter((s) => selectedIds.has(s.id));
   const signupCount = selected.reduce((sum, s) => sum + (s.signups?.length ?? 0), 0);
@@ -50,18 +52,20 @@ export function BulkShiftBar({
   };
 
   const remove = async () => {
+    if (signupCount > 0) {
+      setNotifyHelpers(true);
+      setShowDeleteDialog(true);
+      return;
+    }
     const ok = await confirm({
       title: `${count} Schicht${count === 1 ? '' : 'en'} löschen?`,
-      description:
-        signupCount > 0
-          ? `Dabei werden auch ${signupCount} Eintragung${signupCount === 1 ? '' : 'en'} gelöscht. Das lässt sich nicht rückgängig machen.`
-          : 'Das lässt sich nicht rückgängig machen.',
+      description: 'Das lässt sich nicht rückgängig machen.',
       confirmLabel: 'Löschen',
       tone: 'danger',
     });
     if (!ok) return;
     try {
-      await run({ type: 'DELETE' }, '{n} Schichten gelöscht');
+      await run({ type: 'DELETE', notify: false }, '{n} Schichten gelöscht');
       onClear();
     } catch (err) {
       toast({ title: 'Löschen fehlgeschlagen', description: errorMessage(err), tone: 'error' });
@@ -131,6 +135,59 @@ export function BulkShiftBar({
           />
         )}
       </Dialog>
+
+      {showDeleteDialog && (
+        <Dialog
+          open
+          onClose={() => setShowDeleteDialog(false)}
+          size="sm"
+          title={`${count} Schicht${count === 1 ? '' : 'en'} löschen?`}
+          description={
+            <div className="space-y-4 pt-1 text-left">
+              <p className="text-sm text-fg-muted">
+                Dabei werden auch {signupCount} Eintragung{signupCount === 1 ? '' : 'en'} unwiderruflich gelöscht.
+              </p>
+              <label className="flex items-start gap-2.5 rounded-field border border-line bg-surface-2 p-3 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={notifyHelpers}
+                  onChange={(e) => setNotifyHelpers(e.target.checked)}
+                  className="mt-0.5 size-4 rounded border-line text-accent focus:ring-accent"
+                />
+                <div className="space-y-0.5">
+                  <span className="text-xs font-semibold text-fg block">
+                    Eingetragene Helfende per E-Mail benachrichtigen
+                  </span>
+                  <span className="text-xs text-fg-muted block">
+                    Informiert die betroffenen Helfenden automatisch darüber, dass ihre Schicht abgesagt wurde.
+                  </span>
+                </div>
+              </label>
+            </div>
+          }
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setShowDeleteDialog(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  setShowDeleteDialog(false);
+                  try {
+                    await run({ type: 'DELETE', notify: notifyHelpers }, '{n} Schichten gelöscht');
+                    onClear();
+                  } catch (err) {
+                    toast({ title: 'Löschen fehlgeschlagen', description: errorMessage(err), tone: 'error' });
+                  }
+                }}
+              >
+                Schichten löschen
+              </Button>
+            </>
+          }
+        />
+      )}
     </>
   );
 }

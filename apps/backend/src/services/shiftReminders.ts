@@ -55,14 +55,13 @@ export function eventUrl(departmentSlug: string, eventSlug: string, env: NodeJS.
 interface CandidateEntry {
   kind: 'signup' | 'responsible';
   recordId: string;
-  userId: string;
+  userId: string | null;
   shiftId: string;
   isResponsible: boolean;
   sentEmail: Set<number>;
   sentPush: Set<number>;
-  legacyReminderSent: boolean;
   user: {
-    id: string;
+    id: string | null;
     email: string | null;
     emailVerified: boolean;
     ceviName: string | null;
@@ -93,14 +92,12 @@ async function claimEmailReminder(
   prisma: PrismaClient,
   kind: 'signup' | 'responsible',
   recordId: string,
-  leadMinutes: number,
-  now: Date
+  leadMinutes: number
 ): Promise<boolean> {
   if (kind === 'signup') {
     const count = await prisma.$executeRaw`
       UPDATE "shift_signups"
-      SET "sent_email_reminders" = array_append("sent_email_reminders", ${leadMinutes}),
-          "reminder_sent_at" = COALESCE("reminder_sent_at", ${now})
+      SET "sent_email_reminders" = array_append("sent_email_reminders", ${leadMinutes})
       WHERE "id" = ${recordId}
         AND NOT ("sent_email_reminders" @> ARRAY[${leadMinutes}]::INTEGER[])
     `;
@@ -113,6 +110,27 @@ async function claimEmailReminder(
         AND NOT ("sent_email_reminders" @> ARRAY[${leadMinutes}]::INTEGER[])
     `;
     return Number(count) > 0;
+  }
+}
+
+async function unclaimEmailReminder(
+  prisma: PrismaClient,
+  kind: 'signup' | 'responsible',
+  recordId: string,
+  leadMinutes: number
+): Promise<void> {
+  if (kind === 'signup') {
+    await prisma.$executeRaw`
+      UPDATE "shift_signups"
+      SET "sent_email_reminders" = array_remove("sent_email_reminders", ${leadMinutes})
+      WHERE "id" = ${recordId}
+    `;
+  } else {
+    await prisma.$executeRaw`
+      UPDATE "shift_responsibles"
+      SET "sent_email_reminders" = array_remove("sent_email_reminders", ${leadMinutes})
+      WHERE "id" = ${recordId}
+    `;
   }
 }
 
@@ -156,13 +174,17 @@ export async function sendDueShiftReminders(
   const [signups, responsibles] = await Promise.all([
     prisma.shiftSignup.findMany({
       where: {
-        userId: { not: null },
         shift: { startTime: { gt: now, lte: until } },
+        OR: [
+          { userId: { not: null } },
+          { guestEmail: { not: null } },
+        ],
       },
       select: {
         id: true,
         userId: true,
-        reminderSentAt: true,
+        guestName: true,
+        guestEmail: true,
         sentEmailReminders: true,
         sentPushReminders: true,
         user: {
@@ -252,42 +274,72 @@ export async function sendDueShiftReminders(
   const byUserShift = new Map<string, CandidateEntry & { companionResponsibleId?: string }>();
 
   for (const s of signups) {
-    if (!s.user || !s.userId) continue;
-    const key = `${s.userId}:${s.shift.id}`;
-    const sentEmail = new Set<number>(s.sentEmailReminders ?? []);
-    if (s.reminderSentAt && sentEmail.size === 0) sentEmail.add(1440);
-    byUserShift.set(key, {
-      kind: 'signup',
-      recordId: s.id,
-      userId: s.userId,
-      shiftId: s.shift.id,
-      isResponsible: false,
-      sentEmail,
-      sentPush: new Set<number>(s.sentPushReminders ?? []),
-      legacyReminderSent: Boolean(s.reminderSentAt),
-      user: {
-        id: s.user.id,
-        email: s.user.email,
-        emailVerified: s.user.emailVerified,
-        ceviName: s.user.ceviName,
-        firstName: s.user.firstName,
-        shiftRemindersEnabled: s.user.shiftRemindersEnabled,
-        emailReminderMinutes:
-          s.user.emailReminderMinutes && s.user.emailReminderMinutes.length > 0
-            ? s.user.emailReminderMinutes
-            : s.user.shiftRemindersEnabled
-              ? [...DEFAULT_EMAIL_REMINDER_MINUTES]
-              : [],
-        pushRemindersEnabled: s.user.pushRemindersEnabled ?? true,
-        pushReminderMinutes:
-          s.user.pushReminderMinutes && s.user.pushReminderMinutes.length > 0
-            ? s.user.pushReminderMinutes
-            : [...DEFAULT_PUSH_REMINDER_MINUTES],
-        hasPushSubscriptions: (s.user._count?.pushSubscriptions ?? 0) > 0,
-      },
-      taskTitle: s.task?.title ?? null,
-      shift: s.shift,
-    });
+    if (s.user && s.userId) {
+      const key = `${s.userId}:${s.shift.id}`;
+      const sentEmail = new Set<number>(s.sentEmailReminders ?? []);
+      byUserShift.set(key, {
+        kind: 'signup',
+        recordId: s.id,
+        userId: s.userId,
+        shiftId: s.shift.id,
+        isResponsible: false,
+        sentEmail,
+        sentPush: new Set<number>(s.sentPushReminders ?? []),
+        user: {
+          id: s.user.id,
+          email: s.user.email,
+          emailVerified: s.user.emailVerified,
+          ceviName: s.user.ceviName,
+          firstName: s.user.firstName,
+          shiftRemindersEnabled: s.user.shiftRemindersEnabled,
+          emailReminderMinutes:
+            s.user.emailReminderMinutes && s.user.emailReminderMinutes.length > 0
+              ? s.user.emailReminderMinutes
+              : s.user.shiftRemindersEnabled
+                ? [...DEFAULT_EMAIL_REMINDER_MINUTES]
+                : [],
+          pushRemindersEnabled: s.user.pushRemindersEnabled ?? true,
+          pushReminderMinutes:
+            s.user.pushReminderMinutes && s.user.pushReminderMinutes.length > 0
+              ? s.user.pushReminderMinutes
+              : [...DEFAULT_PUSH_REMINDER_MINUTES],
+          hasPushSubscriptions: (s.user._count?.pushSubscriptions ?? 0) > 0,
+        },
+        taskTitle: s.task?.title ?? null,
+        shift: s.shift,
+      });
+      continue;
+    }
+
+    // Gast-Anmeldung ohne Account (mit hinterlegter guestEmail)
+    const trimmedGuestEmail = s.guestEmail?.trim();
+    if (!s.userId && trimmedGuestEmail && trimmedGuestEmail.includes('@')) {
+      const key = `guest:${s.id}`;
+      const sentEmail = new Set<number>(s.sentEmailReminders ?? []);
+      byUserShift.set(key, {
+        kind: 'signup',
+        recordId: s.id,
+        userId: null,
+        shiftId: s.shift.id,
+        isResponsible: false,
+        sentEmail,
+        sentPush: new Set<number>(s.sentPushReminders ?? []),
+        user: {
+          id: null,
+          email: trimmedGuestEmail,
+          emailVerified: true,
+          ceviName: null,
+          firstName: s.guestName?.trim() || 'Helfer*in',
+          shiftRemindersEnabled: true,
+          emailReminderMinutes: [...DEFAULT_EMAIL_REMINDER_MINUTES],
+          pushRemindersEnabled: false,
+          pushReminderMinutes: [],
+          hasPushSubscriptions: false,
+        },
+        taskTitle: s.task?.title ?? null,
+        shift: s.shift,
+      });
+    }
   }
 
   for (const r of responsibles) {
@@ -309,7 +361,6 @@ export async function sendDueShiftReminders(
       isResponsible: true,
       sentEmail: new Set<number>(r.sentEmailReminders ?? []),
       sentPush: new Set<number>(r.sentPushReminders ?? []),
-      legacyReminderSent: false,
       user: {
         id: r.user.id,
         email: r.user.email,
@@ -358,40 +409,64 @@ export async function sendDueShiftReminders(
         // Kleinste bereits erreichte Schwelle senden (und allfällige grössere gleich mit abhaken,
         // damit nicht mehrere Erinnerungs-Mails auf einmal rausgehen)
         const targetLead = dueEmailThresholds[0];
-        let claimed = false;
+        const claimedMinutes: number[] = [];
+        const claimedCompanionMinutes: number[] = [];
+
         for (const m of dueEmailThresholds) {
-          const c = await claimEmailReminder(prisma, entry.kind, entry.recordId, m, now);
-          if (c) claimed = true;
+          const c = await claimEmailReminder(prisma, entry.kind, entry.recordId, m);
+          if (c) claimedMinutes.push(m);
           if (entry.companionResponsibleId) {
-            await claimEmailReminder(prisma, 'responsible', entry.companionResponsibleId, m, now);
+            const cc = await claimEmailReminder(prisma, 'responsible', entry.companionResponsibleId, m);
+            if (cc) claimedCompanionMinutes.push(m);
           }
         }
 
-        if (claimed && !PLACEHOLDER_EMAIL_REGEX.test(user.email)) {
-          const ok = await send({
-            to: user.email,
-            name: user.ceviName || user.firstName,
-            eventTitle: shift.event.title,
-            shiftTitle,
-            timeRangeFormatted: timeFormatted,
-            shiftUrl: targetUrl,
-            departmentName: shift.event.department.name,
-            accentColor: shift.event.department.primaryColor,
-            category: shift.category,
-            startTime: shift.startTime,
-            endTime: shift.endTime,
-            shiftId: shift.id,
-            leadMinutes: targetLead,
-            reminderNote: shift.event.reminderNote,
-            isResponsible: entry.isResponsible,
-          });
-          if (ok) sentCount++;
+        if (claimedMinutes.length > 0 || claimedCompanionMinutes.length > 0) {
+          if (!PLACEHOLDER_EMAIL_REGEX.test(user.email)) {
+            let ok = false;
+            try {
+              ok = await send({
+                to: user.email,
+                name: user.ceviName || user.firstName,
+                eventTitle: shift.event.title,
+                shiftTitle,
+                timeRangeFormatted: timeFormatted,
+                shiftUrl: targetUrl,
+                departmentName: shift.event.department.name,
+                accentColor: shift.event.department.primaryColor,
+                category: shift.category,
+                startTime: shift.startTime,
+                endTime: shift.endTime,
+                shiftId: shift.id,
+                leadMinutes: targetLead,
+                reminderNote: shift.event.reminderNote,
+                isResponsible: entry.isResponsible,
+                isGuest: entry.userId === null,
+              });
+            } catch {
+              ok = false;
+            }
+
+            if (ok) {
+              sentCount++;
+            } else {
+              // Rollback bei fehlgeschlagenem E-Mail-Versand, damit beim nächsten Durchlauf erneut versucht wird
+              for (const m of claimedMinutes) {
+                await unclaimEmailReminder(prisma, entry.kind, entry.recordId, m);
+              }
+              if (entry.companionResponsibleId) {
+                for (const m of claimedCompanionMinutes) {
+                  await unclaimEmailReminder(prisma, 'responsible', entry.companionResponsibleId, m);
+                }
+              }
+            }
+          }
         }
       }
     }
 
-    // 2. Web-Push-Erinnerung prüfen
-    if (user.pushRemindersEnabled && user.hasPushSubscriptions) {
+    // 2. Web-Push-Erinnerung prüfen (nur für registrierte Benutzer mit Push-Abonnement)
+    if (user.id && user.pushRemindersEnabled && user.hasPushSubscriptions) {
       const duePushThresholds = user.pushReminderMinutes
         .filter((m) => diffMinutes <= m && !entry.sentPush.has(m))
         .sort((a, b) => a - b);

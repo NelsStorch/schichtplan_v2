@@ -79,4 +79,53 @@ describe.skipIf(!hasTestDb)('sendDueShiftReminders', () => {
     expect(await sendDueShiftReminders(app.prisma, new Date('2030-06-01T08:00:00Z'), send)).toBe(0);
     expect(send).not.toHaveBeenCalled();
   });
+
+  it('rollt den Claim zurück, wenn der E-Mail-Versand fehlschlägt', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+    const user = await createUser(app, { email: 'fehler@example.com' });
+    const signup = await app.prisma.shiftSignup.create({ data: { shiftId: shift.id, userId: user.id } });
+
+    const sendFail = vi.fn(async () => false);
+    const now = new Date('2030-06-01T08:00:00Z');
+    expect(await sendDueShiftReminders(app.prisma, now, sendFail)).toBe(0);
+    expect(sendFail).toHaveBeenCalledTimes(1);
+
+    const afterFail = await app.prisma.shiftSignup.findUnique({ where: { id: signup.id } });
+    expect(afterFail?.sentEmailReminders).toEqual([]);
+
+    const sendOk = vi.fn(async () => true);
+    expect(await sendDueShiftReminders(app.prisma, now, sendOk)).toBe(1);
+    expect(sendOk).toHaveBeenCalledTimes(1);
+
+    const afterOk = await app.prisma.shiftSignup.findUnique({ where: { id: signup.id } });
+    expect(afterOk?.sentEmailReminders).toContain(1440);
+  });
+
+  it('erinnert Gast-Helfer ohne Benutzerkonto per E-Mail', async () => {
+    const department = await createDepartment(app);
+    const event = await createEvent(app, department.id);
+    const shift = await createShift(app, event.id);
+    const guestSignup = await app.prisma.shiftSignup.create({
+      data: {
+        shiftId: shift.id,
+        guestName: 'Gast Helfer',
+        guestEmail: 'gast@example.com',
+      },
+    });
+
+    const send = vi.fn(async () => true);
+    const now = new Date('2030-06-01T08:00:00Z');
+    expect(await sendDueShiftReminders(app.prisma, now, send)).toBe(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]).toMatchObject([{
+      to: 'gast@example.com',
+      name: 'Gast Helfer',
+      shiftTitle: 'Bar',
+    }]);
+
+    const updated = await app.prisma.shiftSignup.findUnique({ where: { id: guestSignup.id } });
+    expect(updated?.sentEmailReminders).toContain(1440);
+  });
 });
