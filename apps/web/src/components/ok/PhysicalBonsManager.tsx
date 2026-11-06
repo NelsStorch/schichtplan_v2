@@ -2,21 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import {
-  AlertTriangle,
-  Ban,
   CheckCircle2,
   Download,
-  FileText,
   Lock,
-  Plus,
   Printer,
-  QrCode,
   RefreshCw,
   Sparkles,
   Unlock,
 } from 'lucide-react';
 import type { CateringBatchDto, CateringBatchMode } from '@schichtplan/shared';
-import { Badge, Button, Card, Field, Input, cn, useToast } from '@schichtplan/ui';
+import { Badge, Button, Field, Input, cn, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 
 interface PhysicalBonsManagerProps {

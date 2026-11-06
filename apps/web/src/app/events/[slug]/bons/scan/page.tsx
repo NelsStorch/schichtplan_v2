@@ -3,15 +3,12 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import {
-  AlertTriangle,
   Ban,
   Check,
   CheckCircle2,
-  Clock,
   CupSoda,
   KeyRound,
   LogOut,
-  QrCode,
   Sparkles,
   Ticket,
   UtensilsCrossed,

@@ -14,7 +14,6 @@ import {
   Mail,
   Plus,
   Search,
-  Sparkles,
   Users,
   X,
 } from 'lucide-react';

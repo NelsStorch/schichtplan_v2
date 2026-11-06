@@ -10,17 +10,14 @@ import {
   Clock,
   Download,
   FileText,
-  Filter,
   Layers,
   Medal,
   Printer,
   Search,
   ShieldCheck,
-  TrendingUp,
   Users,
 } from 'lucide-react';
 import {
-  formatMinutes,
   type DepartmentStatsResponseDto,
 } from '@schichtplan/shared';
 import { Badge, Button, EmptyState, Input, Skeleton, Switch, cn, useToast } from '@schichtplan/ui';

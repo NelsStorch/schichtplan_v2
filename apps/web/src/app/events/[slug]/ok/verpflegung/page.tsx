@@ -75,6 +75,24 @@ export default function OkCateringPage() {
     void loadOverview();
   }, [loadOverview]);
 
+  const filteredTokens = useMemo(() => {
+    const list = data?.tokens ?? [];
+    const q = query.trim().toLowerCase();
+    return list.filter((t) => {
+      if (statusFilter === 'AVAILABLE' && t.status !== 'AVAILABLE') return false;
+      if (statusFilter === 'REDEEMED' && t.status !== 'REDEEMED') return false;
+      if (statusFilter === 'READY_NOW' && (t.status !== 'AVAILABLE' || !t.isAvailableNow)) return false;
+      if (roleFilter === 'HELPER' && t.isResponsible) return false;
+      if (roleFilter === 'LEADER' && !t.isResponsible) return false;
+      if (itemFilter !== 'ALL' && t.title !== itemFilter) return false;
+      if (q) {
+        const hay = `${t.helperName} ${t.title} ${t.shiftTitle ?? ''} ${t.taskTitle ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [data, query, statusFilter, roleFilter, itemFilter]);
+
   if (!event) return null;
 
   const handleManualRedeem = async (tokenId: string, title: string, helperName: string) => {
@@ -166,24 +184,6 @@ export default function OkCateringPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const filteredTokens = useMemo(() => {
-    const list = data?.tokens ?? [];
-    const q = query.trim().toLowerCase();
-    return list.filter((t) => {
-      if (statusFilter === 'AVAILABLE' && t.status !== 'AVAILABLE') return false;
-      if (statusFilter === 'REDEEMED' && t.status !== 'REDEEMED') return false;
-      if (statusFilter === 'READY_NOW' && (t.status !== 'AVAILABLE' || !t.isAvailableNow)) return false;
-      if (roleFilter === 'HELPER' && t.isResponsible) return false;
-      if (roleFilter === 'LEADER' && !t.isResponsible) return false;
-      if (itemFilter !== 'ALL' && t.title !== itemFilter) return false;
-      if (q) {
-        const hay = `${t.helperName} ${t.title} ${t.shiftTitle ?? ''} ${t.taskTitle ?? ''}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [data, query, statusFilter, roleFilter, itemFilter]);
 
   if (!event.cateringTokensEnabled) {
     return (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock, Loader2, Sparkles, UtensilsCrossed } from 'lucide-react';
+import { CheckCircle2, Loader2, UtensilsCrossed } from 'lucide-react';
 import type { CateringTokensOverviewDto } from '@schichtplan/shared';
 import { Badge, Button, Card, Dialog, EmptyState } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';

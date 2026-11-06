@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Sparkles, UtensilsCrossed } from 'lucide-react';
+import { Loader2, UtensilsCrossed } from 'lucide-react';
 import type { CateringTokenDto } from '@schichtplan/shared';
 import { Button, Dialog, EmptyState } from '@schichtplan/ui';
 import { CateringTokenCard } from '@/components/CateringTokenCard';

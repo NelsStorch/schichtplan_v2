@@ -11,7 +11,6 @@ import {
   Mail,
   Phone,
   Search,
-  Sparkles,
   Trash2,
   UserRound,
   X,

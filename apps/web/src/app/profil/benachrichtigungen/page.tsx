@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Bell, ShieldCheck } from 'lucide-react';
 import { getLoginUrl } from '@schichtplan/shared';
-import { Badge, Card, NotificationSettings } from '@schichtplan/ui';
+import { NotificationSettings } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { usePortal } from '@/lib/portal';
 

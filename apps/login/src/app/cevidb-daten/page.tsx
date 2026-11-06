@@ -17,7 +17,6 @@ import {
   Lock,
   LogOut,
   Mail,
-  MapPin,
   Phone,
   RefreshCw,
   Search,

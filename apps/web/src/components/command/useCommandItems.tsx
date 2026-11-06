@@ -12,7 +12,6 @@ import {
   Copy,
   Download,
   ExternalLink,
-  HelpCircle,
   Keyboard,
   LayoutDashboard,
   LifeBuoy,
@@ -56,7 +55,6 @@ import { useCommandPalette } from './CommandContext';
 import { getRecentCommandIds, recordRecentCommand } from './recentCommands';
 import type {
   CommandItem,
-  CommandPreviewData,
   CommandQuickAction,
   CommandSection,
   CommandSubAction,
