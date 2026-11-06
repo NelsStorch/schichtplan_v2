@@ -7,7 +7,6 @@ import {
   Clock,
   Copy,
   Crown,
-  Loader2,
   Minus,
   Plus,
   Shield,
@@ -30,6 +29,7 @@ import {
   Field,
   Input,
   Select,
+  Spinner,
   Textarea,
   cn,
   useToast,
@@ -202,7 +202,7 @@ export function ShiftFormDialog({
             {isEdit ? (
               status.autoSaveStatus === 'saving' ? (
                 <span className="flex items-center gap-1.5 font-medium text-fg-muted">
-                  <Loader2 className="size-3.5 animate-spin text-accent" />
+                  <Spinner size="xs" className="text-accent" />
                   Wird gespeichert…
                 </span>
               ) : status.isDirty && status.validationError ? (

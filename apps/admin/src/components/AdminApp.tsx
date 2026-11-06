@@ -13,7 +13,7 @@ import {
   ShieldAlert,
   Users,
 } from 'lucide-react';
-import { Button, Callout, CeviLogo, ThemeToggle, buttonClasses, cn } from '@schichtplan/ui';
+import { Button, Callout, CeviLogo, Spinner, ThemeToggle, buttonClasses, cn } from '@schichtplan/ui';
 import {
   PRIVACY_URL,
   STATUS_URL,
@@ -162,10 +162,7 @@ export function AdminApp() {
       <Shell>
         <Centered>
           <p role="status" className="flex items-center gap-3 text-[15px] text-fg-muted">
-            <span
-              aria-hidden
-              className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
-            />
+            <Spinner size="sm" />
             {session.status === 'redirecting' ? 'Weiterleitung zum Login …' : 'Anmeldung wird geprüft …'}
           </p>
         </Centered>
