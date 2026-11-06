@@ -61,8 +61,23 @@ if [ -f REVISION ]; then sed 's/^/  /' REVISION; else echo "  unbekannt (keine R
 
 if [ "$mode" = "list" ]; then
   echo ""
-  echo "Verfuegbare Staende (Tags des Backend-Images, neuste zuerst):"
-  docker images "$ProjectName-backend" --format '{{.Tag}}  {{.CreatedAt}}' | grep -v '^latest ' | sed 's/^/  /' || true
+  echo "Verfuegbare Staende (zuletzt deployt zuerst):"
+  if [ -f .revisions ]; then
+    tac .revisions | while read -r tag; do
+      missing=""
+      for service in `$services; do
+        docker image inspect "$ProjectName-`$service:`$tag" > /dev/null 2>&1 || missing="`$missing `$service"
+      done
+      if [ -z "`$missing" ]; then echo "  `$tag"; else echo "  `$tag  (unvollstaendig, fehlt:`$missing)"; fi
+    done
+  else
+    echo "  (noch keine .revisions, erst nach dem naechsten Deploy)"
+  fi
+  others=`$(docker images "$ProjectName-backend" --format '{{.Tag}}' | grep -vE '^(latest|[0-9a-f]{7,40}(-dirty-[0-9]{14})?)$' || true)
+  if [ -n "`$others" ]; then
+    echo "Von Hand gesetzte Tags:"
+    echo "`$others" | sed 's/^/  /'
+  fi
   exit 0
 fi
 

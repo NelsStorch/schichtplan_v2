@@ -257,10 +257,14 @@ done
 # Laufenden Stand festhalten (Zeile 1 Kurz-Hash/Tag, Zeile 2 voller Hash, Zeile 3 Zeitpunkt, Zeile 4 Art)
 { echo "$revision"; echo "$revisionFull"; date -Iseconds; echo "deploy"; } > REVISION
 
-# Nur die 7 neusten Git-Stand-Tags pro Dienst behalten (von Hand gesetzte wie rollback-* bleiben unberuehrt)
+# Die 7 zuletzt deployten Staende behalten. Die Reihenfolge steht in .revisions (neuster zuletzt), nicht im
+# Erstellungsdatum der Images: unveraenderte Dienste teilen sich ein Image, dort ist die Docker-Sortierung zufaellig.
+# Von Hand gesetzte Tags (z. B. rollback-*) passen nicht auf das Muster und bleiben unberuehrt.
+{ grep -vxF "$revision" .revisions 2>/dev/null || true; echo "$revision"; } | tail -n 7 > .revisions.tmp
+mv .revisions.tmp .revisions
 for service in `$services; do
   docker images "$ProjectName-`$service" --format '{{.Tag}}' \
-    | grep -E '^[0-9a-f]{7,40}(-dirty-[0-9]{14})?$' | tail -n +8 \
+    | grep -E '^[0-9a-f]{7,40}(-dirty-[0-9]{14})?$' | grep -vxF -f .revisions \
     | xargs -r -I{} docker rmi "$ProjectName-`$service:{}" > /dev/null 2>&1 || true
 done
 
