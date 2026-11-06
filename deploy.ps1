@@ -10,6 +10,12 @@ param (
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
+# Sonderzeichen per Codepoint statt als Literal: PowerShell 5.1 liest Skripte ohne BOM als ANSI
+# und wuerde Emojis/Mittelpunkt sonst im Discord-Webhook als Zeichensalat ausgeben.
+$IconRocket = [char]::ConvertFromUtf32(0x1F680)
+$IconCross  = [char]::ConvertFromUtf32(0x274C)
+$Dot        = [char]0x00B7
+
 # Deployst den Schichtplan V2 auf den Server:
 #   1. Packt das Projekt (ohne node_modules, build-output und .env-Dateien)
 #   2. Erstellt ein Backup der PostgreSQL-Datenbank auf dem Server
@@ -62,7 +68,7 @@ function Send-DiscordNotification($title, $description, $color = 14753096) {
                 color = $color
                 timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
                 footer = @{
-                    text = "Cevi Schichtplan V2 · $Environment"
+                    text = "Cevi Schichtplan V2 $Dot $Environment"
                 }
             }
         )
@@ -80,7 +86,7 @@ function Stop-Deploy($text) {
     Write-Host "`nDEPLOY FEHLGESCHLAGEN: $text" -ForegroundColor Red
     $info = "**Grund:** $text`n**Server:** $Server"
     if ($commit) { $info += "`n**Stand:** $commit" }
-    Send-DiscordNotification -title "❌ Deployment fehlgeschlagen ($Environment)" -description $info -color 15158332
+    Send-DiscordNotification -title "$IconCross Deployment fehlgeschlagen ($Environment)" -description $info -color 15158332
     Remove-Item $ArchiveName, $RemoteScript -ErrorAction SilentlyContinue
     exit 1
 }
@@ -216,7 +222,7 @@ if ! compose run --rm --no-deps -T --label traefik.enable=false backend npx pris
   echo "Migration fehlgeschlagen, neuer Code wurde nicht gestartet. Die bisherigen Container laufen weiter."
   exit 1
 fi
-# Kein Seed auf dem Server: Demo-Daten (npm run db:seed) sind nur für die lokale Entwicklung
+# Kein Seed auf dem Server: Demo-Daten (npm run db:seed) sind nur fuer die lokale Entwicklung
 
 # Dienste einzeln tauschen: der neue Container uebernimmt, sobald er gesund ist, erst dann geht der alte.
 # Wird er nicht gesund, bleibt der alte stehen und der Deploy bricht hier ab.
@@ -291,10 +297,10 @@ if ($result -ne 0) {
 $duration = [Math]::Round(((Get-Date) - $StartTime).TotalSeconds)
 Write-Host "`nDeploy nach $Environment erfolgreich abgeschlossen! Services laufen unterbruchfrei." -ForegroundColor Green
 
-$deployInfo = "**Umgebung:** `$Environment` (https://$DefaultDomain)`n**Stand:** $commit"
+$deployInfo = "**Umgebung:** ``$Environment`` (https://$DefaultDomain)`n**Stand:** $commit"
 if ($dirty.Count -gt 0) {
     $deployInfo += "`n**Uncommittete Dateien:** $($dirty.Count)"
 }
-$deployInfo += "`n**Dauer:** ${duration}s · **Status:** Unterbruchfrei online"
+$deployInfo += "`n**Dauer:** ${duration}s $Dot **Status:** Unterbruchfrei online"
 
-Send-DiscordNotification -title "🚀 Deployment erfolgreich ($Environment)" -description $deployInfo -color 3066993
+Send-DiscordNotification -title "$IconRocket Deployment erfolgreich ($Environment)" -description $deployInfo -color 3066993
