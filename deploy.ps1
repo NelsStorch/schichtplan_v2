@@ -257,10 +257,10 @@ done
 # Laufenden Stand festhalten (Zeile 1 Kurz-Hash/Tag, Zeile 2 voller Hash, Zeile 3 Zeitpunkt, Zeile 4 Art)
 { echo "$revision"; echo "$revisionFull"; date -Iseconds; echo "deploy"; } > REVISION
 
-# Nur die 5 neusten Git-Stand-Tags pro Dienst behalten (von Hand gesetzte wie rollback-* bleiben unberuehrt)
+# Nur die 7 neusten Git-Stand-Tags pro Dienst behalten (von Hand gesetzte wie rollback-* bleiben unberuehrt)
 for service in `$services; do
   docker images "$ProjectName-`$service" --format '{{.Tag}}' \
-    | grep -E '^[0-9a-f]{7,40}(-dirty-[0-9]{14})?$' | tail -n +6 \
+    | grep -E '^[0-9a-f]{7,40}(-dirty-[0-9]{14})?$' | tail -n +8 \
     | xargs -r -I{} docker rmi "$ProjectName-`$service:{}" > /dev/null 2>&1 || true
 done
 
