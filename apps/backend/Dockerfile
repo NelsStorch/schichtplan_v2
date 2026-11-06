@@ -63,5 +63,10 @@ EXPOSE 4000
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
   CMD node -e "fetch('http://localhost:4000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
+# Deployter Git-Stand (von deploy.ps1 als Build-Argument), erscheint in /health.
+# Steht bewusst am Ende, damit ein neuer Stand nur diese Schicht neu baut.
+ARG APP_REVISION=unknown
+ENV APP_REVISION=$APP_REVISION
+
 # Node direkt (nicht über npm), damit SIGTERM beim Deploy beim Server ankommt
 CMD ["node", "dist/server.js"]

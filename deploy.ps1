@@ -23,6 +23,8 @@ $Dot        = [char]0x00B7
 #   4. Fuehrt DB-Migrationen durch: schlagen sie fehl, bricht der Deploy ab, bevor neuer Code startet
 #   5. Tauscht die Dienste einzeln per docker rollout (Plugin auf dem Server, siehe docs/internal/deployment.md)
 #   6. Wartet bis API und Frontend HTTP 200 melden
+# Jedes Image bekommt zusaetzlich den Git-Stand als Tag (Rollback ohne Neubau: rollback.ps1),
+# der laufende Stand steht in REVISION auf dem Server und unter /health im Feld revision.
 
 # Serverdetails ($Server, $RemoteBase) liegen ausserhalb von Git in deploy.config.ps1
 $ConfigFile = Join-Path $PSScriptRoot "deploy.config.ps1"
@@ -98,6 +100,13 @@ Write-Host "Deploy nach $Environment ($RemoteDir auf $Server)" -ForegroundColor 
 $commit = git log --oneline -1 2>$null
 $dirty = @(git status --porcelain 2>$null)
 if ($commit) { Write-Host "Stand: $commit" }
+# Git-Stand fuer Image-Tags, REVISION und /health. Mit uncommitteten Dateien eindeutig markiert.
+$revision = git rev-parse --short HEAD 2>$null
+if (-not $revision) { $revision = "unknown" }
+$revisionFull = git rev-parse HEAD 2>$null
+if (-not $revisionFull) { $revisionFull = "unknown" }
+if ($dirty.Count -gt 0) { $revision = "$revision-dirty-$(Get-Date -Format yyyyMMddHHmmss)" }
+Write-Host "Revision: $revision"
 if ($dirty.Count -gt 0) {
     Write-Host "Achtung: $($dirty.Count) Datei(en) sind nicht committet und gehen trotzdem mit:" -ForegroundColor Yellow
     $dirty | Select-Object -First 8 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
@@ -131,6 +140,9 @@ if ! docker rollout --version > /dev/null 2>&1; then
 fi
 
 compose() { docker compose -f "$ComposeFile" -p "$ProjectName" "`$@"; }
+services="backend web landing login admin hilfe"
+# Landet als Build-Argument im Backend-Image (/health) und als Tag auf allen Images
+export APP_REVISION="$revision"
 
 if [ "$backup" = "1" ]; then
   if docker ps --format '{{.Names}}' | grep -qx "$Prefix-db"; then
@@ -211,6 +223,12 @@ if ! compose build > "`$log" 2>&1; then
 fi
 rm -f "`$log"
 
+# Jeden Stand zusaetzlich unter seinem Git-Stand ablegen: rollback.ps1 setzt ihn ohne Neubau wieder ein
+for service in `$services; do
+  docker tag "$ProjectName-`$service:latest" "$ProjectName-`$service:$revision"
+done
+echo "Images getaggt: $revision"
+
 # Die DB startet nur neu, wenn sich ihre Konfiguration geaendert hat
 compose up -d --no-build --wait db
 
@@ -226,7 +244,7 @@ fi
 
 # Dienste einzeln tauschen: der neue Container uebernimmt, sobald er gesund ist, erst dann geht der alte.
 # Wird er nicht gesund, bleibt der alte stehen und der Deploy bricht hier ab.
-for service in backend web landing login admin hilfe; do
+for service in `$services; do
   echo "Rollout `$service..."
   if ! docker rollout -f "$ComposeFile" -p "$ProjectName" "`$service" > "`$log" 2>&1; then
     tail -n 60 "`$log"; rm -f "`$log"
@@ -234,6 +252,16 @@ for service in backend web landing login admin hilfe; do
     exit 1
   fi
   rm -f "`$log"
+done
+
+# Laufenden Stand festhalten (Zeile 1 Kurz-Hash/Tag, Zeile 2 voller Hash, Zeile 3 Zeitpunkt, Zeile 4 Art)
+{ echo "$revision"; echo "$revisionFull"; date -Iseconds; echo "deploy"; } > REVISION
+
+# Nur die 5 neusten Git-Stand-Tags pro Dienst behalten (von Hand gesetzte wie rollback-* bleiben unberuehrt)
+for service in `$services; do
+  docker images "$ProjectName-`$service" --format '{{.Tag}}' \
+    | grep -E '^[0-9a-f]{7,40}(-dirty-[0-9]{14})?$' | tail -n +6 \
+    | xargs -r -I{} docker rmi "$ProjectName-`$service:{}" > /dev/null 2>&1 || true
 done
 
 # Altes Netz (vor der Segmentierung) aufraeumen, sobald es leer ist
@@ -297,7 +325,7 @@ if ($result -ne 0) {
 $duration = [Math]::Round(((Get-Date) - $StartTime).TotalSeconds)
 Write-Host "`nDeploy nach $Environment erfolgreich abgeschlossen! Services laufen unterbruchfrei." -ForegroundColor Green
 
-$deployInfo = "**Umgebung:** ``$Environment`` (https://$DefaultDomain)`n**Stand:** $commit"
+$deployInfo = "**Umgebung:** ``$Environment`` (https://$DefaultDomain)`n**Stand:** $commit`n**Revision:** ``$revision``"
 if ($dirty.Count -gt 0) {
     $deployInfo += "`n**Uncommittete Dateien:** $($dirty.Count)"
 }

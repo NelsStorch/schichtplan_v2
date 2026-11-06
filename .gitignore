@@ -69,3 +69,7 @@ Thumbs.db
 
 # Prisma 7 generiert den Client in den Quellordner (npx prisma generate)
 apps/backend/src/generated/
+
+# Deploy/Rollback: temporaere Server-Skripte
+rollback-remote.sh
+REVISION

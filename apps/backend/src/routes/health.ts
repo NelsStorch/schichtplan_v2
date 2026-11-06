@@ -6,7 +6,11 @@ const HealthOkResponseSchema = z.object({
   timestamp: z.string().describe('ISO-Zeitstempel des Abfragezeitpunkts'),
   version: z.string().describe('Aktuelle Versionsnummer der API'),
   database: z.boolean().describe('Gibt an, ob die Datenbankabfrage erfolgreich war'),
+  revision: z.string().describe('Deployter Git-Stand (Kurz-Hash), «unknown» ausserhalb eines Deploys'),
 });
+
+/** Git-Stand aus dem Image (Build-Argument von deploy.ps1) */
+const REVISION = process.env.APP_REVISION || 'unknown';
 
 const HealthErrorResponseSchema = z.object({
   status: z.string().describe('Status der API (error)'),
@@ -25,6 +29,7 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
         timestamp: new Date().toISOString(),
         version: '2.0.0',
         database: true,
+        revision: REVISION,
       };
     } catch (err) {
       fastify.log.error(err, 'Health check failed: DB error');
