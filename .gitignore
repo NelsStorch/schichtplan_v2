@@ -73,3 +73,8 @@ apps/backend/src/generated/
 # Deploy/Rollback: temporaere Server-Skripte
 rollback-remote.sh
 REVISION
+
+# Playwright (End-to-End-Tests, siehe e2e/README.md)
+test-results/
+playwright-report/
+e2e/test-results/

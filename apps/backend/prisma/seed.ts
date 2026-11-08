@@ -31,7 +31,7 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {},
+    update: { emailVerified: true },
     create: {
       email: 'admin@example.com',
       firstName: 'Demo',
@@ -40,6 +40,9 @@ async function main() {
       birthDate: new Date('2000-01-01'),
       isGlobalAdmin: true,
       passwordHash: defaultPasswordHash,
+      // Demo-Adressen (example.com) lassen sich nicht bestätigen: als bestätigt anlegen
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -79,7 +82,7 @@ async function main() {
     const declared = index < 2;
     const user = await prisma.user.upsert({
       where: { email: h.email },
-      update: {},
+      update: { emailVerified: true },
       create: {
         email: h.email,
         firstName: h.firstName,
@@ -87,6 +90,8 @@ async function main() {
         ceviName: h.ceviName,
         birthDate: h.birthDate,
         passwordHash: defaultPasswordHash,
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
         homeDepartmentId: declared ? department.id : null,
         homeDepartmentSource: declared ? 'SELF' : null,
         departmentSetupAt: declared ? new Date() : null,
