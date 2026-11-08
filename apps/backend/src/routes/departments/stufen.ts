@@ -53,17 +53,16 @@ const departmentStufenRoutes: FastifyPluginAsync = async (fastify) => {
     const ctx = await requirePermission(request, reply, 'STUFEN_MANAGE');
     if (!ctx) return;
     const { tenant } = ctx;
-    const parse = StufeInputSchema.safeParse(request.body);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+    const input = request.body as z.output<typeof StufeInputSchema>;
 
     try {
       const count = await fastify.prisma.departmentStufe.count({ where: { departmentId: tenant.id } });
       const stufe = await fastify.prisma.departmentStufe.create({
         data: {
           departmentId: tenant.id,
-          name: parse.data.name,
-          ceviDbGroupId: parse.data.ceviDbGroupId ?? null,
-          sortOrder: parse.data.sortOrder ?? count,
+          name: input.name,
+          ceviDbGroupId: input.ceviDbGroupId ?? null,
+          sortOrder: input.sortOrder ?? count,
         },
       });
       if (stufe.ceviDbGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);
@@ -95,8 +94,8 @@ const departmentStufenRoutes: FastifyPluginAsync = async (fastify) => {
       const ctx = await requirePermission(request, reply, 'STUFEN_MANAGE');
       if (!ctx) return;
       const { tenant } = ctx;
-      const parse = StufeInputSchema.partial().safeParse(request.body);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+      // Vom Routen-Schema geprüft (StufeInputSchema.partial())
+      const input = request.body as Partial<z.output<typeof StufeInputSchema>>;
 
       const existing = await fastify.prisma.departmentStufe.findFirst({
         where: { id: request.params.id, departmentId: tenant.id },
@@ -107,12 +106,12 @@ const departmentStufenRoutes: FastifyPluginAsync = async (fastify) => {
         const stufe = await fastify.prisma.departmentStufe.update({
           where: { id: existing.id },
           data: {
-            name: parse.data.name,
-            ceviDbGroupId: parse.data.ceviDbGroupId,
-            sortOrder: parse.data.sortOrder,
+            name: input.name,
+            ceviDbGroupId: input.ceviDbGroupId,
+            sortOrder: input.sortOrder,
           },
         });
-        if (parse.data.ceviDbGroupId !== undefined && parse.data.ceviDbGroupId !== existing.ceviDbGroupId) {
+        if (input.ceviDbGroupId !== undefined && input.ceviDbGroupId !== existing.ceviDbGroupId) {
           // Zuordnungen aus Cevi.DB zur alten Gruppe gelten nicht mehr
           await fastify.prisma.userStufe.deleteMany({ where: { stufeId: stufe.id, source: 'CEVIDB' } });
           if (stufe.ceviDbGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);

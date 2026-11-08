@@ -82,11 +82,8 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Die Anwesenheitsliste ist für diesen Anlass ausgeschaltet' });
       }
 
-      const parse = SetAttendanceSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const { status } = parse.data;
+      const input = request.body as z.output<typeof SetAttendanceSchema>;
+      const { status } = input;
 
       const signup = await fastify.prisma.shiftSignup.findUnique({
         where: { id: request.params.signupId },
@@ -174,10 +171,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
       if (checkinIpLimiter.hit(`ip:${request.ip}`)) {
         return reply.status(429).send({ error: 'Zu viele Versuche. Bitte warte ein paar Minuten.' });
       }
-      const parse = CheckinSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: 'Ungültiger Check-in-Code', code: 'INVALID_CODE' });
-      }
+      const input = request.body as z.output<typeof CheckinSchema>;
 
       const event = await findEvent(request.tenant.id, request.params.slug);
       if (!event) {
@@ -188,7 +182,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
           .status(403)
           .send({ error: 'Der Selbst-Check-in ist für diesen Anlass nicht aktiviert', code: 'CHECKIN_DISABLED' });
       }
-      if (!event.checkinToken || !sameToken(parse.data.code, event.checkinToken)) {
+      if (!event.checkinToken || !sameToken(input.code, event.checkinToken)) {
         return reply.status(403).send({
           error: 'Dieser QR-Code ist nicht (mehr) gültig. Frag beim OK nach dem aktuellen Code.',
           code: 'INVALID_CODE',

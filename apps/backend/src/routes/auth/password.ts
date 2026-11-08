@@ -1,4 +1,5 @@
 import { FastifyPluginAsync, } from 'fastify';
+import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Prisma } from '../../db.js';
@@ -52,12 +53,9 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = LoginSchema.safeParse(request.body);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
+    const input = request.body as z.output<typeof LoginSchema>;
 
-    const { email, password } = parse.data;
+    const { email, password } = input;
     // Gegen das Durchprobieren von Passwörtern: Fehlversuche pro IP und pro Konto bremsen
     const emailKey = email.trim().toLowerCase();
     // Zuerst zählen, dann prüfen: sonst kämen viele gleichzeitige Versuche alle an der Bremse vorbei.
@@ -121,12 +119,9 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     if (mailRequestsByIp.hit(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
-    const parse = RegisterHelperSchema.safeParse(request.body);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
+    const input = request.body as z.output<typeof RegisterHelperSchema>;
 
-    const { email, password, firstName, lastName, ceviName, phone } = parse.data;
+    const { email, password, firstName, lastName, ceviName, phone } = input;
     const cleanEmail = email.toLowerCase().trim();
     const existing = await fastify.prisma.user.findUnique({
       where: { email: cleanEmail },
@@ -232,12 +227,9 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     if (mailRequestsByIp.hit(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
-    const parse = ResendVerificationSchema.safeParse(request.body);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
+    const input = request.body as z.output<typeof ResendVerificationSchema>;
 
-    const cleanEmail = parse.data.email.toLowerCase().trim();
+    const cleanEmail = input.email.toLowerCase().trim();
     const user = await fastify.prisma.user.findUnique({
       where: { email: cleanEmail },
     });
@@ -299,12 +291,9 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     if (verifyEmailByIp.hit(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
-    const parse = VerifyEmailSchema.safeParse(request.body);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
+    const input = request.body as z.output<typeof VerifyEmailSchema>;
 
-    const { token } = parse.data;
+    const { token } = input;
     const hashed = hashVerificationToken(token);
     // Unterstützt gehashte Tokens sowie ältere Klartext-Tokens für nahtlose Rückwärtskompatibilität
     const tokenRecord = await fastify.prisma.emailVerificationToken.findFirst({
@@ -360,6 +349,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     {
       schema: {
         hide: true,
+        querystring: z.object({ token: z.string().max(200).optional() }),
       },
     },
     async (request, reply) => {

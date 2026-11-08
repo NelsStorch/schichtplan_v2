@@ -144,11 +144,8 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
-      const parse = PushSubscribeSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const { endpoint, keys } = parse.data;
+      const input = request.body as z.output<typeof PushSubscribeSchema>;
+      const { endpoint, keys } = input;
       if (!isAllowedPushEndpoint(endpoint)) {
         return reply.status(400).send({ error: 'Dieser Push-Dienst wird nicht unterstützt.' });
       }

@@ -203,11 +203,8 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
-      const parse = CreateDepartmentFromCeviDbSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const { departmentName, slug } = parse.data;
+      const input = request.body as z.output<typeof CreateDepartmentFromCeviDbSchema>;
+      const { departmentName, slug } = input;
 
       const eligibility = await departmentCreationEligibility(fastify.prisma, request.user.id);
       if (!eligibility.eligible || eligibility.ortsgruppeId === null) {
@@ -312,11 +309,8 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       if (!ctx) return;
       const { tenant } = ctx;
 
-      const parse = UpdateDepartmentSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const { contactUserId } = parse.data;
+      const input = request.body as z.output<typeof UpdateDepartmentSchema>;
+      const { contactUserId } = input;
       if (contactUserId) {
         const candidate = await fastify.prisma.departmentMember.findFirst({
           where: { ...contactCandidateWhere(tenant.id), userId: contactUserId },
@@ -332,16 +326,16 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       const updated = await fastify.prisma.department.update({
         where: { id: tenant.id },
         data: {
-          name: parse.data.name !== undefined ? parse.data.name : undefined,
-          logoUrl: parse.data.logoUrl !== undefined ? parse.data.logoUrl : undefined,
-          primaryColor: parse.data.primaryColor !== undefined ? parse.data.primaryColor : undefined,
-          secondaryColor: parse.data.secondaryColor !== undefined ? parse.data.secondaryColor : undefined,
-          qrStyle: parse.data.qrStyle !== undefined ? parse.data.qrStyle : undefined,
-          qrCustomColors: parse.data.qrCustomColors !== undefined ? parse.data.qrCustomColors : undefined,
-          qrColorPrimary: parse.data.qrColorPrimary !== undefined ? parse.data.qrColorPrimary : undefined,
-          qrColorSecondary: parse.data.qrColorSecondary !== undefined ? parse.data.qrColorSecondary : undefined,
+          name: input.name !== undefined ? input.name : undefined,
+          logoUrl: input.logoUrl !== undefined ? input.logoUrl : undefined,
+          primaryColor: input.primaryColor !== undefined ? input.primaryColor : undefined,
+          secondaryColor: input.secondaryColor !== undefined ? input.secondaryColor : undefined,
+          qrStyle: input.qrStyle !== undefined ? input.qrStyle : undefined,
+          qrCustomColors: input.qrCustomColors !== undefined ? input.qrCustomColors : undefined,
+          qrColorPrimary: input.qrColorPrimary !== undefined ? input.qrColorPrimary : undefined,
+          qrColorSecondary: input.qrColorSecondary !== undefined ? input.qrColorSecondary : undefined,
           contactUserId,
-          membersOnly: parse.data.membersOnly,
+          membersOnly: input.membersOnly,
         },
       });
 

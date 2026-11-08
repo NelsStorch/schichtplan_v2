@@ -181,18 +181,15 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
 
-      const parse = CreateAccessLinkSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof CreateAccessLinkSchema>;
 
       const link = await fastify.prisma.eventAccessLink.create({
         data: {
           eventId: event.id,
           token: crypto.randomBytes(18).toString('base64url'),
-          label: parse.data.label,
-          kind: parse.data.kind,
-          expiresAt: parse.data.expiresAt ? new Date(parse.data.expiresAt) : null,
+          label: input.label,
+          kind: input.kind,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
           createdById: request.user.id,
         },
       });
@@ -251,12 +248,9 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const event = await loadEvent(request, reply);
       if (!event) return;
 
-      const parse = RedeemAccessLinkSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: 'Ungültiger Link' });
-      }
+      const input = request.body as z.output<typeof RedeemAccessLinkSchema>;
 
-      const link = await fastify.prisma.eventAccessLink.findUnique({ where: { token: parse.data.token } });
+      const link = await fastify.prisma.eventAccessLink.findUnique({ where: { token: input.token } });
       if (!link || link.eventId !== event.id) {
         return reply.status(404).send({ error: 'Dieser Link ist ungültig oder wurde gelöscht.' });
       }
@@ -308,17 +302,14 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const event = await loadEvent(request, reply);
       if (!event) return;
 
-      const parse = EventParticipationSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof EventParticipationSchema>;
 
-      if (parse.data.profile) {
-        const result = await applyProfileUpdate(fastify.prisma, request.user.id, parse.data.profile);
+      if (input.profile) {
+        const result = await applyProfileUpdate(fastify.prisma, request.user.id, input.profile);
         if ('error' in result) return reply.status(result.status).send({ error: result.error });
       }
 
-      const answers = parse.data.answers ?? {};
+      const answers = input.answers ?? {};
       // Hier nur Fragen, die einmal pro Anlass gelten; PER_SIGNUP-Antworten kommen mit der Eintragung
       const questions = await fastify.prisma.eventQuestion.findMany({
         where: { eventId: event.id, id: { in: Object.keys(answers) }, scope: 'ONCE' },
@@ -718,13 +709,10 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const event = await loadManagedEvent(request, reply, 'HELPERS');
       if (!event) return;
 
-      const parse = EventDeregistrationSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof EventDeregistrationSchema>;
 
       const user = await fastify.prisma.user.findUnique({
-        where: { id: parse.data.userId },
+        where: { id: input.userId },
         select: { id: true, firstName: true, lastName: true, ceviName: true },
       });
       if (!user) {
@@ -734,13 +722,13 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const dereg = await fastify.prisma.eventDeregistration.upsert({
         where: { eventId_userId: { eventId: event.id, userId: user.id } },
         update: {
-          reason: parse.data.reason?.trim() || null,
+          reason: input.reason?.trim() || null,
           createdById: request.user.id,
         },
         create: {
           eventId: event.id,
           userId: user.id,
-          reason: parse.data.reason?.trim() || null,
+          reason: input.reason?.trim() || null,
           createdById: request.user.id,
         },
       });

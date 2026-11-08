@@ -37,9 +37,8 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = AdminUpdateUserSchema.safeParse(request.body);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const { isGlobalAdmin, homeDepartmentId } = parse.data;
+    const input = request.body as z.output<typeof AdminUpdateUserSchema>;
+    const { isGlobalAdmin, homeDepartmentId } = input;
 
     const user = await fastify.prisma.user
       .findUnique({
@@ -152,10 +151,9 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = AdminMergeUserSchema.safeParse(request.body);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+    const input = request.body as z.output<typeof AdminMergeUserSchema>;
     const sourceId = request.params.id;
-    const { targetUserId } = parse.data;
+    const { targetUserId } = input;
 
     if (sourceId === targetUserId) {
       return reply.status(400).send({ error: 'Quelle und Ziel dürfen nicht dasselbe Konto sein.' });
@@ -245,12 +243,12 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         summary: 'Plattform-Audit-Log abrufen (Admin)',
         description: 'Vollständiges Protokoll aller durchgeführten Administrator-Aktionen.',
         security: [{ bearerAuth: [] }],
+        querystring: AuditQuerySchema,
       },
     },
     async (request, reply) => {
-    const parse = AuditQuerySchema.safeParse(request.query);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const { q, targetType, targetId, since, until, page, pageSize } = parse.data;
+    const queryInput = request.query as z.output<typeof AuditQuerySchema>;
+    const { q, targetType, targetId, since, until, page, pageSize } = queryInput;
     const terms = (q ?? '').split(/\s+/).filter(Boolean).slice(0, 5);
     const where: Prisma.AdminAuditLogWhereInput = {
       AND: [

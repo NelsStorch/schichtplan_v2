@@ -139,9 +139,8 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
       },
       async (request, reply) => {
       await flushUsageStats(fastify.prisma);
-      const parse = RangeQuerySchema.safeParse(request.query);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-      const { days, departmentId } = parse.data;
+      const queryInput = request.query as z.output<typeof RangeQuerySchema>;
+      const { days, departmentId } = queryInput;
       const dayList = rangeDays(days);
       const from = dayDate(dayList[0]);
       const today = dayList[dayList.length - 1];
@@ -242,9 +241,8 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
         },
       },
       async (request, reply) => {
-      const parse = RangeQuerySchema.safeParse(request.query);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-      const { days, departmentId } = parse.data;
+      const queryInput = request.query as z.output<typeof RangeQuerySchema>;
+      const { days, departmentId } = queryInput;
       const dayList = rangeDays(days);
       const from = zurichDayStart(dayList[0]);
       const now = new Date();
@@ -477,9 +475,8 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
         },
       },
       async (request, reply) => {
-      const parse = RangeQuerySchema.safeParse(request.query);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-      const dayList = rangeDays(parse.data.days);
+      const queryInput = request.query as z.output<typeof RangeQuerySchema>;
+      const dayList = rangeDays(queryInput.days);
       const from = zurichDayStart(dayList[0]);
 
       const [tables, dbSize, uploads, dailyRows, routeRows, bucketRows, snapshots] = await Promise.all([

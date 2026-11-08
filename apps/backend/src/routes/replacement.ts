@@ -47,10 +47,7 @@ const replacementRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
-      const parse = ReplacementOfferSchema.safeParse(request.body ?? {});
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof ReplacementOfferSchema>;
       const found = await loadSignup(request.params.signupId, request.user);
       if (!found.ok) return reply.status(found.status).send({ error: found.error });
       const { event, signup, isSelf } = found;
@@ -76,7 +73,7 @@ const replacementRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           // Beim Ändern des Grunds bleibt der Zeitpunkt
           replacementWantedAt: signup.replacementWantedAt ?? new Date(),
-          replacementNote: parse.data.note?.trim() || null,
+          replacementNote: input.note?.trim() || null,
           replacementByName: byName,
         },
       });

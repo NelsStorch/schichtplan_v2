@@ -83,12 +83,9 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Arbeiten' });
       }
 
-      const parse = CreateTaskDefinitionSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof CreateTaskDefinitionSchema>;
 
-      const { title, description, minAge, ageRequirementType } = parse.data;
+      const { title, description, minAge, ageRequirementType } = input;
 
       // Prüfe ob bereits eine Arbeit mit identischem Titel existiert
       const existing = await fastify.prisma.taskDefinition.findFirst({
@@ -150,10 +147,7 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten von Arbeiten' });
       }
 
-      const parse = UpdateTaskDefinitionSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof UpdateTaskDefinitionSchema>;
 
       const task = await fastify.prisma.taskDefinition.findUnique({
         where: { id: request.params.id },
@@ -163,7 +157,7 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Arbeit nicht gefunden' });
       }
 
-      const { title, description, minAge, ageRequirementType } = parse.data;
+      const { title, description, minAge, ageRequirementType } = input;
 
       const updated = await fastify.prisma.taskDefinition.update({
         where: { id: request.params.id },

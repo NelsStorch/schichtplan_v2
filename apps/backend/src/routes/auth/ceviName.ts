@@ -1,4 +1,5 @@
 import { FastifyPluginAsync, FastifyReply } from 'fastify';
+import { z } from 'zod';
 import {
   CeviNameQuickLoginSchema,
   CeviNameRegisterSchema,
@@ -41,11 +42,8 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     if (tooManyRequests(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
-    const parse = CeviNameQuickLoginSchema.safeParse(request.body);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
-    const { departmentSlug, ceviName, birthDate, returnTo } = parse.data;
+    const input = request.body as z.output<typeof CeviNameQuickLoginSchema>;
+    const { departmentSlug, ceviName, birthDate, returnTo } = input;
 
     const department = await fastify.prisma.department.findUnique({
       where: { slug: departmentSlug.toLowerCase() },
@@ -106,11 +104,8 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     if (tooManyRequests(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
-    const parse = CeviNameRegisterSchema.safeParse(request.body);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
-    const { departmentSlug, ceviName, birthDate, firstName, lastName, phone, stufen, returnTo } = parse.data;
+    const input = request.body as z.output<typeof CeviNameRegisterSchema>;
+    const { departmentSlug, ceviName, birthDate, firstName, lastName, phone, stufen, returnTo } = input;
 
     const department = await fastify.prisma.department.findUnique({
       where: { slug: departmentSlug.toLowerCase() },

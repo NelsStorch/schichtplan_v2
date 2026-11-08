@@ -149,11 +149,8 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Vorlage nicht gefunden' });
       }
 
-      const parse = InstantiateTemplateSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      if (!(await allUsersRelatedTo(fastify.prisma, { departmentIds: [request.tenant.id] }, [parse.data.contactUserId]))) {
+      const input = request.body as z.output<typeof InstantiateTemplateSchema>;
+      if (!(await allUsersRelatedTo(fastify.prisma, { departmentIds: [request.tenant.id] }, [input.contactUserId]))) {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
@@ -171,7 +168,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
         allowedStufeIds,
         questions,
         allowPublicSignup,
-      } = parse.data;
+      } = input;
 
       const existing = await fastify.prisma.event.findUnique({
         where: {
@@ -201,7 +198,7 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
 
       const templateData = template.data as unknown as EventTemplateData;
       const templateShifts = templateData?.shifts || [];
-      const instantiateAttendanceMode = parse.data.attendanceMode ?? templateData?.attendanceMode ?? 'OFF';
+      const instantiateAttendanceMode = input.attendanceMode ?? templateData?.attendanceMode ?? 'OFF';
 
       // Erster Tag und Uhrzeiten der Vorlage gelten in Schweizer Zeit (der Server läuft in UTC)
       const baseDay = zurichDayKey(startDate);
@@ -224,18 +221,18 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             leadersOnly,
             requiredFields,
             allowPublicSignup,
-            minShiftsPerPerson: parse.data.minShiftsPerPerson ?? template.minShiftsPerPerson ?? null,
-            cancelDeadlineDays: parse.data.cancelDeadlineDays !== undefined ? parse.data.cancelDeadlineDays : (template.cancelDeadlineDays ?? null),
-            overlapToleranceMinutes: parse.data.overlapToleranceMinutes !== undefined ? parse.data.overlapToleranceMinutes : (template.overlapToleranceMinutes ?? 15),
-            contactUserId: parse.data.contactUserId || null,
-            dayCutoffTime: parse.data.dayCutoffTime || '04:00',
-            responsibleMode: parse.data.responsibleMode || 'BY_SHIFT',
-            contactVisibility: parse.data.contactVisibility || (template.data as any)?.contactVisibility || 'BOTH',
-            signupOpensAt: parse.data.signupOpensAt ? new Date(parse.data.signupOpensAt) : null,
+            minShiftsPerPerson: input.minShiftsPerPerson ?? template.minShiftsPerPerson ?? null,
+            cancelDeadlineDays: input.cancelDeadlineDays !== undefined ? input.cancelDeadlineDays : (template.cancelDeadlineDays ?? null),
+            overlapToleranceMinutes: input.overlapToleranceMinutes !== undefined ? input.overlapToleranceMinutes : (template.overlapToleranceMinutes ?? 15),
+            contactUserId: input.contactUserId || null,
+            dayCutoffTime: input.dayCutoffTime || '04:00',
+            responsibleMode: input.responsibleMode || 'BY_SHIFT',
+            contactVisibility: input.contactVisibility || (template.data as any)?.contactVisibility || 'BOTH',
+            signupOpensAt: input.signupOpensAt ? new Date(input.signupOpensAt) : null,
             attendanceMode: instantiateAttendanceMode,
-            allowReplacement: parse.data.allowReplacement ?? templateData?.allowReplacement ?? true,
-            replacementCutoffHours: parse.data.replacementCutoffHours ?? templateData?.replacementCutoffHours ?? 0,
-            reminderNote: parse.data.reminderNote !== undefined ? (parse.data.reminderNote?.trim() || null) : (templateData?.reminderNote || null),
+            allowReplacement: input.allowReplacement ?? templateData?.allowReplacement ?? true,
+            replacementCutoffHours: input.replacementCutoffHours ?? templateData?.replacementCutoffHours ?? 0,
+            reminderNote: input.reminderNote !== undefined ? (input.reminderNote?.trim() || null) : (templateData?.reminderNote || null),
             checkinToken: instantiateAttendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
           },
         });

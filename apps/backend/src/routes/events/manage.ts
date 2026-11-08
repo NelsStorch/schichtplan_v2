@@ -52,10 +52,7 @@ const eventManageRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const parse = CreateEventSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof CreateEventSchema>;
 
       const {
         title,
@@ -91,7 +88,7 @@ const eventManageRoutes: FastifyPluginAsync = async (fastify) => {
         allowedStufeIds,
         questions,
         organizers: requestedOrganizers,
-      } = parse.data;
+      } = input;
 
       const existing = await fastify.prisma.event.findUnique({
         where: {
@@ -287,11 +284,8 @@ const eventManageRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: 'Nur die Abteilungsleitung oder die OK-Leitung dürfen diesen Anlass bearbeiten' });
       }
 
-      const parse = UpdateEventSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const body = parse.data;
+      const input = request.body as z.output<typeof UpdateEventSchema>;
+      const body = input;
       if (body.contactUserId && !(await allUsersRelatedToEvent(fastify.prisma, event.id, [body.contactUserId]))) {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
@@ -430,14 +424,11 @@ const eventManageRoutes: FastifyPluginAsync = async (fastify) => {
           .status(403)
           .send({ error: 'Nur die Abteilungsleitung oder die OK-Leitung dürfen diesen Anlass verschieben' });
       }
-      const parse = MoveEventSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof MoveEventSchema>;
 
-      const movedShifts = await fastify.prisma.$transaction((tx) => moveEventByDays(tx, event, parse.data.days));
+      const movedShifts = await fastify.prisma.$transaction((tx) => moveEventByDays(tx, event, input.days));
       const updated = await fastify.prisma.event.findUniqueOrThrow({ where: { id: event.id } });
-      request.log.info({ eventId: event.id, days: parse.data.days, movedShifts }, 'Anlass verschoben');
+      request.log.info({ eventId: event.id, days: input.days, movedShifts }, 'Anlass verschoben');
 
       return {
         movedShifts,
@@ -550,13 +541,10 @@ const eventManageRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Erstellen von Vorlagen' });
       }
 
-      const parse = SaveAsTemplateSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof SaveAsTemplateSchema>;
 
-      const templateTitle = parse.data.title || `${event.title} (Vorlage)`;
-      const templateDescription = parse.data.description || event.description || null;
+      const templateTitle = input.title || `${event.title} (Vorlage)`;
+      const templateDescription = input.description || event.description || null;
 
       // Tag und Uhrzeit relativ zum ersten Tag, alles in Schweizer Zeit (der Server läuft in UTC)
       const baseDay = zurichDayKey(event.startDate);

@@ -68,12 +68,9 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Verwalten der Tagesverantwortlichen' });
       }
 
-      const parse = SetDayResponsiblesSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof SetDayResponsiblesSchema>;
 
-      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, parse.data.userIds))) {
+      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, input.userIds))) {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
@@ -84,9 +81,9 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
             dayDate,
           },
         });
-        if (parse.data.userIds.length > 0) {
+        if (input.userIds.length > 0) {
           await tx.eventDayResponsible.createMany({
-            data: parse.data.userIds.map((userId) => ({
+            data: input.userIds.map((userId) => ({
               eventId: event.id,
               dayDate,
               userId,
@@ -158,12 +155,9 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zur OK-Verwaltung' });
       }
 
-      const parse = AddEventOrganizerSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof AddEventOrganizerSchema>;
 
-      const { userId, ceviName, email, role, roleTitle } = parse.data;
+      const { userId, ceviName, email, role, roleTitle } = input;
 
       // Benutzer finden anhand ID, E-Mail oder Cevi-Name (nur Konten mit Cevi.DB oder Passwort)
       const resolved = await resolveOrganizerUser(fastify.prisma, request.tenant.id, { userId, ceviName, email });
@@ -289,12 +283,9 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Abmelden von Helfenden' });
       }
 
-      const parse = UnregisterHelperSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof UnregisterHelperSchema>;
 
-      const { userId, guestName } = parse.data;
+      const { userId, guestName } = input;
 
       if (!userId && !guestName) {
         return reply.status(400).send({ error: 'userId oder guestName erforderlich' });

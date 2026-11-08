@@ -141,9 +141,8 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
       if (!ctx) return;
       const { tenant, access } = ctx;
-      const parse = UpdateDepartmentPersonSchema.safeParse(request.body);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-      const { stufen } = parse.data;
+      const input = request.body as z.output<typeof UpdateDepartmentPersonSchema>;
+      const { stufen } = input;
       const userId = request.params.userId;
 
       const user = await fastify.prisma.user.findUnique({
@@ -179,7 +178,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const nextPermissions = parse.data.permissions ? normalizePermissions(parse.data.permissions) : null;
+      const nextPermissions = input.permissions ? normalizePermissions(input.permissions) : null;
       if (nextPermissions) {
         if (membership?.role === 'ADMIN') {
           return reply.status(400).send({

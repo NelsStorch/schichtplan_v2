@@ -5,6 +5,7 @@ import {
   BulkShiftsSchema,
   CreateShiftSchema,
   CreateShiftSeriesSchema,
+  DuplicateShiftSchema,
   calculateShiftSeriesIntervals,
   UpdateShiftSchema,
   type BulkShiftsResultDto,
@@ -34,10 +35,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
-      const parse = CreateShiftSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof CreateShiftSchema>;
 
       const {
         eventId,
@@ -51,7 +49,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         minAge,
         tasks,
         responsibleUserIds,
-      } = parse.data;
+      } = input;
       if (new Date(endTime) <= new Date(startTime)) {
         return reply.status(400).send({ error: 'Das Ende der Schicht muss nach dem Beginn liegen' });
       }
@@ -172,10 +170,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
-      const parse = CreateShiftSeriesSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof CreateShiftSeriesSchema>;
 
       const {
         eventId,
@@ -191,7 +186,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         minAge,
         tasks,
         responsibleUserIds,
-      } = parse.data;
+      } = input;
 
       if (new Date(endTime) <= new Date(startTime)) {
         return reply.status(400).send({ error: 'Das Ende der Serie muss nach dem Beginn liegen' });
@@ -340,10 +335,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const shiftId = request.params.id;
-      const parse = UpdateShiftSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof UpdateShiftSchema>;
 
       const shift = await fastify.prisma.shift.findUnique({
         where: { id: shiftId },
@@ -365,7 +357,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten dieser Schicht' });
       }
 
-      const { title, category, isSetupTeardown, startTime, endTime, description, minAge, tasks, responsibleUserIds } = parse.data;
+      const { title, category, isSetupTeardown, startTime, endTime, description, minAge, tasks, responsibleUserIds } = input;
       if (!(await allUsersRelatedToEvent(fastify.prisma, shift.eventId, responsibleUserIds ?? []))) {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
@@ -445,7 +437,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             endTime: endTime ? new Date(endTime) : undefined,
             description: description !== undefined ? description : undefined,
             minAge: minAge !== undefined ? minAge : undefined,
-            requiredSlots: parse.data.requiredSlots !== undefined ? parse.data.requiredSlots : undefined,
+            requiredSlots: input.requiredSlots !== undefined ? input.requiredSlots : undefined,
           },
         });
       }
@@ -633,6 +625,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         params: z.object({
           id: z.string().uuid().describe('ID der Schicht'),
         }),
+        body: DuplicateShiftSchema,
       },
       preHandler: [fastify.authenticate],
     },
@@ -659,9 +652,13 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Duplizieren dieser Schicht' });
       }
 
-      const body = (request.body as any) || {};
+      // Vom Routen-Schema geprüft (DuplicateShiftSchema): Titel höchstens 120 Zeichen, Zeiten im ISO-Format
+      const body = request.body as z.output<typeof DuplicateShiftSchema>;
       const newStartTime = body.startTime ? new Date(body.startTime) : new Date(shift.startTime);
       const newEndTime = body.endTime ? new Date(body.endTime) : new Date(shift.endTime);
+      if (newEndTime <= newStartTime) {
+        return reply.status(400).send({ error: 'Das Ende der Schicht muss nach dem Beginn liegen' });
+      }
 
       const duplicated = await fastify.prisma.shift.create({
         data: {
@@ -753,12 +750,9 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Bearbeiten der Schichten' });
       }
 
-      const parse = BulkShiftsSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const shiftIds = [...new Set(parse.data.shiftIds)];
-      const { action } = parse.data;
+      const input = request.body as z.output<typeof BulkShiftsSchema>;
+      const shiftIds = [...new Set(input.shiftIds)];
+      const { action } = input;
 
       const shifts = await fastify.prisma.shift.findMany({
         where: { id: { in: shiftIds }, eventId: event.id },

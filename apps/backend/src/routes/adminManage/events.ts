@@ -26,12 +26,12 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
         summary: 'Alle Anlässe plattformweit durchsuchen (Admin)',
         description: 'Paginierte Liste aller Anlässe mit Filter nach Zeitraum, Status oder Abteilung.',
         security: [{ bearerAuth: [] }],
+        querystring: EventListQuerySchema,
       },
     },
     async (request, reply) => {
-    const parse = EventListQuerySchema.safeParse(request.query);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const { q, departmentId, when, page, pageSize } = parse.data;
+    const queryInput = request.query as z.output<typeof EventListQuerySchema>;
+    const { q, departmentId, when, page, pageSize } = queryInput;
     const now = new Date();
 
     const terms = (q ?? '').split(/\s+/).filter(Boolean).slice(0, 5);
@@ -96,13 +96,12 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = AdminUpdateEventSchema.safeParse(request.body);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+    const input = request.body as z.output<typeof AdminUpdateEventSchema>;
 
     const updated = await fastify.prisma.event
       .update({
         where: { id: request.params.id },
-        data: parse.data,
+        data: input,
         select: { id: true, title: true, department: { select: { name: true } } },
       })
       .catch(() => null);
@@ -113,7 +112,7 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
       targetType: 'EVENT',
       targetId: updated.id,
       targetLabel: `${updated.title} (${updated.department.name})`,
-      details: { changes: parse.data },
+      details: { changes: input },
     });
     return { success: true };
   });
@@ -134,8 +133,7 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+    const input = request.body as z.output<typeof ConfirmDeleteSchema>;
 
     const event = await fastify.prisma.event
       .findUnique({
@@ -144,7 +142,7 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
       })
       .catch(() => null);
     if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
-    if (parse.data.confirm !== event.slug) {
+    if (input.confirm !== event.slug) {
       return reply.status(400).send({ error: 'Zur Bestätigung das Kürzel des Anlasses genau eintippen.' });
     }
 

@@ -1,4 +1,5 @@
 import { FastifyPluginAsync, } from 'fastify';
+import { z } from 'zod';
 import {
   SetHomeDepartmentSchema,
   UpdateProfileSchema,
@@ -56,11 +57,8 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
-      const parse = UpdateProfileSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const result = await applyProfileUpdate(fastify.prisma, request.user.id, parse.data);
+      const input = request.body as z.output<typeof UpdateProfileSchema>;
+      const result = await applyProfileUpdate(fastify.prisma, request.user.id, input);
       if ('error' in result) return reply.status(result.status).send({ error: result.error });
       return loadUserDto(fastify.prisma, request.user.id, request.tenant?.id ?? null);
     }
@@ -171,10 +169,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
-      const parse = SetHomeDepartmentSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof SetHomeDepartmentSchema>;
       const userId = request.user.id;
       const current = await fastify.prisma.user.findUnique({
         where: { id: userId },
@@ -183,7 +178,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       if (!current) return reply.status(404).send({ error: 'Person nicht gefunden' });
 
       const fromCeviDb = current.homeDepartmentSource === 'CEVIDB';
-      const departmentId = fromCeviDb ? current.homeDepartmentId : parse.data.departmentId;
+      const departmentId = fromCeviDb ? current.homeDepartmentId : input.departmentId;
       // Stufen ändern lässt eine Bestätigung bestehen, ein Abteilungswechsel beendet sie
       const staysConfirmed = current.homeDepartmentSource === 'CONFIRMED' && departmentId === current.homeDepartmentId;
 
@@ -192,7 +187,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
         if (!exists) return reply.status(400).send({ error: 'Diese Abteilung gibt es nicht' });
       }
 
-      const wanted = departmentId ? parse.data.stufen : [];
+      const wanted = departmentId ? input.stufen : [];
       const stufen = wanted.length
         ? await fastify.prisma.departmentStufe.findMany({
             where: { id: { in: wanted.map((s) => s.stufeId) }, departmentId: departmentId ?? undefined },

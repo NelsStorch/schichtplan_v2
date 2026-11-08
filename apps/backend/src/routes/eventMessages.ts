@@ -144,15 +144,14 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
       if (!event) return reply.status(404).send({ error: 'Event nicht gefunden' });
       if (!allowed) return reply.status(403).send({ error: 'Nur die Abteilungsleitung oder das Event-OK' });
 
-      const parse = SendEventMessageSchema.safeParse(request.body);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-      const { subject, body, target, dryRun } = parse.data;
+      const input = request.body as z.output<typeof SendEventMessageSchema>;
+      const { subject, body, target, dryRun } = input;
 
       let recipients: Recipient[] = [];
       let targetLabel = '';
 
       if (target === 'ALL' || target === 'SHIFTS') {
-        const shiftIds = target === 'SHIFTS' ? [...new Set(parse.data.shiftIds ?? [])] : null;
+        const shiftIds = target === 'SHIFTS' ? [...new Set(input.shiftIds ?? [])] : null;
         let selectedDayKeys: string[] = [];
         if (shiftIds) {
           const selectedShifts = await fastify.prisma.shift.findMany({
@@ -298,7 +297,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           ? `Unter dem Soll (mind. ${event.minShiftsPerPerson} Schicht${event.minShiftsPerPerson === 1 ? '' : 'en'})`
           : 'Noch ohne Schicht';
       } else {
-        const userIds = [...new Set(parse.data.userIds ?? [])];
+        const userIds = [...new Set(input.userIds ?? [])];
         // Nur Personen mit Bezug zum Anlass oder zur Abteilung, nie beliebige Konten
         const departmentIds = [event.departmentId, ...event.allowedDepartments.map((d) => d.departmentId)];
         const users = await fastify.prisma.user.findMany({

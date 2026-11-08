@@ -62,6 +62,35 @@ export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalho
   );
 }
 
+/** Deutsche Meldungen für Fehler, die Fastify selbst auslöst (nach Code, sonst nach Status) */
+const FASTIFY_ERROR_MESSAGES: Record<string, string> = {
+  FST_ERR_CTP_BODY_TOO_LARGE: 'Die Anfrage ist zu gross.',
+  FST_ERR_CTP_INVALID_MEDIA_TYPE: 'Dieses Format wird nicht unterstützt.',
+  FST_ERR_CTP_INVALID_CONTENT_LENGTH: 'Ungültige Anfrage.',
+  FST_ERR_CTP_EMPTY_JSON_BODY: 'Die Anfrage ist leer.',
+  FST_ERR_CTP_INVALID_JSON_BODY: 'Die Anfrage enthält kein gültiges JSON.',
+  NOT_FOUND: 'Nicht gefunden.',
+};
+const STATUS_MESSAGES: Record<number, string> = {
+  400: 'Ungültige Anfrage.',
+  401: 'Nicht angemeldet.',
+  403: 'Kein Zugriff.',
+  404: 'Nicht gefunden.',
+  405: 'Diese Methode ist hier nicht erlaubt.',
+  413: 'Die Anfrage ist zu gross.',
+  415: 'Dieses Format wird nicht unterstützt.',
+  429: 'Zu viele Anfragen. Bitte warte kurz.',
+};
+
+/**
+ * Einheitliches Fehlerformat wie in den Routen: `error` ist die Meldung fürs Frontend, `code` maschinenlesbar.
+ * Nie die Originalmeldung von Fastify übernehmen (englisch, kann Interna nennen).
+ */
+export function clientErrorBody(statusCode: number, code?: string) {
+  const message = (code && FASTIFY_ERROR_MESSAGES[code]) || STATUS_MESSAGES[statusCode] || 'Die Anfrage konnte nicht verarbeitet werden.';
+  return { statusCode, code: code || `HTTP_${statusCode}`, error: message, message };
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: 2 * 1024 * 1024, // Normale JSON-Anfragen sind klein; nur /api/uploads erlaubt mehr (siehe routes/uploads.ts)
@@ -155,14 +184,24 @@ export async function buildApp(): Promise<FastifyInstance> {
 
     if (statusCode >= 500) {
       request.log.error(error);
+      const message = 'Ein interner Serverfehler ist aufgetreten. Bitte versuche es nochmals.';
       return reply.status(statusCode).send({
         statusCode,
-        error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'production' ? 'Ein interner Serverfehler ist aufgetreten' : error.message,
+        code: 'INTERNAL',
+        error: message,
+        // Details nur ausserhalb von Produktion (nie Stacktraces oder SQL nach aussen)
+        message: process.env.NODE_ENV === 'production' ? message : error.message,
       });
     }
 
-    return reply.status(statusCode).send(error);
+    // Übrige Fehler von Fastify selbst (ungültiges JSON, zu grosser Body, falscher Content-Type ...):
+    // gleiches Format wie alle anderen Fehler, mit deutscher Meldung statt «Bad Request»
+    return reply.status(statusCode).send(clientErrorBody(statusCode, error.code));
+  });
+
+  // Unbekannte Routen: gleiches Format (sonst «Route GET:/api/x not found» auf Englisch)
+  app.setNotFoundHandler((_request, reply) => {
+    reply.status(404).send(clientErrorBody(404, 'NOT_FOUND'));
   });
 
   // Application routes

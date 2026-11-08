@@ -263,18 +263,16 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         summary: 'Benutzerliste abrufen (Admin)',
         description: 'Filterbare, sortierbare und paginierte Übersicht aller Benutzerkonten auf der Plattform.',
         security: [{ bearerAuth: [] }],
+        querystring: ListQuerySchema,
       },
       preHandler: [fastify.requireGlobalAdmin],
     },
     async (request, reply) => {
-    const parse = ListQuerySchema.safeParse(request.query);
-    if (!parse.success) {
-      return reply.status(400).send({ error: parse.error.issues[0].message });
-    }
-    const { q, method, role, departmentId, sort, page, pageSize } = parse.data;
+    const queryInput = request.query as z.output<typeof ListQuerySchema>;
+    const { q, method, role, departmentId, sort, page, pageSize } = queryInput;
     const duplicateMap = await findDuplicateUsers(fastify.prisma);
     const duplicateIds = Array.from(duplicateMap.keys());
-    const dir = parse.data.dir ?? (sort === 'created' ? 'desc' : 'asc');
+    const dir = queryInput.dir ?? (sort === 'created' ? 'desc' : 'asc');
 
     const where: Prisma.UserWhereInput = {
       AND: [
@@ -567,9 +565,8 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.requireGlobalAdmin],
     },
     async (request, reply) => {
-      const parse = AdminBatchDeleteUsersSchema.safeParse(request.body);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-      const rawIds = parse.data.userIds;
+      const input = request.body as z.output<typeof AdminBatchDeleteUsersSchema>;
+      const rawIds = input.userIds;
       const filteredIds = rawIds.filter((id) => id !== request.user.id);
       if (filteredIds.length === 0) {
         return reply.status(400).send({ error: 'Das eigene Admin-Konto kann nicht gelöscht werden.' });

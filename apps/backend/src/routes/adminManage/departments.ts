@@ -57,9 +57,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parsedId = z.string().uuid().safeParse(request.params.id);
-    if (!parsedId.success) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
-    const departmentId = parsedId.data;
+    // Vom Routen-Schema als UUID geprüft
+    const departmentId = request.params.id;
 
     const row = await fastify.prisma.department.findUnique({ where: { id: departmentId }, select: departmentSelect });
     if (!row) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
@@ -166,9 +165,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = AdminCreateDepartmentSchema.safeParse(request.body);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const { name, slug, ceviDbGroupId, membersOnly, leaderUserId } = parse.data;
+    const input = request.body as z.output<typeof AdminCreateDepartmentSchema>;
+    const { name, slug, ceviDbGroupId, membersOnly, leaderUserId } = input;
 
     if (ceviDbGroupId) {
       const existingWithGroup = await fastify.prisma.department.findUnique({
@@ -242,9 +240,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = AdminUpdateDepartmentSchema.safeParse(request.body);
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-    const data = parse.data;
+    const input = request.body as z.output<typeof AdminUpdateDepartmentSchema>;
+    const data = input;
 
     const existing = await fastify.prisma.department.findUnique({
       where: { id: request.params.id },
@@ -341,15 +338,14 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-    const parse = ConfirmDeleteSchema.safeParse(request.body ?? {});
-    if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
+    const input = request.body as z.output<typeof ConfirmDeleteSchema>;
 
     const department = await fastify.prisma.department.findUnique({
       where: { id: request.params.id },
       select: { id: true, slug: true, name: true, _count: { select: { events: true, members: true } } },
     }).catch(() => null);
     if (!department) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
-    if (parse.data.confirm !== department.slug) {
+    if (input.confirm !== department.slug) {
       return reply.status(400).send({ error: 'Zur Bestätigung die Subdomain der Abteilung genau eintippen.' });
     }
 
@@ -391,10 +387,9 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const parse = AdminSetMemberRoleSchema.safeParse(request.body);
-      if (!parse.success) return reply.status(400).send({ error: parse.error.issues[0].message });
-      const { role } = parse.data;
-      const permissions = role === 'ADMIN' ? [] : normalizePermissions(parse.data.permissions ?? []);
+      const input = request.body as z.output<typeof AdminSetMemberRoleSchema>;
+      const { role } = input;
+      const permissions = role === 'ADMIN' ? [] : normalizePermissions(input.permissions ?? []);
       const { id: departmentId, userId } = request.params;
 
       const [department, user] = await Promise.all([

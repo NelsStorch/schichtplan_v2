@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import {
   DEFAULT_CATERING_EARLY_HOURS,
   DEFAULT_CATERING_TOKEN_ITEMS,
@@ -28,6 +29,12 @@ import {
 import { timingSafeEqual } from 'node:crypto';
 import { eventUrl } from '../services/shiftReminders.js';
 import { createRateLimiter } from '../services/rateLimit.js';
+
+/** Pfad- und Abfrageparameter der Verpflegungs-Routen (vom Routen-Schema geprüft) */
+const SlugParams = z.object({ slug: z.string().min(1).max(100) });
+const TokenParams = SlugParams.extend({ tokenId: z.string().uuid() });
+const BatchParams = SlugParams.extend({ batchId: z.string().uuid() });
+const ScanQuery = z.object({ code: z.string().max(200).optional() });
 
 /** Falsche Stand-PINs pro IP und Anlass: 10 Versuche in 15 Minuten (ein 4-stelliger PIN ist schnell durchprobiert) */
 const staffPinLimiter = createRateLimiter(15 * 60 * 1000, 10);
@@ -139,6 +146,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/my-catering-tokens',
     {
       schema: {
+        params: SlugParams,
         tags: ['Verpflegung'],
         summary: 'Eigene Verpflegungs-Bons für einen Anlass abrufen',
         security: [{ bearerAuth: [] }],
@@ -180,6 +188,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-tokens/:tokenId/redeem',
     {
       schema: {
+        params: TokenParams,
         tags: ['Verpflegung'],
         summary: 'Verpflegungs-Bon entwerten',
         security: [{ bearerAuth: [] }],
@@ -323,6 +332,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-tokens/:tokenId/reset',
     {
       schema: {
+        params: TokenParams,
         tags: ['Verpflegung'],
         summary: 'Eingelösten Verpflegungs-Bon zurücksetzen (nur OK)',
         security: [{ bearerAuth: [] }],
@@ -431,6 +441,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-overview',
     {
       schema: {
+        params: SlugParams,
         tags: ['Verpflegung'],
         summary: 'Übersicht über Verpflegungs-Bons für das OK',
         security: [{ bearerAuth: [] }],
@@ -465,6 +476,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-batches/count-helpers',
     {
       schema: {
+        params: SlugParams,
         tags: ['Verpflegung'],
         summary: 'Anzahl angemeldeter Helfenden und Schichtleitungen ermitteln',
         security: [{ bearerAuth: [] }],
@@ -501,6 +513,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-batches',
     {
       schema: {
+        params: SlugParams,
         tags: ['Verpflegung'],
         summary: 'Alle Druck-Tranchen physischer Bons abrufen',
         security: [{ bearerAuth: [] }],
@@ -524,6 +537,8 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-batches',
     {
       schema: {
+        params: SlugParams,
+        body: CreateCateringBatchSchema,
         tags: ['Verpflegung'],
         summary: 'Neue Druck-Tranche für physische Bons generieren',
         security: [{ bearerAuth: [] }],
@@ -538,19 +553,16 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung' });
       }
 
-      const parsed = CreateCateringBatchSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({ error: parsed.error.issues[0]?.message || 'Ungültige Eingabe' });
-      }
+      const input = request.body as z.output<typeof CreateCateringBatchSchema>;
 
       // Die Adresse landet gedruckt auf den Bons: nur die eigene Domain, nie ungeprüfte Header übernehmen
       const baseUrl = cateringBaseUrl(request.headers.host, request.tenant?.slug ?? null);
 
       const created = await createCateringBatch(fastify.prisma, {
         eventId: event.id,
-        title: parsed.data.title,
-        mode: parsed.data.mode,
-        cardCount: parsed.data.cardCount,
+        title: input.title,
+        mode: input.mode,
+        cardCount: input.cardCount,
         baseUrl,
       });
 
@@ -563,6 +575,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-batches/:batchId/pdf',
     {
       schema: {
+        params: BatchParams,
         tags: ['Verpflegung'],
         summary: 'A4-Druckbogen als PDF herunterladen',
         security: [{ bearerAuth: [] }],
@@ -620,6 +633,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-batches/:batchId/toggle-block',
     {
       schema: {
+        params: BatchParams,
         tags: ['Verpflegung'],
         summary: 'Tranche sperren oder wieder freigeben',
         security: [{ bearerAuth: [] }],
@@ -646,6 +660,8 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-scan',
     {
       schema: {
+        params: SlugParams,
+        querystring: ScanQuery,
         tags: ['Verpflegung'],
         summary: 'Physischen Bon per Scan-Code abrufen',
       },
@@ -683,6 +699,8 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/events/:slug/catering-scan/redeem',
     {
       schema: {
+        params: SlugParams,
+        body: RedeemPhysicalTokenSchema,
         tags: ['Verpflegung'],
         summary: 'Artikel eines physischen Bons entwerten',
       },
@@ -693,25 +711,22 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
       const event = await findEvent(request.tenant.id, request.params.slug);
       if (!event) return reply.status(404).send({ error: 'Anlass nicht gefunden' });
 
-      const parsed = RedeemPhysicalTokenSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({ error: parsed.error.issues[0]?.message || 'Ungültige Eingabe' });
-      }
+      const input = request.body as z.output<typeof RedeemPhysicalTokenSchema>;
 
       const staff = await authorizeStaff(
         request,
         reply,
         event,
-        (request.headers['x-staff-pin'] as string | undefined) || parsed.data.staffPin
+        (request.headers['x-staff-pin'] as string | undefined) || input.staffPin
       );
       if (!staff) return reply;
 
       try {
         return await redeemPhysicalTokens(fastify.prisma, {
           eventId: event.id,
-          code: parsed.data.code,
-          tokenId: parsed.data.tokenId,
-          redeemAll: parsed.data.redeemAll,
+          code: input.code,
+          tokenId: input.tokenId,
+          redeemAll: input.redeemAll,
           redeemedByName: staff.name,
         });
       } catch (err) {

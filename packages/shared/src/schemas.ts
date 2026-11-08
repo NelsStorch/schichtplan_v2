@@ -453,6 +453,15 @@ export const CreateShiftTaskSchema = z.object({
 
 export type CreateShiftTaskInput = z.infer<typeof CreateShiftTaskSchema>;
 
+/** Schicht duplizieren: neuer Titel und neue Zeiten (alles optional, sonst wie das Original) */
+export const DuplicateShiftSchema = z
+  .object({
+    title: z.string().trim().max(120).optional(),
+    startTime: z.string().datetime().optional(),
+    endTime: z.string().datetime().optional(),
+  })
+  .default({});
+
 export const CreateShiftSchema = z.object({
   eventId: z.string().uuid(),
   title: z.string().trim().max(120).nullish().transform((v) => v?.trim() || null).default(null),
@@ -527,9 +536,12 @@ export const SignupShiftSchema = z.object({
 export type SignupShiftInput = z.infer<typeof SignupShiftSchema>;
 
 /** «Ersatz gesucht» setzen: Grund freiwillig, sichtbar für alle, die Namen sehen */
-export const ReplacementOfferSchema = z.object({
-  note: z.string().trim().max(300).optional().nullable(),
-});
+/** Ersatz gesucht: Grund optional, auch ganz ohne Body */
+export const ReplacementOfferSchema = z
+  .object({
+    note: z.string().trim().max(300).optional().nullable(),
+  })
+  .default({});
 
 export const SaveAsTemplateSchema = z.object({
   title: z.string().trim().min(2, 'Name der Vorlage erforderlich').max(120),

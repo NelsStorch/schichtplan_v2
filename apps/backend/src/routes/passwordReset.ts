@@ -55,11 +55,8 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
       if (requestsByIp.hit(request.ip)) {
         return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
       }
-      const parse = RequestPasswordResetSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
-      const email = parse.data.email.toLowerCase();
+      const input = request.body as z.output<typeof RequestPasswordResetSchema>;
+      const email = input.email.toLowerCase();
       trackUsage('PASSWORD_RESET', { dim: 'REQUEST' });
 
       const user = await fastify.prisma.user.findUnique({
@@ -117,13 +114,10 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
       if (confirmsByIp.hit(request.ip)) {
         return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
       }
-      const parse = ResetPasswordSchema.safeParse(request.body);
-      if (!parse.success) {
-        return reply.status(400).send({ error: parse.error.issues[0].message });
-      }
+      const input = request.body as z.output<typeof ResetPasswordSchema>;
 
       const record = await fastify.prisma.passwordResetToken.findUnique({
-        where: { tokenHash: hashResetToken(parse.data.token) },
+        where: { tokenHash: hashResetToken(input.token) },
         select: { id: true, userId: true, expiresAt: true },
       });
       if (!record || record.expiresAt < new Date()) {
@@ -134,7 +128,7 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const passwordHash = await bcrypt.hash(parse.data.password, 10);
+      const passwordHash = await bcrypt.hash(input.password, 10);
       const now = new Date();
       // Wer den Link aus der E-Mail öffnet, hat die Adresse bestätigt
       await fastify.prisma.$transaction(async (tx) => {
