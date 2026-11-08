@@ -57,27 +57,44 @@ if ($Environment -eq 'dev') {
 $ProxyNetwork = "schichtplan_${Environment}_proxy"
 $StartTime = Get-Date
 
-function Step($text) { Write-Host "`n$text" -ForegroundColor Cyan }
+function Step($text) {
+    $script:CurrentStep = $text
+    Write-Host "`n$text" -ForegroundColor Cyan
+}
 
-function Send-DiscordNotification($title, $description, $color = 14753096) {
+$IconHourglass = [char]::ConvertFromUtf32(0x23F3)
+
+# Discord-Grenzen: Feldwert 1024, Beschreibung 4096 Zeichen
+function Limit-Text([string]$text, [int]$max) {
+    if ($text.Length -le $max) { return $text }
+    return $text.Substring(0, $max - 3) + "..."
+}
+
+# Webhook-Meldung. $fields: Liste von @{ name = ...; value = ...; inline = $true/$false } (leere Werte fallen weg)
+function Send-DiscordNotification($title, $description, $color = 14753096, $fields = @(), $url = $null) {
     $webhook = if ($DiscordWebhookUrl) { $DiscordWebhookUrl } else { $env:DISCORD_WEBHOOK_URL }
     if (-not $webhook) { return }
+
+    $embed = @{
+        title = $title
+        description = (Limit-Text $description 4000)
+        color = $color
+        timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        footer = @{
+            text = "Cevi Schichtplan V2 $Dot $Environment"
+        }
+    }
+    if ($url) { $embed.url = $url }
+    $cleanFields = @($fields | Where-Object { $_ -and $_.value } | ForEach-Object {
+        @{ name = $_.name; value = (Limit-Text ([string]$_.value) 1000); inline = [bool]$_.inline }
+    })
+    if ($cleanFields.Count -gt 0) { $embed.fields = $cleanFields }
 
     $payload = @{
         username = "Cevi Schichtplan Deploy"
         avatar_url = "https://status.cevi-schichtplan.ch/upload/logo.png"
-        embeds = @(
-            @{
-                title = $title
-                description = $description
-                color = $color
-                timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-                footer = @{
-                    text = "Cevi Schichtplan V2 $Dot $Environment"
-                }
-            }
-        )
-    } | ConvertTo-Json -Depth 5
+        embeds = @($embed)
+    } | ConvertTo-Json -Depth 6
 
     try {
         $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
@@ -87,11 +104,32 @@ function Send-DiscordNotification($title, $description, $color = 14753096) {
     }
 }
 
+# Aktueller Schritt (fuer die Fehlermeldung) und die Ausgabe des Server-Skripts (fuer Auswertung und Fehlerdetails)
+$script:CurrentStep = "Vorbereitung"
+$script:RemoteOutput = @()
+
+# Kurzinfos fuer die Meldungen: Repo-Link, wer deployt
+$RepoUrl = (git remote get-url origin 2>$null) -replace '\.git$', '' -replace '^git@github\.com:', 'https://github.com/'
+$DeployedBy = git config user.name 2>$null
+if (-not $DeployedBy) { $DeployedBy = $env:USERNAME }
+
+function Get-CommitLink($rev) {
+    if ($RepoUrl -and $rev -match '^[0-9a-f]{7,40}$') { return "[``$rev``]($RepoUrl/commit/$rev)" }
+    return "``$rev``"
+}
+
 function Stop-Deploy($text) {
     Write-Host "`nDEPLOY FEHLGESCHLAGEN: $text" -ForegroundColor Red
-    $info = "**Grund:** $text`n**Server:** $Server"
+    # Keine Server-Adresse in der Meldung (Discord ist kein geschuetzter Ort)
+    $info = "**Grund:** $text`n**Schritt:** $($script:CurrentStep)"
     if ($commit) { $info += "`n**Stand:** $commit" }
-    Send-DiscordNotification -title "$IconCross Deployment fehlgeschlagen ($Environment)" -description $info -color 15158332
+    $fields = @()
+    $backupLine = $script:RemoteOutput | Where-Object { $_ -match '^Backup: ' } | Select-Object -First 1
+    if ($backupLine) { $fields += @{ name = "Sicherung"; value = "``$($backupLine -replace '^Backup: ', '')``" } }
+    $tail = @($script:RemoteOutput | Where-Object { $_ -and $_.Trim() } | Select-Object -Last 12) -join "`n"
+    if ($tail) { $fields += @{ name = "Letzte Ausgabe"; value = "```````n$(Limit-Text $tail 950)`n``````" } }
+    $fields += @{ name = "Was jetzt?"; value = "Bereits getauschte Dienste laufen auf dem neuen Stand, die uebrigen auf dem alten. Zuruecksetzen: ``.\rollback.ps1 $Environment``" }
+    Send-DiscordNotification -title "$IconCross Deployment fehlgeschlagen ($Environment)" -description $info -color 15158332 -fields $fields
     Remove-Item $ArchiveName, $RemoteScript -ErrorAction SilentlyContinue
     exit 1
 }
@@ -353,26 +391,81 @@ echo "DEPLOY_SUCCESS=1"
 Step "2. Hochladen"
 ssh -n $Server "mkdir -p $RemoteDir"
 if ($LASTEXITCODE -ne 0) { Stop-Deploy "Keine Verbindung zum Server." }
+# Bisher laufender Stand (fuer die Liste der Aenderungen und den Rollback-Hinweis)
+$previousRevision = "$(ssh -n $Server "head -n 1 $RemoteDir/REVISION 2>/dev/null")".Trim()
 scp -q $ArchiveName $RemoteScript "${Server}:${RemoteDir}/"
 if ($LASTEXITCODE -ne 0) { Stop-Deploy "Das Hochladen hat nicht geklappt." }
 
+# Aenderungen seit dem bisherigen Stand (nur wenn er ein bekannter Commit ist)
+$changes = @()
+$previousCommit = $previousRevision -replace '-dirty-\d+$', ''
+if ($previousCommit -match '^[0-9a-f]{7,40}$') {
+    git cat-file -e "$previousCommit^{commit}" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $changes = @(git log --format="%h %s" "$previousCommit..HEAD" 2>$null)
+    }
+}
+$compareUrl = if ($RepoUrl -and $previousCommit -match '^[0-9a-f]{7,40}$' -and $previousCommit -ne $revision) {
+    "$RepoUrl/compare/$previousCommit...$($revisionFull)"
+} else { $null }
+
+if ($Environment -eq 'prod') {
+    # Vorab melden, damit niemand gleichzeitig deployt
+    $startInfo = "**Von** $(Get-CommitLink $previousCommit) **auf** $(Get-CommitLink ($revision -replace '-dirty-\d+$', ''))`n**Durch:** $DeployedBy $Dot $($changes.Count) Commit(s)"
+    Send-DiscordNotification -title "$IconHourglass Deployment gestartet ($Environment)" -description $startInfo -color 3447003 -url $compareUrl
+}
+
 Step "3. Backup, Build und unterbruchfreier Neustart auf dem Server"
-ssh -n $Server "bash $RemoteDir/$RemoteScript; code=`$?; rm -f $RemoteDir/$RemoteScript; exit `$code"
+# Ausgabe anzeigen und zugleich festhalten (fuer Migrationen, Sicherung, Warnungen und Fehlerdetails)
+ssh -n $Server "bash $RemoteDir/$RemoteScript; code=`$?; rm -f $RemoteDir/$RemoteScript; exit `$code" | Tee-Object -Variable remoteLines | Out-Host
 $result = $LASTEXITCODE
+$script:RemoteOutput = @($remoteLines | ForEach-Object { "$_" })
 
 Remove-Item $ArchiveName, $RemoteScript -ErrorAction SilentlyContinue
 
 if ($result -ne 0) {
-    Stop-Deploy "Siehe Ausgabe oben. Der vorherige Stand der DB liegt unter $RemoteDir/backups."
+    $reason = $script:RemoteOutput | Where-Object { $_ -match 'fehlgeschlagen|FEHLER' } | Select-Object -Last 1
+    if (-not $reason) { $reason = "Das Skript auf dem Server ist mit Code $result abgebrochen." }
+    Stop-Deploy $reason
 }
 
 $duration = [Math]::Round(((Get-Date) - $StartTime).TotalSeconds)
 Write-Host "`nDeploy nach $Environment erfolgreich abgeschlossen! Services laufen unterbruchfrei." -ForegroundColor Green
 
-$deployInfo = "**Umgebung:** ``$Environment`` (https://$DefaultDomain)`n**Stand:** $commit`n**Revision:** ``$revision``"
+$durationText = if ($duration -ge 60) { "{0} min {1} s" -f [Math]::Floor($duration / 60), ($duration % 60) } else { "$duration s" }
+$deployInfo = "**Stand:** $(Get-CommitLink ($revision -replace '-dirty-\d+$', '')) $($commit -replace '^[0-9a-f]+ ', '')"
 if ($dirty.Count -gt 0) {
-    $deployInfo += "`n**Uncommittete Dateien:** $($dirty.Count)"
+    $deployInfo += "`n**Achtung:** $($dirty.Count) nicht committete Datei(en) mitgeliefert (``$revision``)"
 }
-$deployInfo += "`n**Dauer:** ${duration}s $Dot **Status:** Unterbruchfrei online"
+$deployInfo += "`nhttps://$DefaultDomain $Dot unterbruchfrei online"
 
-Send-DiscordNotification -title "$IconRocket Deployment erfolgreich ($Environment)" -description $deployInfo -color 3066993
+$fields = @()
+if ($changes.Count -gt 0) {
+    # Ganze Zeilen (je hoechstens 80 Zeichen), bis das Feld voll ist; der Rest als Zahl (Discord: 1024 Zeichen)
+    $list = ""
+    $shownCount = 0
+    foreach ($change in $changes) {
+        $line = "- " + (Limit-Text $change 80)
+        if (($list.Length + $line.Length + 40) -gt 1000) { break }
+        $list += $(if ($list) { "`n" } else { "" }) + $line
+        $shownCount++
+    }
+    if ($shownCount -lt $changes.Count) { $list += "`n... und $($changes.Count - $shownCount) weitere (Link oben)" }
+    $fields += @{ name = "Neu seit $previousCommit ($($changes.Count))"; value = $list }
+} elseif ($previousCommit -eq ($revision -replace '-dirty-\d+$', '')) {
+    $fields += @{ name = "Aenderungen"; value = "Gleicher Stand wie bisher (erneut deployt)" }
+}
+$migrations = @($script:RemoteOutput | ForEach-Object { if ($_ -match 'Applying migration `([^`]+)`') { "- ``$($Matches[1])``" } })
+$fields += @{ name = "Migrationen"; value = $(if ($migrations.Count -gt 0) { $migrations -join "`n" } else { "keine" }); inline = $true }
+$backupLine = $script:RemoteOutput | Where-Object { $_ -match '^Backup: ' } | Select-Object -First 1
+$fields += @{ name = "Sicherung"; value = $(if ($backupLine) { "``$($backupLine -replace '^Backup: ', '')``" } else { "uebersprungen" }); inline = $true }
+$fields += @{ name = "Dauer"; value = $durationText; inline = $true }
+$fields += @{ name = "Durch"; value = $DeployedBy; inline = $true }
+$warnings = @($script:RemoteOutput | Where-Object { $_ -match '^WARNUNG' })
+if ($warnings.Count -gt 0) { $fields += @{ name = "Warnungen"; value = ($warnings -join "`n") } }
+if ($previousCommit -match '^[0-9a-f]{7,40}$' -and $previousCommit -ne ($revision -replace '-dirty-\d+$', '')) {
+    $fields += @{ name = "Zurueck auf den alten Stand"; value = "``.\rollback.ps1 $Environment -Revision $previousCommit``" }
+}
+
+$color = if ($warnings.Count -gt 0) { 15105570 } else { 3066993 }
+Send-DiscordNotification -title "$IconRocket Deployment erfolgreich ($Environment)" -description $deployInfo -color $color -fields $fields -url $compareUrl
