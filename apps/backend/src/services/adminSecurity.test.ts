@@ -4,7 +4,7 @@ import { adminRequestProblem, adminSecurityConfig, adminSessionProblem, bootstra
 const prod = { rootDomain: 'cevi-schichtplan.ch', allowLocalhost: false };
 
 describe('adminRequestProblem', () => {
-  it('lässt das Admin-Portal und die Login-Debugseite zu', () => {
+  it('lässt nur das Admin-Portal zu', () => {
     expect(adminRequestProblem({ host: 'admin.cevi-schichtplan.ch' }, prod)).toBeNull();
     expect(
       adminRequestProblem(
@@ -12,7 +12,7 @@ describe('adminRequestProblem', () => {
         prod
       )
     ).toBeNull();
-    expect(adminRequestProblem({ host: 'login.cevi-schichtplan.ch', secFetchSite: 'same-origin' }, prod)).toBeNull();
+    expect(adminRequestProblem({ host: 'login.cevi-schichtplan.ch', secFetchSite: 'same-origin' }, prod)).toBe('HOST');
   });
 
   it('sperrt Abteilungs-Subdomains, Dev und fremde Hosts', () => {

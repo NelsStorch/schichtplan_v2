@@ -24,7 +24,6 @@ import {
   resolveCeviDbPlacement,
   syncCeviDbHomeDepartment,
   syncCeviDbStufen,
-  toCeviDbStufeDto,
 } from '../services/homeDepartment.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
 import { sendAccountExistsEmail, sendVerificationEmail } from '../services/email.js';
@@ -38,7 +37,6 @@ import {
 } from '../services/ceviNameLogin.js';
 import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
 import { trackUsage } from '../services/usageStats.js';
-import { withoutCeviDbAddress } from '../services/profile.js';
 import { syncCeviDbLeadership } from '../services/departmentLeaders.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 
@@ -389,7 +387,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           birthDate,
           emailVerified: true,
           emailVerifiedAt: now,
-          ceviDbData: withoutCeviDbAddress(profile),
           ceviDbSyncedAt: now,
         },
       });
@@ -405,7 +402,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           ...(await ceviDbEmailUpdate(user, profile.email)),
           emailVerified: true,
           emailVerifiedAt: user.emailVerifiedAt || now,
-          ceviDbData: withoutCeviDbAddress(profile),
           ceviDbSyncedAt: now,
         },
       });
@@ -419,7 +415,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
     }
 
-    // Was der Schichtplan aus Cevi.DB braucht, in eigene Spalten schreiben (ceviDbData wird nie gelesen).
+    // Was der Schichtplan aus Cevi.DB braucht, in eigene Spalten schreiben (das Rohprofil wird nicht gespeichert).
     // Die eigene Abteilung und die Stufen kommen aus den Rollen und der Cevi.DB-Gruppenstruktur.
     const derived = deriveCeviDbFields(profile);
     const placement = await resolveCeviDbPlacement(fastify.prisma, derived, user.homeDepartmentId);
@@ -1307,114 +1303,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         await ensureHelperMembership(fastify.prisma, departmentId, userId);
       }
       return loadUserDto(fastify.prisma, userId, request.tenant?.id ?? null);
-    }
-  );
-
-  // 6b. Cevi.DB Rohdaten / Debug-Profil (Streng geschützt: NUR globale Admins in der DB)
-  fastify.get<{ Querystring: { userId?: string } }>(
-    '/api/auth/cevidb/debug-profile',
-    {
-      schema: {
-        tags: ['Auth'],
-        summary: 'Cevi.DB Debug-Profil abrufen (Admin)',
-        description: 'Liefert die rohen Cevi.DB/Hitobito-Profildaten eines Benutzers zu Diagnosezwecken.',
-        security: [{ bearerAuth: [] }],
-        querystring: z.object({
-          userId: z.string().uuid().optional(),
-        }),
-      },
-      preHandler: [fastify.requireGlobalAdmin],
-    },
-    async (request, reply) => {
-      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-
-      // Admin kann eigenes Profil oder das Profil eines beliebigen anderen Benutzers ansehen
-      const targetUserId = request.query.userId?.trim() || request.user.id;
-
-      const user = await fastify.prisma.user.findUnique({
-        where: { id: targetUserId },
-        include: {
-          homeDepartment: {
-            select: { id: true, name: true, slug: true },
-          },
-          ceviDbStufen: {
-            select: { groupId: true, groupName: true, kind: true, roleNames: true, isPrimary: true },
-            orderBy: [{ isPrimary: 'desc' }, { groupName: 'asc' }],
-          },
-        },
-      });
-
-      if (!user) {
-        return reply.status(404).send({ error: 'Person nicht gefunden' });
-      }
-
-      return {
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          ceviName: user.ceviName,
-          phone: user.phone,
-          birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
-          isGlobalAdmin: user.isGlobalAdmin,
-          ceviDbId: user.ceviDbId,
-          ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
-          hasCeviDb: Boolean(user.ceviDbId),
-          ceviDbOrtsgruppeId: user.ceviDbOrtsgruppeId,
-          ceviDbOrtsgruppeName: user.ceviDbOrtsgruppeName,
-          ceviDbDepartmentLeader: user.ceviDbDepartmentLeader,
-          ceviDbLeaderGroupName: user.ceviDbLeaderGroupName,
-          ceviDbLeaderGroupIds: user.ceviDbLeaderGroupIds,
-          ceviDbJungscharIds: user.ceviDbJungscharIds,
-          homeDepartment: user.homeDepartment,
-          homeDepartmentSource: user.homeDepartmentSource,
-          ceviDbStufen: user.ceviDbStufen.map(toCeviDbStufeDto),
-        },
-        hasCeviDb: Boolean(user.ceviDbId),
-        ceviDbData: user.ceviDbData ?? null,
-      };
-    }
-  );
-
-  // 6c. Liste aller Benutzer mit Cevi.DB Profil (NUR globale Admins)
-  fastify.get(
-    '/api/auth/cevidb/users',
-    {
-      schema: {
-        tags: ['Auth'],
-        summary: 'Alle Benutzer mit Cevi.DB-Verknüpfung auflisten (Admin)',
-        description: 'Liefert eine Übersicht aller Benutzerkonten mit hinterlegter Cevi.DB-ID.',
-        security: [{ bearerAuth: [] }],
-      },
-      preHandler: [fastify.requireGlobalAdmin],
-    },
-    async (_request, reply) => {
-      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-
-      const users = await fastify.prisma.user.findMany({
-        where: {
-          ceviDbId: { not: null },
-        },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          ceviName: true,
-          email: true,
-          ceviDbId: true,
-          isGlobalAdmin: true,
-          ceviDbSyncedAt: true,
-        },
-        orderBy: [{ ceviName: 'asc' }, { firstName: 'asc' }],
-      });
-
-      return {
-        users: users.map((u) => ({
-          ...u,
-          ceviDbSyncedAt: u.ceviDbSyncedAt ? u.ceviDbSyncedAt.toISOString() : null,
-        })),
-      };
     }
   );
 

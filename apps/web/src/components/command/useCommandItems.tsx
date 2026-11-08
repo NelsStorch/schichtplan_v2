@@ -37,8 +37,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import {
-  getCeviDbDataUrl,
+import {
   type DepartmentPersonDto,
   type EventDto,
   type ShiftDto,
@@ -2041,22 +2040,6 @@ export function useCommandItems(query: string) {
           close();
         },
       });
-
-      if (user.isGlobalAdmin) {
-        list.push({
-          id: 'nav-cevidb',
-          title: 'Cevi.DB Synchronisation',
-          subtitle: 'Verknüpfte Hitobito-Daten und Stufen anzeigen',
-          section: 'NAVIGATION',
-          icon: <Sparkles className="size-4" />,
-          keywords: ['cevidb', 'hitobito', 'daten', 'sync', 'abgleich'],
-          onSelect: () => {
-            recordRecentCommand('nav-cevidb');
-            window.location.href = getCeviDbDataUrl();
-            close();
-          },
-        });
-      }
     }
 
     list.push({

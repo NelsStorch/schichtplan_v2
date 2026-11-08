@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveCeviDbFields, isDepartmentLeaderRole, parseCeviDbGroupId, placeCeviDbPerson } from './cevidb.js';
-import { missingProfileFields, personLabel, withoutCeviDbAddress } from './profile.js';
+import { missingProfileFields, personLabel } from './profile.js';
 
 const profile = {
   id: 12211,
@@ -54,25 +54,6 @@ describe('deriveCeviDbFields', () => {
     expect(isDepartmentLeaderRole('Group::Jungschar::Abteilungsleiterin', [])).toBe(true);
     expect(isDepartmentLeaderRole('Group::Abteilung::Abteilungsleitung', [])).toBe(true);
     expect(isDepartmentLeaderRole('Group::Stufe::Stufenleiter', [])).toBe(false);
-  });
-});
-
-describe('withoutCeviDbAddress', () => {
-  it('entfernt Adressfelder, auch in _userInfo', () => {
-    expect(
-      withoutCeviDbAddress({
-        id: 1,
-        nickname: 'Falk',
-        address: 'Hauptstrasse 1',
-        zip_code: '8307',
-        town: 'Effretikon',
-        country: 'CH',
-        company_name: 'Firma AG',
-        company: true,
-        _userInfo: { sub: '1', address: 'Hauptstrasse 1', postal_code: '8307', company: false },
-      })
-    ).toEqual({ id: 1, nickname: 'Falk', _userInfo: { sub: '1' } });
-    expect(withoutCeviDbAddress('x')).toBe('x');
   });
 });
 

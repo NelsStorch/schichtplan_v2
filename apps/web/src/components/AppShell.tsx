@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
-  Database,
   LifeBuoy,
   LogIn,
   LogOut,
@@ -31,7 +30,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, departmentRoleLabel, getCeviDbDataUrl, helpUrl, statusUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
+import { PRIVACY_URL, departmentRoleLabel, helpUrl, statusUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
 import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { clearOfflineData, useInstallPrompt } from '@/lib/offline';
@@ -482,11 +481,6 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
               <a href={helpUrl()} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
                 <LifeBuoy className="size-4 text-accent" /> Hilfe &amp; Anleitungen
               </a>
-              {user.isGlobalAdmin && (
-                <a href={getCeviDbDataUrl()} onClick={onClose} className={buttonClasses({ variant: 'secondary', className: 'justify-start col-span-full' })}>
-                  <Database className="size-4 text-accent" /> Cevi.DB Daten &amp; Rollen
-                </a>
-              )}
             </div>
           </div>
 

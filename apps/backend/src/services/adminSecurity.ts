@@ -1,5 +1,5 @@
 /**
- * Zusätzliche Hürden für die Schnittstelle der globalen Admins (Admin-Portal und Cevi.DB-Debugseite).
+ * Zusätzliche Hürden für die Schnittstelle der globalen Admins (Admin-Portal).
  *
  * Das Login-Cookie gilt für alle Subdomains, und Traefik leitet `/api` auf jeder Subdomain ans Backend.
  * Ohne diese Prüfungen könnte ein Skript auf einer Abteilungsseite oder auf Dev (`*.dev.`) mit dem
@@ -40,7 +40,7 @@ function bareHost(value: string | undefined): string {
 export type AdminRequestProblem = 'HOST' | 'CROSS_ORIGIN';
 
 /**
- * Darf diese Anfrage überhaupt an die Admin-Schnittstelle? Nur auf `admin.` und `login.` (Debugseite)
+ * Darf diese Anfrage überhaupt an die Admin-Schnittstelle? Nur auf `admin.`
  * und nur von derselben Seite (kein Aufruf von einer anderen Subdomain, auch nicht von Dev).
  */
 export function adminRequestProblem(
@@ -48,7 +48,7 @@ export function adminRequestProblem(
   config: Pick<AdminSecurityConfig, 'rootDomain' | 'allowLocalhost'>
 ): AdminRequestProblem | null {
   const host = bareHost(headers.host);
-  const allowedHosts = [`admin.${config.rootDomain}`, `login.${config.rootDomain}`];
+  const allowedHosts = [`admin.${config.rootDomain}`];
   if (!allowedHosts.includes(host) && !(config.allowLocalhost && isLocalHost(host))) return 'HOST';
 
   // Browser schicken Sec-Fetch-Site mit: alles ausser «same-origin» (oder «none» = direkt eingetippt) ablehnen

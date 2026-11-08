@@ -663,62 +663,6 @@ export interface EventRosterResponseDto {
   items: EventRosterItemDto[];
 }
 
-export interface CeviDbRoleDto {
-  group_id: number;
-  group_name: string;
-  role_name: string;
-  role_class?: string;
-  role?: string;
-  permissions?: string[];
-}
-
-export interface CeviDbProfileDto {
-  id: number;
-  email?: string | null;
-  first_name?: string | null;
-  last_name?: string | null;
-  given_name?: string | null;
-  family_name?: string | null;
-  nickname?: string | null;
-  company_name?: string | null;
-  company?: boolean;
-  address?: string | null;
-  zip_code?: string | null;
-  town?: string | null;
-  country?: string | null;
-  gender?: string | null;
-  birthday?: string | null;
-  primary_group_id?: number | null;
-  language?: string | null;
-  locale?: string | null;
-  roles?: CeviDbRoleDto[];
-  _userInfo?: Record<string, unknown>;
-  _meta?: {
-    fetchedAt?: string;
-    grantedScopes?: string;
-    tokenType?: string;
-    expiresIn?: number;
-  };
-  [key: string]: unknown;
-}
-
-export interface CeviDbDebugResponseDto {
-  user: UserDto;
-  hasCeviDb: boolean;
-  ceviDbData: CeviDbProfileDto | null;
-}
-
-export interface CeviDbUserSummaryDto {
-  id: string;
-  firstName: string;
-  lastName: string | null;
-  ceviName: string | null;
-  email: string | null;
-  ceviDbId: number | null;
-  isGlobalAdmin: boolean;
-  ceviDbSyncedAt: string | null;
-}
-
 export interface QuickLoginDto {
   ceviName: string;
   firstName?: string;

@@ -41,37 +41,6 @@ export function missingProfileFields(user: ProfileFieldsSource, required: string
   return cleanRequiredFields(required).filter((field) => !hasProfileField(user, field));
 }
 
-/** Adressfelder im Cevi.DB-Profil (oberste Ebene und OpenID-`_userInfo`) */
-const CEVIDB_ADDRESS_KEYS = [
-  'address',
-  'street',
-  'housenumber',
-  'postbox',
-  'zip_code',
-  'postal_code',
-  'town',
-  'country',
-  'additional_addresses',
-  'company_name',
-  'company',
-];
-
-/**
- * Rohes Cevi.DB-Profil ohne Adresse: Der Schichtplan speichert keine Adressen (Datensparsamkeit),
- * auch nicht in `users.ceviDbData`.
- */
-export function withoutCeviDbAddress<T>(profile: T): T {
-  const strip = (value: unknown): unknown => {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
-    return Object.fromEntries(Object.entries(value).filter(([key]) => !CEVIDB_ADDRESS_KEYS.includes(key)));
-  };
-  const top = strip(profile);
-  if (typeof top !== 'object' || top === null) return profile;
-  const record = top as Record<string, unknown>;
-  if ('_userInfo' in record) record._userInfo = strip(record._userInfo);
-  return record as T;
-}
-
 /** «Falk (Max Muster)», ohne Platzhalter-Nachnamen und ohne Wiederholung des Cevi-Namens */
 export function personLabel(u: { ceviName: string | null; firstName: string; lastName: string | null }): string {
   const lastName = u.lastName && u.lastName !== PLACEHOLDER_LAST_NAME ? u.lastName : '';

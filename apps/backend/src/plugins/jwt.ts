@@ -23,7 +23,7 @@ declare module 'fastify' {
     optionalAuthenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     /**
      * Eingeloggt und in der Datenbank als globaler Admin geführt (nicht nur laut Token). Zusätzlich:
-     * nur auf admin./login., nur von derselben Seite, Anmeldung frisch (und in Produktion über Cevi.DB),
+     * nur auf admin., nur von derselben Seite, Anmeldung frisch (und in Produktion über Cevi.DB),
      * Änderungen gebremst. Siehe services/adminSecurity.ts.
      */
     requireGlobalAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;

@@ -15,8 +15,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import {
-  getRootDomain,
+import {
   normalizePermissions,
   type AdminDepartmentListItemDto,
   type AdminUserDetailDto,
@@ -467,21 +466,6 @@ export function UserDialog({
                   <History className="size-3.5" aria-hidden />
                   Im Protokoll zeigen
                 </button>
-              )}
-              {user.ceviDbId && (
-                <a
-                  href={
-                    typeof window !== 'undefined' &&
-                    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-                      ? `http://localhost:3002/cevidb-daten?userId=${encodeURIComponent(user.id)}`
-                      : `https://login.${getRootDomain()}/cevidb-daten?userId=${encodeURIComponent(user.id)}`
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
-                >
-                  Cevi.DB Rohdaten prüfen ↗
-                </a>
               )}
             </div>
           </div>
