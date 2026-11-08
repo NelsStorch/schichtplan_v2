@@ -1,0 +1,206 @@
+import { FastifyPluginAsync, FastifyReply } from 'fastify';
+import {
+  CeviNameQuickLoginSchema,
+  CeviNameRegisterSchema,
+} from '@schichtplan/shared';
+import {
+  RATE_LIMIT_ERROR,
+  findCeviNameMatches,
+  pickCeviNameMatch,
+  claimCeviNameAttempt,
+  releaseCeviNameAttempt,
+  tooManyRequests,
+} from '../../services/ceviNameLogin.js';
+import { trackUsage } from '../../services/usageStats.js';
+
+import {
+  setAuthCookie,
+  cleanReturnTo,
+  loadUserDto,
+  ensureHelperMembership,
+} from '../../services/authSession.js';
+
+
+/** Passwortlose Anmeldung und Registrierung mit Cevi-Name und Geburtsdatum (nur an einer Abteilung) */
+const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
+  // 3. Cevi-Name-Login (ohne Passwort, nur an einer Abteilung)
+  //    Cevi-Name + Geburtsdatum + Abteilung bestimmen das Profil. Nur reine Cevi-Name-Profile ohne
+  //    Rechte lassen sich so anmelden; Cevi.DB- und Passwort-Konten verlangen ihren eigenen Login.
+  //    Findet sich niemand, bietet das Login-Portal die Registrierung an (ceviname-register).
+  fastify.post(
+    '/api/auth/ceviname-login',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Schnellanmeldung mit Cevi-Name und Geburtsdatum',
+        description: 'Passwortlose Helfer-Anmeldung an einer Abteilung mit Cevi-Name und Geburtsdatum.',
+        body: CeviNameQuickLoginSchema,
+      },
+    },
+    async (request, reply) => {
+    if (tooManyRequests(request.ip)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
+    const parse = CeviNameQuickLoginSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({ error: parse.error.issues[0].message });
+    }
+    const { departmentSlug, ceviName, birthDate, returnTo } = parse.data;
+
+    const department = await fastify.prisma.department.findUnique({
+      where: { slug: departmentSlug.toLowerCase() },
+      select: { id: true, name: true },
+    });
+    if (!department) {
+      return reply.status(404).send({ error: 'Diese Abteilung gibt es nicht.' });
+    }
+
+    // Sperre vor der Suche: Auch ein richtiges Geburtsdatum kommt während der Sperre nicht durch
+    if (claimCeviNameAttempt(department.id, ceviName)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
+    const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
+    const result = pickCeviNameMatch(matches);
+    // Nur ein erfolgreicher Login ist kein Fehlversuch
+    if (result.kind === 'LOGIN') releaseCeviNameAttempt(department.id, ceviName);
+    if (result.kind === 'USE_CEVIDB') {
+      trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_USE_CEVIDB', departmentId: department.id });
+      return reply.status(403).send({
+        code: 'USE_CEVIDB',
+        error: 'Zu diesem Cevi-Namen gibt es ein Konto mit Cevi.DB. Melde dich bitte mit Cevi.DB an.',
+      });
+    }
+    if (result.kind === 'USE_PASSWORD') {
+      trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_USE_PASSWORD', departmentId: department.id });
+      return reply.status(403).send({
+        code: 'USE_PASSWORD',
+        error: 'Zu diesem Cevi-Namen gibt es ein geschütztes Konto. Melde dich bitte mit E-Mail und Passwort an.',
+      });
+    }
+    if (result.kind === 'NONE') {
+      trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_NOT_FOUND', departmentId: department.id });
+      return reply.status(404).send({
+        code: 'NOT_FOUND',
+        error: `Bei ${department.name} gibt es noch kein Profil mit diesem Cevi-Namen und Geburtsdatum.`,
+      });
+    }
+
+    await ensureHelperMembership(fastify.prisma, department.id, result.userId);
+    const user = await fastify.prisma.user.findUniqueOrThrow({ where: { id: result.userId } });
+    trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
+    return signInCeviNameProfile(reply, user, returnTo);
+  });
+
+  // 3b. Neues Cevi-Name-Profil an einer Abteilung (nach einem Login ohne Treffer)
+  fastify.post(
+    '/api/auth/ceviname-register',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Neues Helferprofil mit Cevi-Name anlegen',
+        description: 'Erstellt ein neues passwortloses Helferprofil für eine Abteilung.',
+        body: CeviNameRegisterSchema,
+      },
+    },
+    async (request, reply) => {
+    if (tooManyRequests(request.ip)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
+    const parse = CeviNameRegisterSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({ error: parse.error.issues[0].message });
+    }
+    const { departmentSlug, ceviName, birthDate, firstName, lastName, phone, stufen, returnTo } = parse.data;
+
+    const department = await fastify.prisma.department.findUnique({
+      where: { slug: departmentSlug.toLowerCase() },
+      select: { id: true, name: true },
+    });
+    if (!department) {
+      return reply.status(404).send({ error: 'Diese Abteilung gibt es nicht.' });
+    }
+
+    // Gleicher Cevi-Name und gleiches Geburtsdatum in derselben Abteilung gibt es nur einmal.
+    // Die Antwort verrät, ob Name und Geburtsdatum passen: gleiche Bremse wie beim Login.
+    if (claimCeviNameAttempt(department.id, ceviName)) {
+      return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
+    }
+    const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
+    // Kein Treffer verrät nichts: kein Fehlversuch
+    if (matches.length === 0) releaseCeviNameAttempt(department.id, ceviName);
+    if (matches.length > 0) {
+      const result = pickCeviNameMatch(matches);
+      return reply.status(409).send({
+        code: result.kind === 'USE_CEVIDB' ? 'USE_CEVIDB' : result.kind === 'USE_PASSWORD' ? 'USE_PASSWORD' : 'EXISTS',
+        error:
+          result.kind === 'LOGIN'
+            ? 'Dieses Profil gibt es schon. Melde dich mit Cevi-Name und Geburtsdatum an.'
+            : 'Zu diesem Cevi-Namen und Geburtsdatum gibt es schon ein Konto. Melde dich damit an.',
+      });
+    }
+
+    const stufeIds = [...new Set(stufen.map((s) => s.stufeId))];
+    if (stufeIds.length) {
+      const found = await fastify.prisma.departmentStufe.count({
+        where: { id: { in: stufeIds }, departmentId: department.id },
+      });
+      if (found !== stufeIds.length) {
+        return reply.status(400).send({ error: 'Eine Stufe gehört nicht zu dieser Abteilung' });
+      }
+    }
+
+    const cleanCeviName = ceviName.trim();
+    const user = await fastify.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          ceviName: cleanCeviName,
+          firstName: firstName?.trim() || cleanCeviName,
+          lastName: lastName?.trim() || null,
+          birthDate: new Date(`${birthDate}T00:00:00Z`),
+          phone: phone?.trim() || null,
+          homeDepartmentId: department.id,
+          homeDepartmentSource: 'SELF',
+          departmentSetupAt: new Date(),
+        },
+      });
+      await tx.departmentMember.create({
+        data: { departmentId: department.id, userId: created.id, role: 'HELPER' },
+      });
+      const unique = new Map(stufen.map((s) => [s.stufeId, s.role]));
+      if (unique.size) {
+        await tx.userStufe.createMany({
+          data: [...unique].map(([stufeId, role]) => ({ userId: created.id, stufeId, role, source: 'SELF' })),
+        });
+      }
+      return created;
+    });
+
+    fastify.log.info({ userId: user.id, departmentId: department.id }, 'Cevi-Name-Profil angelegt');
+    trackUsage('REGISTER', { dim: 'ceviname', departmentId: department.id });
+    trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
+    return signInCeviNameProfile(reply, user, returnTo);
+  });
+
+  /** Cookie setzen und Profil zurückgeben (Login und Registrierung mit Cevi-Name) */
+  async function signInCeviNameProfile(
+    reply: FastifyReply,
+    user: { id: string; email: string | null; ceviName: string | null; isGlobalAdmin: boolean },
+    returnTo: string | undefined
+  ) {
+    const token = fastify.signAuthToken({
+      id: user.id,
+      email:
+        user.email ||
+        `${(user.ceviName ?? 'helfer').toLowerCase().replace(/[^a-z0-9]/g, '')}@guest.cevi-schichtplan.ch`,
+      isGlobalAdmin: user.isGlobalAdmin,
+      amr: 'ceviname',
+    });
+    setAuthCookie(reply, token);
+    return {
+      redirectUrl: cleanReturnTo(returnTo),
+      user: await loadUserDto(fastify.prisma, user.id, null),
+    };
+  }
+};
+
+export default ceviNameAuthRoutes;
