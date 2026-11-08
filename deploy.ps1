@@ -3,7 +3,10 @@ param (
     [string]$Environment = 'prod',
 
     # Ueberspringt das Datenbank-Dump vor dem Deployment
-    [switch]$SkipBackup
+    [switch]$SkipBackup,
+
+    # Nur fuer Notfaelle: Prod auch ohne gepushten Stand und gruene CI deployen
+    [switch]$Force
 )
 
 # Zeichensatz auf UTF-8 festlegen fuer saubere Konsolen- und Webhook-Ausgaben
@@ -110,6 +113,43 @@ Write-Host "Revision: $revision"
 if ($dirty.Count -gt 0) {
     Write-Host "Achtung: $($dirty.Count) Datei(en) sind nicht committet und gehen trotzdem mit:" -ForegroundColor Yellow
     $dirty | Select-Object -First 8 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+}
+
+# Prod nur mit einem Stand, den die CI geprueft hat (Lint, Typen, Tests inkl. Datenbank, Builds):
+# alles committet, auf main, gepusht, und der CI-Lauf fuer genau diesen Commit ist gruen.
+# Dev bleibt frei zum Ausprobieren. Notfall: -Force (wird in Discord vermerkt).
+function Test-ProdReady {
+    if ($dirty.Count -gt 0) { return "Es gibt nicht committete Dateien." }
+    $branch = git rev-parse --abbrev-ref HEAD 2>$null
+    if ($branch -ne 'main') { return "Prod wird nur von main deployt (aktuell: $branch)." }
+    git fetch --quiet origin main 2>$null
+    if ($LASTEXITCODE -ne 0) { return "git fetch origin main ist fehlgeschlagen." }
+    $remote = git rev-parse origin/main 2>$null
+    if ($remote -ne $revisionFull) { return "Der Stand ist nicht gepusht oder nicht aktuell (origin/main: $($remote.Substring(0, [Math]::Min(7, "$remote".Length))))." }
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return "GitHub CLI (gh) fehlt, die CI laesst sich nicht pruefen." }
+    $runsJson = gh run list --workflow CI --commit $revisionFull --event push --json status,conclusion,url --limit 5 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $runsJson) { return "Die CI-Laeufe konnten nicht abgefragt werden (gh auth status?)." }
+    $runs = @($runsJson | ConvertFrom-Json)
+    if ($runs.Count -eq 0) { return "Fuer diesen Commit gibt es keinen CI-Lauf." }
+    $run = $runs[0]
+    if ($run.status -ne 'completed') { return "Die CI laeuft noch ($($run.url)). Bitte warten, bis sie gruen ist." }
+    if ($run.conclusion -ne 'success') { return "Die CI ist nicht gruen ($($run.conclusion), $($run.url))." }
+    Write-Host "CI gruen fuer $revision ($($run.url))" -ForegroundColor Green
+    return $null
+}
+
+if ($Environment -eq 'prod') {
+    $problem = Test-ProdReady
+    if ($problem) {
+        if ($Force) {
+            Write-Host "ACHTUNG -Force: $problem Deploy laeuft trotzdem." -ForegroundColor Yellow
+            Send-DiscordNotification -title "Prod-Deploy mit -Force" -description "**Grund fuer die Sperre:** $problem`n**Stand:** $commit" -color 15105570
+        } else {
+            Write-Host "`nProd-Deploy gestoppt: $problem" -ForegroundColor Red
+            Write-Host "Erst pushen und die CI abwarten. Nur im Notfall: .\deploy.ps1 prod -Force" -ForegroundColor Red
+            exit 1
+        }
+    }
 }
 
 Step "1. Archiv erstellen"
