@@ -2,7 +2,7 @@
  * Heimabteilung und Stufen einer Person.
  * Cevi.DB-Personen: Abteilung und Stufen aus den Rollen und der Gruppenstruktur (Quelle CEVIDB, bei jedem Login neu).
  * Alle anderen geben beides beim Login selbst an (Quelle SELF).
- * Grundlage sind die beim Login gespeicherten Spalten (users.ceviDb*) und user_cevidb_stufen, nie users.ceviDbData.
+ * Grundlage sind die beim Login gespeicherten Spalten (users.ceviDb*) und user_cevidb_stufen.
  */
 import type { PrismaClient } from '../db.js';
 import type { CeviDbStufeDto, StufeRole, UserStufeDto } from '@schichtplan/shared';

@@ -1,6 +1,6 @@
 /**
  * Auswertung des Cevi.DB-Profils (`/oauth/profile` mit Scope `with_roles`).
- * Wird nur beim Cevi.DB-Login auf die frische Antwort angewendet (`deriveCeviDbFields`), nie auf `users.ceviDbData`.
+ * Wird nur beim Cevi.DB-Login auf die frische Antwort angewendet (`deriveCeviDbFields`), das Rohprofil wird nicht gespeichert.
  * Welche Rollen was bedeuten, steht in `config/cevidb.ts`.
  *
  * Vertrauen: `roles` vergibt die Leitung in der Cevi.DB, `primary_group_id` lässt sich nur aus den eigenen Rollen
@@ -154,7 +154,7 @@ export interface CeviDbDerived {
 
 /**
  * Alles, was der Schichtplan aus dem Cevi.DB-Profil braucht. Wird nur direkt beim Login auf die frische
- * OAuth-Antwort angewendet und in eigene Spalten/Tabellen geschrieben (users.ceviDbData wird nie gelesen).
+ * OAuth-Antwort angewendet und in eigene Spalten/Tabellen geschrieben (das Rohprofil wird nicht gespeichert).
  */
 export function deriveCeviDbFields(profile: unknown): CeviDbDerived {
   const leadership = ceviDbLeadership(profile);

@@ -124,10 +124,9 @@ model User {
   phone         String?
   birthDate     DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
   isGlobalAdmin Boolean            @default(false)
-  // VERALTET: Rohes Cevi.DB-Profil. Wird weder geschrieben noch gelesen und ist geleert
-  // (Migration 20261108120000). Die Spalte entfällt mit der nächsten Migration, wenn kein laufender
-  // Code sie mehr kennt. Nicht mehr verwenden.
-  ceviDbData    Json?
+  // Die frühere Spalte "ceviDbData" (rohes Cevi.DB-Profil) ist hier bewusst nicht mehr aufgeführt:
+  // geleert mit Migration 20261108120000, gelöscht wird sie erst mit dem Deploy NACH diesem Stand
+  // (vorher läuft beim Rollout noch Code, dessen Prisma-Client sie abfragt).
   // Aus dem Cevi.DB-Profil beim Login abgeleitet (siehe services/cevidb.ts)
   ceviDbOrtsgruppeId      Int?     @map("cevidb_ortsgruppe_id")
   ceviDbOrtsgruppeName    String?  @map("cevidb_ortsgruppe_name")
