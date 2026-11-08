@@ -461,7 +461,7 @@ function LoginContent() {
             {destination && (
               <div className="mt-4 rounded-xl border border-line bg-surface-2/60 p-3 text-xs text-fg-subtle">
                 Ziel:{' '}
-                <span className="font-medium text-fg">{destination}</span>
+                <span className="font-medium text-fg break-all">{destination}</span>
               </div>
             )}
 
@@ -473,8 +473,12 @@ function LoginContent() {
                   className: 'w-full justify-between shadow-soft',
                 })}
               >
-                <span>Weiter {destination ? `zu ${destination}` : 'zur Übersicht'}</span>
-                <ArrowUpRight className="size-4" />
+                {/* Kurz halten: Die volle Adresse steht schon im «Ziel»-Feld darüber.
+                    Lange Namen werden abgeschnitten statt über den Knopf hinauszulaufen. */}
+                <span className="min-w-0 truncate">
+                  {department ? `Weiter zu ${department.name}` : destination ? 'Weiter' : 'Weiter zur Übersicht'}
+                </span>
+                <ArrowUpRight className="size-4 shrink-0" />
               </a>
 
               <Button
