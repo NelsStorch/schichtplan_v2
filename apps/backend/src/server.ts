@@ -8,6 +8,7 @@ import { isDatabaseOverloadError, sendServerAlert } from './services/serverAlert
 import { STATS_MAINTENANCE_INTERVAL_MS, runStatsMaintenance } from './services/statsMaintenance.js';
 import { trackUsage } from './services/usageStats.js';
 import { runExclusive } from './services/jobLock.js';
+import { UNVERIFIED_CLEANUP_INTERVAL_MS, deleteExpiredUnverifiedAccounts } from './services/unverifiedAccounts.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -102,6 +103,31 @@ async function main() {
   app.addHook('onClose', async () => {
     clearInterval(purgeTimer);
     clearTimeout(firstPurge);
+  });
+
+  // Unbestätigte Passwort-Konten löschen, sobald kein gültiger Bestätigungslink mehr offen ist (24 h)
+  const cleanupUnverified = () =>
+    runExclusive(app.prisma, 'unverified-accounts', () => deleteExpiredUnverifiedAccounts(app.prisma, app.log))
+      .then((res) => {
+        if (!res.ran) return;
+        const deleted = res.value;
+        trackUsage('JOB_RUN', { dim: 'UNVERIFIED_ACCOUNTS' });
+        if (deleted > 0) {
+          trackUsage('JOB_ITEMS', { dim: 'UNVERIFIED_ACCOUNTS', n: deleted });
+          app.log.info({ deleted }, 'Unbestätigte Konten gelöscht');
+        }
+      })
+      .catch((err) => {
+        trackUsage('JOB_FAILED', { dim: 'UNVERIFIED_ACCOUNTS' });
+        app.log.error(err, 'Löschen unbestätigter Konten fehlgeschlagen');
+      });
+  const unverifiedTimer = setInterval(cleanupUnverified, UNVERIFIED_CLEANUP_INTERVAL_MS);
+  unverifiedTimer.unref();
+  const firstUnverified = setTimeout(cleanupUnverified, 4 * 60 * 1000);
+  firstUnverified.unref();
+  app.addHook('onClose', async () => {
+    clearInterval(unverifiedTimer);
+    clearTimeout(firstUnverified);
   });
 
   // Nutzungsstatistik: Momentaufnahme des Vortags, alte Stundenwerte zusammenfassen, Altes löschen

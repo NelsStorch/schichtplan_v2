@@ -654,11 +654,14 @@ export async function sendVerificationEmail({
   name,
   verificationUrl,
   expiresHours = 24,
+  deletesUnconfirmed = false,
 }: {
   to: string;
   name?: string | null;
   verificationUrl: string;
   expiresHours?: number;
+  /** Hinweis, dass das Konto ohne Bestätigung gelöscht wird (neue Passwort-Konten) */
+  deletesUnconfirmed?: boolean;
 }): Promise<boolean> {
   const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
   const subject = 'Bestätige deine E-Mail-Adresse – Cevi Schichtplan';
@@ -671,9 +674,11 @@ export async function sendVerificationEmail({
     <p style="margin: 0 0 16px 0;">schön, dass du dabei bist! Bitte bestätige kurz deine E-Mail-Adresse, damit wir dir Erinnerungen zu deinen Schichten und Infos vom OK schicken können:</p>
   `;
 
+  // Neues Passwort-Konto: ohne Bestätigung wird es nach Ablauf des Links gelöscht (services/unverifiedAccounts.ts)
+  const deleteNote = deletesUnconfirmed ? ' Ohne Bestätigung löschen wir das Konto danach wieder.' : '';
   const calloutBox = {
     title: 'Sicherheitshinweis',
-    text: `Dieser Bestätigungslink ist ${expiresHours} Stunden gültig. Falls du diese Adresse nicht selbst eingetragen hast, kannst du diese E-Mail einfach ignorieren.`,
+    text: `Dieser Bestätigungslink ist ${expiresHours} Stunden gültig.${deleteNote} Falls du diese Adresse nicht selbst eingetragen hast, kannst du diese E-Mail einfach ignorieren.`,
     tone: 'info' as const,
   };
 
@@ -689,7 +694,7 @@ export async function sendVerificationEmail({
       'Du erhältst diese E-Mail, weil deine Adresse bei einem Konto auf cevi-schichtplan.ch hinterlegt wurde.',
   });
 
-  const text = `Hallo ${displayName},\n\nWillkommen beim Cevi Schichtplan!\n\nBitte öffne den folgenden Link in deinem Browser, um deine E-Mail-Adresse zu bestätigen:\n${verificationUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig.\n\nFalls du diese Adresse nicht selbst eingetragen hast, kannst du diese Nachricht ignorieren.\n\nHerzliche Grüsse\nDein Cevi Schichtplan Team\nhttps://cevi-schichtplan.ch`;
+  const text = `Hallo ${displayName},\n\nWillkommen beim Cevi Schichtplan!\n\nBitte öffne den folgenden Link in deinem Browser, um deine E-Mail-Adresse zu bestätigen:\n${verificationUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig.${deleteNote}\n\nFalls du diese Adresse nicht selbst eingetragen hast, kannst du diese Nachricht ignorieren.\n\nHerzliche Grüsse\nDein Cevi Schichtplan Team\nhttps://cevi-schichtplan.ch`;
 
   return sendEmail({ to, subject, html, text, kind: 'VERIFICATION' });
 }

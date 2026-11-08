@@ -927,6 +927,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       to: cleanEmail,
       name: user.ceviName || user.firstName,
       verificationUrl,
+      deletesUnconfirmed: true,
     });
 
     // Absichtlich KEIN Auth-Cookie setzen, damit die E-Mail zuerst verifiziert werden muss
@@ -993,6 +994,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       to: cleanEmail,
       name: user.ceviName || user.firstName,
       verificationUrl,
+      // Unbestätigte Passwort-Konten löscht der Aufräumjob (Cevi-Name-Profile mit E-Mail nicht)
+      deletesUnconfirmed: Boolean(user.passwordHash && user.ceviDbId === null),
     });
 
     return genericAnswer;

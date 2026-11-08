@@ -47,6 +47,7 @@ export const STATS_JOBS = {
   SHIFT_REMINDERS: 'Schicht-Erinnerungen',
   ANSWER_RETENTION: 'Löschfristen der Antworten',
   STATS_MAINTENANCE: 'Statistik aufräumen',
+  UNVERIFIED_ACCOUNTS: 'Unbestätigte Konten löschen',
 } as const;
 
 /** Unterseiten des OK-Bereichs (Pfad nach /ok/, '' = Übersicht) */
@@ -105,7 +106,12 @@ export const USAGE_METRICS = {
     label: 'Von Jobs bearbeitet',
     group: 'BETRIEB',
     source: 'server',
-    dims: { SHIFT_REMINDERS: 'Erinnerungen verschickt', ANSWER_RETENTION: 'Antworten gelöscht', STATS_MAINTENANCE: 'Zeilen zusammengefasst' },
+    dims: {
+      SHIFT_REMINDERS: 'Erinnerungen verschickt',
+      ANSWER_RETENTION: 'Antworten gelöscht',
+      STATS_MAINTENANCE: 'Zeilen zusammengefasst',
+      UNVERIFIED_ACCOUNTS: 'Unbestätigte Konten gelöscht',
+    },
   },
   EXTERNAL: {
     label: 'Externe Dienste',
