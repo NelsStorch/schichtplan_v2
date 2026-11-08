@@ -33,15 +33,26 @@ export function extractSubdomain(hostHeader?: string): string | null {
   return null;
 }
 
+/** Darf der Header `x-tenant-slug` die Abteilung bestimmen? Ausserhalb von Produktion immer, sonst nur intern. */
+export function tenantHeaderAllowed(
+  headers: Record<string, string | string[] | undefined>,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (env.NODE_ENV !== 'production') return true;
+  return !headers['x-forwarded-for'] && !headers['x-forwarded-host'];
+}
+
 const tenantPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorateRequest('tenant', null);
 
   fastify.addHook('preHandler', async (request) => {
-    // 1. Check explicit header first (helpful for local dev or API clients)
+    // 1. Abteilung per Header: lokal (Next-Proxy, Tests) und für interne Aufrufe der Frontends
+    //    (z. B. Link-Vorschau). Von aussen gilt in Produktion nur der Host: Traefik setzt immer
+    //    X-Forwarded-For, eine Anfrage über den Proxy kann sich die Abteilung so nicht aussuchen.
     const headerSlug = request.headers['x-tenant-slug'];
     let slug: string | null = null;
 
-    if (typeof headerSlug === 'string' && headerSlug.trim().length > 0) {
+    if (typeof headerSlug === 'string' && headerSlug.trim().length > 0 && tenantHeaderAllowed(request.headers)) {
       slug = headerSlug.trim().toLowerCase();
     } else {
       // 2. Extract from Host header

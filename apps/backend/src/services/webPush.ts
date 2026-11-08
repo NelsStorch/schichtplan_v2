@@ -24,6 +24,26 @@ export interface PushSubscriptionKeys {
   auth: string;
 }
 
+/**
+ * Push-Dienste der Browser (Chrome/Edge/Opera über FCM, Firefox, Safari, Windows). Nur dorthin schickt
+ * der Server Push-Nachrichten. Sonst könnte jedes Konto eine beliebige Adresse als «Push-Endpoint»
+ * eintragen und den Server Anfragen an interne Dienste schicken lassen (SSRF).
+ */
+const PUSH_SERVICE_HOSTS = ['fcm.googleapis.com', 'android.googleapis.com'];
+const PUSH_SERVICE_SUFFIXES = ['.push.services.mozilla.com', '.push.apple.com', '.notify.windows.com'];
+
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_SERVICE_HOSTS.includes(host) || PUSH_SERVICE_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
 interface VapidKeys {
   publicKeyBase64Url: string;
   privateKeyBytes: Buffer;
@@ -226,6 +246,10 @@ export async function sendPushNotification(
   payload: PushPayload,
   ttlSeconds = 86_400,
 ): Promise<SendPushResult> {
+  // Auch bei älteren Abos prüfen (vorher liess sich jede Adresse speichern); «gone» räumt sie weg
+  if (!isAllowedPushEndpoint(sub.endpoint)) {
+    return { ok: false, status: 410, gone: true, errorText: 'Push-Endpoint nicht erlaubt' };
+  }
   const body = encryptWebPushPayload(JSON.stringify(payload), sub.p256dh, sub.auth);
   const authorization = createVapidAuthorizationHeader(sub.endpoint);
 
@@ -240,6 +264,8 @@ export async function sendPushNotification(
       Urgency: 'high',
     },
     body: new Uint8Array(body),
+    // Keiner Weiterleitung folgen: sonst führte ein erlaubter Host doch noch zu einer anderen Adresse
+    redirect: 'manual',
     signal: AbortSignal.timeout(10_000),
   });
 

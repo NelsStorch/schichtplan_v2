@@ -184,8 +184,9 @@ const eventRoutes: FastifyPluginAsync = async (fastify) => {
     });
     if (!link || link.eventId !== eventId) return false;
     if (link.expiresAt && link.expiresAt <= new Date()) return false;
-    // Persoenlicher Link: nur gueltig, wenn noch frei oder bereits an diesen User gebunden
-    if (link.kind === 'PERSONAL' && link.boundUserId && viewerId && link.boundUserId !== viewerId) {
+    // Persönlicher Link: nur gültig, wenn noch frei oder bereits an diese Person gebunden.
+    // Schon gebunden und niemand angemeldet: nicht mehr gültig (sonst öffnete er den Anlass für alle).
+    if (link.kind === 'PERSONAL' && link.boundUserId && link.boundUserId !== viewerId) {
       return false;
     }
     return true;

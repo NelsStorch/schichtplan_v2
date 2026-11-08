@@ -170,6 +170,18 @@ const ReplacementCutoffSchema = z
   .int()
   .refine((h) => (REPLACEMENT_CUTOFF_HOURS as readonly number[]).includes(h), 'Ungültige Frist');
 
+/** Mindestlänge des Stand-PINs: Ein kurzer PIN ist mit wenigen IP-Adressen schnell durchprobiert */
+export const STAFF_PIN_MIN_LENGTH = 4;
+
+/** Stand-PIN für Papier-Bons: leer/null = kein PIN, sonst mindestens STAFF_PIN_MIN_LENGTH Zeichen */
+const StaffPinSchema = z
+  .string()
+  .trim()
+  .max(20, 'Der Stand-PIN darf höchstens 20 Zeichen haben')
+  .refine((pin) => pin === '' || pin.length >= STAFF_PIN_MIN_LENGTH, `Der Stand-PIN braucht mindestens ${STAFF_PIN_MIN_LENGTH} Zeichen`)
+  .nullable()
+  .optional();
+
 export const CreateEventSchema = z.object({
   title: z.string().trim().min(2, 'Titel ist erforderlich').max(120),
   slug: z
@@ -210,7 +222,7 @@ export const CreateEventSchema = z.object({
     .max(72, 'Maximal 72 Stunden Vorlaufzeit')
     .optional()
     .default(2),
-  cateringStaffPin: z.string().trim().max(20).nullable().optional(),
+  cateringStaffPin: StaffPinSchema,
   cateringRemindersEnabled: z.boolean().optional().default(true),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional().default(15),
   allowReplacement: z.boolean().optional(),
@@ -256,7 +268,7 @@ export const UpdateEventSchema = z.object({
     .min(-1, 'Ungültige Vorlaufzeit')
     .max(72, 'Maximal 72 Stunden Vorlaufzeit')
     .optional(),
-  cateringStaffPin: z.string().trim().max(20).nullable().optional(),
+  cateringStaffPin: StaffPinSchema,
   cateringRemindersEnabled: z.boolean().optional(),
   overlapToleranceMinutes: z.number().int().min(0).max(120).optional(),
   allowReplacement: z.boolean().optional(),

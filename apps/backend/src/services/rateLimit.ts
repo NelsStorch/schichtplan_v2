@@ -9,6 +9,11 @@ export interface RateLimiter {
   isBlocked(key: string): boolean;
   /** Versuche eines Schlüssels vergessen (z. B. nach erfolgreichem Login) */
   reset(key: string): void;
+  /**
+   * Den zuletzt gezählten Versuch zurücknehmen. Für «zuerst zählen, dann prüfen»: So kommen auch
+   * gleichzeitige Anfragen nicht an der Bremse vorbei, ein erfolgreicher Versuch zählt danach nicht.
+   */
+  undo(key: string): void;
 }
 
 export function createRateLimiter(
@@ -57,6 +62,12 @@ export function createRateLimiter(
     },
     reset(key) {
       attempts.delete(key);
+    },
+    undo(key) {
+      const times = attempts.get(key);
+      if (!times) return;
+      times.pop();
+      if (times.length === 0) attempts.delete(key);
     },
   };
 }

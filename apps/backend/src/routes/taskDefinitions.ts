@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { CreateTaskDefinitionSchema, UpdateTaskDefinitionSchema } from '@schichtplan/shared';
-import { canPlanInDepartment } from '../services/departmentVisibility.js';
+import { canPlanInDepartment, isDepartmentInsider } from '../services/departmentVisibility.js';
 
 const TaskDefinitionResponseSchema = z.object({
   id: z.string().uuid(),
@@ -24,10 +24,21 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
         summary: 'Arbeiten (Tätigkeiten) der Abteilung abrufen',
         description: 'Liefert den Arbeitskatalog der aktuellen Abteilung mit hinterlegten Mindestalters- und Anforderungskriterien.',
       },
+      preHandler: [fastify.optionalAuthenticate],
     },
     async (request, reply) => {
       if (!request.tenant) {
         return reply.status(400).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      // «Nur für Mitglieder»: den Arbeitskatalog sehen nur Angehörige der Abteilung und wer dort plant
+      if (request.tenant.membersOnly) {
+        const userId = request.user?.id;
+        const allowed =
+          (await isDepartmentInsider(fastify.prisma, request.tenant.id, userId)) ||
+          (await canPlanInDepartment(fastify.prisma, request.tenant.id, userId));
+        if (!allowed) {
+          return reply.status(userId ? 403 : 401).send({ error: 'Dieser Katalog ist nur für Mitglieder der Abteilung.' });
+        }
       }
 
       const tasks = await fastify.prisma.taskDefinition.findMany({

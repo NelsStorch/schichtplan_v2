@@ -32,6 +32,22 @@ import { createRateLimiter } from '../services/rateLimit.js';
 /** Falsche Stand-PINs pro IP und Anlass: 10 Versuche in 15 Minuten (ein 4-stelliger PIN ist schnell durchprobiert) */
 const staffPinLimiter = createRateLimiter(15 * 60 * 1000, 10);
 
+/**
+ * Basis-URL für die QR-Codes auf Papier-Bons. Der Host muss zur eigenen Domain gehören (lokal auch
+ * localhost); sonst die Abteilungs-Subdomain. In Produktion immer https.
+ */
+export function cateringBaseUrl(hostHeader: string | undefined, tenantSlug: string | null): string {
+  const root = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '').toLowerCase();
+  const production = process.env.NODE_ENV === 'production';
+  const host = (hostHeader ?? '').trim().toLowerCase();
+  const hostname = host.replace(/:\d+$/, '');
+  const isLocal = !production && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost'));
+  const isOwn = /^[a-z0-9.-]+(:\d+)?$/.test(host) && (hostname === root || hostname.endsWith(`.${root}`));
+  if (isLocal) return `http://${host}`;
+  if (isOwn) return `https://${hostname}`;
+  return tenantSlug ? `https://${tenantSlug}.${root}` : `https://${root}`;
+}
+
 function samePin(given: string, expected: string): boolean {
   const a = Buffer.from(given.trim());
   const b = Buffer.from(expected.trim());
@@ -262,14 +278,22 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         ? personLabel(personUser)
         : token.signup?.guestName || 'Helfende Person';
 
-      const updated = await fastify.prisma.cateringToken.update({
-        where: { id: token.id },
+      // Nur entwerten, wenn noch nicht eingelöst: Zwei gleichzeitige Anfragen dürfen den Bon nicht beide einlösen
+      const { count } = await fastify.prisma.cateringToken.updateMany({
+        where: { id: token.id, status: { not: 'REDEEMED' } },
         data: {
           status: 'REDEEMED',
           redeemedAt: now,
           redeemedByName: redeemerName,
         },
       });
+      const updated = await fastify.prisma.cateringToken.findUniqueOrThrow({ where: { id: token.id } });
+      if (count === 0) {
+        return reply.status(409).send({
+          error: 'Dieser Verpflegungs-Bon wurde bereits eingelöst',
+          redeemedAt: updated.redeemedAt ? updated.redeemedAt.toISOString() : null,
+        });
+      }
 
       const isResponsible = !token.shiftSignupId;
       const dto: CateringTokenDto = {
@@ -519,9 +543,8 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parsed.error.issues[0]?.message || 'Ungültige Eingabe' });
       }
 
-      const host = request.headers.host || 'cevi-schichtplan.ch';
-      const proto = (request.headers['x-forwarded-proto'] as string) || 'https';
-      const baseUrl = `${proto}://${host}`;
+      // Die Adresse landet gedruckt auf den Bons: nur die eigene Domain, nie ungeprüfte Header übernehmen
+      const baseUrl = cateringBaseUrl(request.headers.host, request.tenant?.slug ?? null);
 
       const created = await createCateringBatch(fastify.prisma, {
         eventId: event.id,

@@ -3,6 +3,22 @@ import { PLACEHOLDER_EMAIL_REGEX, type UpdateProfileInput } from '@schichtplan/s
 import { findCeviNameMatches, isCeviNameProfile } from './ceviNameLogin.js';
 
 /**
+ * Darf die Person ihre E-Mail selbst setzen bzw. ändern? Wo noch keine echte steht immer. Eine selbst
+ * eingetragene, noch unbestätigte Adresse (Konto ohne Passwort und ohne Cevi.DB) lässt sich korrigieren.
+ * Bei Passwort-Konten ist die E-Mail der Login, bei Cevi.DB-Konten kommt sie aus Cevi.DB.
+ */
+export function canChangeOwnEmail(user: {
+  email: string | null;
+  emailVerified: boolean;
+  passwordHash: string | null;
+  ceviDbId: number | null;
+}): boolean {
+  const hasRealEmail = Boolean(user.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  if (!hasRealEmail) return true;
+  return !user.emailVerified && !user.passwordHash && user.ceviDbId === null;
+}
+
+/**
  * Profilangaben der Person selbst ändern (nur gesetzte Felder).
  * Die E-Mail lässt sich nur ergänzen, wo noch keine echte hinterlegt ist: Sie ist bei Passwort-Konten
  * der Login, bei Cevi.DB-Konten kommt sie aus Cevi.DB.
@@ -19,6 +35,7 @@ export async function applyProfileUpdate(
       ceviName: true,
       passwordHash: true,
       ceviDbId: true,
+      emailVerified: true,
       birthDate: true,
       homeDepartmentId: true,
       memberships: { select: { departmentId: true } },
@@ -79,12 +96,22 @@ export async function applyProfileUpdate(
     data.birthDate = date;
   }
   if (input.email !== undefined) {
-    const hasRealEmail = Boolean(user.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
-    // Selbst eingetragen heisst unbestätigt: Die Adresse gilt erst nach einer Bestätigung als die eigene
-    if (!hasRealEmail) {
-      data.email = input.email.toLowerCase();
+    const nextEmail = input.email.toLowerCase();
+    if (nextEmail !== user.email) {
+      if (!canChangeOwnEmail(user)) {
+        return {
+          error: user.ceviDbId !== null
+            ? 'Deine E-Mail kommt aus Cevi.DB. Ändere sie bitte dort.'
+            : 'Deine E-Mail-Adresse lässt sich hier nicht mehr ändern.',
+          status: 400,
+        };
+      }
+      // Selbst eingetragen heisst unbestätigt: Die Adresse gilt erst nach einer Bestätigung als die eigene.
+      // Alte Bestätigungslinks gelten für die alte Adresse und fallen weg.
+      data.email = nextEmail;
       data.emailVerified = false;
       data.emailVerifiedAt = null;
+      data.emailVerificationTokens = { deleteMany: {} };
     }
   }
 

@@ -2,6 +2,8 @@ import { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { Prisma } from '../db.js';
+import { isVerifiedHomeSource } from '../services/eventAccess.js';
 import {
   LoginSchema,
   RegisterHelperSchema,
@@ -30,8 +32,8 @@ import {
   RATE_LIMIT_ERROR,
   findCeviNameMatches,
   pickCeviNameMatch,
-  ceviNameAttemptsBlocked,
-  recordCeviNameMiss,
+  claimCeviNameAttempt,
+  releaseCeviNameAttempt,
   tooManyRequests,
 } from '../services/ceviNameLogin.js';
 import { mergeCeviNameProfilesInto } from '../services/mergeProfiles.js';
@@ -70,6 +72,9 @@ export function hashVerificationToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+/** Vergleichswert für Logins ohne Konto (gleich viel Rechenzeit wie ein echter Passwortvergleich) */
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10);
+
 /** Höchstens 30 Versuche pro IP in 10 Minuten, ein E-Mail-Token einzulösen */
 const verifyEmailByIp = createRateLimiter(10 * 60 * 1000, 30);
 
@@ -102,7 +107,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const returnTo = request.query.returnTo
         ? cleanReturnTo(request.query.returnTo)
         : request.tenant
-          ? `${protocol}://${request.tenant.slug}.${host}`
+          ? defaultDestination(request.tenant.slug)
           : null;
 
       if (!CEVIDB_CLIENT_ID) {
@@ -444,13 +449,20 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Frühere Cevi-Name-Profile derselben Person (Name, Geburtsdatum, Abteilung) ins Konto übernehmen.
+    // Nur in Abteilungen, die Cevi.DB über die Rollen belegt (oder die Abteilungsleitung bestätigt hat):
+    // Cevi-Name, Geburtsdatum, `ortsgruppe_id` und die Abteilung beim Login (tenantSlug) kann die Person
+    // selbst wählen. Sonst liesse sich so ein fremdes Cevi-Name-Profil samt Schichten dauerhaft übernehmen.
     // Ein Fehler hier darf den Login nicht verhindern.
     try {
-      const merged = await mergeCeviNameProfilesInto(
-        fastify.prisma,
-        user,
-        [homeDepartment?.id, tenantDepartmentId].filter((id): id is string => Boolean(id))
-      );
+      const home = await fastify.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { homeDepartmentId: true, homeDepartmentSource: true },
+      });
+      const mergeDepartmentIds = [
+        ...placement.departmentIds,
+        ...(home?.homeDepartmentId && isVerifiedHomeSource(home.homeDepartmentSource) ? [home.homeDepartmentId] : []),
+      ];
+      const merged = await mergeCeviNameProfilesInto(fastify.prisma, user, mergeDepartmentIds);
       if (merged > 0) {
         fastify.log.info({ userId: user.id, merged }, 'Cevi-Name-Profile ins Cevi.DB-Konto übernommen');
         trackUsage('PROFILE_MERGE', { n: merged, departmentId: homeDepartment?.id ?? tenantDepartmentId });
@@ -599,12 +611,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Sperre vor der Suche: Auch ein richtiges Geburtsdatum kommt während der Sperre nicht durch
-    if (ceviNameAttemptsBlocked(department.id, ceviName)) {
+    if (claimCeviNameAttempt(department.id, ceviName)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
     const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
     const result = pickCeviNameMatch(matches);
-    if (result.kind !== 'LOGIN') recordCeviNameMiss(department.id, ceviName);
+    // Nur ein erfolgreicher Login ist kein Fehlversuch
+    if (result.kind === 'LOGIN') releaseCeviNameAttempt(department.id, ceviName);
     if (result.kind === 'USE_CEVIDB') {
       trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_USE_CEVIDB', departmentId: department.id });
       return reply.status(403).send({
@@ -664,12 +677,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Gleicher Cevi-Name und gleiches Geburtsdatum in derselben Abteilung gibt es nur einmal.
     // Die Antwort verrät, ob Name und Geburtsdatum passen: gleiche Bremse wie beim Login.
-    if (ceviNameAttemptsBlocked(department.id, ceviName)) {
+    if (claimCeviNameAttempt(department.id, ceviName)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
     const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
+    // Kein Treffer verrät nichts: kein Fehlversuch
+    if (matches.length === 0) releaseCeviNameAttempt(department.id, ceviName);
     if (matches.length > 0) {
-      recordCeviNameMiss(department.id, ceviName);
       const result = pickCeviNameMatch(matches);
       return reply.status(409).send({
         code: result.kind === 'USE_CEVIDB' ? 'USE_CEVIDB' : result.kind === 'USE_PASSWORD' ? 'USE_PASSWORD' : 'EXISTS',
@@ -763,7 +777,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const { email, password } = parse.data;
     // Gegen das Durchprobieren von Passwörtern: Fehlversuche pro IP und pro Konto bremsen
     const emailKey = email.trim().toLowerCase();
-    if (loginFailuresByIp.isBlocked(request.ip) || loginFailuresByEmail.isBlocked(emailKey)) {
+    // Zuerst zählen, dann prüfen: sonst kämen viele gleichzeitige Versuche alle an der Bremse vorbei.
+    // Ein erfolgreicher Login nimmt seinen Versuch wieder zurück.
+    const ipBlocked = loginFailuresByIp.hit(request.ip);
+    const emailBlocked = loginFailuresByEmail.hit(emailKey);
+    if (ipBlocked || emailBlocked) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
     const user = await fastify.prisma.user.findUnique({
@@ -771,12 +789,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       select: { id: true, email: true, passwordHash: true, emailVerified: true, isGlobalAdmin: true },
     });
 
-    if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
-      loginFailuresByIp.hit(request.ip);
-      loginFailuresByEmail.hit(emailKey);
+    // Auch ohne Konto ein Passwort prüfen: sonst verriete die Antwortzeit, ob es die Adresse gibt
+    const passwordOk = await bcrypt.compare(password, user?.passwordHash || DUMMY_PASSWORD_HASH);
+    if (!user || !user.passwordHash || !passwordOk) {
       trackUsage('LOGIN_FAILED', { dim: 'PASSWORD_WRONG', departmentId: request.tenant?.id });
       return reply.status(401).send({ error: 'E-Mail oder Passwort falsch' });
     }
+    loginFailuresByIp.undo(request.ip);
     loginFailuresByEmail.reset(emailKey);
 
     // E-Mail-Bestätigung erzwingen
@@ -829,12 +848,20 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const existing = await fastify.prisma.user.findUnique({
       where: { email: cleanEmail },
     });
+    // Immer hashen, auch wenn es die Adresse schon gibt: sonst verriete die Antwortzeit, ob ein Konto existiert
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    // Auch ohne Passwort nicht übernehmen: Ein bestehendes Konto (z. B. Cevi-Name-Profil mit selbst
-    // eingetragener E-Mail) bekäme sonst von irgendwem ein Passwort und fremde Namen.
+    // Eine nur selbst eingetragene, unbestätigte Adresse (Konto ohne Passwort und ohne Cevi.DB, z. B.
+    // Cevi-Name-Profil) gehört nicht nachweislich diesem Konto. Sonst könnte jemand eine fremde Adresse
+    // besetzen und die Person damit von der Registrierung aussperren. Wie beim Cevi.DB-Login: freigeben.
+    const releaseUnverified = Boolean(
+      existing && !existing.emailVerified && !existing.passwordHash && existing.ceviDbId === null
+    );
+
+    // Sonst nicht übernehmen: Ein bestehendes Konto bekäme von irgendwem ein Passwort und fremde Namen.
     // Die Antwort ist dieselbe wie bei einem neuen Konto: sonst liesse sich durchprobieren, wer ein Konto
     // hat. Die Person mit dieser Adresse bekommt stattdessen einen Hinweis per Mail.
-    if (existing) {
+    if (existing && !releaseUnverified) {
       const loginPortalUrl = getLoginPortalBaseUrl(request.headers.host);
       if (!accountExistsMailsByEmail.hit(cleanEmail)) await sendAccountExistsEmail({
         to: cleanEmail,
@@ -845,19 +872,34 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return registrationAccepted(cleanEmail);
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await fastify.prisma.user.create({
-      data: {
-        email: cleanEmail,
-        passwordHash,
-        firstName,
-        lastName: lastName?.trim() || null,
-        ceviName: ceviName || null,
-        phone: phone || null,
-        emailVerified: false,
-        emailVerifiedAt: null,
-      },
-    });
+    let user: { id: string; ceviName: string | null; firstName: string };
+    try {
+      user = await fastify.prisma.$transaction(async (tx) => {
+        if (existing && releaseUnverified) {
+          await tx.emailVerificationToken.deleteMany({ where: { userId: existing.id } });
+          await tx.user.update({ where: { id: existing.id }, data: { email: null } });
+          request.log.warn({ userId: existing.id }, 'Registrierung: unbestätigte E-Mail von anderem Konto gelöst');
+        }
+        return tx.user.create({
+          data: {
+            email: cleanEmail,
+            passwordHash,
+            firstName,
+            lastName: lastName?.trim() || null,
+            ceviName: ceviName || null,
+            phone: phone || null,
+            emailVerified: false,
+            emailVerifiedAt: null,
+          },
+        });
+      });
+    } catch (err) {
+      // Gleichzeitig hat ein anderes Konto die Adresse bekommen: gleiche Antwort wie bei «gibt es schon»
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        return registrationAccepted(cleanEmail);
+      }
+      throw err;
+    }
 
     if (request.tenant) {
       await ensureHelperMembership(fastify.prisma, request.tenant.id, user.id);

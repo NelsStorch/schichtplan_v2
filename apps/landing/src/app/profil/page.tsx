@@ -118,7 +118,8 @@ export default function ProfilePage() {
         firstName: me.firstName ?? '',
         lastName: me.lastName === PLACEHOLDER_LAST_NAME ? '' : (me.lastName ?? ''),
         phone: me.phone ?? '',
-        email: '',
+        // Unbestätigte, selbst eingetragene Adresse vorausfüllen, damit sich ein Tippfehler korrigieren lässt
+        email: me.email && !me.emailVerified && !me.hasPassword && !me.hasCeviDb && !PLACEHOLDER_EMAIL_REGEX.test(me.email) ? me.email : '',
         birthDate: me.birthDate ?? '',
       });
       const shiftsRes = await fetch('/api/shifts/my', { cache: 'no-store' });
@@ -131,6 +132,8 @@ export default function ProfilePage() {
   }, []);
 
   const hasRealEmail = Boolean(user?.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  // Wie canChangeOwnEmail im Backend: ohne echte Adresse, oder selbst eingetragen und noch unbestätigt
+  const emailEditable = !hasRealEmail || Boolean(user && !user.emailVerified && !user.hasPassword && !user.hasCeviDb);
   // Geburtsdatum aus Cevi.DB zählt für Altersgrenzen: nur dort änderbar
   const birthDateFromCeviDb = Boolean(user?.hasCeviDb && user.birthDate);
   const [resendingVerification, setResendingVerification] = useState(false);
@@ -179,7 +182,9 @@ export default function ProfilePage() {
     if (form.lastName.trim()) payload.lastName = form.lastName.trim();
     if (form.phone.trim()) payload.phone = form.phone.trim();
     if (form.birthDate && !birthDateFromCeviDb) payload.birthDate = form.birthDate;
-    if (!hasRealEmail && form.email.trim()) payload.email = form.email.trim();
+    if (emailEditable && form.email.trim() && form.email.trim().toLowerCase() !== user?.email) {
+      payload.email = form.email.trim();
+    }
     try {
       const res = await fetch('/api/auth/me', {
         method: 'PATCH',
@@ -328,7 +333,7 @@ export default function ProfilePage() {
                 <Field label="Geburtsdatum" hint={birthDateFromCeviDb ? 'Aus Cevi.DB, nur dort änderbar' : undefined}>
                   <Input type="date" value={form.birthDate} disabled={birthDateFromCeviDb} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} autoComplete="bday" />
                 </Field>
-                {hasRealEmail ? (
+                {!emailEditable ? (
                   <div className="sm:col-span-2">
                     <div className="text-xs font-medium text-fg-subtle">E-Mail</div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -355,9 +360,24 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 ) : (
-                  <Field label="E-Mail" className="sm:col-span-2">
-                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} autoComplete="email" />
-                  </Field>
+                  <div className="sm:col-span-2">
+                    <Field
+                      label="E-Mail"
+                      hint={hasRealEmail ? 'Noch nicht bestätigt. Du kannst die Adresse korrigieren, bis du sie bestätigt hast.' : undefined}
+                    >
+                      <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} autoComplete="email" />
+                    </Field>
+                    {hasRealEmail && (
+                      <button
+                        type="button"
+                        onClick={handleProfileResend}
+                        disabled={resendingVerification}
+                        className="mt-1.5 text-xs font-medium text-accent-ink underline-offset-4 hover:underline"
+                      >
+                        {resendingVerification ? 'Wird gesendet …' : `Bestätigungslink an ${user?.email} anfordern`}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex justify-end">

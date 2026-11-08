@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PushSubscribeSchema, PushUnsubscribeSchema } from '@schichtplan/shared';
 import {
   getVapidPublicKey,
+  isAllowedPushEndpoint,
   isValidP256dhKey,
   sendPushNotification,
   sendPushToUser,
@@ -148,6 +149,9 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: parse.error.issues[0].message });
       }
       const { endpoint, keys } = parse.data;
+      if (!isAllowedPushEndpoint(endpoint)) {
+        return reply.status(400).send({ error: 'Dieser Push-Dienst wird nicht unterstützt.' });
+      }
       if (!isValidP256dhKey(keys.p256dh)) {
         return reply.status(400).send({ error: 'Ungültiger Push-Schlüssel (p256dh)' });
       }

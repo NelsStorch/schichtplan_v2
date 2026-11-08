@@ -5,6 +5,7 @@ import { AlertCircle, AlertTriangle, CalendarPlus, Check, ChevronDown, Crown, Li
 import {
   ATTENDANCE_MODES,
   REPLACEMENT_CUTOFF_HOURS,
+  STAFF_PIN_MIN_LENGTH,
   helpUrl,
   toZurichInput,
   zurichInputToIso,
@@ -23,6 +24,12 @@ import { ImageUpload } from './ImageUpload';
 import { questionDraft } from './ok/QuestionsEditor';
 import { SectionBody, useSection } from './ok/SettingsSections';
 import { PhysicalBonsManager } from './ok/PhysicalBonsManager';
+
+/** Eingetippt, aber kürzer als erlaubt (leer heisst «kein PIN» und ist in Ordnung) */
+function staffPinTooShort(pin: string): boolean {
+  const trimmed = pin.trim();
+  return trimmed.length > 0 && trimmed.length < STAFF_PIN_MIN_LENGTH;
+}
 
 export interface EventFormValues {
   title: string;
@@ -422,7 +429,8 @@ export function EventForm({
           cateringTokensEnabled: form.cateringTokensEnabled,
           cateringTokenItems: form.cateringTokenItems,
           cateringEarlyHours: form.cateringEarlyHours,
-          cateringStaffPin: form.cateringStaffPin.trim() || null,
+          // Zu kurzer PIN (noch beim Tippen oder ein alter kurzer PIN): nicht mitschicken, der bisherige bleibt
+          ...(staffPinTooShort(form.cateringStaffPin) ? {} : { cateringStaffPin: form.cateringStaffPin.trim() || null }),
           cateringRemindersEnabled: form.cateringRemindersEnabled,
           allowReplacement: form.allowReplacement,
           replacementCutoffHours: form.replacementCutoffHours,
@@ -1411,11 +1419,15 @@ export function EventForm({
 
                   <Field
                     label="Stand-PIN für Bar &amp; Essensausgabe"
-                    hint="Code für Standpersonal ohne Konto. Ohne PIN können nur angemeldete OK-Mitglieder Papier-Bons entwerten. Bleibt am Stand-Handy gemerkt."
+                    hint={
+                      staffPinTooShort(form.cateringStaffPin)
+                        ? `Der PIN braucht mindestens ${STAFF_PIN_MIN_LENGTH} Zeichen und wird erst dann gespeichert.`
+                        : `Code für Standpersonal ohne Konto (mindestens ${STAFF_PIN_MIN_LENGTH} Zeichen). Ohne PIN können nur angemeldete OK-Mitglieder Papier-Bons entwerten. Bleibt am Stand-Handy gemerkt.`
+                    }
                   >
                     <Input
-                      placeholder="z. B. 4821 (optional)"
-                      maxLength={10}
+                      placeholder="z. B. 482193 (optional)"
+                      maxLength={20}
                       value={form.cateringStaffPin}
                       onChange={(e) => set('cateringStaffPin', e.target.value)}
                       className="font-mono"

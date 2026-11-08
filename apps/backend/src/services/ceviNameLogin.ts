@@ -138,23 +138,29 @@ export function tooManyRequests(ip: string): boolean {
 const nameKey = (departmentId: string, ceviName: string) => `${departmentId}:${ceviName.trim().toLowerCase()}`;
 
 /**
- * Gesperrt nach zu vielen Fehlversuchen für diesen Cevi-Namen und diese Abteilung (unabhängig von der IP):
- * 8 in 15 Minuten oder 20 am Tag. Muss VOR der Suche geprüft werden: Sonst käme ein richtiges Geburtsdatum
- * trotz Sperre durch, und die Sperre verriete nur, welche Daten falsch sind.
+ * Versuch für diesen Cevi-Namen und diese Abteilung anmelden (unabhängig von der IP). true = gesperrt:
+ * 8 Fehlversuche in 15 Minuten oder 20 am Tag. Muss VOR der Suche laufen: Sonst käme ein richtiges
+ * Geburtsdatum trotz Sperre durch, und die Sperre verriete nur, welche Daten falsch sind.
+ * Der Versuch zählt sofort (synchron), damit gleichzeitige Anfragen nicht alle durch die Bremse kommen.
+ * Ein Versuch, der kein Fehlversuch war, wird mit releaseCeviNameAttempt zurückgenommen.
  */
-export function ceviNameAttemptsBlocked(departmentId: string, ceviName: string): boolean {
+export function claimCeviNameAttempt(departmentId: string, ceviName: string): boolean {
   const key = nameKey(departmentId, ceviName);
-  return missLimiter.isBlocked(key) || dailyMissLimiter.isBlocked(key);
+  if (missLimiter.isBlocked(key) || dailyMissLimiter.isBlocked(key)) return true;
+  missLimiter.hit(key);
+  dailyMissLimiter.hit(key);
+  return false;
 }
 
 /**
- * Fehlversuch zählen: kein Profil, oder ein geschütztes Konto (Cevi.DB/Passwort). Auch Letzteres zählt,
- * weil die Antwort verrät, dass Name und Geburtsdatum zu einem Konto passen.
+ * Versuch zurücknehmen, wenn er kein Fehlversuch war (Login geklappt oder neues Profil angelegt).
+ * Als Fehlversuch zählen: kein Profil, oder ein geschütztes Konto (Cevi.DB/Passwort), weil die Antwort
+ * verrät, dass Name und Geburtsdatum zu einem Konto passen.
  */
-export function recordCeviNameMiss(departmentId: string, ceviName: string): void {
+export function releaseCeviNameAttempt(departmentId: string, ceviName: string): void {
   const key = nameKey(departmentId, ceviName);
-  missLimiter.hit(key);
-  dailyMissLimiter.hit(key);
+  missLimiter.undo(key);
+  dailyMissLimiter.undo(key);
 }
 
 export const RATE_LIMIT_ERROR = 'Zu viele Versuche. Bitte warte ein paar Minuten und versuch es dann nochmals.';

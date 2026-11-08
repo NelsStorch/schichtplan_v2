@@ -38,6 +38,20 @@ const toStufeDto = (s: {
   sortOrder: s.sortOrder,
 });
 
+/** Letztes Nachführen der Cevi.DB-Stufen pro Abteilung beim öffentlichen Abruf (im Speicher) */
+const lastStufenSync = new Map<string, number>();
+const STUFEN_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Ist das Nachführen für diese Abteilung wieder fällig? Merkt sich den Zeitpunkt, wenn ja. */
+function stufenSyncDue(departmentId: string, now = Date.now()): boolean {
+  if (process.env.NODE_ENV === 'test') return true;
+  const last = lastStufenSync.get(departmentId);
+  if (last !== undefined && now - last < STUFEN_SYNC_INTERVAL_MS) return false;
+  if (lastStufenSync.size > 5000) lastStufenSync.clear();
+  lastStufenSync.set(departmentId, now);
+  return true;
+}
+
 /** Kontaktperson: Abteilungsleitung oder jemand mit «Personen und Rechte verwalten» */
 export const contactCandidateWhere = (departmentId: string) => ({
   departmentId,
@@ -225,7 +239,11 @@ const departmentRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
     if (!request.tenant) return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
-    await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, request.tenant.id);
+    // Öffentlicher Abruf: das Nachführen (mit Schreibzugriffen) höchstens alle paar Minuten pro Abteilung.
+    // Beim Cevi.DB-Login und in den Stufen-Vorschlägen läuft es ohnehin.
+    if (stufenSyncDue(request.tenant.id)) {
+      await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, request.tenant.id);
+    }
     const stufen = await fastify.prisma.departmentStufe.findMany({
       where: { departmentId: request.tenant.id },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
