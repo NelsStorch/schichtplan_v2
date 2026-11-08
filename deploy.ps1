@@ -154,7 +154,7 @@ if ($dirty.Count -gt 0) {
 }
 
 # Prod nur mit einem Stand, den die CI geprueft hat (Lint, Typen, Tests inkl. Datenbank, Builds):
-# alles committet, auf main, gepusht, und der CI-Lauf fuer genau diesen Commit ist gruen.
+# alles committet, auf main, gepusht, der CI-Lauf fuer genau diesen Commit ist gruen und er lief schon auf Dev.
 # Dev bleibt frei zum Ausprobieren. Notfall: -Force (wird in Discord vermerkt).
 function Test-ProdReady {
     if ($dirty.Count -gt 0) { return "Es gibt nicht committete Dateien." }
@@ -173,6 +173,18 @@ function Test-ProdReady {
     if ($run.status -ne 'completed') { return "Die CI laeuft noch ($($run.url)). Bitte warten, bis sie gruen ist." }
     if ($run.conclusion -ne 'success') { return "Die CI ist nicht gruen ($($run.conclusion), $($run.url))." }
     Write-Host "CI gruen fuer $revision ($($run.url))" -ForegroundColor Green
+
+    # Genau dieser Stand muss vorher auf Dev deployt worden sein (dort als Kurz-Hash in .revisions vermerkt)
+    $devRevisions = @(ssh -n $Server "cat $RemoteBase/schichtplan-dev/.revisions 2>/dev/null")
+    if ($LASTEXITCODE -ne 0) { return "Die Dev-Staende auf dem Server konnten nicht gelesen werden." }
+    if ($devRevisions -notcontains $revision) {
+        return "Dieser Stand ($revision) lief noch nie auf Dev. Zuerst .\deploy.ps1 dev und dort pruefen."
+    }
+    $devCurrent = "$(ssh -n $Server "head -n 1 $RemoteBase/schichtplan-dev/REVISION 2>/dev/null")".Trim()
+    if ($devCurrent -ne $revision) {
+        Write-Host "Hinweis: Auf Dev laeuft gerade $devCurrent, $revision war dort aber schon deployt." -ForegroundColor Yellow
+    }
+    Write-Host "Auf Dev deployt: $revision" -ForegroundColor Green
     return $null
 }
 
@@ -184,7 +196,7 @@ if ($Environment -eq 'prod') {
             Send-DiscordNotification -title "Prod-Deploy mit -Force" -description "**Grund fuer die Sperre:** $problem`n**Stand:** $commit" -color 15105570
         } else {
             Write-Host "`nProd-Deploy gestoppt: $problem" -ForegroundColor Red
-            Write-Host "Erst pushen und die CI abwarten. Nur im Notfall: .\deploy.ps1 prod -Force" -ForegroundColor Red
+            Write-Host "Erst pushen, die CI abwarten und auf Dev deployen. Nur im Notfall: .\deploy.ps1 prod -Force" -ForegroundColor Red
             exit 1
         }
     }
