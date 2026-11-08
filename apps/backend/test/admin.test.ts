@@ -40,6 +40,15 @@ describe.skipIf(!hasTestDb)('Admin-Portal: Abteilungen, Anlässe, Rollen', () =>
     }
   });
 
+  it('antwortet in allen Teilen ohne Zwischenspeicher (no-store)', async () => {
+    const { cookie } = await admin();
+    for (const url of ['/api/admin/session', '/api/admin/departments', '/api/admin/events', '/api/admin/audit']) {
+      const res = await inject(app, { method: 'GET', url, cookie });
+      expect(res.statusCode, url).toBe(200);
+      expect(res.headers['cache-control'], url).toBe('no-store');
+    }
+  });
+
   it('listet Abteilungen mit Kennzahlen und Abteilungsleitung', async () => {
     const { cookie } = await admin();
     const department = await createDepartment(app, { name: 'Cevi Test' });
