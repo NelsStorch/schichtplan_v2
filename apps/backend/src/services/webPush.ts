@@ -277,6 +277,19 @@ export async function sendPushNotification(
 }
 
 /**
+ * Abos mit Adressen ausserhalb der Browser-Push-Dienste löschen. Vor der Prüfung in isAllowedPushEndpoint
+ * liess sich jede Adresse speichern; echte Browser-Abos bleiben, nur die unerlaubten gehen weg.
+ * Läuft einmal beim Start (server.ts). Gibt die Anzahl gelöschter Abos zurück.
+ */
+export async function purgeDisallowedPushSubscriptions(prisma: Pick<PrismaClient, 'pushSubscription'>): Promise<number> {
+  const subs = await prisma.pushSubscription.findMany({ select: { id: true, endpoint: true } });
+  const ids = subs.filter((s) => !isAllowedPushEndpoint(s.endpoint)).map((s) => s.id);
+  if (ids.length === 0) return 0;
+  const { count } = await prisma.pushSubscription.deleteMany({ where: { id: { in: ids } } });
+  return count;
+}
+
+/**
  * Sends a Web Push notification to all registered devices of a user and automatically
  * cleans up expired (`404`/`410`) subscriptions.
  */

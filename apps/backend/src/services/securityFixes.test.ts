@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CreateEventSchema, STAFF_PIN_MIN_LENGTH, UpdateEventSchema } from '@schichtplan/shared';
-import { isAllowedPushEndpoint } from './webPush.js';
+import { isAllowedPushEndpoint, purgeDisallowedPushSubscriptions } from './webPush.js';
 import { canChangeOwnEmail } from './profileUpdate.js';
 import { createRateLimiter } from './rateLimit.js';
 import { claimCeviNameAttempt, releaseCeviNameAttempt } from './ceviNameLogin.js';
@@ -24,6 +24,29 @@ describe('Push-Endpoints (SSRF)', () => {
     expect(isAllowedPushEndpoint('https://user:pw@fcm.googleapis.com/x')).toBe(false);
     expect(isAllowedPushEndpoint('https://fcm.googleapis.com:8443/x')).toBe(false);
     expect(isAllowedPushEndpoint('kein url')).toBe(false);
+  });
+});
+
+describe('Push-Abos bereinigen', () => {
+  it('löscht nur Abos mit unerlaubter Adresse', async () => {
+    const subs = [
+      { id: 'ok', endpoint: 'https://fcm.googleapis.com/fcm/send/abc' },
+      { id: 'intern', endpoint: 'http://backend:4000/api/health' },
+      { id: 'fremd', endpoint: 'https://evil.example/push' },
+    ];
+    let deletedIds: string[] = [];
+    const prisma = {
+      pushSubscription: {
+        findMany: async () => subs,
+        deleteMany: async ({ where }: { where: { id: { in: string[] } } }) => {
+          deletedIds = where.id.in;
+          return { count: where.id.in.length };
+        },
+      },
+    } as unknown as Parameters<typeof purgeDisallowedPushSubscriptions>[0];
+
+    expect(await purgeDisallowedPushSubscriptions(prisma)).toBe(2);
+    expect(deletedIds).toEqual(['intern', 'fremd']);
   });
 });
 

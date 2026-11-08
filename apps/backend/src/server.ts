@@ -9,6 +9,7 @@ import { STATS_MAINTENANCE_INTERVAL_MS, runStatsMaintenance } from './services/s
 import { trackUsage } from './services/usageStats.js';
 import { runExclusive } from './services/jobLock.js';
 import { UNVERIFIED_CLEANUP_INTERVAL_MS, deleteExpiredUnverifiedAccounts } from './services/unverifiedAccounts.js';
+import { purgeDisallowedPushSubscriptions } from './services/webPush.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -129,6 +130,17 @@ async function main() {
     clearInterval(unverifiedTimer);
     clearTimeout(firstUnverified);
   });
+
+  // Push-Abos mit unerlaubten Adressen (aus der Zeit vor der Prüfung) einmal beim Start wegräumen
+  const purgePush = setTimeout(() => {
+    runExclusive(app.prisma, 'push-endpoint-purge', () => purgeDisallowedPushSubscriptions(app.prisma))
+      .then((res) => {
+        if (res.ran && res.value > 0) app.log.warn({ deleted: res.value }, 'Push-Abos mit unerlaubter Adresse gelöscht');
+      })
+      .catch((err) => app.log.error(err, 'Bereinigen der Push-Abos fehlgeschlagen'));
+  }, 30 * 1000);
+  purgePush.unref();
+  app.addHook('onClose', async () => clearTimeout(purgePush));
 
   // Nutzungsstatistik: Momentaufnahme des Vortags, alte Stundenwerte zusammenfassen, Altes löschen
   const maintainStats = () =>
