@@ -88,7 +88,7 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
         }),
       ]);
 
-      const resetUrl = `${getLoginPortalBaseUrl(request.headers.host)}/passwort-zuruecksetzen?token=${token}`;
+      const resetUrl = `${getLoginPortalBaseUrl()}/passwort-zuruecksetzen?token=${token}`;
       const sent = await sendPasswordResetEmail({
         to: email,
         name: user.ceviName || user.firstName,

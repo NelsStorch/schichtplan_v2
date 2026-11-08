@@ -18,10 +18,25 @@ const DEFAULT_ACCENT = '#e11d48';
  */
 export async function getRequestOrigin(): Promise<{ origin: string; host: string }> {
   const h = await headers();
-  const host = (h.get('x-forwarded-host') ?? h.get('host') ?? 'cevi-schichtplan.ch').split(',')[0].trim();
+  const host = trustedHost(h.get('x-forwarded-host') ?? h.get('host'));
   const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host) || host.split(':')[0].endsWith('.localhost');
   const proto = isLocal ? 'http' : 'https';
   return { origin: `${proto}://${host}`, host };
+}
+
+/**
+ * Host aus der Anfrage, aber nur die eigene Domain (DOMAIN, Standard cevi-schichtplan.ch, samt Subdomains)
+ * oder lokal localhost. Sonst die Hauptdomain: Mit dem Ursprung lädt der Server Logos nach, und er
+ * landet als absolute URL in der Link-Vorschau.
+ */
+export function trustedHost(value: string | null | undefined, rootDomain = process.env.DOMAIN || 'cevi-schichtplan.ch'): string {
+  const root = rootDomain.replace(/^\./, '').toLowerCase();
+  const host = (value ?? '').split(',')[0].trim().toLowerCase();
+  if (!/^[a-z0-9.-]+(:\d+)?$/.test(host) && !/^\[::1\](:\d+)?$/.test(host)) return root;
+  const hostname = host.replace(/:\d+$/, '');
+  const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(hostname) || hostname.endsWith('.localhost');
+  const isOwn = hostname === root || hostname.endsWith(`.${root}`);
+  return isLocal || isOwn ? host : root;
 }
 
 /** Cevi-Logo aus dem `public/`-Ordner der laufenden App als Data-URI (null, falls nicht lesbar). */

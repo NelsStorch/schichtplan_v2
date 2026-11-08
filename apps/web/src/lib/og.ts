@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { getRootDomain } from '@schichtplan/shared';
+import { trustedHost } from '@schichtplan/ui/og';
 
 export interface DepartmentPreview {
   name: string;
@@ -26,7 +27,8 @@ export async function getDepartmentPreview(): Promise<DepartmentPreview | null> 
   const backend = process.env.INTERNAL_API_URL;
   if (!backend) return null;
   const h = await headers();
-  const host = (h.get('x-forwarded-host') ?? h.get('host') ?? '').split(',')[0].trim();
+  // Nur die eigene Domain (oder lokal localhost); sonst gibt es keine Abteilung
+  const host = trustedHost(h.get('x-forwarded-host') ?? h.get('host'));
   const slug = slugFromHost(host);
   if (!slug) return null;
   try {

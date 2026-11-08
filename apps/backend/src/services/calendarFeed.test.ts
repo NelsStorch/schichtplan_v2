@@ -102,12 +102,15 @@ describe('deriveCalendarUrls', () => {
     expect(valid.httpsUrl).toBe('https://illnau.cevi-schichtplan.ch/api/calendar/tok123.ics');
     expect(valid.webcalUrl).toBe('webcal://illnau.cevi-schichtplan.ch/api/calendar/tok123.ics');
 
-    // Manipulierter X-Forwarded-Host Header (Host Header Injection / Poisoning)
-    const poisoned = deriveCalendarUrls(
+    // X-Forwarded-Host wird nicht beachtet (Host Header Injection / Poisoning)
+    const forwarded = deriveCalendarUrls(
       { headers: { 'x-forwarded-host': 'evil.com', host: 'illnau.cevi-schichtplan.ch' }, protocol: 'https' },
       'tok123'
     );
-    // Verhindert evil.com und fällt sicher auf die Root-Domain zurück
+    expect(forwarded.httpsUrl).toBe('https://illnau.cevi-schichtplan.ch/api/calendar/tok123.ics');
+
+    // Fremder Host fällt sicher auf die Root-Domain zurück
+    const poisoned = deriveCalendarUrls({ headers: { host: 'evil.com' }, protocol: 'https' }, 'tok123');
     expect(poisoned.httpsUrl).toBe('https://cevi-schichtplan.ch/api/calendar/tok123.ics');
     expect(poisoned.webcalUrl).toBe('webcal://cevi-schichtplan.ch/api/calendar/tok123.ics');
   });

@@ -52,6 +52,7 @@ import {
   defaultDestination,
   bootstrapAdminCeviDbIds,
   getLoginPortalBaseUrl,
+  getCeviDbRedirectUri,
   loginPageUrl,
   PENDING_LINK_COOKIE,
   PENDING_LINK_TTL_SECONDS,
@@ -96,10 +97,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const host = request.headers.host || 'cevi-schichtplan.ch';
-      const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectUri =
-        process.env.CEVIDB_REDIRECT_URI || `${protocol}://${host}/api/auth/cevidb/callback`;
+      // Aus der Konfiguration, nicht aus dem Host-Header
+      const redirectUri = getCeviDbRedirectUri();
 
       // Ohne Ziel bestimmt der Callback die Weiterleitung (eigene Abteilung oder Landingpage)
       const returnTo = request.query.returnTo
@@ -183,10 +182,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
       }
 
-      const host = request.headers.host || 'cevi-schichtplan.ch';
-      const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectUri =
-        process.env.CEVIDB_REDIRECT_URI || `${protocol}://${host}/api/auth/cevidb/callback`;
+      // Aus der Konfiguration, nicht aus dem Host-Header
+      const redirectUri = getCeviDbRedirectUri();
 
       let profile: any;
       try {
@@ -858,7 +855,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     // Die Antwort ist dieselbe wie bei einem neuen Konto: sonst liesse sich durchprobieren, wer ein Konto
     // hat. Die Person mit dieser Adresse bekommt stattdessen einen Hinweis per Mail.
     if (existing && !releaseUnverified) {
-      const loginPortalUrl = getLoginPortalBaseUrl(request.headers.host);
+      const loginPortalUrl = getLoginPortalBaseUrl();
       if (!accountExistsMailsByEmail.hit(cleanEmail)) await sendAccountExistsEmail({
         to: cleanEmail,
         name: existing.ceviName || existing.firstName,
@@ -917,7 +914,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // Bestätigungs-E-Mail versenden
-    const loginPortalUrl = getLoginPortalBaseUrl(request.headers.host);
+    const loginPortalUrl = getLoginPortalBaseUrl();
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,
@@ -984,7 +981,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    const loginPortalUrl = getLoginPortalBaseUrl(request.headers.host);
+    const loginPortalUrl = getLoginPortalBaseUrl();
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,
@@ -1077,7 +1074,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const token = request.query.token;
-      const loginBase = getLoginPortalBaseUrl(request.headers.host);
+      const loginBase = getLoginPortalBaseUrl();
       if (!token) {
         return reply.redirect(`${loginBase}/verify-email?error=missing_token`);
       }

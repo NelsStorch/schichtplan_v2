@@ -15,19 +15,16 @@ const CalendarTokenResponseSchema = z.object({
 
 export function deriveCalendarUrls(request: { headers: Record<string, any>; protocol: string }, token: string) {
   const root = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '').toLowerCase();
-  const forwardedHost = (request.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim();
-  const rawHost = (forwardedHost || request.headers.host || root).split(':')[0].trim().toLowerCase();
+  // Nur der Host der Anfrage (Traefik leitet nur eigene Hosts weiter) und nur die eigene Domain; keine
+  // X-Forwarded-Header. Das Protokoll folgt der Umgebung: in Produktion immer https.
+  const rawHost = String(request.headers.host || root).split(':')[0].trim().toLowerCase();
 
   const allowLocalhost = process.env.NODE_ENV !== 'production';
   const isLocalHost = allowLocalhost && (rawHost === 'localhost' || rawHost === '127.0.0.1' || rawHost.endsWith('.localhost'));
-  const isValidHost = rawHost === root || rawHost.endsWith(`.${root}`) || isLocalHost;
+  const isValidHost = /^[a-z0-9.-]+$/.test(rawHost) && (rawHost === root || rawHost.endsWith(`.${root}`) || isLocalHost);
   const host = isValidHost ? rawHost : root;
 
-  const forwardedProto = (request.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim();
-  const isHttps =
-    forwardedProto === 'https' ||
-    request.protocol === 'https' ||
-    (process.env.NODE_ENV === 'production' && !host.includes('localhost'));
+  const isHttps = process.env.NODE_ENV === 'production' ? true : !isLocalHost;
 
   const httpsUrl = `${isHttps ? 'https' : 'http'}://${host}/api/calendar/${token}.ics`;
   const webcalUrl = `webcal://${host}/api/calendar/${token}.ics`;

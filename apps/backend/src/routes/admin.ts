@@ -538,7 +538,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         }),
       ]);
 
-      const resetUrl = `${getLoginPortalBaseUrl(request.headers.host)}/passwort-zuruecksetzen?token=${token}`;
+      const resetUrl = `${getLoginPortalBaseUrl()}/passwort-zuruecksetzen?token=${token}`;
       const name = user.ceviName ? `${user.ceviName} (${user.firstName} ${user.lastName})` : `${user.firstName} ${user.lastName}`;
 
       await recordAdminAction(fastify.prisma, request, {

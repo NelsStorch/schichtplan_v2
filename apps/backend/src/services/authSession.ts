@@ -92,18 +92,20 @@ export function bootstrapAdminCeviDbIds(): Set<number> {
   return new Set(ids);
 }
 
-/** Basis-URL für das zentrale Login-Portal (login.<domain>) */
-export function getLoginPortalBaseUrl(requestHost?: string): string {
-  if (process.env.NODE_ENV !== 'production' || (requestHost && requestHost.includes('localhost'))) {
-    return 'http://localhost:3002';
-  }
-  const domain = (
-    process.env.COOKIE_DOMAIN ||
-    process.env.DOMAIN_DEV ||
-    process.env.DOMAIN ||
-    'cevi-schichtplan.ch'
-  ).replace(/^\./, '');
+/**
+ * Basis-URL für das zentrale Login-Portal (login.<domain>). Nur aus der Konfiguration, nie aus dem
+ * Host-Header: Die Adresse landet in E-Mails (Passwort-Reset, Bestätigung) und Weiterleitungen.
+ * Lokal (ausserhalb von Produktion) LOGIN_PORTAL_URL oder der Next-Dev-Server auf Port 3002.
+ */
+export function getLoginPortalBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.NODE_ENV !== 'production') return (env.LOGIN_PORTAL_URL || 'http://localhost:3002').replace(/\/$/, '');
+  const domain = (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
   return `https://login.${domain}`;
+}
+
+/** Redirect-URI für Cevi.DB-OAuth: CEVIDB_REDIRECT_URI, sonst der Callback auf dem Login-Portal */
+export function getCeviDbRedirectUri(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CEVIDB_REDIRECT_URI || `${getLoginPortalBaseUrl(env)}/api/auth/cevidb/callback`;
 }
 
 /** Login-Seite (login.<domain>), z. B. für die Abfrage der Abteilung nach dem Cevi.DB-Login */
