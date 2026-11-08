@@ -12,6 +12,7 @@ import {
 } from '@schichtplan/shared';
 import { accessEventInclude, checkRules, managerFlags, type AccessUser } from '../services/eventAccess.js';
 import { escapeHtml, renderEmailTemplate, sendEmail } from '../services/email.js';
+import { eventRelatedPeopleWhere } from '../services/departmentVisibility.js';
 import { personLabel } from '../services/profile.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 import { eventUrl } from '../services/shiftReminders.js';
@@ -227,14 +228,8 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         const candidates = await fastify.prisma.user.findMany({
           where: {
             deregistrations: { none: { eventId: event.id } },
-            OR: [
-              { homeDepartmentId: { in: targetDeptIds } },
-              { memberships: { some: { departmentId: { in: targetDeptIds } } } },
-              { stufen: { some: { stufe: { departmentId: { in: targetDeptIds } } } } },
-              { organizedEvents: { some: { eventId: event.id } } },
-              { eventAccessGrants: { some: { eventId: event.id } } },
-              { signups: { some: { shift: { eventId: event.id } } } },
-            ],
+            // Wie der Helfer-Pool: freigegebene Abteilungen nur mit eigenem Bezug zum Anlass
+            OR: eventRelatedPeopleWhere(event),
           },
           select: {
             ...userSelect,
@@ -266,9 +261,10 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         const matching = candidates.filter((u) => {
           if (u.signups.length >= minRequired) return false;
           const hasGrant = u.eventAccessGrants.length > 0;
-          const isDeptAdmin =
-            u.isGlobalAdmin ||
-            u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');
+          // Globale Admins zählen hier nicht automatisch: Sie haben oft eine Mitgliedschaft in vielen
+          // Abteilungen, sind aber nicht Helfende jedes Anlasses (sonst bekämen sie z. B. jede
+          // «Noch ohne Schicht»-Nachricht). Für sie gelten die normalen Regeln.
+          const isDeptAdmin = u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');
           const isPlanner = u.memberships.some(
             (m) => m.departmentId === event.departmentId && m.permissions.includes('EVENTS_VIEW_ALL')
           );
@@ -299,19 +295,14 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
       } else {
         const userIds = [...new Set(input.userIds ?? [])];
         // Nur Personen mit Bezug zum Anlass oder zur Abteilung, nie beliebige Konten
-        const departmentIds = [event.departmentId, ...event.allowedDepartments.map((d) => d.departmentId)];
+        // (freigegebene Abteilungen nur mit eigenem Bezug zum Anlass, siehe eventRelatedPeopleWhere)
         const users = await fastify.prisma.user.findMany({
           where: {
             id: { in: userIds },
             OR: [
-              { signups: { some: { shift: { eventId: event.id } } } },
+              ...eventRelatedPeopleWhere(event),
               { shiftResponsibles: { some: { shift: { eventId: event.id } } } },
               { eventDayResponsibles: { some: { eventId: event.id } } },
-              { organizedEvents: { some: { eventId: event.id } } },
-              { eventAccessGrants: { some: { eventId: event.id } } },
-              { homeDepartmentId: { in: departmentIds } },
-              { memberships: { some: { departmentId: { in: departmentIds } } } },
-              { stufen: { some: { stufe: { departmentId: { in: departmentIds } } } } },
             ],
           },
           select: userSelect,

@@ -19,6 +19,7 @@ import {
   managerFlags,
   type AccessUser,
 } from '../services/eventAccess.js';
+import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent, eventRelatedPeopleWhere } from '../services/departmentVisibility.js';
 import { personLabel } from '../services/profile.js';
 import {
   disambiguatePersonNames,
@@ -507,17 +508,10 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const isRestricted = cfg.scope === 'DEPARTMENT' || event.allowedStufen.length > 0;
 
       // Kandidaten laden
+      // Kandidaten: eigene Abteilung und wer selbst Bezug zum Anlass hat. Freigegebene Abteilungen nicht
+      // pauschal (siehe eventRelatedPeopleWhere): ihre Personen erscheinen, sobald sie sich eintragen.
       const candidateUsers = await fastify.prisma.user.findMany({
-        where: {
-          OR: [
-            { homeDepartmentId: { in: targetDeptIds } },
-            { memberships: { some: { departmentId: { in: targetDeptIds } } } },
-            { stufen: { some: { stufe: { departmentId: { in: targetDeptIds } } } } },
-            { organizedEvents: { some: { eventId: event.id } } },
-            { eventAccessGrants: { some: { eventId: event.id } } },
-            { signups: { some: { shift: { eventId: event.id } } } },
-          ],
-        },
+        where: { OR: eventRelatedPeopleWhere(event) },
         select: {
           id: true,
           firstName: true,
@@ -567,9 +561,10 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
 
       for (const u of candidateUsers) {
         const hasGrant = u.eventAccessGrants.length > 0;
-        const isDeptAdmin =
-          u.isGlobalAdmin ||
-          u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');
+        // Globale Admins zählen hier nicht automatisch: Sie haben oft eine Mitgliedschaft in vielen
+        // Abteilungen, sind aber nicht Helfende jedes Anlasses (sonst bekämen sie z. B. jede
+        // «Noch ohne Schicht»-Nachricht). Für sie gelten die normalen Regeln.
+        const isDeptAdmin = u.memberships.some((m) => m.departmentId === event.departmentId && m.role === 'ADMIN');
         const isPlanner = u.memberships.some(
           (m) => m.departmentId === event.departmentId && m.permissions.includes('EVENTS_VIEW_ALL')
         );
@@ -710,6 +705,11 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       if (!event) return;
 
       const input = request.body as z.output<typeof EventDeregistrationSchema>;
+
+      // Nur Personen der Abteilung oder des Anlasses (sonst verriete die Antwort beliebige Namen)
+      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, [input.userId]))) {
+        return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
+      }
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: input.userId },

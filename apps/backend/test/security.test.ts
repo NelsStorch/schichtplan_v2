@@ -386,13 +386,60 @@ describe.skipIf(!hasTestDb)('Sicherheit der API', () => {
 
       const normal = await ids(`/api/events/${event.slug}/roster`);
       expect(normal.has(ownNoAccess.id)).toBe(false);
-      expect(normal.get(otherAccess.id)).toBe(true);
+      // Freigegebene Abteilung: nicht pauschal (die Freigabe setzt die Gastgeber-Abteilung allein)
+      expect(normal.has(otherAccess.id)).toBe(false);
 
       const all = await ids(`/api/events/${event.slug}/roster?alle=1`);
       expect(all.get(ownNoAccess.id)).toBe(false);
-      expect(all.get(otherAccess.id)).toBe(true);
+      expect(all.has(otherAccess.id)).toBe(false);
       expect(all.has(otherNoAccess.id)).toBe(false);
       expect(all.has(stranger.id)).toBe(false);
+
+      // Erst mit eigenem Bezug zum Anlass (eingetragen) erscheint die Person
+      const shift = await createShift(app, event.id);
+      await app.prisma.shiftSignup.create({ data: { shiftId: shift.id, userId: otherAccess.id } });
+      const afterSignup = await ids(`/api/events/${event.slug}/roster`);
+      expect(afterSignup.get(otherAccess.id)).toBe(true);
+    });
+
+    it('lässt Personen freigegebener Abteilungen ohne Bezug weder einteilen noch anschreiben', async () => {
+      const host = await createDepartment(app);
+      const other = await createDepartment(app);
+      const ok = await createUser(app, { homeDepartmentId: host.id });
+      const event = await createEvent(app, host.id, { accessType: 'WHITELIST_CEVIDB', organizerId: ok.id });
+      await app.prisma.eventAllowedDepartment.create({ data: { eventId: event.id, departmentId: other.id } });
+      const otherPerson = await createUser(app, { homeDepartmentId: other.id, ceviDbId: 990002, homeDepartmentSource: 'CEVIDB' });
+      const shift = await createShift(app, event.id);
+      const cookie = authCookie(app, ok);
+
+      const assign = await inject(app, {
+        method: 'POST',
+        url: `/api/shifts/${shift.id}/signup`,
+        tenant: host.slug,
+        cookie,
+        payload: { userId: otherPerson.id },
+      });
+      expect(assign.statusCode).toBe(400);
+
+      const message = await inject(app, {
+        method: 'POST',
+        url: `/api/events/${event.slug}/messages`,
+        tenant: host.slug,
+        cookie,
+        payload: { subject: 'Hallo', body: 'Test', target: 'USERS', userIds: [otherPerson.id], dryRun: true },
+      });
+      expect(message.statusCode).toBe(400);
+
+      const open = await inject(app, {
+        method: 'POST',
+        url: `/api/events/${event.slug}/messages`,
+        tenant: host.slug,
+        cookie,
+        payload: { subject: 'Hallo', body: 'Test', target: 'OPEN', dryRun: true },
+      });
+      expect(open.statusCode).toBe(200);
+      // Nur das OK selbst, niemand aus der freigegebenen Abteilung
+      expect(open.json().recipientCount).toBe(1);
     });
 
     it('verweigert den Pool ohne OK- oder Leitungsrolle', async () => {
@@ -407,6 +454,126 @@ describe.skipIf(!hasTestDb)('Sicherheit der API', () => {
         cookie: authCookie(app, helper),
       });
       expect(res.statusCode).toBe(403);
+    });
+  });
+  describe('Fremde Personen', () => {
+    it('Kollisionsprüfung: nur mit Einteilrecht, nur Personen mit Bezug, fremde Anlässe ohne Titel', async () => {
+      const host = await createDepartment(app);
+      const foreign = await createDepartment(app);
+      const ok = await createUser(app, { homeDepartmentId: host.id });
+      const viewer = await createUser(app, { homeDepartmentId: host.id });
+      await addMember(app, host.id, viewer.id, 'HELPER', ['EVENTS_VIEW_ALL']);
+      const event = await createEvent(app, host.id, { organizerId: ok.id });
+      const shift = await createShift(app, event.id);
+
+      const stranger = await createUser(app);
+      const member = await createUser(app, { homeDepartmentId: host.id });
+      // Das Mitglied hat zur gleichen Zeit eine Schicht in einem Anlass einer fremden Abteilung
+      const foreignEvent = await createEvent(app, foreign.id);
+      const foreignShift = await createShift(app, foreignEvent.id, { title: 'Geheime Bar' });
+      await app.prisma.shiftSignup.create({ data: { shiftId: foreignShift.id, userId: member.id } });
+
+      const check = (cookie: string, userId: string) =>
+        inject(app, { method: 'GET', url: `/api/shifts/${shift.id}/check-collision?userId=${userId}`, tenant: host.slug, cookie });
+
+      expect((await check(authCookie(app, viewer), member.id)).statusCode).toBe(403);
+      expect((await check(authCookie(app, ok), stranger.id)).statusCode).toBe(400);
+
+      const res = await check(authCookie(app, ok), member.id);
+      expect(res.statusCode).toBe(200);
+      expect(res.json().hasCollision).toBe(true);
+      expect(JSON.stringify(res.json())).not.toContain('Geheime Bar');
+    });
+
+    it('Abmelden geht nur für Personen mit Bezug zum Anlass', async () => {
+      const host = await createDepartment(app);
+      const ok = await createUser(app, { homeDepartmentId: host.id });
+      const event = await createEvent(app, host.id, { organizerId: ok.id });
+      const stranger = await createUser(app, { firstName: 'Fremda' });
+
+      const res = await inject(app, {
+        method: 'POST',
+        url: `/api/events/${event.slug}/deregistrations`,
+        tenant: host.slug,
+        cookie: authCookie(app, ok),
+        payload: { userId: stranger.id },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).not.toContain('Fremda');
+      expect(await app.prisma.eventDeregistration.count()).toBe(0);
+    });
+
+    it('«Noch ohne Schicht» geht nicht pauschal an globale Admins', async () => {
+      const host = await createDepartment(app);
+      const ok = await createUser(app, { homeDepartmentId: host.id });
+      const event = await createEvent(app, host.id, { accessType: 'DEPARTMENT', organizerId: ok.id });
+      await createShift(app, event.id);
+      const globalAdmin = await createUser(app, { isGlobalAdmin: true });
+      await addMember(app, host.id, globalAdmin.id, 'HELPER');
+      await createUser(app, { homeDepartmentId: host.id });
+
+      const res = await inject(app, {
+        method: 'POST',
+        url: `/api/events/${event.slug}/messages`,
+        tenant: host.slug,
+        cookie: authCookie(app, ok),
+        payload: { subject: 'Hallo', body: 'Test', target: 'OPEN', dryRun: true },
+      });
+      expect(res.statusCode).toBe(200);
+      // Helfer*in und OK, nicht der globale Admin
+      expect(res.json().recipientCount).toBe(2);
+    });
+  });
+
+  describe('Eintragen und Austragen', () => {
+    it('erlaubt Überlappung bis zur Übergabe-Toleranz auch beim Speichern', async () => {
+      const host = await createDepartment(app);
+      const event = await createEvent(app, host.id);
+      const first = await createShift(app, event.id, {
+        startTime: new Date('2030-06-01T08:00:00Z'),
+        endTime: new Date('2030-06-01T10:10:00Z'),
+      });
+      const second = await createShift(app, event.id, {
+        startTime: new Date('2030-06-01T10:00:00Z'),
+        endTime: new Date('2030-06-01T12:00:00Z'),
+      });
+      const user = await createUser(app, { homeDepartmentId: host.id, birthDate: new Date('1990-01-01T00:00:00Z') });
+      const cookie = authCookie(app, user);
+
+      for (const shift of [first, second]) {
+        const res = await inject(app, { method: 'POST', url: `/api/shifts/${shift.id}/signup`, tenant: host.slug, cookie, payload: {} });
+        expect(res.statusCode).toBe(200);
+      }
+    });
+
+    it('trägt über signupId nur aus der Schicht in der Adresse aus', async () => {
+      const host = await createDepartment(app);
+      const ok = await createUser(app, { homeDepartmentId: host.id });
+      const event = await createEvent(app, host.id, { organizerId: ok.id });
+      const shiftA = await createShift(app, event.id);
+      const shiftB = await createShift(app, event.id, {
+        startTime: new Date('2030-06-02T08:00:00Z'),
+        endTime: new Date('2030-06-02T10:00:00Z'),
+      });
+      const helper = await createUser(app, { homeDepartmentId: host.id });
+      const signup = await app.prisma.shiftSignup.create({ data: { shiftId: shiftB.id, userId: helper.id } });
+
+      const wrong = await inject(app, {
+        method: 'DELETE',
+        url: `/api/shifts/${shiftA.id}/signup?signupId=${signup.id}`,
+        tenant: host.slug,
+        cookie: authCookie(app, ok),
+      });
+      expect(wrong.statusCode).toBe(404);
+      expect(await app.prisma.shiftSignup.count({ where: { id: signup.id } })).toBe(1);
+
+      const right = await inject(app, {
+        method: 'DELETE',
+        url: `/api/shifts/${shiftB.id}/signup?signupId=${signup.id}`,
+        tenant: host.slug,
+        cookie: authCookie(app, ok),
+      });
+      expect(right.statusCode).toBe(200);
     });
   });
 });

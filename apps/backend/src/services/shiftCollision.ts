@@ -10,7 +10,14 @@ export interface CollisionCheckOptions {
   userId?: string | null;
   guestName?: string | null;
   overlapToleranceMinutes?: number;
+  /**
+   * Schichten aus anderen Anlässen nur neutral nennen (ohne Titel und Arbeit). Für Abfragen über
+   * andere Personen: Das OK eines Anlasses soll nicht sehen, wo jemand anderswo eingetragen ist.
+   */
+  hideOtherEvents?: boolean;
 }
+
+export const OTHER_EVENT_SHIFT_TITLE = 'Schicht in einem anderen Anlass';
 
 /**
  * Prüft, ob sich zwei halboffene Zeitintervalle [startA, endA) und [startB, endB) überschneiden.
@@ -99,6 +106,7 @@ export async function findShiftCollisions(
         shift: {
           select: {
             id: true,
+            eventId: true,
             title: true,
             startTime: true,
             endTime: true,
@@ -121,15 +129,18 @@ export async function findShiftCollisions(
       return hasShiftCollision(startTime, endTime, s.shift.startTime, s.shift.endTime, tolerance);
     });
 
-    return filtered.map((s) => ({
-      signupId: s.id,
-      shiftId: s.shift.id,
-      shiftTitle: shiftDisplayTitle(s.shift, s.task),
-      taskTitle: s.task?.title || null,
-      startTime: s.shift.startTime.toISOString(),
-      endTime: s.shift.endTime.toISOString(),
-      sameShift: s.shift.id === shiftId,
-    }));
+    return filtered.map((s) => {
+      const hidden = Boolean(options.hideOtherEvents && s.shift.eventId !== eventId);
+      return {
+        signupId: s.id,
+        shiftId: s.shift.id,
+        shiftTitle: hidden ? OTHER_EVENT_SHIFT_TITLE : shiftDisplayTitle(s.shift, s.task),
+        taskTitle: hidden ? null : s.task?.title || null,
+        startTime: s.shift.startTime.toISOString(),
+        endTime: s.shift.endTime.toISOString(),
+        sameShift: s.shift.id === shiftId,
+      };
+    });
   }
 
   if (guestName && guestName.trim().length > 0) {

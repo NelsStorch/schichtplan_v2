@@ -7,7 +7,7 @@
  * Dazu Prüfungen, wer in einer Abteilung planen bzw. Bilder hochladen darf.
  */
 import type { PrismaClient } from '../db.js';
-import { accessTypeConfig, type DepartmentPermission } from '@schichtplan/shared';
+import type { DepartmentPermission } from '@schichtplan/shared';
 import { accessFrom } from './permissions.js';
 
 type Db = Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer'>;
@@ -56,9 +56,8 @@ export const UNRELATED_PERSON_ERROR = 'Diese Person gehört nicht zu dieser Abte
 
 /**
  * Gehören alle Personen zur Abteilung (Heimabteilung, Mitgliedschaft, Stufe) oder zum Anlass (eingetragen,
- * im OK, Zugangs-Link)? Gleicher Kreis wie der Helfer-Pool (`roster`), bei Whitelist-Anlässen inkl. der
- * freigegebenen Abteilungen. Sonst könnte ein OK beliebige User-IDs als Verantwortliche oder Helfende
- * eintragen und danach deren Kontaktdaten sehen.
+ * im OK, Zugangs-Link)? Gleicher Kreis wie der Helfer-Pool (`roster`). Sonst könnte ein OK beliebige
+ * User-IDs als Verantwortliche oder Helfende eintragen und danach deren Kontaktdaten sehen.
  */
 export async function allUsersRelatedTo(
   prisma: Pick<PrismaClient, 'user'>,
@@ -72,46 +71,50 @@ export async function allUsersRelatedTo(
     where: {
       id: { in: ids },
       OR: [
-        { homeDepartmentId: { in: departmentIds } },
-        { memberships: { some: { departmentId: { in: departmentIds } } } },
-        { stufen: { some: { stufe: { departmentId: { in: departmentIds } } } } },
-        ...(eventId
-          ? [
-              { organizedEvents: { some: { eventId } } },
-              { eventAccessGrants: { some: { eventId } } },
-              { signups: { some: { shift: { eventId } } } },
-            ]
-          : []),
+        ...departmentPeopleWhere(departmentIds),
+        ...(eventId ? eventPeopleWhere(eventId) : []),
       ],
     },
   });
   return count === ids.length;
 }
 
-/** Abteilungen, deren Personen ein Anlass einbeziehen darf: die eigene, bei Whitelist-Typen die freigegebenen */
-export async function eventDepartmentIds(
-  prisma: Pick<PrismaClient, 'event'>,
-  eventId: string
-): Promise<string[]> {
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { departmentId: true, accessType: true, allowedDepartments: { select: { departmentId: true } } },
-  });
-  if (!event) return [];
-  return [
-    event.departmentId,
-    ...(accessTypeConfig(event.accessType).whitelist ? event.allowedDepartments.map((a) => a.departmentId) : []),
-  ];
-}
+/** Personen einer Abteilung: Heimabteilung, Mitgliedschaft oder Stufe */
+export const departmentPeopleWhere = (departmentIds: string[]) => [
+  { homeDepartmentId: { in: departmentIds } },
+  { memberships: { some: { departmentId: { in: departmentIds } } } },
+  { stufen: { some: { stufe: { departmentId: { in: departmentIds } } } } },
+];
 
-/** Kurzform: gehören die Personen zu diesem Anlass (inkl. Abteilung)? */
+/** Personen mit eigenem Bezug zum Anlass: im OK, Zugangs-Link eingelöst oder eingetragen */
+export const eventPeopleWhere = (eventId: string) => [
+  { organizedEvents: { some: { eventId } } },
+  { eventAccessGrants: { some: { eventId } } },
+  { signups: { some: { shift: { eventId } } } },
+];
+
+/**
+ * Personen, die ein Anlass einbeziehen darf: die der eigenen Abteilung und alle mit eigenem Bezug zum
+ * Anlass. Freigegebene Abteilungen (Whitelist) zählen bewusst NICHT pauschal: Die Freigabe setzt die
+ * Gastgeber-Abteilung allein, ohne Zustimmung der anderen. Sonst sähe ein OK über Helfer-Pool,
+ * Nachrichten und Einteilen deren ganze Personenliste. Wer aus einer freigegebenen Abteilung kommt,
+ * erscheint, sobald er sich einträgt oder einen Zugangs-Link einlöst.
+ */
+export const eventRelatedPeopleWhere = (event: { id: string; departmentId: string }) => [
+  ...departmentPeopleWhere([event.departmentId]),
+  ...eventPeopleWhere(event.id),
+];
+
+/** Kurzform: gehören die Personen zu diesem Anlass (inkl. eigene Abteilung)? */
 export async function allUsersRelatedToEvent(
   prisma: Pick<PrismaClient, 'user' | 'event'>,
   eventId: string,
   userIds: (string | null | undefined)[]
 ): Promise<boolean> {
   if (userIds.every((id) => !id)) return true;
-  return allUsersRelatedTo(prisma, { departmentIds: await eventDepartmentIds(prisma, eventId), eventId }, userIds);
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { departmentId: true } });
+  if (!event) return false;
+  return allUsersRelatedTo(prisma, { departmentIds: [event.departmentId], eventId }, userIds);
 }
 
 /** Rechte, mit denen man Bilder (Logos, Banner) braucht */

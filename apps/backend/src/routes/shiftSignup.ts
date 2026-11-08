@@ -16,7 +16,7 @@ import {
 } from '../services/eventAccess.js';
 import { missingProfileFields } from '../services/profile.js';
 import { validateAnswers } from './eventParticipation.js';
-import { findShiftCollisions } from '../services/shiftCollision.js';
+import { OTHER_EVENT_SHIFT_TITLE, findShiftCollisions, hasShiftCollision } from '../services/shiftCollision.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
 import { trackUsage } from '../services/usageStats.js';
 import { personLabel } from '../services/attendance.js';
@@ -70,18 +70,23 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const flags = await managerFlags(fastify.prisma, shift.event, request.user);
-      const isOkOrAdmin = flags.isManager;
+      // Andere Personen prüfen nur, wer auch einteilen darf (wie beim Eintragen); Sehen allein reicht nicht
+      const canAssign = flags.can.HELPERS;
 
       let targetUserId: string | null = null;
       let targetGuestName: string | null = null;
 
-      if (userId) {
-        if (userId !== request.user.id && !isOkOrAdmin) {
+      if (userId && userId !== request.user.id) {
+        if (!canAssign) {
           return reply.status(403).send({ error: 'Keine Berechtigung' });
         }
+        // Nur Personen der Abteilung oder des Anlasses, nie beliebige Konten
+        if (!(await allUsersRelatedToEvent(fastify.prisma, shift.eventId, [userId]))) {
+          return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
+        }
         targetUserId = userId;
-      } else if (guestName) {
-        if (!isOkOrAdmin) {
+      } else if (!userId && guestName) {
+        if (!canAssign) {
           return reply.status(403).send({ error: 'Keine Berechtigung' });
         }
         targetGuestName = guestName;
@@ -96,6 +101,8 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         eventId: shift.eventId,
         userId: targetUserId,
         guestName: targetGuestName,
+        // Bei anderen Personen: Schichten anderer Anlässe nicht mit Titel nennen
+        hideOtherEvents: targetUserId !== request.user.id,
       });
 
       let message: string | undefined;
@@ -305,6 +312,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         eventId: shift.eventId,
         userId: targetUserId,
         guestName,
+        hideOtherEvents: targetUserId !== request.user.id,
       });
 
       if (conflicts.length > 0 && !allowCollision) {
@@ -439,6 +447,12 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
+      const needsAdultOnLastSlot = Boolean(
+        chosenTask?.minAge &&
+          chosenTask.ageRequirementType === 'AT_LEAST_ONE' &&
+          !(userAge !== null && userAge >= chosenTask.minAge)
+      );
+
       // Plätze und Doppel-Eintragung unter Sperre der Schicht nochmals prüfen: Zwei gleichzeitige
       // Eintragungen für den letzten Platz (oder ein Doppelklick) würden die Schicht sonst überbuchen.
       const result = await fastify.prisma.$transaction(async (tx) => {
@@ -453,8 +467,12 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
           await tx.shiftSignup.delete({ where: { id: replaced.id } });
         }
         if (!allowCollision) {
+          // Gleiche Regel wie findShiftCollisions: Überlappung bis zur Übergabe-Toleranz ist erlaubt
+          const tolerance = event.overlapToleranceMinutes ?? 15;
+          const collides = (other: { id: string; startTime: Date; endTime: Date }) =>
+            other.id === shiftId || hasShiftCollision(shift.startTime, shift.endTime, other.startTime, other.endTime, tolerance);
           if (targetUserId) {
-            const overlapping = await tx.shiftSignup.findFirst({
+            const candidates = await tx.shiftSignup.findMany({
               where: {
                 userId: targetUserId,
                 shift: {
@@ -464,16 +482,22 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
               },
               include: { shift: true },
             });
+            const overlapping = candidates.find((c) => collides(c.shift));
             if (overlapping) {
               const isSame = overlapping.shiftId === shiftId;
+              // Bei anderen Personen keine Titel aus anderen Anlässen nennen
+              const otherTitle =
+                targetUserId !== request.user!.id && overlapping.shift.eventId !== shift.eventId
+                  ? OTHER_EVENT_SHIFT_TITLE
+                  : overlapping.shift.title || 'eine andere Schicht';
               return {
                 error: isSame
                   ? 'Diese Person ist für diese Schicht bereits eingetragen'
-                  : `Zur gleichen Zeit besteht bereits eine Eintragung für «${overlapping.shift.title || 'eine andere Schicht'}»`,
+                  : `Zur gleichen Zeit besteht bereits eine Eintragung für «${otherTitle}»`,
               } as const;
             }
           } else if (guestName) {
-            const overlapping = await tx.shiftSignup.findFirst({
+            const candidates = await tx.shiftSignup.findMany({
               where: {
                 shift: {
                   eventId: shift.eventId,
@@ -484,7 +508,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
               },
               include: { shift: true },
             });
-            if (overlapping) {
+            if (candidates.some((c) => collides(c.shift))) {
               return {
                 error: `Jemand mit dem Namen "${guestName}" ist zur gleichen Zeit bereits eingetragen`,
               } as const;
@@ -498,6 +522,23 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
           return {
             error: `Für die Arbeit "${chosenTask.title}" sind alle Plätze belegt. Bitte wähle eine andere Arbeit.`,
           } as const;
+        }
+        // «Mindestens eine Person ab X Jahren» unter der Sperre nochmals prüfen: Sonst könnten zwei zu
+        // junge Personen gleichzeitig die letzten Plätze bekommen.
+        if (needsAdultOnLastSlot && chosenTask?.minAge) {
+          const current = await tx.shiftSignup.findMany({
+            where: { shiftId },
+            select: { user: { select: { birthDate: true } } },
+          });
+          const hasAdult = current.some((c) => {
+            const age = c.user?.birthDate ? ageAt(c.user.birthDate, shiftDate) : null;
+            return age !== null && age >= chosenTask.minAge!;
+          });
+          if (!hasAdult && shift.requiredSlots - current.length <= 1) {
+            return {
+              error: `Für die Arbeit "${chosenTask.title}" muss mindestens eine Person in der Schicht mindestens ${chosenTask.minAge} Jahre alt sein. Der letzte freie Platz bleibt für eine Person ab ${chosenTask.minAge} Jahren.`,
+            } as const;
+          }
         }
 
         const created = await tx.shiftSignup.create({
@@ -658,7 +699,9 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      if (!existingSignup) {
+      // Die Eintragung muss zur Schicht in der Adresse gehören. Bewusst ohne Abteilungs-Prüfung:
+      // «Meine Schichten» trägt auch Schichten anderer Abteilungen aus (die Berechtigung folgt unten).
+      if (!existingSignup || existingSignup.shiftId !== shiftId) {
         return reply.status(404).send({ error: 'Eintragung nicht gefunden' });
       }
 
