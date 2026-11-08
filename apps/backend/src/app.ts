@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { z } from 'zod';
 import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -61,6 +62,10 @@ export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalho
     (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost'))
   );
 }
+
+// Standardmeldungen von Zod auf Deutsch (z. B. «Ungültig: UUID» statt «Invalid UUID»).
+// Eigene Meldungen in den Schemas haben Vorrang und bleiben unverändert.
+z.config(z.locales.de());
 
 /** Deutsche Meldungen für Fehler, die Fastify selbst auslöst (nach Code, sonst nach Status) */
 const FASTIFY_ERROR_MESSAGES: Record<string, string> = {

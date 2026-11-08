@@ -62,6 +62,8 @@ describe.skipIf(!hasTestDb)('Eingabeprüfung der Routen', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('FST_ERR_VALIDATION');
+    // Standardmeldung von Zod auf Deutsch (app.ts: z.config(z.locales.de()))
+    expect(res.json().error).toBe('Ungültig: UUID');
   });
 
   it('dupliziert Schichten nur mit gültigen Zeiten', async () => {
