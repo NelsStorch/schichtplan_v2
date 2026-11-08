@@ -2,7 +2,7 @@
 # Hilfe-Center: Astro baut statisches HTML, nginx liefert es aus. Kein Node zur Laufzeit,
 # kein Backend, keine DB. Build-Kontext ist das Repo-Root (wie bei den anderen Apps).
 
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app/hilfe
 COPY hilfe/package.json hilfe/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
