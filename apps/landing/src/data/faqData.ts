@@ -25,7 +25,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     category: 'allgemein',
     question: 'Ist der Cevi Schichtplan wirklich 100% kostenlos und ohne Werbung?',
     answer:
-      'Ja, zu 100%. Der Cevi Schichtplan ist ein ehrenamtliches Open-Source-Projekt von und für Cevianer*innen. Es gibt weder Nutzungsgebühren, Abos noch Werbebanner oder Tracker. Die gesamte Infrastruktur wird in der Schweiz betrieben.',
+      'Ja, zu 100%. Der Cevi Schichtplan ist ein unabhängiges, ehrenamtliches Open-Source-Projekt von und für Cevianer*innen und kein offizielles Angebot des Cevi Schweiz. Es gibt weder Nutzungsgebühren, Abos noch Werbebanner oder Tracker. Die Server stehen in einem Rechenzentrum in Frankfurt am Main (Deutschland); Details stehen in der Datenschutzerklärung.',
   },
   {
     id: 'anmeldung-helfer',
@@ -37,7 +37,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     id: 'cevidb-anbindung',
     category: 'leitende',
-    question: 'Wie funktioniert die offizielle Cevi.DB-Anbindung für Leitende?',
+    question: 'Wie funktioniert die Cevi.DB-Anbindung für Leitende?',
     answer:
       'Leitende melden sich per Single Sign-On (OAuth 2.0) direkt mit ihren gewohnten Zugangsdaten der Cevi.DB (Hitobito) an. Vorname, Nachname, Cevi-Name, Ortsgruppe/Abteilung und Leitungsrollen werden vollautomatisch übernommen. Abteilungsleitende erhalten sofort Zugriff auf ihre eigene Abteilung und können sofort Anlässe und Schichten anlegen.',
   },

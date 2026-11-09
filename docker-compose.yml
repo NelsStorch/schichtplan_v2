@@ -129,8 +129,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_prod_proxy"
-      # Hauptdomain und www (Marketing & Abteilungsauswahl)
-      - "traefik.http.routers.schichtplan-landing.rule=Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`)"
+      # Hauptdomain (Marketing & Abteilungsauswahl)
+      - "traefik.http.routers.schichtplan-landing.rule=Host(`${DOMAIN:-cevi-schichtplan.ch}`)"
       - "traefik.http.routers.schichtplan-landing.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-landing.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-landing.priority=20"
@@ -138,6 +138,16 @@ services:
       - "traefik.http.services.schichtplan-landing.loadbalancer.server.port=3001"
       - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.interval=3s"
+      # www leitet dauerhaft (301) auf die Hauptdomain um, damit es keine doppelte Seite gibt (SEO)
+      - "traefik.http.routers.schichtplan-landing-www.rule=Host(`www.${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-landing-www.entrypoints=websecure"
+      - "traefik.http.routers.schichtplan-landing-www.tls.certresolver=myresolver"
+      - "traefik.http.routers.schichtplan-landing-www.priority=20"
+      - "traefik.http.routers.schichtplan-landing-www.service=schichtplan-landing"
+      - "traefik.http.routers.schichtplan-landing-www.middlewares=schichtplan-www-redirect"
+      - "traefik.http.middlewares.schichtplan-www-redirect.redirectregex.regex=^https?://www\\.(.+)"
+      - "traefik.http.middlewares.schichtplan-www-redirect.redirectregex.replacement=https://$${1}"
+      - "traefik.http.middlewares.schichtplan-www-redirect.redirectregex.permanent=true"
 
   login:
     build:

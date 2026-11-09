@@ -1,9 +1,5 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  LogIn,
   Flame,
   ExternalLink,
   CheckCircle2,
@@ -11,21 +7,13 @@ import {
   LifeBuoy,
   ShieldCheck,
   ChevronDown,
-  ArrowRight,
   Heart,
   Users,
 } from 'lucide-react';
-import {
-  getLoginUrl,
-  getLandingUrl,
-  getDepartmentUrl,
-  helpUrl,
-  statusUrl,
-  type UserDto,
-} from '@schichtplan/shared';
+import { helpUrl, statusUrl } from '@schichtplan/shared';
 import { CeviLogo } from '@/components/CeviLogo';
-import { Avatar, ThemeToggle, buttonClasses } from '@schichtplan/ui';
-import { Campfire3DCanvas } from '@/components/Campfire3DCanvas';
+import { ThemeToggle, buttonClasses } from '@schichtplan/ui';
+import { CampfireBackground } from '@/components/CampfireBackground';
 import { Hero3DStage } from '@/components/Hero3DStage';
 import { ComparisonTable } from '@/components/ComparisonTable';
 import { Reveal } from '@/components/Reveal';
@@ -34,27 +22,17 @@ import { CeviDbIsometricGraphic } from '@/components/CeviDbIsometricGraphic';
 import { SubdomainIsometricGraphic } from '@/components/SubdomainIsometricGraphic';
 import { MultiEventIsometricGraphic } from '@/components/MultiEventIsometricGraphic';
 import { MobilePwaIsometricGraphic } from '@/components/MobilePwaIsometricGraphic';
+import { CreateDepartmentButton, HeaderAccount, MeProvider, PrimaryCta } from '@/components/AccountArea';
 
+const PRIMARY_CTA_CLASS = 'justify-center text-sm font-semibold h-12 px-6 gap-2 shadow-glow';
+
+/** Server-Komponente: Inhalt steht direkt im HTML, nur die Konto-Knöpfe laufen im Browser */
 export default function LandingPage() {
-  // Angemeldete Person (Cookie gilt für alle Subdomains): Name statt «Anmelden» im Kopf
-  const [me, setMe] = useState<UserDto | null>(null);
-
-  useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then(setMe)
-      .catch(() => setMe(null));
-  }, []);
-
-  /** Abteilung anlegen passiert im Login-Portal (nur Abteilungsleitung mit Cevi.DB) */
-  const goCreateDepartment = () => {
-    window.location.href = getLoginUrl(getLandingUrl(), '/abteilung-erstellen');
-  };
-
   return (
+    <MeProvider>
     <div className="relative min-h-[100dvh] flex flex-col bg-canvas text-fg selection:bg-accent selection:text-white overflow-x-hidden">
       {/* 3D Atmospheric Canvas (Interactive Rising Campfire Embers) */}
-      <Campfire3DCanvas />
+      <CampfireBackground />
 
       {/* Campfire Warmth Atmosphere Glow */}
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[640px] bg-campfire opacity-95 -z-10" />
@@ -89,43 +67,7 @@ export default function LandingPage() {
               <span>Hilfe</span>
             </a>
 
-            {me ? (
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {me.homeDepartment && (
-                  <a
-                    href={getDepartmentUrl(me.homeDepartment.slug)}
-                    className={buttonClasses({
-                      variant: 'secondary',
-                      size: 'sm',
-                      className: 'hidden sm:inline-flex text-xs font-semibold gap-1.5 px-3',
-                    })}
-                  >
-                    <span>{me.homeDepartment.name}</span>
-                    <ArrowRight className="size-3 text-fg-subtle" />
-                  </a>
-                )}
-                <Link
-                  href="/profil"
-                  className="flex items-center gap-1.5 sm:gap-2 rounded-full py-1 pl-1 pr-2.5 sm:pr-3 text-xs font-semibold text-fg transition hover:bg-surface-2"
-                  aria-label="Dein Profil und Schichten"
-                >
-                  <Avatar name={me.ceviName || me.firstName} size="sm" highlight className="size-7 text-[10px]" />
-                  <span className="max-w-20 sm:max-w-28 truncate">{me.ceviName || me.firstName}</span>
-                </Link>
-              </div>
-            ) : (
-              <Link
-                href="/login"
-                className={buttonClasses({
-                  variant: 'primary',
-                  size: 'sm',
-                  className: 'gap-1.5 text-xs font-semibold px-3 sm:px-4',
-                })}
-              >
-                <LogIn className="size-3.5" />
-                <span>Anmelden</span>
-              </Link>
-            )}
+            <HeaderAccount />
           </div>
         </div>
       </header>
@@ -140,7 +82,7 @@ export default function LandingPage() {
               <div className="lg:col-span-7 flex flex-col items-start text-left">
                 <div className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-2xs font-bold uppercase tracking-[0.16em] bg-accent/12 text-accent-ink border border-accent/25 mb-6 shadow-sm">
                   <Flame className="size-3 text-accent animate-pulse" />
-                  <span>Cevi Schichtplan • Helferplanung für Chilbi, Lager &amp; Vereine</span>
+                  <span>Helferliste online • Schichtplan für Chilbi &amp; Lager</span>
                 </div>
 
                 <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-fg leading-[1.08] text-balance">
@@ -151,52 +93,15 @@ export default function LandingPage() {
                 </h1>
 
                 <p className="mt-5 text-base sm:text-lg text-fg-muted max-w-[54ch] leading-relaxed">
-                  Schichten online erfassen, Direktlink teilen und Helfer*innen tragen sich in Sekunden selbst ein.
-                  Das OK sieht jederzeit live alle Einteilungen. Die kostenlose Schweizer Lösung für Cevi-Abteilungen,
-                  Pfadi, Jubla und Vereine – mit Cevi.DB-Login und ohne mühsame Excel-Tabellen.
+                  Die kostenlose Helferplanung für Cevi-Abteilungen: Schichten online erfassen, den Link zur
+                  Helferliste teilen und Helfer*innen tragen sich in Sekunden selbst ein. Das OK sieht jederzeit
+                  live alle Einteilungen. Eintragen können sich alle, auch Eltern, Ehemalige und Leute aus
+                  befreundeten Vereinen – ohne Konto und ohne mühsame Excel-Tabellen.
                 </p>
 
                 {/* CTAs */}
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                  {me ? (
-                    me.homeDepartment ? (
-                      <a
-                        href={getDepartmentUrl(me.homeDepartment.slug)}
-                        className={buttonClasses({
-                          variant: 'primary',
-                          size: 'md',
-                          className: 'justify-center text-sm font-semibold h-12 px-6 gap-2 shadow-glow',
-                        })}
-                      >
-                        <span>Zu deiner Abteilung ({me.homeDepartment.name})</span>
-                        <ArrowRight className="size-4" />
-                      </a>
-                    ) : (
-                      <Link
-                        href="/profil"
-                        className={buttonClasses({
-                          variant: 'primary',
-                          size: 'md',
-                          className: 'justify-center text-sm font-semibold h-12 px-6 gap-2 shadow-glow',
-                        })}
-                      >
-                        <span>Zu deinen Schichten ({me.ceviName || me.firstName})</span>
-                        <ArrowRight className="size-4" />
-                      </Link>
-                    )
-                  ) : (
-                    <Link
-                      href="/login"
-                      className={buttonClasses({
-                        variant: 'primary',
-                        size: 'md',
-                        className: 'justify-center text-sm font-semibold h-12 px-6 gap-2 shadow-glow',
-                      })}
-                    >
-                      <LogIn className="size-4" />
-                      <span>Schichtplan öffnen / Anmelden</span>
-                    </Link>
-                  )}
+                  <PrimaryCta loginLabel="Schichtplan öffnen / Anmelden" className={PRIMARY_CTA_CLASS} />
 
                   <a
                     href="#so-funktionierts"
@@ -223,13 +128,7 @@ export default function LandingPage() {
                   </div>
                   <div className="text-fg-subtle pt-1">
                     Du leitest eine Cevi-Abteilung?{' '}
-                    <button
-                      type="button"
-                      onClick={goCreateDepartment}
-                      className="font-semibold text-accent hover:underline inline-flex items-center gap-0.5"
-                    >
-                      Schichtplan für deine Abteilung einrichten <ArrowRight className="size-3" />
-                    </button>
+                    <CreateDepartmentButton />
                   </div>
                 </div>
 
@@ -275,7 +174,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-6xl px-4">
             <Reveal>
               <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">
-                In drei Schritten zum vollen Schichtplan.
+                In drei Schritten zur vollen Helferliste.
               </h2>
             </Reveal>
             <StepsTimeline />
@@ -294,11 +193,11 @@ export default function LandingPage() {
                 Was es euch bringt
               </div>
               <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">
-                Gebaut für den Cevi-Alltag.
+                Helferplanung, gebaut für den Cevi-Alltag.
               </h2>
               <p className="mt-3 text-base text-fg-muted leading-relaxed">
                 Ob du am Grill stehst, den Anlass organisierst oder die ganze Abteilung leitest – der Schichtplan
-                nimmt euch die mühsame Organisation ab.
+                nimmt euch die mühsame Organisation ab, von der Chilbi bis zum Sommerlager.
               </p>
             </Reveal>
 
@@ -475,45 +374,7 @@ export default function LandingPage() {
 
                 {/* Dynamic Bottom Button: Shows home department if present, or profile, or login if not */}
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  {me ? (
-                    me.homeDepartment ? (
-                      <a
-                        href={getDepartmentUrl(me.homeDepartment.slug)}
-                        className={buttonClasses({
-                          variant: 'primary',
-                          size: 'md',
-                          className: 'h-12 justify-center font-semibold text-sm px-6 gap-2 shadow-glow',
-                        })}
-                      >
-                        <span>Zu deiner Abteilung ({me.homeDepartment.name})</span>
-                        <ArrowRight className="size-4" />
-                      </a>
-                    ) : (
-                      <Link
-                        href="/profil"
-                        className={buttonClasses({
-                          variant: 'primary',
-                          size: 'md',
-                          className: 'h-12 justify-center font-semibold text-sm px-6 gap-2 shadow-glow',
-                        })}
-                      >
-                        <span>Zu deinen Schichten ({me.ceviName || me.firstName})</span>
-                        <ArrowRight className="size-4" />
-                      </Link>
-                    )
-                  ) : (
-                    <Link
-                      href="/login"
-                      className={buttonClasses({
-                        variant: 'primary',
-                        size: 'md',
-                        className: 'h-12 justify-center font-semibold text-sm px-6 gap-2 shadow-glow',
-                      })}
-                    >
-                      <LogIn className="size-4" />
-                      <span>Jetzt anmelden</span>
-                    </Link>
-                  )}
+                  <PrimaryCta loginLabel="Jetzt anmelden" className={PRIMARY_CTA_CLASS} />
 
                   <a
                     href={helpUrl()}
@@ -530,7 +391,8 @@ export default function LandingPage() {
                 </div>
 
                 <p className="mt-4 text-xs text-fg-subtle">
-                  Ein ehrenamtliches Projekt · Kostenlos für alle Abteilungen des Cevi Schweiz.
+                  Ein unabhängiges, ehrenamtliches Projekt · Kostenlos für alle Cevi-Abteilungen · Kein offizielles
+                  Angebot des Cevi Schweiz.
                 </p>
               </div>
             </Reveal>
@@ -544,7 +406,8 @@ export default function LandingPage() {
           <div className="flex items-center gap-3">
             <CeviLogo className="size-7 shrink-0" />
             <span>
-              © {new Date().getFullYear()} Cevi Schichtplan · Ein ehrenamtliches Projekt für Cevi-Abteilungen
+              © {new Date().getFullYear()} Cevi Schichtplan · Unabhängiges, ehrenamtliches Projekt für
+              Cevi-Abteilungen, nicht vom Cevi Schweiz betrieben
             </span>
           </div>
 
@@ -583,5 +446,6 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
+    </MeProvider>
   );
 }

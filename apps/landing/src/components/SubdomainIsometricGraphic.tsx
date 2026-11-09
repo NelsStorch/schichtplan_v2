@@ -30,7 +30,7 @@ export function SubdomainIsometricGraphic({ className = '' }: { className?: stri
               <CeviLogo className="size-6 shrink-0" />
               <div>
                 <div className="font-display text-xs font-bold text-fg">Cevi Illnau-Effretikon</div>
-                <div className="text-[10px] text-fg-subtle">Offizielle Schichtplanung</div>
+                <div className="text-[10px] text-fg-subtle">Schichtplanung der Abteilung</div>
               </div>
             </div>
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[9px] font-bold text-accent-ink border border-accent/20">

@@ -1,5 +1,3 @@
-'use client';
-
 import {
   Check,
   X,
@@ -27,7 +25,7 @@ const rows: Row[] = [
   },
   {
     title: 'Cevi.DB-Anbindung für Leitende',
-    desc: 'Offizieller Login mit bestehenden Cevi.DB-Zugangsdaten.',
+    desc: 'Login mit den bestehenden Cevi.DB-Zugangsdaten.',
     excel: { state: 'no', text: 'Alles manuell abtippen' },
     chat: { state: 'no', text: 'Keine Schnittstelle' },
     cevi: { state: 'yes', text: 'Name, Abteilung & Stufen synchron' },

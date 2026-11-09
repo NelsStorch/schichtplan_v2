@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-static';
 
 export async function GET() {
-  const filePath = path.join(process.cwd(), 'public', 'llms-full.txt');
+  const filePath = path.join(process.cwd(), 'src', 'content', 'llms-full.txt');
   const content = readFileSync(filePath, 'utf8');
 
   return new NextResponse(content, {

@@ -27,6 +27,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   transpilePackages: ['@schichtplan/ui'],
+  experimental: {
+    // CSS direkt ins HTML statt als blockierende Datei: schnellerer erster Seitenaufbau (Tailwind-CSS ist klein)
+    inlineCss: true,
+  },
   turbopack: {
     root: path.join(__dirname, '../..'),
   },

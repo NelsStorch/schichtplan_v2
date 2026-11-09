@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   title: "Datenschutzerklärung",
   description:
     "Welche Personendaten der Cevi Schichtplan bearbeitet, wozu und welche Rechte du hast (nDSG).",
+  // Eigener Canonical statt dem der Startseite (aus dem Layout), sonst widersprechen sich die Signale
+  alternates: { canonical: "/datenschutz" },
   // Nicht in Suchmaschinen, keine Kopie im Cache (zusätzlich zu robots.txt)
   robots: {
     index: false,

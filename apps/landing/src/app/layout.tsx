@@ -5,43 +5,24 @@ import type { Metadata, Viewport } from 'next';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { JsonLd } from '@/components/JsonLd';
 
-const TITLE = 'Cevi Schichtplan · Helferliste & Schichtplan für Vereine (Kostenlos)';
+const TITLE = 'Cevi Schichtplan · Helferliste & Schichtplan für Cevi-Abteilungen';
+// Höchstens ~155 Zeichen, sonst kürzt Google die Beschreibung
 const DESCRIPTION =
-  'Schichtplan und Helferliste für Chilbi, Lager & Vereinsanlässe. Helfer tragen sich in 10 Sekunden per Link ein – ohne App & Passwort. 100% kostenlos mit Schweizer Datenschutz.';
+  'Kostenlose Helferliste online für Chilbi, Lager und Anlässe von Cevi-Abteilungen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { origin } = await getRequestOrigin();
   const image = {
     url: `${origin}/og`,
     ...OG_SIZE,
-    alt: 'Cevi Schichtplan: Kostenlose Schicht- und Helferplanung für Schweizer Vereine & Cevi-Abteilungen',
+    alt: 'Cevi Schichtplan: Kostenlose Schicht- und Helferplanung für Cevi-Abteilungen',
   };
 
   return {
     metadataBase: new URL(origin),
     title: { default: TITLE, template: '%s · Cevi Schichtplan' },
     description: DESCRIPTION,
-    keywords: [
-      'Cevi Schichtplan',
-      'Helferplanung',
-      'Schichtplan Verein',
-      'Chilbi Schichtliste',
-      'Freiwillige Helfer einteilen',
-      'Cevi.DB',
-      'Hitobito',
-      'PfiLa Helfer',
-      'Sommerlager Schichtplan',
-      'Doodle Alternative Verein',
-      'Excel Schichtplan Vorlage',
-      'Helferliste online',
-      'Pfadi Schichtplan',
-      'Jubla Helferplanung',
-      'Vereinsanlass Helfer',
-      'Schweizer Vereine',
-      'Helferbörse',
-      'Helferkoordination Schweiz',
-    ],
-    authors: [{ name: 'Cevi Schichtplan', url: 'https://cevi-schichtplan.ch' }],
+    authors: [{ name: 'Cevi Schichtplan', url: `${origin}/` }],
     creator: 'Cevi Schichtplan Team',
     publisher: 'Cevi Schichtplan',
     formatDetection: {
@@ -50,13 +31,11 @@ export async function generateMetadata(): Promise<Metadata> {
       telephone: false,
     },
     alternates: {
-      canonical: origin,
+      canonical: `${origin}/`,
     },
     icons: {
-      icon: [
-        { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
-        { url: '/images/cevi-logo.png', type: 'image/png' },
-      ],
+      // Nur das SVG: Sonst laden manche Browser zusätzlich das 54-KB-PNG
+      icon: [{ url: '/images/cevi-logo.svg', type: 'image/svg+xml' }],
       apple: '/images/cevi-logo.png',
     },
     openGraph: {
@@ -66,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
       alternateLocale: ['de_DE'],
       title: TITLE,
       description: DESCRIPTION,
-      url: origin,
+      url: `${origin}/`,
       images: [image],
     },
     twitter: {
