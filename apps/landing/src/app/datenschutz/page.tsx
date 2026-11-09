@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 // Rechtliche Stammdaten: Platzhalter in eckigen Klammern vor dem Livegang ausfüllen
-const STAND = "26. Oktober 2026";
+const STAND = "9. November 2026";
 
 function Section({
   id,
@@ -413,6 +413,14 @@ export default function DatenschutzPage() {
               mit ihren Sicherungen.
             </li>
             <li>
+              <strong>Google Drive</strong> (Google Ireland Limited, Dublin,
+              Irland): Speicherort für eine zusätzliche Sicherungskopie
+              ausserhalb des Rechenzentrums. Die Sicherungen werden schon auf
+              unserem Server verschlüsselt, bevor sie hochgeladen werden. Der
+              Schlüssel zum Entschlüsseln liegt weder auf dem Server noch bei
+              Google. Google kann die Inhalte deshalb nicht lesen.
+            </li>
+            <li>
               <strong>Infomaniak Network AG</strong>, Genf, Schweiz: Versand der
               E-Mails (SMTP) und Verwaltung der Domain (DNS).
             </li>
@@ -444,8 +452,12 @@ export default function DatenschutzPage() {
           <p>
             Durch das Hosting werden deine Daten in Deutschland gespeichert.
             Deutschland bietet nach der Liste des Bundesrats (Anhang 1 der
-            Datenschutzverordnung) einen angemessenen Datenschutz. Let&apos;s
-            Encrypt in den USA erhält keine Personendaten.
+            Datenschutzverordnung) einen angemessenen Datenschutz, ebenso
+            Irland. Google kann die verschlüsselte Sicherungskopie auch in
+            Rechenzentren ausserhalb Europas, etwa in den USA, speichern; dort
+            liegen nur verschlüsselte Daten, die ohne unseren Schlüssel nicht
+            lesbar sind. Let&apos;s Encrypt in den USA erhält keine
+            Personendaten.
           </p>
         </Section>
 
@@ -490,8 +502,21 @@ export default function DatenschutzPage() {
               Wir sichern die Datenbank jede Nacht und bewahren diese
               Sicherungen 14 Tage auf. Zusätzlich sichern wir sie vor jeder
               Aktualisierung der Software und behalten davon die letzten zehn,
-              höchstens aber 40 Tage. Gelöschte Daten können in diesen
-              Sicherungen noch enthalten sein, bis sie ersetzt werden.
+              höchstens aber 40 Tage.
+            </li>
+            <li>
+              Zusätzlich legen wir jede Nacht eine verschlüsselte Kopie der
+              Datenbank und der hochgeladenen Bilder in Google Drive ab (siehe
+              Abschnitt 7). Davon behalten wir die Sicherungen der letzten
+              sieben Tage, je eine pro Woche für vier Wochen und je eine pro
+              Monat für sechs Monate. Ältere Sicherungen werden gelöscht und
+              nach weiteren 30 Tagen endgültig aus dem Papierkorb entfernt.
+            </li>
+            <li>
+              Gelöschte Daten können in diesen Sicherungen noch enthalten sein,
+              bis die jeweilige Sicherung gelöscht wird, also höchstens rund
+              sieben Monate. Wir verwenden Sicherungen nur, um nach einem Fehler
+              oder Ausfall den Betrieb wiederherzustellen.
             </li>
           </List>
         </Section>
