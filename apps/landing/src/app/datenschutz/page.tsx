@@ -422,7 +422,10 @@ export default function DatenschutzPage() {
             </li>
             <li>
               <strong>Infomaniak Network AG</strong>, Genf, Schweiz: Versand der
-              E-Mails (SMTP) und Verwaltung der Domain (DNS).
+              E-Mails (SMTP), Verwaltung der Domain (DNS) und Speicherort einer
+              verschlüsselten Sicherungskopie der Datenbank in der Schweiz. Wie
+              bei Google Drive verschlüsseln wir die Sicherung vor dem Hochladen;
+              Infomaniak kann sie nicht lesen.
             </li>
             <li>
               <strong>Cevi.DB</strong> (Hitobito), betrieben vom Dachverband
@@ -511,6 +514,13 @@ export default function DatenschutzPage() {
               sieben Tage, je eine pro Woche für vier Wochen und je eine pro
               Monat für sechs Monate. Ältere Sicherungen werden gelöscht und
               nach weiteren 30 Tagen endgültig aus dem Papierkorb entfernt.
+            </li>
+            <li>
+              Ebenfalls jede Nacht legen wir eine verschlüsselte Kopie der
+              Datenbank bei Infomaniak in der Schweiz ab (siehe Abschnitt 7).
+              Davon behalten wir die Sicherungen der letzten 14 Tage, die
+              Sonntage der letzten acht Wochen und die Monatsersten der letzten
+              sechs Monate.
             </li>
             <li>
               Gelöschte Daten können in diesen Sicherungen noch enthalten sein,
