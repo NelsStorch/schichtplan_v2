@@ -1,0 +1,53 @@
+name: 🐞 Fehler melden
+description: Etwas funktioniert nicht wie erwartet.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fürs Melden! **Sicherheitslücken bitte nicht hier**, sondern vertraulich gemäss [SECURITY.md](https://github.com/NelsStorch/schichtplan_v2/blob/main/SECURITY.md).
+        Bitte keine Namen, E-Mail-Adressen oder anderen Personendaten von Helfer:innen in Text oder Screenshots.
+  - type: textarea
+    id: beschreibung
+    attributes:
+      label: Was ist passiert?
+      description: Kurze Beschreibung des Fehlers.
+    validations:
+      required: true
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Schritte zum Nachstellen
+      placeholder: |
+        1. Öffne …
+        2. Klicke auf …
+        3. Fehler erscheint
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was hättest du erwartet?
+  - type: dropdown
+    id: bereich
+    attributes:
+      label: Bereich
+      options:
+        - Schichtplan (Abteilungs-Subdomain)
+        - OK-Bereich
+        - Login / Konto
+        - Admin-Portal
+        - Startseite
+        - Hilfe-Center
+        - Weiss nicht
+    validations:
+      required: true
+  - type: input
+    id: geraet
+    attributes:
+      label: Gerät und Browser
+      placeholder: z. B. iPhone, Safari / Windows, Chrome
+  - type: textarea
+    id: zusatz
+    attributes:
+      label: Screenshots oder weitere Hinweise

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Sicherheitslücke melden
+    url: https://github.com/NelsStorch/schichtplan_v2/security/advisories/new
+    about: Bitte vertraulich melden, nicht als öffentliches Issue.
+  - name: 📚 Hilfe-Center
+    url: https://hilfe.cevi-schichtplan.ch/
+    about: Anleitungen und FAQ für Helfer:innen, OK und Abteilungsleitungen.

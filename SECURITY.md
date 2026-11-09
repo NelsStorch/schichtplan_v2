@@ -13,7 +13,10 @@ Wenn du eine Sicherheitslücke oder ein Datenschutzproblem in dieser Plattform e
 
 ### Kontakt
 
-Sende deine Meldung bitte vertraulich per E-Mail an:
+Am einfachsten meldest du eine Lücke vertraulich direkt über GitHub:
+* **GitHub:** [Sicherheitslücke melden](https://github.com/NelsStorch/schichtplan_v2/security/advisories/new) (Tab *Security* → *Report a vulnerability*)
+
+Alternativ per E-Mail:
 * **E-Mail:** [admin@cevi-schichtplan.ch](mailto:admin@cevi-schichtplan.ch)
 
 Bitte gib in deiner Meldung folgende Details an:

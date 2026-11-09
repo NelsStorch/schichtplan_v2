@@ -1,0 +1,29 @@
+name: 💡 Wunsch oder Idee
+description: Eine neue Funktion oder Verbesserung vorschlagen.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem soll gelöst werden?
+      description: Beschreibe die Situation, z. B. «Als OK-Mitglied möchte ich …, weil …».
+    validations:
+      required: true
+  - type: textarea
+    id: vorschlag
+    attributes:
+      label: Wie könnte die Lösung aussehen?
+  - type: dropdown
+    id: rolle
+    attributes:
+      label: Für wen ist das?
+      multiple: true
+      options:
+        - Helfer:innen
+        - OK / Anlass-Organisation
+        - Abteilungsleitung
+        - Globale Admins
+  - type: textarea
+    id: alternativen
+    attributes:
+      label: Wie löst ihr das heute?

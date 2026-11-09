@@ -1,8 +1,8 @@
 # Cevi Schichtplan V2 🏕️📋
 
 [![CI](https://github.com/NelsStorch/schichtplan_v2/actions/workflows/ci.yml/badge.svg)](https://github.com/NelsStorch/schichtplan_v2/actions/workflows/ci.yml)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-15%20%7C%2016-black.svg)](https://nextjs.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D26-brightgreen.svg)](https://nodejs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![Fastify](https://img.shields.io/badge/Fastify-5.x-black.svg)](https://fastify.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x%20%2F%207.x-blue.svg)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
@@ -10,6 +10,26 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38bdf8.svg)](https://tailwindcss.com/)
 
 Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Web-Plattform zur Organisation von Schichtplänen, Einsätzen und Helferteams für Cevi-Abteilungen in der Schweiz.
+
+> [!NOTE]
+> **Du willst den Schichtplan für deine Abteilung oder deinen Anlass nutzen?** Dafür brauchst du diesen Code nicht.
+> Die Plattform läuft bereits auf **[cevi-schichtplan.ch](https://cevi-schichtplan.ch/)**, Anleitungen findest du im **[Hilfe-Center](https://hilfe.cevi-schichtplan.ch/)**.
+> Dieses Repository richtet sich an Entwickler:innen, die mithelfen oder den Aufbau verstehen möchten.
+
+![Schichtplan eines Anlasses aus Sicht von Helfenden](docs/screenshots/anlass.webp)
+
+<table>
+  <tr>
+    <td width="68%"><img src="docs/screenshots/ok-schichten.webp" alt="OK-Bereich: Schichten planen und Personen einteilen"></td>
+    <td width="32%"><img src="docs/screenshots/mobil-meine-schichten.webp" alt="Meine Schichten auf dem Handy mit Kalender-Abo"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>OK-Bereich: Schichten planen und einteilen</sub></td>
+    <td align="center"><sub>«Meine Schichten» auf dem Handy</sub></td>
+  </tr>
+</table>
+
+<sub>Screenshots mit Demo-Daten aus <code>npm run db:seed</code>.</sub>
 
 ---
 
@@ -90,7 +110,7 @@ Das Monorepo besteht aus fünf Next.js-/Fastify-Diensten, einer statischen Dokum
 | `admin.cevi-schichtplan.ch` | `apps/admin` | 3003 | Zentrales Administrations-Portal für globale Admins |
 | `*.cevi-schichtplan.ch/api/*` | `apps/backend` | 4000 | Fastify REST API & Webcal/ICS-Feeds |
 | `hilfe.cevi-schichtplan.ch` | `hilfe/` | 3004 | Statisches Hilfe-Center (Astro Starlight + Nginx) |
-| `status.cevi-schichtplan.ch` | `status-schichtplan` | 3001 | Öffentliches Verfügbarkeits-Portal (Uptime Kuma) |
+| `status.cevi-schichtplan.ch` | Uptime Kuma (separater Container, nicht in diesem Repo) | – | Öffentliches Verfügbarkeits-Portal |
 
 ---
 
@@ -99,11 +119,11 @@ Das Monorepo besteht aus fünf Next.js-/Fastify-Diensten, einer statischen Dokum
 ```
 schichtplan_v2/
 ├── apps/
-│   ├── admin/          # Admin-Portal für globale Administratoren (Next.js 15)
+│   ├── admin/          # Admin-Portal für globale Administratoren (Next.js 16)
 │   ├── backend/        # REST-API mit Fastify 5, Prisma 7 & TypeScript
-│   ├── landing/        # Hauptseite & Marketing-Portal (Next.js 15)
-│   ├── login/          # Zentrales Single Sign-On Portal (Next.js 15)
-│   └── web/            # Mandantenfähige Schichtplan-App für Abteilungen (Next.js 15)
+│   ├── landing/        # Hauptseite & Marketing-Portal (Next.js 16)
+│   ├── login/          # Zentrales Single Sign-On Portal (Next.js 16)
+│   └── web/            # Mandantenfähige Schichtplan-App für Abteilungen (Next.js 16)
 ├── packages/
 │   ├── shared/         # Gemeinsame Zod-Schemas, TypeScript-Typen & Hilfsfunktionen
 │   └── ui/             # Gemeinsames Design-System (@schichtplan/ui mit Tailwind CSS v4)
@@ -120,7 +140,7 @@ schichtplan_v2/
 
 ### Voraussetzungen
 
-* **Node.js** `>= 22.0.0` und **npm** `>= 10.x`
+* **Node.js** `>= 26` (siehe `.nvmrc`) und **npm** `>= 11`
 * **Docker** & **Docker Compose**
 
 ### 1. Repository klonen & Abhängigkeiten installieren
@@ -236,6 +256,10 @@ Wichtige Parameter:
 ---
 
 ## 🚀 Deployment & Betrieb
+
+> [!IMPORTANT]
+> `deploy.ps1`, `rollback.ps1` und `restore.ps1` sind auf den Betrieb von **cevi-schichtplan.ch** zugeschnitten (ein Linux-Server, Traefik mit Wildcard-Zertifikat, Deploy von Windows aus).
+> Für eine eigene Installation reichen in der Regel `docker-compose.yml` und eine `.env` nach Vorlage `.env.prod.example`. Vorausgesetzt werden ein laufender Traefik v3 (externes Proxy-Netzwerk und Zertifikats-Resolver `myresolver`, siehe Labels in `docker-compose.yml`) und ein Wildcard-DNS-Eintrag für die Abteilungs-Subdomains.
 
 Das Projekt ist für unterbruchfreies Deployment (**Zero-Downtime**) auf Linux-Servern mit **Traefik** als Reverse Proxy optimiert:
 
