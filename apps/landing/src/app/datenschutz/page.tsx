@@ -416,9 +416,9 @@ export default function DatenschutzPage() {
               <strong>Google Drive</strong> (Google Ireland Limited, Dublin,
               Irland): Speicherort für eine zusätzliche Sicherungskopie
               ausserhalb des Rechenzentrums. Die Sicherungen werden schon auf
-              unserem Server verschlüsselt, bevor sie hochgeladen werden. Der
-              Schlüssel zum Entschlüsseln liegt weder auf dem Server noch bei
-              Google. Google kann die Inhalte deshalb nicht lesen.
+              unserem Server verschlüsselt, bevor sie hochgeladen werden. Den
+              Schlüssel zum Entschlüsseln haben nur wir, nicht Google. Google
+              kann die Inhalte deshalb nicht lesen.
             </li>
             <li>
               <strong>Infomaniak Network AG</strong>, Genf, Schweiz: Versand der
@@ -520,7 +520,10 @@ export default function DatenschutzPage() {
               Datenbank bei Infomaniak in der Schweiz ab (siehe Abschnitt 7).
               Davon behalten wir die Sicherungen der letzten 14 Tage, die
               Sonntage der letzten acht Wochen und die Monatsersten der letzten
-              sechs Monate.
+              sechs Monate. Einmal im Monat spielen wir eine dieser Sicherungen
+              probeweise in eine vorübergehende Datenbank auf unserem Server
+              ein, um zu prüfen, ob sie sich wiederherstellen lässt; diese
+              Datenbank wird gleich danach gelöscht.
             </li>
             <li>
               Gelöschte Daten können in diesen Sicherungen noch enthalten sein,
