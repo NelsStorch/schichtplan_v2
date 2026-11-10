@@ -486,16 +486,16 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
     trackUsage('LOGIN', { dim: 'cevidb', departmentId: homeDepartment?.id ?? tenantDepartmentId });
 
     // Ohne Ziel: Abteilungsseite, sonst Landingpage (nicht zurück auf die Login-Seite)
-    const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null);
+    const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null, reply.request?.hostname);
 
     // Abteilungsleitung, deren Ortsgruppe noch keinen Schichtplan hat: Abteilung anlegen anbieten
     if (!homeDepartment && derived.isDepartmentLeader && derived.ortsgruppeId !== null) {
-      return loginPageUrl('/abteilung-erstellen', target);
+      return loginPageUrl('/abteilung-erstellen', target, reply.request?.hostname);
     }
     // Ohne passende Abteilung im Schichtplan: Abteilung und Stufe einmal nachfragen (auch nach einem Abteilungswechsel)
     if (!homeDepartment) {
       const setup = await fastify.prisma.user.findUnique({ where: { id: user.id }, select: { departmentSetupAt: true } });
-      if (!setup?.departmentSetupAt) return loginPageUrl('/abteilung', target);
+      if (!setup?.departmentSetupAt) return loginPageUrl('/abteilung', target, reply.request?.hostname);
     }
     return target;
   }

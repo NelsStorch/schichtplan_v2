@@ -1,53 +1,139 @@
-import nodemailer from 'nodemailer';
-import type { MailKind } from '@schichtplan/shared';
+import nodemailer, { type Transporter } from 'nodemailer';
+import type { MailKind, OrganizationType } from '@schichtplan/shared';
 import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
 import { escapeIcsText, foldIcsLine, formatIcsUtc } from './calendarFeed.js';
 import { trackUsage } from './usageStats.js';
 
-const host = process.env.SMTP_HOST || 'mail.infomaniak.com';
-const port = Number(process.env.SMTP_PORT || 587);
-const user = process.env.SMTP_USER || 'admin@cevi-schichtplan.ch';
-const pass = process.env.SMTP_PASSWORD || '';
-const from = process.env.SMTP_FROM || 'Cevi Schichtplan <admin@cevi-schichtplan.ch>';
-
-// Infomaniak: Port 587 uses STARTTLS (secure: false), Port 465 uses SSL/TLS (secure: true)
-const isSecure = port === 465;
-
-/**
- * SMTP-Transporter mit Connection-Pooling & Rate-Throttling:
- * Verhindert Verbindungs-Spikes und Rate-Limit-Sperren beim Massenversand (z. B. OK-Nachrichten).
- */
-export const mailTransporter = nodemailer.createTransport({
-  pool: true,
-  maxConnections: 3,
-  maxMessages: 100,
-  rateDelta: 1000,
-  rateLimit: 5,
-  host,
-  port,
-  secure: isSecure,
-  auth: pass
-    ? {
-        user,
-        pass,
-      }
-    : undefined,
-  tls: {
-    rejectUnauthorized: process.env.NODE_ENV === 'production',
-  },
-});
-
-export function isEmailConfigured(): boolean {
-  return Boolean(pass);
+export interface SmtpAccountConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  from: string;
 }
 
-export async function verifySmtpConnection(): Promise<boolean> {
-  if (!pass) return false;
+const defaultHost = process.env.SMTP_HOST || 'mail.infomaniak.com';
+const defaultPort = Number(process.env.SMTP_PORT || 587);
+const defaultSecure = defaultPort === 465;
+
+/**
+ * Normalisiert eine beliebige Organisations-Bezeichnung (Slug, Hostname, Enum)
+ * in den gültigen Datenbank-Enum-Wert ('CEVI' | 'PFADI' | 'JUBLA' | 'OTHER').
+ */
+export function normalizeOrganizationType(org?: string | null): OrganizationType {
+  if (!org) return 'CEVI';
+  const clean = org.toUpperCase().trim();
+  if (clean === 'CEVI' || clean === 'PFADI' || clean === 'JUBLA' || clean === 'OTHER') {
+    return clean as OrganizationType;
+  }
+  return getOrganization(org).dbType;
+}
+
+/**
+ * Liefert die SMTP-Kontodaten für die jeweilige Organisation.
+ * Unterstützt Umgebungsvariablen-Overrides sowie die hinterlegten Zugangsdaten.
+ */
+export function getSmtpConfig(orgType: OrganizationType): SmtpAccountConfig {
+  switch (orgType) {
+    case 'PFADI':
+      return {
+        host: process.env.SMTP_HOST_PFADI || defaultHost,
+        port: Number(process.env.SMTP_PORT_PFADI || defaultPort),
+        secure: process.env.SMTP_PORT_PFADI ? Number(process.env.SMTP_PORT_PFADI) === 465 : defaultSecure,
+        user: process.env.SMTP_USER_PFADI || 'admin@pfadi-schichtplan.ch',
+        pass: process.env.SMTP_PASSWORD_PFADI || 'RP5U!asb-78-g8E+',
+        from: process.env.SMTP_FROM_PFADI || 'Pfadi Schichtplan <admin@pfadi-schichtplan.ch>',
+      };
+    case 'JUBLA':
+      return {
+        host: process.env.SMTP_HOST_JUBLA || defaultHost,
+        port: Number(process.env.SMTP_PORT_JUBLA || defaultPort),
+        secure: process.env.SMTP_PORT_JUBLA ? Number(process.env.SMTP_PORT_JUBLA) === 465 : defaultSecure,
+        user: process.env.SMTP_USER_JUBLA || 'admin@jubla-schichtplan.ch',
+        pass: process.env.SMTP_PASSWORD_JUBLA || 'k5+z%*Z+R6UIa*34',
+        from: process.env.SMTP_FROM_JUBLA || 'Jubla Schichtplan <admin@jubla-schichtplan.ch>',
+      };
+    case 'OTHER':
+      return {
+        host: process.env.SMTP_HOST_VEREIN || defaultHost,
+        port: Number(process.env.SMTP_PORT_VEREIN || defaultPort),
+        secure: process.env.SMTP_PORT_VEREIN ? Number(process.env.SMTP_PORT_VEREIN) === 465 : defaultSecure,
+        user: process.env.SMTP_USER_VEREIN || 'admin@vereins-schichtplan.ch',
+        pass: process.env.SMTP_PASSWORD_VEREIN || 'zHrHId+89-&+vD%1',
+        from: process.env.SMTP_FROM_VEREIN || 'Vereins Schichtplan <admin@vereins-schichtplan.ch>',
+      };
+    case 'CEVI':
+    default:
+      return {
+        host: process.env.SMTP_HOST_CEVI || defaultHost,
+        port: Number(process.env.SMTP_PORT_CEVI || defaultPort),
+        secure: process.env.SMTP_PORT_CEVI ? Number(process.env.SMTP_PORT_CEVI) === 465 : defaultSecure,
+        user: process.env.SMTP_USER_CEVI || process.env.SMTP_USER || 'admin@cevi-schichtplan.ch',
+        pass: process.env.SMTP_PASSWORD_CEVI || process.env.SMTP_PASSWORD || '',
+        from: process.env.SMTP_FROM_CEVI || process.env.SMTP_FROM || 'Cevi Schichtplan <admin@cevi-schichtplan.ch>',
+      };
+  }
+}
+
+/**
+ * Transporter-Pool: Gecachte nodemailer-Transporter pro OrganizationType.
+ * Connection-Pooling & Rate-Throttling verhindern Verbindungs-Spikes und Sperren.
+ */
+const transporterPool = new Map<OrganizationType, Transporter>();
+
+export function getMailTransporter(orgType?: OrganizationType | string | null): Transporter {
+  const normalized = normalizeOrganizationType(orgType);
+  const existing = transporterPool.get(normalized);
+  if (existing) {
+    return existing;
+  }
+
+  const config = getSmtpConfig(normalized);
+  const transporter = nodemailer.createTransport({
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    rateDelta: 1000,
+    rateLimit: 5,
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.pass
+      ? {
+          user: config.user,
+          pass: config.pass,
+        }
+      : undefined,
+    tls: {
+      rejectUnauthorized: process.env.NODE_ENV === 'production',
+    },
+  });
+
+  transporterPool.set(normalized, transporter);
+  return transporter;
+}
+
+/**
+ * Standard-Transporter (CEVI) für Abwärtskompatibilität.
+ */
+export const mailTransporter = getMailTransporter('CEVI');
+
+export function isEmailConfigured(organization?: OrganizationType | string | null): boolean {
+  const norm = normalizeOrganizationType(organization);
+  return Boolean(getSmtpConfig(norm).pass);
+}
+
+export async function verifySmtpConnection(organization?: OrganizationType | string | null): Promise<boolean> {
+  const norm = normalizeOrganizationType(organization);
+  const config = getSmtpConfig(norm);
+  if (!config.pass) return false;
   try {
-    await mailTransporter.verify();
+    const transporter = getMailTransporter(norm);
+    await transporter.verify();
     return true;
   } catch (error) {
-    console.error('[Mail] SMTP-Verbindungstest fehlgeschlagen:', error);
+    console.error(`[Mail] SMTP-Verbindungstest fehlgeschlagen für ${norm}:`, error);
     return false;
   }
 }
@@ -86,16 +172,37 @@ export interface EmailTemplateOptions {
   unsubscribeUrl?: string;
   unsubscribeLabel?: string;
   /** Optionale Organisation für dynamisches Branding (Logo, Farben, Footer, Domain) */
-  organization?: string;
+  organization?: OrganizationType | string;
 }
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 /**
+ * Liefert den formatierten Standard-Absender für die jeweilige Organisation.
+ */
+export function getDefaultFromHeader(orgType?: OrganizationType | string | null): string {
+  const norm = normalizeOrganizationType(orgType);
+  return getSmtpConfig(norm).from;
+}
+
+/**
  * Baut den Absender-Header mit optionalem Anzeigenamen unter Beibehaltung der
  * authentifizierten E-Mail-Adresse (wichtig für SPF/DKIM/DMARC Alignment).
+ * Akzeptiert als zweiten Parameter entweder eine explizite Absenderadresse oder einen OrganizationType.
  */
-export function formatFromHeader(customSenderName?: string, baseFrom: string = from): string {
+export function formatFromHeader(
+  customSenderName?: string,
+  baseFromOrOrg?: string | OrganizationType
+): string {
+  let baseFrom: string;
+  if (!baseFromOrOrg) {
+    baseFrom = getDefaultFromHeader('CEVI');
+  } else if (baseFromOrOrg.includes('@')) {
+    baseFrom = baseFromOrOrg;
+  } else {
+    baseFrom = getDefaultFromHeader(baseFromOrOrg);
+  }
+
   if (!customSenderName?.trim()) return baseFrom;
   const emailMatch = baseFrom.match(/<([^>]+)>/);
   const address = emailMatch ? emailMatch[1] : baseFrom.trim();
@@ -104,6 +211,38 @@ export function formatFromHeader(customSenderName?: string, baseFrom: string = f
     .replace(/\s+/g, ' ')
     .trim();
   return `"${safeName}" <${address}>`;
+}
+
+/**
+ * Setzt in Dev- und Staging-Umgebungen das Präfix "[DEV] " vor den E-Mail-Betreff.
+ */
+export function formatEmailSubject(subject: string): string {
+  const isDev =
+    process.env.NODE_ENV !== 'production' ||
+    Boolean(process.env.DOMAIN?.includes('dev')) ||
+    process.env.IS_DEV === 'true';
+
+  if (isDev && !subject.trimStart().startsWith('[DEV] ')) {
+    return `[DEV] ${subject}`;
+  }
+  return subject;
+}
+
+/**
+ * Liefert eine passende Standard-Anrede für Helfende ohne hinterlegten Namen.
+ */
+function getDefaultGreeting(orgSlug: string): string {
+  switch (orgSlug) {
+    case 'pfadi':
+      return 'Pfadi';
+    case 'jubla':
+      return 'Jublaner*in';
+    case 'verein':
+      return 'Helfer*in';
+    case 'cevi':
+    default:
+      return 'Cevianer*in';
+  }
 }
 
 /**
@@ -151,6 +290,7 @@ export function buildShiftIcsAttachment({
   endTime,
   shiftUrl,
   description,
+  organization,
 }: {
   uid: string;
   shiftTitle: string;
@@ -160,7 +300,9 @@ export function buildShiftIcsAttachment({
   endTime: Date;
   shiftUrl?: string;
   description?: string;
+  organization?: OrganizationType | string;
 }): string {
+  const org = getOrganization(organization);
   const nowUtc = formatIcsUtc(new Date());
   const summary = `${shiftTitle} · ${eventTitle}`;
   const descLines = [
@@ -174,7 +316,7 @@ export function buildShiftIcsAttachment({
   const rawLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Cevi Schichtplan//DE',
+    `PRODID:-//${org.name}//DE`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
@@ -565,7 +707,8 @@ export function escapeHtml(str: string): string {
 }
 
 /**
- * Basis-E-Mail-Versandfunktion mit Anti-Spam-Headern, sauberem Text-Fallback und Logging.
+ * Basis-E-Mail-Versandfunktion mit Anti-Spam-Headern, sauberem Text-Fallback,
+ * Multi-SMTP-Transporter-Auswahl und Entwicklungs-Präfix.
  */
 export async function sendEmail({
   to,
@@ -578,6 +721,7 @@ export async function sendEmail({
   autoSubmitted = true,
   icalEvent,
   kind = 'OTHER',
+  organization,
 }: {
   to: string;
   subject: string;
@@ -599,9 +743,14 @@ export async function sendEmail({
   };
   /** Art der Mail, nur für die Statistik */
   kind?: MailKind;
+  /** Optionale Organisation für passenden SMTP-Transporter & Absenderadresse */
+  organization?: OrganizationType | string;
 }): Promise<boolean> {
+  const orgType = normalizeOrganizationType(organization);
+  const smtpConfig = getSmtpConfig(orgType);
   const plainText = text?.trim() ? text.trim() : htmlToPlainText(html);
-  const formattedFrom = formatFromHeader(fromName);
+  const formattedFrom = formatFromHeader(fromName, smtpConfig.from);
+  const finalSubject = formatEmailSubject(subject);
 
   const headers: Record<string, string> = {};
   if (autoSubmitted) {
@@ -612,20 +761,21 @@ export async function sendEmail({
     headers['List-Unsubscribe'] = `<${unsubscribeUrl}>`;
   }
 
-  if (!pass) {
-    console.warn(`\n[Mail-Dev / Mock] Kein SMTP_PASSWORD gesetzt. E-Mail wird geloggt:`);
+  if (!smtpConfig.pass) {
+    console.warn(`\n[Mail-Dev / Mock] Kein SMTP_PASSWORD für ${orgType} gesetzt. E-Mail wird geloggt:`);
     console.warn(`Von:       ${formattedFrom}`);
     console.warn(`Empfänger: ${to}`);
-    console.warn(`Betreff:   ${subject}`);
+    console.warn(`Betreff:   ${finalSubject}`);
     console.warn(`Text:      ${plainText}\n`);
     return true; // Im Dev-Modus ohne SMTP als Erfolg werten, damit Flows getestet werden können
   }
 
   try {
-    const info = await mailTransporter.sendMail({
+    const transporter = getMailTransporter(orgType);
+    const info = await transporter.sendMail({
       from: formattedFrom,
       to,
-      subject,
+      subject: finalSubject,
       text: plainText,
       html,
       replyTo,
@@ -638,11 +788,11 @@ export async function sendEmail({
           }
         : undefined,
     });
-    console.log(`[Mail] Gesendet an ${to} (ID: ${info.messageId})`);
+    console.log(`[Mail (${orgType})] Gesendet an ${to} (ID: ${info.messageId})`);
     trackUsage('MAIL_SENT', { dim: kind });
     return true;
   } catch (error) {
-    console.error(`[Mail] Fehler beim Senden an ${to}:`, error);
+    console.error(`[Mail (${orgType})] Fehler beim Senden an ${to}:`, error);
     trackUsage('MAIL_FAILED', { dim: kind });
     return false;
   }
@@ -661,6 +811,7 @@ export async function sendVerificationEmail({
   verificationUrl,
   expiresHours = 24,
   deletesUnconfirmed = false,
+  organization,
 }: {
   to: string;
   name?: string | null;
@@ -668,11 +819,15 @@ export async function sendVerificationEmail({
   expiresHours?: number;
   /** Hinweis, dass das Konto ohne Bestätigung gelöscht wird (neue Passwort-Konten) */
   deletesUnconfirmed?: boolean;
+  /** Organisation für passendes Branding & SMTP-Absender */
+  organization?: OrganizationType;
 }): Promise<boolean> {
-  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
-  const subject = 'Bestätige deine E-Mail-Adresse – Cevi Schichtplan';
+  const org = getOrganization(organization);
+  const defaultGreeting = getDefaultGreeting(org.slug);
+  const displayName = name?.trim() ? name.trim() : defaultGreeting;
+  const subject = `Bestätige deine E-Mail-Adresse – ${org.name}`;
   const eyebrow = 'Konto-Aktivierung';
-  const title = 'Willkommen beim Cevi Schichtplan!';
+  const title = `Willkommen beim ${org.name}!`;
   const preheader = 'Bitte bestätige deine E-Mail-Adresse, um dein Konto zu aktivieren.';
 
   const contentHtml = `
@@ -696,13 +851,20 @@ export async function sendVerificationEmail({
     calloutBox,
     ctaText: 'E-Mail-Adresse bestätigen',
     ctaUrl: verificationUrl,
-    footerNote:
-      'Du erhältst diese E-Mail, weil deine Adresse bei einem Konto auf cevi-schichtplan.ch hinterlegt wurde.',
+    footerNote: `Du erhältst diese E-Mail, weil deine Adresse bei einem Konto auf ${org.domain} hinterlegt wurde.`,
+    organization: org.slug,
   });
 
-  const text = `Hallo ${displayName},\n\nWillkommen beim Cevi Schichtplan!\n\nBitte öffne den folgenden Link in deinem Browser, um deine E-Mail-Adresse zu bestätigen:\n${verificationUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig.${deleteNote}\n\nFalls du diese Adresse nicht selbst eingetragen hast, kannst du diese Nachricht ignorieren.\n\nHerzliche Grüsse\nDein Cevi Schichtplan Team\nhttps://cevi-schichtplan.ch`;
+  const text = `Hallo ${displayName},\n\nWillkommen beim ${org.name}!\n\nBitte öffne den folgenden Link in deinem Browser, um deine E-Mail-Adresse zu bestätigen:\n${verificationUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig.${deleteNote}\n\nFalls du diese Adresse nicht selbst eingetragen hast, kannst du diese Nachricht ignorieren.\n\nHerzliche Grüsse\nDein ${org.name} Team\nhttps://${org.domain}`;
 
-  return sendEmail({ to, subject, html, text, kind: 'VERIFICATION' });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    organization: org.dbType,
+    kind: 'VERIFICATION',
+  });
 }
 
 /**
@@ -713,21 +875,26 @@ export async function sendPasswordResetEmail({
   name,
   resetUrl,
   expiresHours = 2,
+  organization,
 }: {
   to: string;
   name?: string | null;
   resetUrl: string;
   expiresHours?: number;
+  /** Organisation für passendes Branding & SMTP-Absender */
+  organization?: OrganizationType;
 }): Promise<boolean> {
-  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
-  const subject = 'Passwort zurücksetzen – Cevi Schichtplan';
+  const org = getOrganization(organization);
+  const defaultGreeting = getDefaultGreeting(org.slug);
+  const displayName = name?.trim() ? name.trim() : defaultGreeting;
+  const subject = `Passwort zurücksetzen – ${org.name}`;
   const eyebrow = 'Sicherheit';
   const title = 'Neues Passwort festlegen';
-  const preheader = 'Setze dein Passwort für den Cevi Schichtplan zurück.';
+  const preheader = `Setze dein Passwort für den ${org.name} zurück.`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0;">Hallo <strong class="email-signature" style="color: #1c1917;">${escapeHtml(displayName)}</strong>,</p>
-    <p style="margin: 0 0 16px 0;">du hast angefordert, das Passwort für dein Konto beim Cevi Schichtplan zurückzusetzen.</p>
+    <p style="margin: 0 0 16px 0;">du hast angefordert, das Passwort für dein Konto beim ${escapeHtml(org.name)} zurückzusetzen.</p>
     <p style="margin: 0;">Klicke auf den Button unten, um ein neues Passwort zu wählen:</p>
   `;
 
@@ -737,6 +904,11 @@ export async function sendPasswordResetEmail({
     tone: 'warning' as const,
   };
 
+  const footerNote =
+    org.authProviderShort && org.authProviderShort !== 'E-Mail'
+      ? `Tipp: Mit einem ${org.authProviderShort}-Konto kannst du dich auch jederzeit direkt ohne separates Passwort anmelden.`
+      : undefined;
+
   const html = renderEmailTemplate({
     preheader,
     eyebrow,
@@ -745,12 +917,20 @@ export async function sendPasswordResetEmail({
     calloutBox,
     ctaText: 'Neues Passwort wählen',
     ctaUrl: resetUrl,
-    footerNote: 'Tipp: Mit einem Cevi.DB-Konto kannst du dich auch jederzeit direkt ohne separates Passwort anmelden.',
+    footerNote,
+    organization: org.slug,
   });
 
-  const text = `Hallo ${displayName},\n\nÖffne folgenden Link, um ein neues Passwort für den Cevi Schichtplan festzulegen:\n${resetUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig. Falls du diese Anfrage nicht selbst gestellt hast, bleibt dein bisheriges Passwort unverändert.\n\nHerzliche Grüsse\nDein Cevi Schichtplan Team\nhttps://cevi-schichtplan.ch`;
+  const text = `Hallo ${displayName},\n\nÖffne folgenden Link, um ein neues Passwort für den ${org.name} festzulegen:\n${resetUrl}\n\nDieser Link ist ${expiresHours} Stunden gültig. Falls du diese Anfrage nicht selbst gestellt hast, bleibt dein bisheriges Passwort unverändert.\n\nHerzliche Grüsse\nDein ${org.name} Team\nhttps://${org.domain}`;
 
-  return sendEmail({ to, subject, html, text, kind: 'PASSWORD_RESET' });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    organization: org.dbType,
+    kind: 'PASSWORD_RESET',
+  });
 }
 
 /**
@@ -762,18 +942,23 @@ export async function sendAccountExistsEmail({
   name,
   loginUrl,
   resetUrl,
+  organization,
 }: {
   to: string;
   name?: string | null;
   loginUrl: string;
   resetUrl: string;
+  /** Organisation für passendes Branding & SMTP-Absender */
+  organization?: OrganizationType;
 }): Promise<boolean> {
-  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
-  const subject = 'Du hast schon ein Konto – Cevi Schichtplan';
+  const org = getOrganization(organization);
+  const defaultGreeting = getDefaultGreeting(org.slug);
+  const displayName = name?.trim() ? name.trim() : defaultGreeting;
+  const subject = `Du hast schon ein Konto – ${org.name}`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0;">Hallo <strong class="email-signature" style="color: #1c1917;">${escapeHtml(displayName)}</strong>,</p>
-    <p style="margin: 0 0 16px 0;">jemand wollte mit dieser E-Mail-Adresse ein neues Konto beim Cevi Schichtplan anlegen. Zu deiner Adresse gibt es aber bereits ein Konto.</p>
+    <p style="margin: 0 0 16px 0;">jemand wollte mit dieser E-Mail-Adresse ein neues Konto beim ${escapeHtml(org.name)} anlegen. Zu deiner Adresse gibt es aber bereits ein Konto.</p>
     <p style="margin: 0;">Melde dich einfach an. Falls du dein Passwort nicht mehr weisst, kannst du es <a href="${escapeHtml(resetUrl)}" style="text-decoration: underline; font-weight: 600;">hier zurücksetzen</a>.</p>
   `;
 
@@ -789,11 +974,19 @@ export async function sendAccountExistsEmail({
     },
     ctaText: 'Jetzt anmelden',
     ctaUrl: loginUrl,
+    organization: org.slug,
   });
 
-  const text = `Hallo ${displayName},\n\njemand wollte mit dieser E-Mail-Adresse ein neues Konto anlegen. Du hast aber schon eines.\n\nAnmelden: ${loginUrl}\nPasswort vergessen: ${resetUrl}\n\nWarst das nicht du? Dann ignoriere diese E-Mail. An deinem Konto hat sich nichts geändert.\n\nHerzliche Grüsse\nDein Cevi Schichtplan Team`;
+  const text = `Hallo ${displayName},\n\njemand wollte mit dieser E-Mail-Adresse ein neues Konto anlegen. Du hast aber schon eines.\n\nAnmelden: ${loginUrl}\nPasswort vergessen: ${resetUrl}\n\nWarst das nicht du? Dann ignoriere diese E-Mail. An deinem Konto hat sich nichts geändert.\n\nHerzliche Grüsse\nDein ${org.name} Team`;
 
-  return sendEmail({ to, subject, html, text, kind: 'ACCOUNT_EXISTS' });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    organization: org.dbType,
+    kind: 'ACCOUNT_EXISTS',
+  });
 }
 
 /**
@@ -816,6 +1009,7 @@ export async function sendShiftReminderEmail({
   reminderNote,
   isResponsible = false,
   isGuest = false,
+  organization,
 }: {
   to: string;
   name?: string | null;
@@ -837,8 +1031,12 @@ export async function sendShiftReminderEmail({
   isResponsible?: boolean;
   /** Anmeldung als Gast ohne Benutzerkonto */
   isGuest?: boolean;
+  /** Organisation für passendes Branding & SMTP-Absender */
+  organization?: OrganizationType;
 }): Promise<boolean> {
-  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
+  const org = getOrganization(organization);
+  const defaultGreeting = getDefaultGreeting(org.slug);
+  const displayName = name?.trim() ? name.trim() : defaultGreeting;
   const leadLabel =
     leadMinutes !== undefined
       ? leadMinutes < 60
@@ -860,7 +1058,7 @@ export async function sendShiftReminderEmail({
   const eyebrow = isResponsible ? 'Schichtleitung · Erinnerung' : 'Einsatz-Erinnerung';
   const title = leadMinutes !== undefined ? `Deine Schicht beginnt ${leadLabel}!` : 'Deine Schicht steht bevor!';
   const preheader = `Dein Einsatz «${shiftTitle}» bei ${eventTitle} beginnt ${leadLabel} (${timeRangeFormatted}).`;
-  const profileUrl = 'https://cevi-schichtplan.ch/profil';
+  const profileUrl = `https://${org.domain}/profil`;
 
   const cleanNote = reminderNote?.trim() || null;
   const noteBlockHtml = cleanNote
@@ -943,6 +1141,7 @@ export async function sendShiftReminderEmail({
     footerNote,
     unsubscribeUrl,
     unsubscribeLabel,
+    organization: org.slug,
   });
 
   const textLines = [
@@ -968,19 +1167,20 @@ export async function sendShiftReminderEmail({
         ]),
     '',
     'Herzliche Grüsse',
-    departmentName || 'Dein Cevi Schichtplan Team',
+    departmentName || `Dein ${org.name} Team`,
   ];
 
   const icsContent =
     startTime && endTime
       ? buildShiftIcsAttachment({
-          uid: `reminder-${shiftId || startTime.getTime()}@cevi-schichtplan.ch`,
+          uid: `reminder-${shiftId || startTime.getTime()}@${org.domain}`,
           shiftTitle,
           eventTitle,
           departmentName,
           startTime,
           endTime,
           shiftUrl,
+          organization: org.dbType,
         })
       : undefined;
 
@@ -989,10 +1189,11 @@ export async function sendShiftReminderEmail({
     subject,
     html,
     text: textLines.join('\n'),
-    fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – Cevi Schichtplan`,
+    fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – ${org.name}`,
     unsubscribeUrl,
     icalEvent: icsContent ? { filename: 'schicht.ics', method: 'PUBLISH', content: icsContent } : undefined,
     kind: 'SHIFT_REMINDER',
+    organization: org.dbType,
   });
 }
 
@@ -1008,6 +1209,7 @@ export async function sendShiftCancelledEmail({
   eventUrl,
   departmentName,
   accentColor,
+  organization,
 }: {
   to: string;
   name?: string | null;
@@ -1017,8 +1219,11 @@ export async function sendShiftCancelledEmail({
   eventUrl?: string;
   departmentName?: string;
   accentColor?: string | null;
+  organization?: OrganizationType;
 }): Promise<boolean> {
-  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
+  const org = getOrganization(organization);
+  const defaultGreeting = getDefaultGreeting(org.slug);
+  const displayName = name?.trim() ? name.trim() : defaultGreeting;
   const subject = `Schicht abgesagt: «${shiftTitle}» (${eventTitle})`;
   const contentHtml = `
     <p style="margin: 0 0 16px 0;">Hallo <strong class="email-signature" style="color: #1c1917;">${escapeHtml(displayName)}</strong>,</p>
@@ -1049,6 +1254,7 @@ export async function sendShiftCancelledEmail({
     headerSubtitle: departmentName || undefined,
     accentColor,
     footerNote: `Du erhältst diese Benachrichtigung, weil du für diese Schicht bei «${eventTitle}» eingetragen warst.`,
+    organization: org.slug,
   });
 
   const textLines = [
@@ -1066,7 +1272,7 @@ export async function sendShiftCancelledEmail({
     ...(eventUrl ? ['', `Zum Schichtplan: ${eventUrl}`] : []),
     '',
     'Herzliche Grüsse',
-    departmentName || 'Dein Cevi Schichtplan Team',
+    departmentName || `Dein ${org.name} Team`,
   ];
 
   return sendEmail({
@@ -1074,8 +1280,9 @@ export async function sendShiftCancelledEmail({
     subject,
     html,
     text: textLines.join('\n'),
-    fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – Cevi Schichtplan`,
+    fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – ${org.name}`,
     kind: 'SHIFT_CANCELLED',
+    organization: org.dbType,
   });
 }
 
@@ -1092,6 +1299,7 @@ export async function sendReplacementTakenEmail({
   eventUrl,
   departmentName,
   accentColor,
+  organization,
 }: {
   to: string;
   name?: string | null;
@@ -1102,8 +1310,11 @@ export async function sendReplacementTakenEmail({
   eventUrl?: string;
   departmentName?: string;
   accentColor?: string | null;
+  organization?: OrganizationType;
 }): Promise<boolean> {
-  const displayName = name?.trim() ? name.trim() : 'Cevianer*in';
+  const org = getOrganization(organization);
+  const defaultGreeting = getDefaultGreeting(org.slug);
+  const displayName = name?.trim() ? name.trim() : defaultGreeting;
   const subject = `Ersatz gefunden: «${shiftTitle}» (${eventTitle})`;
   const contentHtml = `
     <p style="margin: 0 0 16px 0;">Hallo <strong class="email-signature" style="color: #1c1917;">${escapeHtml(displayName)}</strong>,</p>
@@ -1129,6 +1340,7 @@ export async function sendReplacementTakenEmail({
     headerSubtitle: departmentName || undefined,
     accentColor,
     footerNote: `Du erhältst diese Mail, weil du für deine Schicht bei «${eventTitle}» einen Ersatz gesucht hast.`,
+    organization: org.slug,
   });
 
   const text = [
@@ -1144,7 +1356,7 @@ export async function sendReplacementTakenEmail({
     ...(eventUrl ? ['', `Zum Schichtplan: ${eventUrl}`] : []),
     '',
     'Herzliche Grüsse',
-    'Dein Cevi Schichtplan Team',
+    `Dein ${org.name} Team`,
   ].join('\n');
 
   return sendEmail({
@@ -1152,8 +1364,9 @@ export async function sendReplacementTakenEmail({
     subject,
     html,
     text,
-    fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – Cevi Schichtplan`,
+    fromName: departmentName ? `${eventTitle} (${departmentName})` : `${eventTitle} – ${org.name}`,
     kind: 'REPLACEMENT_TAKEN',
+    organization: org.dbType,
   });
 }
 
@@ -1171,6 +1384,7 @@ export async function sendGenericEmail({
   ctaUrl,
   preheader,
   footerNote,
+  organization,
 }: {
   to: string;
   subject: string;
@@ -1182,7 +1396,9 @@ export async function sendGenericEmail({
   ctaUrl?: string;
   preheader?: string;
   footerNote?: string;
+  organization?: OrganizationType;
 }): Promise<boolean> {
+  const org = getOrganization(organization);
   const html = renderEmailTemplate({
     preheader: preheader || subject,
     eyebrow,
@@ -1192,7 +1408,8 @@ export async function sendGenericEmail({
     ctaText,
     ctaUrl,
     footerNote,
+    organization: org.slug,
   });
 
-  return sendEmail({ to, subject, html, kind: 'ADMIN_NOTICE' });
+  return sendEmail({ to, subject, html, organization: org.dbType, kind: 'ADMIN_NOTICE' });
 }

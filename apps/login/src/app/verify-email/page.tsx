@@ -182,7 +182,7 @@ function VerifyEmailContent() {
 
             <div className="mt-6 text-center">
               <Link
-                href="/"
+                href={withReturnTo('/', returnTo)}
                 className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
               >
                 Zurück zur Anmeldung

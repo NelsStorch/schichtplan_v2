@@ -74,8 +74,9 @@ export function clearAuthCookie(reply: FastifyReply) {
 // Eigene Domain (auch Staging), auf die nach dem Login weitergeleitet werden darf
 export function rootDomain(reqHost?: string): string {
   if (reqHost) {
-    const root = getRootDomain(reqHost);
-    if (root && root !== 'localhost') return root;
+    const cleanHost = reqHost.toLowerCase().split(',')[0].trim().replace(/:\d+$/, '');
+    const root = getRootDomain(cleanHost);
+    if (root) return root;
   }
   return (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
 }
@@ -93,8 +94,7 @@ export function loginErrorUrl(
   returnTo: string | null,
   reqHost?: string
 ) {
-  const root = rootDomain(reqHost);
-  const base = process.env.NODE_ENV === 'production' ? `https://login.${root}` : '';
+  const base = getLoginPortalBaseUrl(process.env, reqHost);
   return `${base}/?error=${code}${returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : ''}`;
 }
 
@@ -103,7 +103,7 @@ export function loginErrorUrl(
  * (Früher ging es auf "/" der Login-Seite zurück, die dann wieder das Login zeigte.)
  */
 export function defaultDestination(homeDepartmentSlug: string | null, reqHost?: string): string {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && (!reqHost || rootDomain(reqHost) === 'localhost')) {
     return homeDepartmentSlug ? `http://${homeDepartmentSlug}.localhost:3000/` : 'http://localhost:3001/';
   }
   const root = rootDomain(reqHost);
@@ -123,26 +123,65 @@ export function bootstrapAdminCeviDbIds(): Set<number> {
 }
 
 /**
- * Basis-URL für das zentrale Login-Portal (login.<domain>). Nur aus der Konfiguration, nie aus dem
- * Host-Header: Die Adresse landet in E-Mails (Passwort-Reset, Bestätigung) und Weiterleitungen.
- * Lokal (ausserhalb von Produktion) LOGIN_PORTAL_URL oder der Next-Dev-Server auf Port 3002.
+ * Basis-URL für das zentrale Login-Portal (login.<domain>).
+ * Wenn reqHost übergeben wird (z. B. "dev.vereins-schichtplan.ch", "login.dev.vereins-schichtplan.ch", "vereins-schichtplan.ch"):
+ * Root-Domain ermitteln: rootDomain(reqHost).
+ * In Produktion sowie Staging: https://login.${rootDomain(reqHost)} zurückgeben!
+ * WICHTIG: env.LOGIN_PORTAL_URL darf NICHT domain-übergreifend Anfragen von anderen Verbänden kapern.
+ * Wenn reqHost übergeben wurde und nicht zu env.LOGIN_PORTAL_URL passt (oder env.LOGIN_PORTAL_URL cevi
+ * enthält, aber reqHost verein/pfadi/jubla ist), muss zwingend https://login.${rootDomain(reqHost)} verwendet werden!
  */
 export function getLoginPortalBaseUrl(env: NodeJS.ProcessEnv = process.env, reqHost?: string): string {
-  if (env.NODE_ENV !== 'production') return (env.LOGIN_PORTAL_URL || 'http://localhost:3002').replace(/\/$/, '');
-  const domain = reqHost ? rootDomain(reqHost) : (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+  if (reqHost) {
+    const root = rootDomain(reqHost);
+    if (root && root !== 'localhost') {
+      if (env.LOGIN_PORTAL_URL) {
+        try {
+          const parsed = new URL(env.LOGIN_PORTAL_URL);
+          const portalRoot = getRootDomain(parsed.hostname);
+          if (portalRoot === root) {
+            return env.LOGIN_PORTAL_URL.replace(/\/$/, '');
+          }
+        } catch {
+          // ungültige LOGIN_PORTAL_URL
+        }
+      }
+      return `https://login.${root}`;
+    }
+    return (env.LOGIN_PORTAL_URL || 'http://localhost:3002').replace(/\/$/, '');
+  }
+
+  if (env.NODE_ENV !== 'production') {
+    return (env.LOGIN_PORTAL_URL || 'http://localhost:3002').replace(/\/$/, '');
+  }
+  const domain = (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
   return `https://login.${domain}`;
 }
 
 /** Redirect-URI für Cevi.DB-OAuth: CEVIDB_REDIRECT_URI, sonst der Callback auf dem Login-Portal */
 export function getCeviDbRedirectUri(env: NodeJS.ProcessEnv = process.env, reqHost?: string): string {
-  return env.CEVIDB_REDIRECT_URI || `${getLoginPortalBaseUrl(env, reqHost)}/api/auth/cevidb/callback`;
+  if (reqHost && env.CEVIDB_REDIRECT_URI) {
+    try {
+      const parsed = new URL(env.CEVIDB_REDIRECT_URI);
+      const uriRoot = getRootDomain(parsed.hostname);
+      const reqRoot = rootDomain(reqHost);
+      if (uriRoot === reqRoot) {
+        return env.CEVIDB_REDIRECT_URI;
+      }
+    } catch {
+      // ungültige URI
+    }
+  } else if (!reqHost && env.CEVIDB_REDIRECT_URI) {
+    return env.CEVIDB_REDIRECT_URI;
+  }
+  return `${getLoginPortalBaseUrl(env, reqHost)}/api/auth/cevidb/callback`;
 }
 
 /** Login-Seite (login.<domain>), z. B. für die Abfrage der Abteilung nach dem Cevi.DB-Login */
 export function loginPageUrl(path: string, returnTo: string, reqHost?: string) {
-  const root = rootDomain(reqHost);
-  const base = process.env.NODE_ENV === 'production' ? `https://login.${root}` : '';
-  return returnTo ? `${base}${path}?return_to=${encodeURIComponent(returnTo)}` : `${base}${path}`;
+  const base = getLoginPortalBaseUrl(process.env, reqHost);
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return returnTo ? `${base}${cleanPath}?return_to=${encodeURIComponent(returnTo)}` : `${base}${cleanPath}`;
 }
 
 /* ------------------------------------------------------------------ Konto verknüpfen */

@@ -7,3 +7,5 @@ export * from './series.js';
 export * from './stats.js';
 export * from './colors.js';
 export * from './organizations.js';
+export * from './hitobito.js';
+export * from './vocabulary.js';

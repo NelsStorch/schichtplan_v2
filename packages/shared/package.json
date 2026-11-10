@@ -17,6 +17,14 @@
     "./redirect": {
       "types": "./dist/redirect.d.ts",
       "default": "./dist/redirect.js"
+    },
+    "./hitobito": {
+      "types": "./dist/hitobito.d.ts",
+      "default": "./dist/hitobito.js"
+    },
+    "./vocabulary": {
+      "types": "./dist/vocabulary.d.ts",
+      "default": "./dist/vocabulary.js"
     }
   },
   "scripts": {

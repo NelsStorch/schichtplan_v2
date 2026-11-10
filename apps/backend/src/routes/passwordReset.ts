@@ -85,12 +85,13 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
         }),
       ]);
 
-      const resetUrl = `${getLoginPortalBaseUrl()}/passwort-zuruecksetzen?token=${token}`;
+      const resetUrl = `${getLoginPortalBaseUrl(process.env, request.headers.host)}/passwort-zuruecksetzen?token=${token}`;
       const sent = await sendPasswordResetEmail({
         to: email,
         name: user.nickname || user.firstName,
         resetUrl,
         expiresHours: PASSWORD_RESET_TTL_HOURS,
+        organization: request.organization,
       });
       if (!sent) request.log.warn({ userId: user.id }, 'Passwort-Reset: E-Mail konnte nicht gesendet werden');
       request.log.info({ userId: user.id }, 'Passwort-Reset angefordert');

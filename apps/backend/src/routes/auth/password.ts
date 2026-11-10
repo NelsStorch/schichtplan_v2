@@ -140,12 +140,13 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     // Die Antwort ist dieselbe wie bei einem neuen Konto: sonst liesse sich durchprobieren, wer ein Konto
     // hat. Die Person mit dieser Adresse bekommt stattdessen einen Hinweis per Mail.
     if (existing && !releaseUnverified) {
-      const loginPortalUrl = getLoginPortalBaseUrl();
+      const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host);
       if (!accountExistsMailsByEmail.hit(cleanEmail)) await sendAccountExistsEmail({
         to: cleanEmail,
         name: existing.nickname || existing.firstName,
         loginUrl: `${loginPortalUrl}/`,
         resetUrl: `${loginPortalUrl}/passwort-vergessen`,
+        organization: request.organization,
       });
       return registrationAccepted(cleanEmail);
     }
@@ -199,13 +200,14 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // Bestätigungs-E-Mail versenden
-    const loginPortalUrl = getLoginPortalBaseUrl();
+    const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host);
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,
       name: user.nickname || user.firstName,
       verificationUrl,
       deletesUnconfirmed: true,
+      organization: request.organization,
     });
 
     // Absichtlich KEIN Auth-Cookie setzen, damit die E-Mail zuerst verifiziert werden muss
@@ -263,7 +265,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    const loginPortalUrl = getLoginPortalBaseUrl();
+    const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host);
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,
@@ -271,6 +273,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
       verificationUrl,
       // Unbestätigte Passwort-Konten löscht der Aufräumjob (Cevi-Name-Profile mit E-Mail nicht)
       deletesUnconfirmed: Boolean(user.passwordHash && user.providerId === null),
+      organization: request.organization,
     });
 
     return genericAnswer;
@@ -354,7 +357,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const token = request.query.token;
-      const loginBase = getLoginPortalBaseUrl();
+      const loginBase = getLoginPortalBaseUrl(process.env, request.headers.host);
       if (!token) {
         return reply.redirect(`${loginBase}/verify-email?error=missing_token`);
       }

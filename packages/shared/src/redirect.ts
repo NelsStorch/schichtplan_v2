@@ -50,7 +50,7 @@ export function getRootDomain(hostname?: string): string {
     }
   }
 
-  const host = hostname.toLowerCase();
+  const host = hostname.toLowerCase().split(',')[0].trim().replace(/:\d+$/, '');
   if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) {
     return 'localhost';
   }
