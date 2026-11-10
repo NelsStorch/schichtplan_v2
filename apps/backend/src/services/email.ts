@@ -1,6 +1,6 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { MailKind, OrganizationType } from '@schichtplan/shared';
-import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
+import { getOrganization } from '@schichtplan/shared';
 import { escapeIcsText, foldIcsLine, formatIcsUtc } from './calendarFeed.js';
 import { trackUsage } from './usageStats.js';
 

@@ -3,8 +3,6 @@ import crypto from 'crypto';
 import {
   safeReturnTo,
   getRootDomain,
-  getOrganizationSlugFromHost,
-  getOrganization,
   ORGANIZATIONS,
   type UserDto,
   type OrganizationType,

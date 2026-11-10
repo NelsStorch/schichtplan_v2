@@ -6,10 +6,10 @@
 			"apps/*/src/**/*.{ts,tsx}",
 			"apps/*/test/**/*.ts",
 			"packages/*/src/**/*.{ts,tsx}",
-			"!**/generated/**",
-			"!**/node_modules/**",
-			"!**/.next/**",
-			"!**/dist/**"
+			"!**/generated",
+			"!**/node_modules",
+			"!**/.next",
+			"!**/dist"
 		]
 	},
 	"formatter": {

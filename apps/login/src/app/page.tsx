@@ -17,7 +17,6 @@ import {
   Button,
   Callout,
   BrandLogo,
-  CeviLogo,
   Field,
   Input,
   buttonClasses,

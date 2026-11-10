@@ -5,7 +5,6 @@ import crypto from 'crypto';
 import { isVerifiedHomeSource } from '../../services/eventAccess.js';
 import { ceviDbRoleGroupIds, deriveCeviDbFields } from '../../services/cevidb.js';
 import { refreshCeviDbGroups } from '../../services/cevidbGroups.js';
-import { cevidbConfig } from '../../config/cevidb.js';
 import {
   storeCeviDbFields,
   resolveCeviDbPlacement,
