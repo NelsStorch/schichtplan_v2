@@ -1,6 +1,6 @@
 
 import { FastifyReply, FastifyRequest, FastifyInstance } from 'fastify';
-import { Prisma, PrismaClient } from '../../db.js';
+import { Prisma, PrismaClient, OrganizationType } from '../../db.js';
 import {
   DEPARTMENT_PERMISSIONS,
   type DepartmentCreationEligibilityDto,
@@ -80,10 +80,12 @@ export const NOT_ELIGIBLE_MESSAGES = {
 /**
  * Darf die Person für ihre Gruppe eine Abteilung anlegen? Es zählt die Gruppe der Leitungsrolle, nicht das selbst
  * änderbare Feld `ortsgruppe_id`. Die Abteilung hängt an der Ortsgruppe, bei mehreren Jungscharen an der Jungschar.
+ * Für Vereine (organization === 'OTHER'): Authentifizierung mit E-Mail/Passwort berechtigt zur Erstellung.
  */
 export async function departmentCreationEligibility(
   prisma: PrismaClient,
-  userId: string
+  userId: string,
+  organization: OrganizationType = 'CEVI'
 ): Promise<DepartmentCreationEligibilityDto> {
   const denied = (
     reason: NonNullable<DepartmentCreationEligibilityDto['reason']>,
@@ -91,6 +93,7 @@ export async function departmentCreationEligibility(
   ): DepartmentCreationEligibilityDto => ({
     eligible: false,
     reason,
+    provider: organization,
     ortsgruppeId: null,
     ortsgruppeName: null,
     leaderGroupName: null,
@@ -98,7 +101,6 @@ export async function departmentCreationEligibility(
     ...extra,
   });
 
-  // Die provider*-Spalten schreibt nur der Hitobito-Login
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -107,9 +109,31 @@ export async function departmentCreationEligibility(
       departmentLeader: true,
       leaderGroupIds: true,
       leaderGroupName: true,
+      email: true,
+      emailVerified: true,
+      passwordHash: true,
     },
   });
-  if (!user || user.providerId === null) return denied('NOT_CEVIDB');
+  if (!user) return denied('NOT_CEVIDB');
+
+  // Für Vereine (vereins-schichtplan.ch bzw. organization === 'OTHER'):
+  // Kein Hitobito-SSO; Benutzer mit E-Mail/Passwort dürfen einen Verein mit freiem Namen/Slug anlegen.
+  if (organization === 'OTHER' || user.provider === 'OTHER') {
+    const hasAccount = Boolean(user.passwordHash || user.emailVerified || user.providerId !== null);
+    if (!hasAccount) return denied('NOT_CEVIDB');
+    return {
+      eligible: true,
+      reason: null,
+      provider: 'OTHER',
+      ortsgruppeId: null,
+      ortsgruppeName: null,
+      leaderGroupName: null,
+      existingDepartment: null,
+    };
+  }
+
+  // Hitobito-Organisationen (Cevi, Pfadi, Jubla):
+  if (user.providerId === null) return denied('NOT_CEVIDB');
   const provider = user.provider;
 
   const leaderGroupName = user.leaderGroupName;
@@ -138,9 +162,9 @@ export async function departmentCreationEligibility(
       select: { name: true, slug: true },
     });
     if (!existing) {
-      return { eligible: true, reason: null, ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: null };
+      return { eligible: true, reason: null, provider, ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: null };
     }
-    firstExisting ??= denied('EXISTS', { ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: existing });
+    firstExisting ??= denied('EXISTS', { provider, ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: existing });
   }
 
   return firstExisting ?? denied('NO_ORTSGRUPPE', { leaderGroupName });

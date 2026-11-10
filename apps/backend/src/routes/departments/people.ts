@@ -145,8 +145,9 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       if (!ctx) return;
       const { tenant, access } = ctx;
       const input = request.body as z.output<typeof UpdateDepartmentPersonSchema>;
-      const { stufen } = input;
+      const { stufen, role: nextRole } = input;
       const userId = request.params.userId;
+      const isOther = tenant.organization === 'OTHER';
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: userId },
@@ -159,7 +160,10 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           nickname: true,
           firstName: true,
           lastName: true,
-          memberships: { where: { departmentId: tenant.id }, select: { role: true, permissions: true } },
+          memberships: {
+            where: { departmentId: tenant.id },
+            select: { role: true, permissions: true, leaderSource: true },
+          },
           stufen: {
             where: { stufe: { departmentId: tenant.id } },
             select: { stufeId: true, role: true, source: true, stufe: { select: { name: true } } },
@@ -171,8 +175,9 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       if (user.homeDepartmentId !== tenant.id && !membership) {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
-      const currentPermissions = membership?.role === 'ADMIN' ? [] : normalizePermissions(membership?.permissions ?? []);
-      const target = { userId, role: membership?.role ?? null, permissions: currentPermissions };
+      const currentRole = membership?.role ?? 'HELPER';
+      const currentPermissions = currentRole === 'ADMIN' ? [] : normalizePermissions(membership?.permissions ?? []);
+      const target = { userId, role: currentRole, permissions: currentPermissions };
       if (!canEditPerson(access, request.user.id, target)) {
         return reply.status(403).send({
           error:
@@ -182,18 +187,48 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const nextPermissions = input.permissions ? normalizePermissions(input.permissions) : null;
-      if (nextPermissions) {
-        if (membership?.role === 'ADMIN') {
+      if (nextRole !== undefined && nextRole !== currentRole) {
+        if (!isOther) {
           return reply.status(400).send({
             error: 'Die Abteilungsleitung hat alle Rechte. Sie ändert sich nur über Cevi.DB oder das Admin-Portal.',
           });
         }
-        if (nextPermissions.length > 0 && isCeviNameProfile(user)) {
+        if (!access.hasFullAccess) {
+          return reply.status(403).send({
+            error: 'Nur die Vereinsleitung kann Leitungsrollen vergeben oder entziehen.',
+          });
+        }
+        if (nextRole === 'ADMIN' && isCeviNameProfile(user)) {
           return reply.status(400).send({ error: CEVINAME_ROLE_ERROR });
         }
-        if (!canGrantPermissions(access, currentPermissions, nextPermissions)) {
-          return reply.status(403).send({ error: 'Du kannst nur weniger Rechte vergeben, als du selbst hast.' });
+        if (currentRole === 'ADMIN' && nextRole === 'HELPER') {
+          const otherLeaders = await fastify.prisma.departmentMember.count({
+            where: { departmentId: tenant.id, role: 'ADMIN', userId: { not: userId } },
+          });
+          if (otherLeaders === 0) {
+            return reply.status(400).send({
+              error: 'Mindestens eine Vereinsleitung muss in der Abteilung verbleiben.',
+            });
+          }
+        }
+      }
+
+      const effectiveRole = nextRole ?? currentRole;
+      const nextPermissions = input.permissions ? normalizePermissions(input.permissions) : null;
+      if (nextPermissions) {
+        if (effectiveRole === 'ADMIN') {
+          if (!isOther) {
+            return reply.status(400).send({
+              error: 'Die Abteilungsleitung hat alle Rechte. Sie ändert sich nur über Cevi.DB oder das Admin-Portal.',
+            });
+          }
+        } else {
+          if (nextPermissions.length > 0 && isCeviNameProfile(user)) {
+            return reply.status(400).send({ error: CEVINAME_ROLE_ERROR });
+          }
+          if (!canGrantPermissions(access, currentPermissions, nextPermissions)) {
+            return reply.status(403).send({ error: 'Du kannst nur weniger Rechte vergeben, als du selbst hast.' });
+          }
         }
       }
 
@@ -205,6 +240,12 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         const found = await fastify.prisma.departmentStufe.count({ where: { id: { in: ids }, departmentId: tenant.id } });
         if (found !== ids.length) return reply.status(400).send({ error: 'Eine Stufe gehört nicht zu dieser Abteilung' });
       }
+
+      const roleChanged = nextRole !== undefined && nextRole !== currentRole;
+      const permissionsChanged =
+        effectiveRole === 'HELPER' &&
+        nextPermissions !== null &&
+        nextPermissions.join() !== currentPermissions.join();
 
       const stufenBefore = user.stufen.filter((s) => s.source === 'SELF');
       await fastify.prisma.$transaction(async (tx) => {
@@ -219,17 +260,36 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
             });
           }
         }
-        if (nextPermissions) {
-          await tx.departmentMember.upsert({
-            where: { departmentId_userId: { departmentId: tenant.id, userId } },
-            update: { permissions: nextPermissions },
-            create: { departmentId: tenant.id, userId, role: 'HELPER', permissions: nextPermissions },
-          });
+        if (roleChanged || nextPermissions) {
+          if (effectiveRole === 'ADMIN') {
+            await tx.departmentMember.upsert({
+              where: { departmentId_userId: { departmentId: tenant.id, userId } },
+              update: { role: 'ADMIN', leaderSource: membership?.leaderSource ?? 'MANUAL', permissions: [] },
+              create: { departmentId: tenant.id, userId, role: 'ADMIN', leaderSource: 'MANUAL', permissions: [] },
+            });
+          } else {
+            const perms = nextPermissions ?? (currentRole === 'ADMIN' ? [] : currentPermissions);
+            await tx.departmentMember.upsert({
+              where: { departmentId_userId: { departmentId: tenant.id, userId } },
+              update: { role: 'HELPER', leaderSource: null, permissions: perms },
+              create: { departmentId: tenant.id, userId, role: 'HELPER', leaderSource: null, permissions: perms },
+            });
+          }
         }
       });
 
       const label = personLabel(user);
-      if (nextPermissions && nextPermissions.join() !== currentPermissions.join()) {
+      if (roleChanged) {
+        await recordDepartmentAction(fastify.prisma, request.log, {
+          departmentId: tenant.id,
+          actorId: request.user.id,
+          action: effectiveRole === 'ADMIN' ? 'LEADER_GRANT' : 'LEADER_REVOKE',
+          targetUserId: userId,
+          targetLabel: label,
+          ...(effectiveRole === 'ADMIN' ? { details: { source: 'MANUAL' } } : {}),
+        });
+      }
+      if (permissionsChanged) {
         await recordDepartmentAction(fastify.prisma, request.log, {
           departmentId: tenant.id,
           actorId: request.user.id,
@@ -406,7 +466,16 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Diese Person kann nur die Abteilungsleitung entfernen.' });
       }
       if (membership?.role === 'ADMIN') {
-        return reply.status(400).send({ error: 'Die Abteilungsleitung lässt sich hier nicht entfernen.' });
+        if (tenant.organization === 'OTHER' && access.hasFullAccess) {
+          const others = await fastify.prisma.departmentMember.count({
+            where: { departmentId: tenant.id, role: 'ADMIN', userId: { not: user.id } },
+          });
+          if (others === 0) {
+            return reply.status(400).send({ error: 'Mindestens eine Vereinsleitung muss in der Abteilung verbleiben.' });
+          }
+        } else {
+          return reply.status(400).send({ error: 'Die Abteilungsleitung lässt sich hier nicht entfernen.' });
+        }
       }
       if (user.homeDepartmentSource === 'CEVIDB') {
         return reply

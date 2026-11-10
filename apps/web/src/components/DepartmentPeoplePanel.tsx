@@ -9,6 +9,7 @@ import {
   departmentRoleLabel,
   formatZurichDate,
   getOrganization,
+  type OrganizationConfig,
   type DepartmentPermission,
   type DepartmentPersonDto,
   type DepartmentStufeDto,
@@ -237,6 +238,8 @@ export function DepartmentPeoplePanel() {
                   stufen={stufen}
                   grantable={grantable}
                   isSelf={user?.id === p.userId}
+                  isDeptAdmin={Boolean(isDeptAdmin)}
+                  org={org}
                   onCancel={() => setEditing(null)}
                   onRemove={() => remove(p)}
                   onUnconfirm={isDeptAdmin && p.source === 'CONFIRMED' ? () => unconfirmHome(p) : undefined}
@@ -319,6 +322,8 @@ function PersonEditor({
   stufen,
   grantable,
   isSelf,
+  isDeptAdmin,
+  org,
   onCancel,
   onRemove,
   onUnconfirm,
@@ -328,11 +333,15 @@ function PersonEditor({
   stufen: DepartmentStufeDto[];
   grantable: ReadonlySet<DepartmentPermission> | null;
   isSelf: boolean;
+  isDeptAdmin: boolean;
+  org: OrganizationConfig;
   onCancel: () => void;
   onRemove: () => void;
   onUnconfirm?: () => void;
   onSaved: () => void;
 }) {
+  const isVerein = org.slug === 'verein';
+  const [role, setRole] = useState<'ADMIN' | 'HELPER'>(person.departmentRole === 'ADMIN' ? 'ADMIN' : 'HELPER');
   const [roles, setRoles] = useState<Record<string, StufeRole>>(
     Object.fromEntries(person.stufen.map((s) => [s.stufeId, s.role]))
   );
@@ -340,7 +349,7 @@ function PersonEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const locked = new Set(person.stufen.filter((s) => s.source === 'CEVIDB').map((s) => s.stufeId));
-  const isLeader = person.departmentRole === 'ADMIN';
+  const isLeader = isVerein && isDeptAdmin ? role === 'ADMIN' : person.departmentRole === 'ADMIN';
   const canHaveRights = !isLeader && !person.isCeviNameProfile;
 
   const save = async () => {
@@ -350,9 +359,10 @@ function PersonEditor({
       await api(`/api/departments/current/people/${person.userId}`, {
         method: 'PATCH',
         json: {
+          role: isVerein && isDeptAdmin ? role : undefined,
           permissions: canHaveRights ? perms : undefined,
           stufen: person.isHomeDepartment
-            ? Object.entries(roles).map(([stufeId, role]) => ({ stufeId, role }))
+            ? Object.entries(roles).map(([stufeId, r]) => ({ stufeId, role: r }))
             : undefined,
         },
       });
@@ -366,20 +376,52 @@ function PersonEditor({
   return (
     <div className="mt-3 space-y-4 rounded-field border border-line bg-surface-2/60 p-3">
       {error && <Callout tone="danger">{error}</Callout>}
+      {isVerein && isDeptAdmin && !person.isCeviNameProfile && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-fg-subtle">Rolle im Verein</p>
+          <div role="radiogroup" aria-label="Rolle im Verein" className="flex rounded-full bg-surface p-0.5">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={role === 'ADMIN'}
+              onClick={() => setRole('ADMIN')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
+                role === 'ADMIN' ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:text-fg'
+              )}
+            >
+              <Crown className="size-3.5 text-accent-ink" /> Vereinsleitung
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={role === 'HELPER'}
+              onClick={() => setRole('HELPER')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
+                role === 'HELPER' ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:text-fg'
+              )}
+            >
+              Mitglied
+            </button>
+          </div>
+        </div>
+      )}
       {isLeader ? (
         <p className="text-xs leading-relaxed text-fg-muted">
           <Crown className="mr-1 inline size-3.5 text-accent-ink" />
-          Abteilungsleitung {person.leaderSource === 'CEVIDB' ? 'laut Cevi.DB' : 'vom Admin-Portal'}: hat alle Rechte.
-          Das ändert sich nur über die Rolle in Cevi.DB oder im Admin-Portal.
+          {isVerein
+            ? 'Vereinsleitung: hat alle Rechte und kann weitere Vereinsleitungen ernennen.'
+            : `Abteilungsleitung ${person.leaderSource === 'CEVIDB' ? 'laut Cevi.DB' : 'vom Admin-Portal'}: hat alle Rechte. Das ändert sich nur über die Rolle in Cevi.DB oder im Admin-Portal.`}
         </p>
       ) : person.isCeviNameProfile ? (
         <p className="text-xs leading-relaxed text-warning-ink">
-          Nur Cevi-Name-Profil (ohne Passwort): bekommt keine Rechte. Dafür braucht die Person ein Konto mit Cevi.DB
+          Nur Cevi-Name-Profil (ohne Passwort): bekommt keine Rechte. Dafür braucht die Person ein Konto mit {org.authProviderShort}
           oder mit E-Mail und Passwort.
         </p>
       ) : (
         <div>
-          <p className="mb-2 text-xs font-semibold text-fg-subtle">Rechte in der Abteilung</p>
+          <p className="mb-2 text-xs font-semibold text-fg-subtle">Rechte in der {org.unitTerm}</p>
           <PermissionEditor value={perms} onChange={setPerms} grantable={isSelf ? new Set() : grantable} />
           <div className="mt-3 rounded-card border border-line/60 bg-surface/60 p-2 text-2xs leading-normal text-fg-subtle">
             💡 Wer nur bei einem einzelnen Anlass mitplant, kommt besser ins OK-Team dieses Anlasses (Anlass →
@@ -435,9 +477,9 @@ function PersonEditor({
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         <div className="flex flex-wrap gap-2">
-          {person.isHomeDepartment && person.source !== 'CEVIDB' && !isLeader && (
+          {person.isHomeDepartment && person.source !== 'CEVIDB' && (!isLeader || isVerein) && (
             <Button size="sm" variant="ghost" onClick={onRemove} className="hover:text-danger-ink">
-              <UserMinus /> Aus Abteilung entfernen
+              <UserMinus /> Aus {org.unitTerm} entfernen
             </Button>
           )}
           {onUnconfirm && (

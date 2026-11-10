@@ -696,6 +696,7 @@ export const DepartmentPermissionsSchema = z
 
 /** Person bearbeiten (Abteilungsleitung oder «Personen und Rechte verwalten»): Stufen und Rechte */
 export const UpdateDepartmentPersonSchema = z.object({
+  role: z.enum(['ADMIN', 'HELPER']).optional(),
   stufen: z
     .array(z.object({ stufeId: z.string().uuid(), role: z.enum(['LEITUNG', 'TEILNEHMER']) }))
     .max(20)

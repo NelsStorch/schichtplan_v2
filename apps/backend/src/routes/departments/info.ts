@@ -188,11 +188,12 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
-      return departmentCreationEligibility(fastify.prisma, request.user.id);
+      return departmentCreationEligibility(fastify.prisma, request.user.id, request.organization);
     }
   );
 
-  // Abteilung anlegen als Abteilungsleitung: ohne Passwort, verknüpft mit der Cevi.DB-Gruppe
+  // Abteilung anlegen als Abteilungsleitung: ohne Passwort, verknüpft mit der Cevi.DB-Gruppe.
+  // Für Vereine (organization = 'OTHER'): ohne Hitobito-Gruppe mit leaderSource = 'MANUAL'.
   fastify.post(
     '/api/departments/cevidb',
     {
@@ -208,9 +209,10 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const input = request.body as z.output<typeof CreateDepartmentFromCeviDbSchema>;
       const { departmentName, slug } = input;
+      const isOther = request.organization === 'OTHER';
 
-      const eligibility = await departmentCreationEligibility(fastify.prisma, request.user.id);
-      if (!eligibility.eligible || eligibility.ortsgruppeId === null) {
+      const eligibility = await departmentCreationEligibility(fastify.prisma, request.user.id, request.organization);
+      if (!eligibility.eligible || (!isOther && eligibility.ortsgruppeId === null)) {
         const reason = eligibility.reason ?? 'NOT_LEADER';
         return reply
           .status(reason === 'EXISTS' ? 409 : 403)
@@ -221,7 +223,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: request.user.id },
         select: { provider: true },
       });
-      const provider = founderUser?.provider ?? 'CEVI';
+      const provider = isOther ? 'OTHER' : (founderUser?.provider ?? 'CEVI');
 
       try {
         const departmentResult = await fastify.prisma.$transaction(async (tx) => {
@@ -231,42 +233,56 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
               slug,
               organization: provider,
               contactUserId: request.user.id,
-              hitobitoGroupId: ceviDbGroupId,
+              hitobitoGroupId: isOther ? null : ceviDbGroupId,
             },
           });
           await tx.departmentMember.create({
-            data: { departmentId: created.id, userId: request.user.id, role: 'ADMIN', leaderSource: 'CEVIDB' },
+            data: {
+              departmentId: created.id,
+              userId: request.user.id,
+              role: 'ADMIN',
+              leaderSource: isOther ? 'MANUAL' : 'CEVIDB',
+            },
           });
           await tx.user.update({
             where: { id: request.user.id },
-            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', ...NO_HOME_CONFIRMATION, departmentSetupAt: new Date() },
+            data: {
+              homeDepartmentId: created.id,
+              homeDepartmentSource: isOther ? 'SELF' : 'CEVIDB',
+              ...NO_HOME_CONFIRMATION,
+              departmentSetupAt: new Date(),
+            },
           });
 
           // Alle bereits angemeldeten Cevi.DB-Personen dieser Gruppe werden Helfer*innen bzw. Abteilungsleitung
-          // (nur über ihre eigene Leitungsrolle) und bekommen die neue Abteilung wenn möglich als Heimabteilung
-          const people = await ceviDbGroupPeople(tx, ceviDbGroupId, provider);
-          await tx.user.updateMany({
-            where: { id: { in: people.filter((p) => p.moveHome).map((p) => p.id) } },
-            data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', ...NO_HOME_CONFIRMATION, departmentSetupAt: new Date() },
-          });
-          await tx.departmentMember.createMany({
-            data: people.map((p) => ({
-              departmentId: created.id,
-              userId: p.id,
-              role: p.isLeader ? 'ADMIN' : 'HELPER',
-              leaderSource: p.isLeader ? 'CEVIDB' : null,
-            })),
-            skipDuplicates: true,
-          });
-          const leaderIds = people.filter((p) => p.isLeader).map((p) => p.id);
-          if (leaderIds.length) {
-            await tx.departmentMember.updateMany({
-              where: { departmentId: created.id, userId: { in: leaderIds } },
-              data: { role: 'ADMIN', leaderSource: 'CEVIDB' },
+          // (nur bei Hitobito-Gruppen, nicht bei Vereinen)
+          let memberIds: string[] = [];
+          if (!isOther && ceviDbGroupId !== null) {
+            const people = await ceviDbGroupPeople(tx, ceviDbGroupId, provider);
+            await tx.user.updateMany({
+              where: { id: { in: people.filter((p) => p.moveHome).map((p) => p.id) } },
+              data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', ...NO_HOME_CONFIRMATION, departmentSetupAt: new Date() },
             });
+            await tx.departmentMember.createMany({
+              data: people.map((p) => ({
+                departmentId: created.id,
+                userId: p.id,
+                role: p.isLeader ? 'ADMIN' : 'HELPER',
+                leaderSource: p.isLeader ? 'CEVIDB' : null,
+              })),
+              skipDuplicates: true,
+            });
+            const leaderIds = people.filter((p) => p.isLeader).map((p) => p.id);
+            if (leaderIds.length) {
+              await tx.departmentMember.updateMany({
+                where: { departmentId: created.id, userId: { in: leaderIds } },
+                data: { role: 'ADMIN', leaderSource: 'CEVIDB' },
+              });
+            }
+            memberIds = people.map((p) => p.id);
           }
 
-          return { department: created, memberIds: people.map((p) => p.id) };
+          return { department: created, memberIds };
         });
 
         for (const memberId of departmentResult.memberIds) {
@@ -274,8 +290,8 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         request.log.info(
-          { userId: request.user.id, departmentId: departmentResult.department.id, slug, ceviDbGroupId },
-          'Abteilung von Abteilungsleitung (Cevi.DB) angelegt'
+          { userId: request.user.id, departmentId: departmentResult.department.id, slug, hitobitoGroupId: isOther ? null : ceviDbGroupId },
+          isOther ? 'Verein von Vereinsleitung angelegt' : 'Abteilung von Abteilungsleitung (Cevi.DB) angelegt'
         );
         return reply.status(201).send({
           department: {
@@ -283,7 +299,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
             name: departmentResult.department.name,
             slug: departmentResult.department.slug,
           },
-          message: 'Abteilung erfolgreich erstellt!',
+          message: isOther ? 'Verein erfolgreich erstellt!' : 'Abteilung erfolgreich erstellt!',
         });
       } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
