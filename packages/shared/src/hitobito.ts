@@ -234,7 +234,6 @@ export const HITOBITO_JUBLA_CONFIG: HitobitoConfig = {
   ],
   unitRoleClassPrefixes: [
     'Group::ChildGroup::',
-    'Group::Flock::',
     'Group::Gruppe::',
     'Group::Stufe::',
     'Group::SimpleGroup::',

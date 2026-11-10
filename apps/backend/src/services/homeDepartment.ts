@@ -34,9 +34,13 @@ export async function resolveCeviDbPlacement(
   const ortsgruppen = await prisma.hitobitoGroup.findMany({ where: { provider, id: { in: ortsgruppeIds } } });
   const groups = new Map([...roleGroups, ...ortsgruppen].map((g) => [g.id, g]));
 
-  const departmentGroupIds = [...roleGroups.map((g) => g.jungscharId), ...ortsgruppeIds, derived.ortsgruppeId].filter(
-    (id): id is number => id !== null
-  );
+  const departmentGroupIds = [
+    ...derived.roleGroupIds,
+    ...derived.leaderGroupIds,
+    ...roleGroups.map((g) => g.jungscharId),
+    ...ortsgruppeIds,
+    derived.ortsgruppeId,
+  ].filter((id): id is number => id !== null);
   const departments = await prisma.department.findMany({
     where: { organization: provider, hitobitoGroupId: { in: departmentGroupIds } },
     select: { id: true, hitobitoGroupId: true },

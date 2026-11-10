@@ -7,7 +7,15 @@
  * wählen. `ortsgruppe_id` dagegen kann jede Person im eigenen Profil frei ändern, und es wird nach der ersten Rolle
  * nie nachgeführt. Rechte und die Abteilung aus Cevi.DB hängen deshalb nur an den Rollen (`placeCeviDbPerson`).
  */
-import type { CeviDbStufeDto } from '@schichtplan/shared';
+import {
+  type CeviDbStufeDto,
+  type OrganizationType,
+  getHitobitoConfig,
+  isDepartmentLeaderRole as isDepartmentLeaderRoleShared,
+  isUnitRoleClass,
+  getUnitRoleKey,
+  classifyUnitRole,
+} from '@schichtplan/shared';
 import { cevidbConfig } from '../config/cevidb.js';
 
 export interface CeviDbLeadership {
@@ -31,9 +39,16 @@ export function parseCeviDbGroupId(value: unknown): number | null {
   return Number.isInteger(id) && id > 0 && id <= 2_147_483_647 ? id : null;
 }
 
-/** Gruppen-ID der Ortsgruppe aus dem Profil (konfiguriertes Feld, Standard `ortsgruppe_id`). */
-export function ortsgruppeIdFromProfile(profile: unknown): number | null {
-  return isRecord(profile) ? parseCeviDbGroupId(profile[cevidbConfig().ortsgruppeField]) : null;
+/** Gruppen-ID der Ortsgruppe / Schar / Abteilung aus dem Profil. */
+export function ortsgruppeIdFromProfile(profile: unknown, orgType: OrganizationType = 'CEVI'): number | null {
+  if (!isRecord(profile)) return null;
+  const configuredField = orgType === 'CEVI' ? cevidbConfig().ortsgruppeField : getHitobitoConfig(orgType).ortsgruppeField;
+  return (
+    parseCeviDbGroupId(profile[configuredField]) ??
+    parseCeviDbGroupId(profile.ortsgruppe_id) ??
+    parseCeviDbGroupId(profile.abteilung_id) ??
+    parseCeviDbGroupId(profile.schar_id)
+  );
 }
 
 function profileRoles(profile: unknown): Record<string, unknown>[] {
@@ -49,27 +64,44 @@ function roleClassOf(role: Record<string, unknown>): string | null {
   return typeof roleClass === 'string' ? roleClass : null;
 }
 
-/** Prüft, ob eine Rolle als Abteilungsleitung zählt (aus Konfiguration oder flexibler Suffix-Erkennung). */
-export function isDepartmentLeaderRole(roleClass: string, configuredRoles: string[]): boolean {
-  if (configuredRoles.includes(roleClass)) return true;
-  const normalized = roleClass.toLowerCase();
-  return (
-    normalized.endsWith('::abteilungsleiter') ||
-    normalized.endsWith('::abteilungsleiterin') ||
-    normalized.endsWith('::abteilungsleitung')
-  );
+/** Prüft, ob eine Rolle als Abteilungsleitung zählt (aus Konfiguration, Verband oder flexibler Suffix-Erkennung). */
+export function isDepartmentLeaderRole(
+  roleClass: string,
+  configuredRolesOrOrg?: string[] | OrganizationType
+): boolean {
+  if (!roleClass || typeof roleClass !== 'string') return false;
+  if (Array.isArray(configuredRolesOrOrg)) {
+    if (configuredRolesOrOrg.includes(roleClass)) return true;
+    const normalized = roleClass.toLowerCase();
+    return (
+      normalized.endsWith('::abteilungsleiter') ||
+      normalized.endsWith('::abteilungsleiterin') ||
+      normalized.endsWith('::abteilungsleitung') ||
+      normalized.endsWith('::scharleiter') ||
+      normalized.endsWith('::scharleiterin') ||
+      normalized.endsWith('::scharleitung')
+    );
+  }
+  return isDepartmentLeaderRoleShared(roleClass, configuredRolesOrOrg);
 }
 
-export function ceviDbLeadership(profile: unknown): CeviDbLeadership {
-  const { departmentLeaderRoleClasses } = cevidbConfig();
+export function ceviDbLeadership(profile: unknown, orgType: OrganizationType = 'CEVI'): CeviDbLeadership {
+  const configuredRoles =
+    orgType === 'CEVI'
+      ? cevidbConfig().departmentLeaderRoleClasses
+      : getHitobitoConfig(orgType).departmentLeaderRoleClasses;
+
   const leaderRoles = profileRoles(profile).filter((role) => {
     const roleClass = roleClassOf(role);
-    return roleClass !== null && isDepartmentLeaderRole(roleClass, departmentLeaderRoleClasses);
+    return (
+      roleClass !== null &&
+      (isDepartmentLeaderRole(roleClass, configuredRoles) || isDepartmentLeaderRoleShared(roleClass, orgType))
+    );
   });
   const leaderRole = leaderRoles[0];
 
   const ortsgruppeId =
-    ortsgruppeIdFromProfile(profile) ??
+    ortsgruppeIdFromProfile(profile, orgType) ??
     (leaderRole ? parseCeviDbGroupId(leaderRole.group_id) : null);
 
   return {
@@ -83,26 +115,37 @@ export function ceviDbLeadership(profile: unknown): CeviDbLeadership {
 const kindRank: Record<CeviDbStufeDto['kind'], number> = { LEITUNG: 0, TEILNEHMER: 1, ANDERE: 2 };
 
 /**
- * Stufen der Person: alle Gruppen, in denen sie eine Rolle mit dem konfigurierten Präfix
- * (Standard `Group::Stufe::`) hat. Pro Stufe zählt die stärkste Rolle (Leitung vor Teilnehmer*in).
- * Die Haupt-Stufe (`primary_group_id` des Profils) steht zuerst.
+ * Stufen / Einheiten der Person: alle Gruppen, in denen sie eine Rolle hat.
+ * Pro Gruppe zählt die stärkste Rolle (Leitung vor Teilnehmer*in).
+ * Die Haupt-Gruppe (`primary_group_id` des Profils) steht zuerst.
  */
-export function ceviDbStufen(profile: unknown): CeviDbStufeDto[] {
-  const { stufeRoleClassPrefix, stufeLeaderRoles, stufeParticipantRoles } = cevidbConfig();
+export function ceviDbStufen(profile: unknown, orgType: OrganizationType = 'CEVI'): CeviDbStufeDto[] {
   const primaryGroupId = isRecord(profile) ? parseCeviDbGroupId(profile.primary_group_id) : null;
   const byGroup = new Map<number, CeviDbStufeDto>();
+  const ceviCfg = orgType === 'CEVI' ? cevidbConfig() : null;
 
   for (const role of profileRoles(profile)) {
     const roleClass = roleClassOf(role);
     const groupId = parseCeviDbGroupId(role.group_id);
-    if (roleClass === null || groupId === null || !roleClass.startsWith(stufeRoleClassPrefix)) continue;
+    if (roleClass === null || groupId === null) continue;
 
-    const roleKey = roleClass.slice(roleClass.lastIndexOf('::') + 2);
-    const kind: CeviDbStufeDto['kind'] = stufeLeaderRoles.includes(roleKey)
-      ? 'LEITUNG'
-      : stufeParticipantRoles.includes(roleKey)
-        ? 'TEILNEHMER'
-        : 'ANDERE';
+    // Scharleitungs- und Abteilungsleitungs-Rollen sind die Leitung der Organisation, keine Unter-Einheit/Stufe
+    if (isDepartmentLeaderRole(roleClass, orgType)) continue;
+
+    const isCeviStufe = ceviCfg ? roleClass.startsWith(ceviCfg.stufeRoleClassPrefix) : false;
+    if (!isCeviStufe && !isUnitRoleClass(roleClass, orgType)) continue;
+
+    const roleKey = getUnitRoleKey(roleClass);
+    let kind: CeviDbStufeDto['kind'];
+    if (ceviCfg && isCeviStufe) {
+      kind = ceviCfg.stufeLeaderRoles.includes(roleKey)
+        ? 'LEITUNG'
+        : ceviCfg.stufeParticipantRoles.includes(roleKey)
+          ? 'TEILNEHMER'
+          : 'ANDERE';
+    } else {
+      kind = classifyUnitRole(roleClass, orgType);
+    }
     const roleName = typeof role.role_name === 'string' ? role.role_name : roleKey;
 
     const existing = byGroup.get(groupId);
@@ -133,7 +176,7 @@ export function ceviDbRoleGroupIds(profile: unknown): number[] {
   return uniqueIds(profileRoles(profile).map((role) => parseCeviDbGroupId(role.group_id)));
 }
 
-/** Name der Ortsgruppe: Gruppe einer Rolle mit der ID der Ortsgruppe (z. B. «Illnau-Effretikon») */
+/** Name der Ortsgruppe / Schar / Abteilung aus den Rollen des Profils */
 function ortsgruppeNameFromProfile(profile: unknown, ortsgruppeId: number | null): string | null {
   if (ortsgruppeId === null) return null;
   const role = profileRoles(profile).find((r) => parseCeviDbGroupId(r.group_id) === ortsgruppeId);
@@ -153,11 +196,11 @@ export interface CeviDbDerived {
 }
 
 /**
- * Alles, was der Schichtplan aus dem Cevi.DB-Profil braucht. Wird nur direkt beim Login auf die frische
- * OAuth-Antwort angewendet und in eigene Spalten/Tabellen geschrieben (das Rohprofil wird nicht gespeichert).
+ * Alles, was der Schichtplan aus dem Hitobito-Profil (Cevi, Pfadi, Jubla) braucht.
+ * Wird nur direkt beim Login auf die frische OAuth-Antwort angewendet und in eigene Spalten geschrieben.
  */
-export function deriveCeviDbFields(profile: unknown): CeviDbDerived {
-  const leadership = ceviDbLeadership(profile);
+export function deriveCeviDbFields(profile: unknown, orgType: OrganizationType = 'CEVI'): CeviDbDerived {
+  const leadership = ceviDbLeadership(profile, orgType);
   return {
     ortsgruppeId: leadership.ortsgruppeId,
     ortsgruppeName: ortsgruppeNameFromProfile(profile, leadership.ortsgruppeId),
@@ -166,7 +209,7 @@ export function deriveCeviDbFields(profile: unknown): CeviDbDerived {
     leaderGroupIds: leadership.leaderGroupIds,
     roleGroupIds: ceviDbRoleGroupIds(profile),
     primaryGroupId: isRecord(profile) ? parseCeviDbGroupId(profile.primary_group_id) : null,
-    stufen: ceviDbStufen(profile),
+    stufen: ceviDbStufen(profile, orgType),
   };
 }
 
@@ -213,7 +256,8 @@ export function placeCeviDbPerson(
   const departmentOf = (groupId: number | null) => (groupId !== null ? departments.get(groupId) : undefined);
   const departmentOfGroup = (groupId: number): string | null => {
     const group = groups.get(groupId);
-    return group ? (departmentOf(group.jungscharId) ?? departmentOf(group.ortsgruppeId) ?? null) : null;
+    if (!group) return null;
+    return departmentOf(groupId) ?? departmentOf(group.jungscharId) ?? departmentOf(group.ortsgruppeId) ?? null;
   };
 
   const leaderDepartmentIds = (): string[] | null => {
@@ -221,6 +265,11 @@ export function placeCeviDbPerson(
     for (const groupId of person.leaderGroupIds) {
       const group = groups.get(groupId);
       if (!group) return null;
+      const direct = departmentOf(groupId);
+      if (direct) {
+        ids.add(direct);
+        continue;
+      }
       const ofJungschar = departmentOf(group.jungscharId);
       if (ofJungschar) {
         ids.add(ofJungschar);

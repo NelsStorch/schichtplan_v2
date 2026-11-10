@@ -22,6 +22,7 @@ import { syncCeviDbLeadership } from '../../services/departmentLeaders.js';
 import {
   getOrganizationSlugFromHost,
   getOrganizationByDbType,
+  getHitobitoConfig,
   type OrganizationType,
 } from '@schichtplan/shared';
 
@@ -134,7 +135,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('client_id', providerConfig.clientId);
       authUrl.searchParams.set('redirect_uri', redirectUri);
-      authUrl.searchParams.set('scope', cevidbConfig().oauthScopes);
+      authUrl.searchParams.set('scope', getHitobitoConfig(providerConfig.type).oauthScopes);
       authUrl.searchParams.set('state', stateEncoded);
 
       return reply.redirect(authUrl.toString());
@@ -261,7 +262,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
         profile._meta = {
           fetchedAt: new Date().toISOString(),
-          grantedScopes: tokenData.scope || cevidbConfig().oauthScopes,
+          grantedScopes: tokenData.scope || getHitobitoConfig(providerConfig.type).oauthScopes,
           tokenType: tokenData.token_type || 'Bearer',
           expiresIn: tokenData.expires_in,
         };
@@ -272,6 +273,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
           accessToken,
           grantedScopes: profile._meta.grantedScopes,
           groupIds: ceviDbRoleGroupIds(profile),
+          provider: providerConfig.type,
         });
       } catch (err) {
         fastify.log.error(err, `${providerConfig.type} nicht erreichbar`);
@@ -422,12 +424,12 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.log.info({ userId: user.id, ceviDbId }, 'Cevi.DB-Person zum globalen Admin befördert');
     }
 
-    // Was der Schichtplan aus Cevi.DB braucht, in eigene Spalten schreiben (das Rohprofil wird nicht gespeichert).
-    // Die eigene Abteilung und die Stufen kommen aus den Rollen und der Cevi.DB-Gruppenstruktur.
-    const derived = deriveCeviDbFields(profile);
-    const placement = await resolveCeviDbPlacement(fastify.prisma, derived, user.homeDepartmentId);
+    // Was der Schichtplan aus Hitobito (Cevi, Pfadi, Jubla) braucht, in eigene Spalten schreiben.
+    // Die eigene Abteilung und die Stufen kommen aus den Rollen und der Gruppenstruktur.
+    const derived = deriveCeviDbFields(profile, provider);
+    const placement = await resolveCeviDbPlacement(fastify.prisma, derived, user.homeDepartmentId, provider);
     await storeCeviDbFields(fastify.prisma, user.id, derived, placement);
-    const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, placement);
+    const homeDepartment = await syncCeviDbHomeDepartment(fastify.prisma, user, placement, provider);
     // Abteilungsleitung vergeben bzw. entziehen (nie die letzte einer Abteilung), in weiteren Abteilungen mit Rollen eintragen
     await syncCeviDbLeadership(
       fastify.prisma,

@@ -10,6 +10,7 @@ import {
   isDepartmentLeaderRole,
   isUnitRoleClass,
 } from '@schichtplan/shared';
+import { deriveCeviDbFields } from './cevidb.js';
 
 describe('Hitobito & Vokabular (Multi-Verband)', () => {
   describe('Vokabular-Definitionen', () => {
@@ -202,6 +203,62 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
       expect(classifyUnitRole('Group::Flock::Guide', 'JUBLA')).toBe('LEITUNG');
       expect(classifyUnitRole('Group::ChildGroup::Child', 'JUBLA')).toBe('TEILNEHMER');
       expect(classifyUnitRole('Group::Flock::Coach', 'JUBLA')).toBe('ANDERE');
+    });
+  });
+
+  describe('Profil-Auswertung mit deriveCeviDbFields (Pfadi & Jubla)', () => {
+    it('wertet Pfadi-Profil korrekt aus (Abteilungsleitung & Wölfe)', () => {
+      const pfadiProfile = {
+        first_name: 'Fiona',
+        last_name: 'Muster',
+        nickname: 'Chinchilla',
+        email: 'chinchilla@pfadi-beispiel.ch',
+        abteilung_id: 501,
+        primary_group_id: 502,
+        roles: [
+          { role_class: 'Group::Abteilung::Abteilungsleitung', group_id: 501, group_name: 'Pfadi Uster' },
+          { role_class: 'Group::Woelfe::Stufenleitung', group_id: 502, group_name: 'Meute Rikki-Tikki' },
+        ],
+      };
+
+      const derived = deriveCeviDbFields(pfadiProfile, 'PFADI');
+      expect(derived.isDepartmentLeader).toBe(true);
+      expect(derived.ortsgruppeId).toBe(501);
+      expect(derived.leaderGroupIds).toContain(501);
+      expect(derived.stufen).toHaveLength(1);
+      expect(derived.stufen[0]).toMatchObject({
+        groupId: 502,
+        groupName: 'Meute Rikki-Tikki',
+        kind: 'LEITUNG',
+        isPrimary: true,
+      });
+    });
+
+    it('wertet Jubla-Profil korrekt aus (Scharleitung & Kindergruppe)', () => {
+      const jublaProfile = {
+        first_name: 'Lukas',
+        last_name: 'Keller',
+        nickname: 'Panda',
+        email: 'panda@jubla-beispiel.ch',
+        schar_id: 601,
+        primary_group_id: 602,
+        roles: [
+          { role_class: 'Group::Flock::Leader', group_id: 601, group_name: 'Jubla Sursee' },
+          { role_class: 'Group::ChildGroup::Guide', group_id: 602, group_name: 'Gruppe Tiger' },
+        ],
+      };
+
+      const derived = deriveCeviDbFields(jublaProfile, 'JUBLA');
+      expect(derived.isDepartmentLeader).toBe(true);
+      expect(derived.ortsgruppeId).toBe(601);
+      expect(derived.leaderGroupIds).toContain(601);
+      expect(derived.stufen).toHaveLength(1);
+      expect(derived.stufen[0]).toMatchObject({
+        groupId: 602,
+        groupName: 'Gruppe Tiger',
+        kind: 'LEITUNG',
+        isPrimary: true,
+      });
     });
   });
 });
