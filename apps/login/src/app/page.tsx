@@ -21,6 +21,7 @@ import {
   Input,
   buttonClasses,
   cn,
+  useOrganization,
 } from '@schichtplan/ui';
 import { getLandingUrl } from '@schichtplan/shared/redirect';
 import {
@@ -28,7 +29,6 @@ import {
   type DepartmentDirectoryItemDto,
   type StufeRole,
   type UserDto,
-  getOrganization,
   type OrganizationConfig,
 } from '@schichtplan/shared';
 import { afterLogin, cleanReturnTo, departmentSlugFromReturnTo, withReturnTo } from '@/lib/destination';
@@ -106,12 +106,8 @@ function destinationHost(returnTo: string | null): string | null {
 
 function LoginContent() {
   const searchParams = useSearchParams();
-  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrg(getOrganization(window.location.host));
-    }
-  }, []);
+  // Verband der Domain, vom Server-Layout bereitgestellt (richtig schon beim ersten Rendern)
+  const org = useOrganization();
 
   // Erst im Browser auswerten (braucht window.location): sonst rendert der Server ohne Ziel und
   // der Browser mit Ziel, und React meldet einen Hydration-Fehler

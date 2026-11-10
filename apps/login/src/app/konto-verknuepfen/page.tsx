@@ -3,8 +3,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Link2 } from 'lucide-react';
-import { Button, Callout, BrandLogo, Field, Input, ThemeToggle } from '@schichtplan/ui';
-import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
+import { Button, Callout, BrandLogo, Field, Input, ThemeToggle, useOrganization } from '@schichtplan/ui';
 import { cleanReturnTo, withReturnTo } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
@@ -15,12 +14,8 @@ import { AuthFooter } from '@/components/AuthFooter';
  */
 function LinkAccount() {
   const searchParams = useSearchParams();
-  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrg(getOrganization(window.location.host));
-    }
-  }, []);
+  // Verband der Domain, vom Server-Layout bereitgestellt (richtig schon beim ersten Rendern)
+  const org = useOrganization();
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [info, setInfo] = useState<{ email: string | null; name: string } | null>(null);
   const [missing, setMissing] = useState(false);

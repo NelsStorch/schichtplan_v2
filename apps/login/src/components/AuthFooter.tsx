@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+
 import { ArrowLeft } from 'lucide-react';
 import { PRIVACY_URL, helpUrl, statusUrl } from '@schichtplan/shared/redirect';
-import { getOrganization } from '@schichtplan/shared';
+import { useOrganization } from '@schichtplan/ui';
 
 export interface AuthFooterProps {
   returnTo?: string | null;
@@ -12,13 +12,7 @@ export interface AuthFooterProps {
 /** Fusszeile der Login-Unterseiten mit Status, Hilfe, Datenschutz und optionalem Zurück-Link */
 export function AuthFooter({ returnTo, landingHref = '/', showBackLink = false }: AuthFooterProps = {}) {
   const backTarget = returnTo ?? landingHref;
-  const [appName, setAppName] = useState('Cevi Schichtplan');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setAppName(getOrganization(window.location.host).name);
-    }
-  }, []);
+  const appName = useOrganization().name;
 
   return (
     <footer className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-fg-subtle sm:px-8">

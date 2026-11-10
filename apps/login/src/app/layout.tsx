@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { ThemeScript, UsageTracker } from '@schichtplan/ui';
+import { OrganizationProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
-import { getOrganization } from '@schichtplan/shared';
+import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { origin, host } = await getRequestOrigin();
@@ -31,18 +31,21 @@ export const viewport: Viewport = {
   themeColor: '#e11d48',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Verband schon auf dem Server aus dem Host bestimmen: Logo und Name stimmen ab dem ersten Rendern
+  const { host } = await getRequestOrigin();
+  const orgSlug = getOrganizationSlugFromHost(host);
   return (
     <html lang="de-CH" className={fontVariables} suppressHydrationWarning>
       <head>
         <ThemeScript />
       </head>
       <body className="min-h-[100dvh]">
-        {children}
+        <OrganizationProvider slug={orgSlug}>{children}</OrganizationProvider>
         <UsageTracker app="login" />
       </body>
     </html>

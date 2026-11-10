@@ -5,8 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { ArrowUpRight, Building2 } from 'lucide-react';
 import type { DepartmentCreationEligibilityDto, UserDto } from '@schichtplan/shared';
 import { getDepartmentUrl } from '@schichtplan/shared/redirect';
-import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
-import { Button, Callout, BrandLogo, Field, Input, ThemeToggle, buttonClasses } from '@schichtplan/ui';
+import { type OrganizationConfig } from '@schichtplan/shared';
+import { Button, Callout, BrandLogo, Field, Input, ThemeToggle, buttonClasses, useOrganization } from '@schichtplan/ui';
 import { cleanReturnTo, finalDestination, withReturnTo } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
@@ -34,12 +34,8 @@ function CreateDepartment() {
   const searchParams = useSearchParams();
   const returnTo = cleanReturnTo(searchParams.get('return_to'));
 
-  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrg(getOrganization(window.location.host));
-    }
-  }, []);
+  // Verband der Domain, vom Server-Layout bereitgestellt (richtig schon beim ersten Rendern)
+  const org = useOrganization();
 
   const [eligibility, setEligibility] = useState<DepartmentCreationEligibilityDto | null>(null);
   const [user, setUser] = useState<UserDto | null>(null);
@@ -60,13 +56,11 @@ function CreateDepartment() {
       const res = await fetch('/api/departments/creation-eligibility', { cache: 'no-store' });
       const data = (await res.json()) as DepartmentCreationEligibilityDto;
       setEligibility(data);
-      const currentOrg = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
-      setOrg(currentOrg);
-      const proposal = suggestedName(data, currentOrg);
+      const proposal = suggestedName(data, org);
       setName(proposal);
-      setSlug(slugify(data.ortsgruppeName ?? proposal.replace(new RegExp(`^${currentOrg.orgName}\\s+`, 'i'), '')));
+      setSlug(slugify(data.ortsgruppeName ?? proposal.replace(new RegExp(`^${org.orgName}\\s+`, 'i'), '')));
     })().catch(() => setError('Die Angaben konnten nicht geladen werden. Bitte lade die Seite neu.'));
-  }, []);
+  }, [org]);
 
   /** «Später»: weiter wie nach einem normalen Login */
   const later = () => {

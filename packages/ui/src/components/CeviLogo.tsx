@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../utils/cn';
-import { getOrganization } from '@schichtplan/shared';
+import { ORGANIZATIONS, getOrganization } from '@schichtplan/shared';
+import { useOrganizationSlug } from './OrganizationContext';
 
 const FALLBACK = '/images/cevi-logo.svg';
 const sizes = { sm: 'size-8', md: 'size-12', lg: 'size-16', xl: 'size-20' };
@@ -27,14 +28,17 @@ export function BrandLogo({
   alt?: string;
 }) {
   const ref = useRef<HTMLImageElement>(null);
-  const [fallback, setFallback] = useState(FALLBACK);
-  const [src, setSrc] = useState(logoUrl || FALLBACK);
+  // Mit OrganizationProvider kennt schon der Server das Verbands-Logo (kein Umschalten nach der Hydration)
+  const orgSlug = useOrganizationSlug();
+  const initialFallback = orgSlug ? ORGANIZATIONS[orgSlug].logoUrl : FALLBACK;
+  const [fallback, setFallback] = useState(initialFallback);
+  const [src, setSrc] = useState(logoUrl || initialFallback);
 
   useEffect(() => {
-    const defaultLogo = resolveDefaultLogo();
+    const defaultLogo = orgSlug ? ORGANIZATIONS[orgSlug].logoUrl : resolveDefaultLogo();
     setFallback(defaultLogo);
     setSrc(logoUrl || defaultLogo);
-  }, [logoUrl]);
+  }, [logoUrl, orgSlug]);
 
   // Ein Ladefehler vor der Hydration löst onError nie aus: deshalb nach dem Mount nachprüfen.
   useEffect(() => {

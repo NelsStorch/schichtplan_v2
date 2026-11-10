@@ -3,20 +3,15 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { KeyRound, Mail } from 'lucide-react';
-import { Button, Callout, Field, Input } from '@schichtplan/ui';
-import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
+import { Button, Callout, Field, Input, useOrganization } from '@schichtplan/ui';
 import { AuthShell } from '@/components/AuthShell';
 import { cleanReturnTo, withReturnTo } from '@/lib/destination';
 
 /** «Passwort vergessen»: E-Mail eingeben, der Link kommt per Mail (gleiche Antwort, ob es das Konto gibt oder nicht). */
 function ForgotPassword() {
   const searchParams = useSearchParams();
-  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrg(getOrganization(window.location.host));
-    }
-  }, []);
+  // Verband der Domain, vom Server-Layout bereitgestellt (richtig schon beim ersten Rendern)
+  const org = useOrganization();
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);

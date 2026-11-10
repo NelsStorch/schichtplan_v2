@@ -1,6 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { BrandLogo, ThemeToggle, cn } from '@schichtplan/ui';
-import { getOrganization } from '@schichtplan/shared';
+import { type ReactNode } from 'react';
+import { BrandLogo, ThemeToggle, cn, useOrganization } from '@schichtplan/ui';
 import { AuthFooter, type AuthFooterProps } from './AuthFooter';
 
 export interface AuthShellProps extends AuthFooterProps {
@@ -16,13 +15,7 @@ export function AuthShell({
   showBackLink,
   contentClassName,
 }: AuthShellProps) {
-  const [appName, setAppName] = useState('Cevi Schichtplan');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setAppName(getOrganization(window.location.host).name);
-    }
-  }, []);
+  const appName = useOrganization().name;
 
   return (
     <div className="grain flex min-h-[100dvh] flex-col">

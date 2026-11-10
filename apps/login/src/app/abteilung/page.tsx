@@ -4,8 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Check, Database, Search, UsersRound } from 'lucide-react';
 import type { DepartmentDirectoryItemDto, StufeRole, UserDto } from '@schichtplan/shared';
-import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
-import { Button, Callout, BrandLogo, Input, ThemeToggle, cn } from '@schichtplan/ui';
+import { Button, Callout, BrandLogo, Input, ThemeToggle, cn, useOrganization } from '@schichtplan/ui';
 import { cleanReturnTo, finalDestination } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
@@ -21,12 +20,8 @@ function DepartmentSetup() {
   const searchParams = useSearchParams();
   const returnTo = cleanReturnTo(searchParams.get('return_to'));
 
-  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrg(getOrganization(window.location.host));
-    }
-  }, []);
+  // Verband der Domain, vom Server-Layout bereitgestellt (richtig schon beim ersten Rendern)
+  const org = useOrganization();
 
   const [user, setUser] = useState<UserDto | null>(null);
   const [departments, setDepartments] = useState<DepartmentDirectoryItemDto[] | null>(null);
