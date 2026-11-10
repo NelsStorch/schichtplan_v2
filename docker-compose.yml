@@ -65,7 +65,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_prod_proxy"
       # API Endpunkte haben Vorrang auf allen Domains, Login und Subdomains (status.* hat eigene Uptime-Kuma-API)
-      - "traefik.http.routers.schichtplan-api.rule=(Host(`${DOMAIN:-cevi-schichtplan.ch}`) || Host(`www.${DOMAIN:-cevi-schichtplan.ch}`) || Host(`login.${DOMAIN:-cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`)) && !Host(`status.${DOMAIN:-cevi-schichtplan.ch}`) && !Host(`dev.${DOMAIN:-cevi-schichtplan.ch}`) && (PathPrefix(`/api`) || Path(`/health`))"
+      - "traefik.http.routers.schichtplan-api.rule=(Host(`cevi-schichtplan.ch`) || Host(`pfadi-schichtplan.ch`) || Host(`jubla-schichtplan.ch`) || Host(`vereins-schichtplan.ch`) || Host(`www.cevi-schichtplan.ch`) || Host(`www.pfadi-schichtplan.ch`) || Host(`www.jubla-schichtplan.ch`) || Host(`www.vereins-schichtplan.ch`) || Host(`login.cevi-schichtplan.ch`) || Host(`login.pfadi-schichtplan.ch`) || Host(`login.jubla-schichtplan.ch`) || Host(`login.vereins-schichtplan.ch`) || Host(`admin.cevi-schichtplan.ch`) || HostRegexp(`^[a-z0-9-]+[.](cevi-schichtplan[.]ch|pfadi-schichtplan[.]ch|jubla-schichtplan[.]ch|vereins-schichtplan[.]ch)$$`)) && !Host(`status.cevi-schichtplan.ch`) && !Host(`dev.cevi-schichtplan.ch`) && !Host(`dev.pfadi-schichtplan.ch`) && !Host(`dev.jubla-schichtplan.ch`) && !Host(`dev.vereins-schichtplan.ch`) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-api.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-api.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-api.priority=100"
@@ -93,15 +93,21 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_prod_proxy"
-      # Dynamische Abteilungs-Subdomains (<abteilung>.cevi-schichtplan.ch)
+      # Dynamische Abteilungs-Subdomains (<abteilung>.cevi-schichtplan.ch, pfadi, jubla, vereine)
       # Ohne dev.: sonst übernimmt Prod die Dev-Adresse, solange die Dev-Container nicht laufen (z. B. beim Neustart)
-      - "traefik.http.routers.schichtplan-web.rule=HostRegexp(`^[a-z0-9-]+[.]${DOMAIN:-cevi-schichtplan.ch}$$`) && !Host(`dev.${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-web.rule=HostRegexp(`^[a-z0-9-]+[.](cevi-schichtplan[.]ch|pfadi-schichtplan[.]ch|jubla-schichtplan[.]ch|vereins-schichtplan[.]ch)$$`) && !Host(`dev.cevi-schichtplan.ch`) && !Host(`dev.pfadi-schichtplan.ch`) && !Host(`dev.jubla-schichtplan.ch`) && !Host(`dev.vereins-schichtplan.ch`)"
       - "traefik.http.routers.schichtplan-web.entrypoints=websecure"
       # Traefik leitet aus HostRegexp keine Zertifikats-Domains ab, deshalb explizit ein Wildcard-Zertifikat.
       # Wildcards gibt es nur via DNS-01: dnsresolver im zentralen Traefik (Infomaniak-API-Token).
       - "traefik.http.routers.schichtplan-web.tls.certresolver=dnsresolver"
-      - "traefik.http.routers.schichtplan-web.tls.domains[0].main=${DOMAIN:-cevi-schichtplan.ch}"
-      - "traefik.http.routers.schichtplan-web.tls.domains[0].sans=*.${DOMAIN:-cevi-schichtplan.ch}"
+      - "traefik.http.routers.schichtplan-web.tls.domains[0].main=cevi-schichtplan.ch"
+      - "traefik.http.routers.schichtplan-web.tls.domains[0].sans=*.cevi-schichtplan.ch"
+      - "traefik.http.routers.schichtplan-web.tls.domains[1].main=pfadi-schichtplan.ch"
+      - "traefik.http.routers.schichtplan-web.tls.domains[1].sans=*.pfadi-schichtplan.ch"
+      - "traefik.http.routers.schichtplan-web.tls.domains[2].main=jubla-schichtplan.ch"
+      - "traefik.http.routers.schichtplan-web.tls.domains[2].sans=*.jubla-schichtplan.ch"
+      - "traefik.http.routers.schichtplan-web.tls.domains[3].main=vereins-schichtplan.ch"
+      - "traefik.http.routers.schichtplan-web.tls.domains[3].sans=*.vereins-schichtplan.ch"
       - "traefik.http.routers.schichtplan-web.priority=10"
       - "traefik.http.routers.schichtplan-web.service=schichtplan-web"
       - "traefik.http.services.schichtplan-web.loadbalancer.server.port=3000"
@@ -130,7 +136,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_prod_proxy"
       # Hauptdomain (Marketing & Abteilungsauswahl)
-      - "traefik.http.routers.schichtplan-landing.rule=Host(`${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-landing.rule=Host(`cevi-schichtplan.ch`) || Host(`pfadi-schichtplan.ch`) || Host(`jubla-schichtplan.ch`) || Host(`vereins-schichtplan.ch`)"
       - "traefik.http.routers.schichtplan-landing.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-landing.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-landing.priority=20"
@@ -139,7 +145,7 @@ services:
       - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.schichtplan-landing.loadbalancer.healthcheck.interval=3s"
       # www leitet dauerhaft (301) auf die Hauptdomain um, damit es keine doppelte Seite gibt (SEO)
-      - "traefik.http.routers.schichtplan-landing-www.rule=Host(`www.${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-landing-www.rule=Host(`www.cevi-schichtplan.ch`) || Host(`www.pfadi-schichtplan.ch`) || Host(`www.jubla-schichtplan.ch`) || Host(`www.vereins-schichtplan.ch`)"
       - "traefik.http.routers.schichtplan-landing-www.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-landing-www.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-landing-www.priority=20"
@@ -167,7 +173,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_prod_proxy"
       # Zentrales Login-Portal (Single Sign-On für alle Abteilungen)
-      - "traefik.http.routers.schichtplan-login.rule=Host(`login.${DOMAIN:-cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-login.rule=Host(`login.cevi-schichtplan.ch`) || Host(`login.pfadi-schichtplan.ch`) || Host(`login.jubla-schichtplan.ch`) || Host(`login.vereins-schichtplan.ch`)"
       - "traefik.http.routers.schichtplan-login.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-login.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-login.priority=30"
@@ -216,8 +222,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_prod_proxy"
-      # Hilfe-Center (hilfe.cevi-schichtplan.ch), schlägt den Abteilungs-Wildcard (Priorität 10)
-      - "traefik.http.routers.schichtplan-hilfe.rule=Host(`hilfe.${DOMAIN:-cevi-schichtplan.ch}`)"
+      # Hilfe-Center (hilfe.cevi-schichtplan.ch, pfadi, jubla, verein), schlägt den Abteilungs-Wildcard (Priorität 10)
+      - "traefik.http.routers.schichtplan-hilfe.rule=Host(`hilfe.cevi-schichtplan.ch`) || Host(`hilfe.pfadi-schichtplan.ch`) || Host(`hilfe.jubla-schichtplan.ch`) || Host(`hilfe.vereins-schichtplan.ch`)"
       - "traefik.http.routers.schichtplan-hilfe.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-hilfe.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-hilfe.priority=30"
