@@ -119,12 +119,15 @@ export function helpUrl(path = '/'): string {
 }
 
 /**
- * Link zum Status-Portal (Uptime Kuma). Wie Hilfe und Datenschutz fest auf Produktion.
+ * Link zum Status-Portal (Uptime Kuma). Unterstützt dynamisch die Verbands-Domain (z. B. status.vereins-schichtplan.ch).
  */
 export const STATUS_URL = 'https://status.cevi-schichtplan.ch';
 
-export function statusUrl(path = '/'): string {
-  return `${STATUS_URL}${path}`;
+export function statusUrl(path = '/', host?: string): string {
+  const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
+  const root = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
+  const cleanPath = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
+  return `https://status.${root}${cleanPath}`;
 }
 
 /** Datenschutzerklärung auf der Landingpage, wie die Hilfe fest auf Produktion (gilt für alle Subdomains) */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getOrganizationSlugFromHost } from '@schichtplan/shared';
+import { getOrganizationSlugFromHost, statusUrl } from '@schichtplan/shared';
 import { getCeviDbRedirectUri, getLoginPortalBaseUrl, loginErrorUrl, loginPageUrl, rootDomain } from './authSession.js';
 
 describe('Adressen nur aus der Konfiguration', () => {
@@ -92,5 +92,13 @@ describe('Verband aus dem Host', () => {
     expect(getOrganizationSlugFromHost('https://login.jubla-schichtplan.ch/abteilung')).toBe('jubla');
     expect(getOrganizationSlugFromHost('PFADI')).toBe('pfadi');
     expect(getOrganizationSlugFromHost('backend:4000')).toBe('cevi');
+  });
+
+  it('statusUrl generiert domain-spezifische Status-Links', () => {
+    expect(statusUrl('/', 'dev.vereins-schichtplan.ch')).toBe('https://status.vereins-schichtplan.ch');
+    expect(statusUrl('/', 'pfadi-schichtplan.ch')).toBe('https://status.pfadi-schichtplan.ch');
+    expect(statusUrl('/', 'jubla-schichtplan.ch')).toBe('https://status.jubla-schichtplan.ch');
+    expect(statusUrl('/', 'cevi-schichtplan.ch')).toBe('https://status.cevi-schichtplan.ch');
+    expect(statusUrl()).toBe('https://status.cevi-schichtplan.ch');
   });
 });
