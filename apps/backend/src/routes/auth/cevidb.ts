@@ -59,16 +59,17 @@ function getHitobitoConfigFor(orgSlugOrHost?: string | null): HitobitoProviderCo
     return {
       type: 'PFADI',
       baseUrl: process.env.MIDATA_BASE_URL || 'https://midata.scouts.ch',
-      clientId: process.env.MIDATA_CLIENT_ID || process.env.CEVIDB_CLIENT_ID || '',
-      clientSecret: process.env.MIDATA_CLIENT_SECRET || process.env.CEVIDB_CLIENT_SECRET || '',
+      // Kein Rückfall auf die Cevi.DB-Zugangsdaten: sonst ginge das Cevi-Secret an eine fremde Hitobito-Instanz
+      clientId: process.env.MIDATA_CLIENT_ID || '',
+      clientSecret: process.env.MIDATA_CLIENT_SECRET || '',
     };
   }
   if (orgSlug === 'jubla') {
     return {
       type: 'JUBLA',
       baseUrl: process.env.JUBLADB_BASE_URL || 'https://db.jubla.ch',
-      clientId: process.env.JUBLADB_CLIENT_ID || process.env.CEVIDB_CLIENT_ID || '',
-      clientSecret: process.env.JUBLADB_CLIENT_SECRET || process.env.CEVIDB_CLIENT_SECRET || '',
+      clientId: process.env.JUBLADB_CLIENT_ID || '',
+      clientSecret: process.env.JUBLADB_CLIENT_SECRET || '',
     };
   }
   return {
@@ -78,6 +79,9 @@ function getHitobitoConfigFor(orgSlugOrHost?: string | null): HitobitoProviderCo
     clientSecret: process.env.CEVIDB_CLIENT_SECRET || '',
   };
 }
+
+/** Verbände mit Hitobito-Login (Vereine melden sich mit E-Mail und Passwort an) */
+const HITOBITO_PROVIDERS: readonly unknown[] = ['CEVI', 'PFADI', 'JUBLA'];
 
 /** Anmeldung über Cevi.DB (OAuth), inkl. Verknüpfen mit einem bestehenden Passwort-Konto */
 const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
@@ -169,8 +173,8 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
         if (state) {
           const parsedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
           returnTo = parsedState.returnTo ? cleanReturnTo(parsedState.returnTo, '/', request.hostname) : null;
-          tenantSlug = parsedState.tenantSlug || null;
-          if (parsedState.provider) providerType = parsedState.provider;
+          tenantSlug = typeof parsedState.tenantSlug === 'string' ? parsedState.tenantSlug : null;
+          if (HITOBITO_PROVIDERS.includes(parsedState.provider)) providerType = parsedState.provider;
         }
       } catch (err) {
         // Fallback default
@@ -188,6 +192,12 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
       if (!code || !state || state !== request.cookies.cevidb_oauth_state) {
         fastify.log.warn('Hitobito Callback ohne gültigen Code oder state');
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
+      }
+
+      // Ohne eigene Zugangsdaten des Verbands nichts an dessen Hitobito schicken
+      if (!providerConfig.clientId || !providerConfig.clientSecret) {
+        fastify.log.error(`${providerConfig.type} OAuth ist nicht konfiguriert (CLIENT_ID/SECRET fehlt)`);
+        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, request.hostname));
       }
 
       let profile: any;

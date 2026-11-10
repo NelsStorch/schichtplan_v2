@@ -18,6 +18,8 @@ export function middleware(request: NextRequest) {
       ? hostParts[0]
       : (process.env.DEV_TENANT_SLUG ?? 'demo');
   headers.set('x-tenant-slug', slug);
+  // Verband für lokale Tests umschaltbar (cevi, pfadi, jubla, verein), Vorgabe Cevi
+  headers.set('x-tenant-org', process.env.DEV_TENANT_ORG ?? 'cevi');
 
   return NextResponse.rewrite(target, { request: { headers } });
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getCeviDbRedirectUri, getLoginPortalBaseUrl, loginErrorUrl, loginPageUrl } from './authSession.js';
+import { getOrganizationSlugFromHost } from '@schichtplan/shared';
+import { getCeviDbRedirectUri, getLoginPortalBaseUrl, loginErrorUrl, loginPageUrl, rootDomain } from './authSession.js';
 
 describe('Adressen nur aus der Konfiguration', () => {
   it('Login-Portal in Produktion aus COOKIE_DOMAIN bzw. DOMAIN', () => {
@@ -66,5 +67,30 @@ describe('Adressen nur aus der Konfiguration', () => {
     expect(loginPageUrl('/abteilung', 'https://dev.vereins-schichtplan.ch/ok', 'dev.vereins-schichtplan.ch')).toBe(
       'https://login.dev.vereins-schichtplan.ch/abteilung?return_to=' + encodeURIComponent('https://dev.vereins-schichtplan.ch/ok')
     );
+  });
+});
+
+describe('Host-Header nur für eigene Domains', () => {
+  const prod = { NODE_ENV: 'production', COOKIE_DOMAIN: '.cevi-schichtplan.ch' };
+  it('ignoriert fremde Hosts in Mail-Links (kein Passwort-Reset-Poisoning)', () => {
+    expect(getLoginPortalBaseUrl(prod, 'login.angreifer.example')).toBe('https://login.cevi-schichtplan.ch');
+    expect(getLoginPortalBaseUrl(prod, 'cevi-schichtplan.ch.angreifer.example')).toBe('https://login.cevi-schichtplan.ch');
+    expect(getLoginPortalBaseUrl(prod, 'backend:4000')).toBe('https://login.cevi-schichtplan.ch');
+    expect(rootDomain('evil.example', prod)).toBe('cevi-schichtplan.ch');
+  });
+  it('übernimmt die Verbands-Domains', () => {
+    expect(rootDomain('illnau.pfadi-schichtplan.ch', prod)).toBe('pfadi-schichtplan.ch');
+    expect(rootDomain('login.dev.jubla-schichtplan.ch', prod)).toBe('dev.jubla-schichtplan.ch');
+  });
+});
+
+describe('Verband aus dem Host', () => {
+  it('erkennt den Verband nur am Domain-Ende', () => {
+    expect(getOrganizationSlugFromHost('pfadi-schichtplan-fans.vereins-schichtplan.ch')).toBe('verein');
+    expect(getOrganizationSlugFromHost('jubla-schichtplan.cevi-schichtplan.ch')).toBe('cevi');
+    expect(getOrganizationSlugFromHost('illnau.dev.pfadi-schichtplan.ch:443')).toBe('pfadi');
+    expect(getOrganizationSlugFromHost('https://login.jubla-schichtplan.ch/abteilung')).toBe('jubla');
+    expect(getOrganizationSlugFromHost('PFADI')).toBe('pfadi');
+    expect(getOrganizationSlugFromHost('backend:4000')).toBe('cevi');
   });
 });

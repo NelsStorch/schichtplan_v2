@@ -43,17 +43,24 @@ describe('email service', () => {
       const pfadi = getSmtpConfig('PFADI');
       expect(pfadi.user).toBe('admin@pfadi-schichtplan.ch');
       expect(pfadi.from).toBe('Pfadi Schichtplan <admin@pfadi-schichtplan.ch>');
-      expect(pfadi.pass).toBe('RP5U!asb-78-g8E+');
 
       const jubla = getSmtpConfig('JUBLA');
       expect(jubla.user).toBe('admin@jubla-schichtplan.ch');
       expect(jubla.from).toBe('Jubla Schichtplan <admin@jubla-schichtplan.ch>');
-      expect(jubla.pass).toBe('k5+z%*Z+R6UIa*34');
 
       const verein = getSmtpConfig('OTHER');
       expect(verein.user).toBe('admin@vereins-schichtplan.ch');
       expect(verein.from).toBe('Vereins Schichtplan <admin@vereins-schichtplan.ch>');
-      expect(verein.pass).toBe('zHrHId+89-&+vD%1');
+    });
+
+    it('enthält ohne Umgebung keine Passwörter (nie Secrets im Code)', () => {
+      vi.stubEnv('SMTP_PASSWORD_PFADI', '');
+      vi.stubEnv('SMTP_PASSWORD_JUBLA', '');
+      vi.stubEnv('SMTP_PASSWORD_VEREIN', '');
+      expect(getSmtpConfig('PFADI').pass).toBe('');
+      expect(getSmtpConfig('JUBLA').pass).toBe('');
+      expect(getSmtpConfig('OTHER').pass).toBe('');
+      vi.unstubAllEnvs();
     });
   });
 
@@ -215,6 +222,9 @@ describe('email service', () => {
 
   describe('sendVerificationEmail & sendPasswordResetEmail', () => {
     it('funktioniert mit optionalem organization-Parameter und ruft den passenden Transporter auf', async () => {
+      // Platzhalter statt echter Zugangsdaten: Passwörter kommen nur aus der Server-.env
+      vi.stubEnv('SMTP_PASSWORD_PFADI', 'test-placeholder');
+      vi.stubEnv('SMTP_PASSWORD_VEREIN', 'test-placeholder');
       const pfadiTransporter = getMailTransporter('PFADI');
       const pfadiSpy = vi.spyOn(pfadiTransporter, 'sendMail').mockResolvedValueOnce({ messageId: 'pfadi-msg-1' } as any);
 
@@ -244,6 +254,7 @@ describe('email service', () => {
       expect(vereinCallArgs.from).toBe('Vereins Schichtplan <admin@vereins-schichtplan.ch>');
       expect(vereinCallArgs.subject).toContain('Passwort zurücksetzen – Vereins Schichtplan');
       expect(vereinCallArgs.text).toContain('Vereins Schichtplan');
+      vi.unstubAllEnvs();
     });
   });
 });

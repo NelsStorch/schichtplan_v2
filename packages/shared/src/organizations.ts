@@ -100,12 +100,26 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
  */
 export function getOrganizationSlugFromHost(hostnameOrSlug?: string | null): OrganizationSlug {
   if (!hostnameOrSlug) return 'cevi';
-  const clean = hostnameOrSlug.toLowerCase().trim().split(':')[0];
+  let clean = hostnameOrSlug.toLowerCase().trim();
+  // Ganze URLs (z. B. return_to) auf den Hostnamen reduzieren
+  if (clean.includes('://')) {
+    try {
+      clean = new URL(clean).hostname;
+    } catch {
+      return 'cevi';
+    }
+  }
+  clean = clean.split(',')[0].trim().split(':')[0].replace(/\.$/, '');
 
-  if (clean === 'pfadi' || clean.includes('pfadi-schichtplan')) return 'pfadi';
-  if (clean === 'jubla' || clean.includes('jubla-schichtplan')) return 'jubla';
-  if (clean === 'verein' || clean === 'other' || clean.includes('vereins-schichtplan')) return 'verein';
-  if (clean === 'cevi' || clean.includes('cevi-schichtplan')) return 'cevi';
+  if (clean === 'pfadi') return 'pfadi';
+  if (clean === 'jubla') return 'jubla';
+  if (clean === 'verein' || clean === 'other') return 'verein';
+  if (clean === 'cevi') return 'cevi';
+
+  // Nur über das Domain-Ende: «pfadi-schichtplan-fans.vereins-schichtplan.ch» ist ein Verein, keine Pfadi
+  for (const org of Object.values(ORGANIZATIONS)) {
+    if (clean === org.domain || clean.endsWith(`.${org.domain}`)) return org.slug;
+  }
 
   return 'cevi';
 }

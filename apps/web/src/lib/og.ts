@@ -33,7 +33,8 @@ export async function getDepartmentPreview(): Promise<DepartmentPreview | null> 
   if (!slug) return null;
   try {
     const res = await fetch(new URL('/api/departments/current', backend), {
-      headers: { 'x-tenant-slug': slug },
+      // Verband mitschicken: intern ist der Host «backend», sonst gälte immer Cevi
+      headers: { 'x-tenant-slug': slug, 'x-tenant-org': host },
       cache: 'no-store',
       signal: AbortSignal.timeout(3000),
     });

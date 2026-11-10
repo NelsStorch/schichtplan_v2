@@ -10,7 +10,10 @@ export function middleware(request: NextRequest) {
   if (process.env.NODE_ENV !== 'development' || !backend) return NextResponse.next();
 
   const target = new URL(request.nextUrl.pathname + request.nextUrl.search, backend);
-  return NextResponse.rewrite(target);
+  // Verband für lokale Tests umschaltbar (cevi, pfadi, jubla, verein), Vorgabe Cevi
+  const headers = new Headers(request.headers);
+  headers.set('x-tenant-org', process.env.DEV_TENANT_ORG ?? 'cevi');
+  return NextResponse.rewrite(target, { request: { headers } });
 }
 
 export const config = {

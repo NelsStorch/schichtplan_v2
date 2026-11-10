@@ -75,12 +75,24 @@ export const NOT_ELIGIBLE_MESSAGES = {
   NO_ORTSGRUPPE: 'In Cevi.DB ist für dich keine Ortsgruppe hinterlegt.',
   EXISTS: 'Für deine Abteilung gibt es bereits einen Schichtplan.',
   UNVERIFIED: 'Wir konnten deine Gruppe in Cevi.DB gerade nicht prüfen. Melde dich bitte nochmals mit Cevi.DB an.',
+  LIMIT: 'Du leitest bereits 3 Vereine. Für einen weiteren Verein melde dich bitte beim Support.',
 } as const;
+
+/** Höchstens so viele Vereine darf eine Person selbst anlegen bzw. leiten (gegen Spam und Subdomain-Squatting) */
+export const MAX_VEREINE_PER_USER = 3;
+
+/** Vereine, in denen die Person Leitung ist (zählt fürs Limit) */
+export function countLedVereine(prisma: Pick<PrismaClient, 'departmentMember'>, userId: string) {
+  return prisma.departmentMember.count({
+    where: { userId, role: 'ADMIN', department: { organization: 'OTHER' } },
+  });
+}
 
 /**
  * Darf die Person für ihre Gruppe eine Abteilung anlegen? Es zählt die Gruppe der Leitungsrolle, nicht das selbst
  * änderbare Feld `ortsgruppe_id`. Die Abteilung hängt an der Ortsgruppe, bei mehreren Jungscharen an der Jungschar.
- * Für Vereine (organization === 'OTHER'): Authentifizierung mit E-Mail/Passwort berechtigt zur Erstellung.
+ * Für Vereine (organization === 'OTHER'): bestätigte E-Mail-Adresse und höchstens MAX_VEREINE_PER_USER Vereine.
+ * Für Hitobito-Verbände muss das Konto vom selben Verband stammen wie die Domain (keine Cevi-Gruppe auf pfadi-…).
  */
 export async function departmentCreationEligibility(
   prisma: PrismaClient,
@@ -117,10 +129,12 @@ export async function departmentCreationEligibility(
   if (!user) return denied('NOT_CEVIDB');
 
   // Für Vereine (vereins-schichtplan.ch bzw. organization === 'OTHER'):
-  // Kein Hitobito-SSO; Benutzer mit E-Mail/Passwort dürfen einen Verein mit freiem Namen/Slug anlegen.
-  if (organization === 'OTHER' || user.provider === 'OTHER') {
-    const hasAccount = Boolean(user.passwordHash || user.emailVerified || user.providerId !== null);
-    if (!hasAccount) return denied('NOT_CEVIDB');
+  // Kein Hitobito-SSO; Konten mit bestätigter E-Mail dürfen einen Verein mit freiem Namen/Slug anlegen.
+  if (organization === 'OTHER') {
+    if (!user.emailVerified || !user.email) return denied('NOT_CEVIDB');
+    if ((await countLedVereine(prisma, userId)) >= MAX_VEREINE_PER_USER) {
+      return denied('LIMIT', { provider: 'OTHER' });
+    }
     return {
       eligible: true,
       reason: null,
@@ -133,7 +147,8 @@ export async function departmentCreationEligibility(
   }
 
   // Hitobito-Organisationen (Cevi, Pfadi, Jubla):
-  if (user.providerId === null) return denied('NOT_CEVIDB');
+  // Das Konto muss vom Verband der Domain stammen: Gruppen-IDs der Hitobito-Instanzen überschneiden sich
+  if (user.providerId === null || user.provider !== organization) return denied('NOT_CEVIDB');
   const provider = user.provider;
 
   const leaderGroupName = user.leaderGroupName;

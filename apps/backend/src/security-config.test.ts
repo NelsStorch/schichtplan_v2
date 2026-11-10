@@ -33,6 +33,15 @@ describe('isAllowedOrigin', () => {
     expect(isAllowedOrigin('null', root, false)).toBe(false);
   });
 
+  it('erlaubt die anderen Verbands-Domains nur in derselben Umgebung', () => {
+    expect(isAllowedOrigin('https://illnau.pfadi-schichtplan.ch', root, false)).toBe(true);
+    expect(isAllowedOrigin('https://login.vereins-schichtplan.ch', root, false)).toBe(true);
+    const dev = 'dev.cevi-schichtplan.ch';
+    expect(isAllowedOrigin('https://illnau.dev.pfadi-schichtplan.ch', dev, false)).toBe(true);
+    expect(isAllowedOrigin('https://illnau.pfadi-schichtplan.ch', dev, false)).toBe(false);
+    expect(isAllowedOrigin('https://cevi-schichtplan.ch', dev, false)).toBe(false);
+  });
+
   it('erlaubt localhost nur lokal', () => {
     expect(isAllowedOrigin('http://illnau.localhost:3000', root, true)).toBe(true);
     expect(isAllowedOrigin('http://localhost:3002', root, false)).toBe(false);

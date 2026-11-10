@@ -9,6 +9,7 @@ import {
   sendPushToUser,
 } from '../services/webPush.js';
 import { createRateLimiter } from '../services/rateLimit.js';
+import { getCookieDomain } from '../services/authSession.js';
 
 // Max 5 test notifications per user within 5 minutes
 const testPushLimiter = createRateLimiter(5 * 60 * 1000, 5);
@@ -16,19 +17,9 @@ const testPushLimiter = createRateLimiter(5 * 60 * 1000, 5);
 const PUSH_DEVICE_COOKIE =
   process.env.COOKIE_NAME === 'token_dev' ? 'push_sub_dev' : 'push_sub_id';
 
-function getCookieDomain(): string | undefined {
-  if (process.env.COOKIE_DOMAIN) {
-    return process.env.COOKIE_DOMAIN;
-  }
-  if (process.env.NODE_ENV === 'production') {
-    const domain = process.env.DOMAIN || 'cevi-schichtplan.ch';
-    return `.${domain}`;
-  }
-  return undefined;
-}
-
 function setPushDeviceCookie(reply: FastifyReply, subscriptionId: string) {
-  const domain = getCookieDomain();
+  // Wie das Login-Cookie: Domain der Anfrage (cevi-/pfadi-/jubla-/vereins-schichtplan.ch)
+  const domain = getCookieDomain(reply.request?.hostname);
   reply.setCookie(PUSH_DEVICE_COOKIE, subscriptionId, {
     path: '/',
     domain,
@@ -40,7 +31,7 @@ function setPushDeviceCookie(reply: FastifyReply, subscriptionId: string) {
 }
 
 function clearPushDeviceCookie(reply: FastifyReply) {
-  const domain = getCookieDomain();
+  const domain = getCookieDomain(reply.request?.hostname);
   reply.clearCookie(PUSH_DEVICE_COOKIE, {
     path: '/',
     domain,

@@ -32,7 +32,7 @@ export function normalizeOrganizationType(org?: string | null): OrganizationType
 
 /**
  * Liefert die SMTP-Kontodaten für die jeweilige Organisation.
- * Unterstützt Umgebungsvariablen-Overrides sowie die hinterlegten Zugangsdaten.
+ * Passwörter kommen ausschliesslich aus der Umgebung (Server-.env), nie aus dem Code.
  */
 export function getSmtpConfig(orgType: OrganizationType): SmtpAccountConfig {
   switch (orgType) {
@@ -42,7 +42,7 @@ export function getSmtpConfig(orgType: OrganizationType): SmtpAccountConfig {
         port: Number(process.env.SMTP_PORT_PFADI || defaultPort),
         secure: process.env.SMTP_PORT_PFADI ? Number(process.env.SMTP_PORT_PFADI) === 465 : defaultSecure,
         user: process.env.SMTP_USER_PFADI || 'admin@pfadi-schichtplan.ch',
-        pass: process.env.SMTP_PASSWORD_PFADI || 'RP5U!asb-78-g8E+',
+        pass: process.env.SMTP_PASSWORD_PFADI || '',
         from: process.env.SMTP_FROM_PFADI || 'Pfadi Schichtplan <admin@pfadi-schichtplan.ch>',
       };
     case 'JUBLA':
@@ -51,7 +51,7 @@ export function getSmtpConfig(orgType: OrganizationType): SmtpAccountConfig {
         port: Number(process.env.SMTP_PORT_JUBLA || defaultPort),
         secure: process.env.SMTP_PORT_JUBLA ? Number(process.env.SMTP_PORT_JUBLA) === 465 : defaultSecure,
         user: process.env.SMTP_USER_JUBLA || 'admin@jubla-schichtplan.ch',
-        pass: process.env.SMTP_PASSWORD_JUBLA || 'k5+z%*Z+R6UIa*34',
+        pass: process.env.SMTP_PASSWORD_JUBLA || '',
         from: process.env.SMTP_FROM_JUBLA || 'Jubla Schichtplan <admin@jubla-schichtplan.ch>',
       };
     case 'OTHER':
@@ -60,7 +60,7 @@ export function getSmtpConfig(orgType: OrganizationType): SmtpAccountConfig {
         port: Number(process.env.SMTP_PORT_VEREIN || defaultPort),
         secure: process.env.SMTP_PORT_VEREIN ? Number(process.env.SMTP_PORT_VEREIN) === 465 : defaultSecure,
         user: process.env.SMTP_USER_VEREIN || 'admin@vereins-schichtplan.ch',
-        pass: process.env.SMTP_PASSWORD_VEREIN || 'zHrHId+89-&+vD%1',
+        pass: process.env.SMTP_PASSWORD_VEREIN || '',
         from: process.env.SMTP_FROM_VEREIN || 'Vereins Schichtplan <admin@vereins-schichtplan.ch>',
       };
     case 'CEVI':

@@ -169,8 +169,11 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
     const input = request.body as z.output<typeof AdminCreateDepartmentSchema>;
     const { name, slug, membersOnly, leaderUserId } = input;
-    const hitobitoGroupId = input.ceviDbGroupId ?? (input as any).hitobitoGroupId;
-    const organization = (input.organization as any) || 'CEVI';
+    const hitobitoGroupId = input.ceviDbGroupId ?? input.hitobitoGroupId;
+    const organization = input.organization ?? 'CEVI';
+    if (organization === 'OTHER' && hitobitoGroupId) {
+      return reply.status(400).send({ error: 'Ein Verein hat keine Hitobito-Gruppe.' });
+    }
 
     if (hitobitoGroupId) {
       const existingWithGroup = await fastify.prisma.department.findUnique({
@@ -247,13 +250,27 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
     const input = request.body as z.output<typeof AdminUpdateDepartmentSchema>;
     const data = input;
-    const targetHitobitoGroupId = data.ceviDbGroupId !== undefined ? data.ceviDbGroupId : (data as any).hitobitoGroupId;
+    let targetHitobitoGroupId: number | null | undefined =
+      data.ceviDbGroupId !== undefined ? data.ceviDbGroupId : data.hitobitoGroupId;
 
     const existing = await fastify.prisma.department.findUnique({
       where: { id: request.params.id },
       select: { id: true, name: true, slug: true, organization: true, hitobitoGroupId: true, membersOnly: true },
     }).catch(() => null);
     if (!existing) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
+
+    // Verband nach der Änderung: Gruppen-IDs gelten nur innerhalb ihrer Hitobito-Instanz
+    const targetOrganization = data.organization ?? existing.organization;
+    const organizationChanged = targetOrganization !== existing.organization;
+    if (targetOrganization === 'OTHER') {
+      if (targetHitobitoGroupId) {
+        return reply.status(400).send({ error: 'Ein Verein hat keine Hitobito-Gruppe.' });
+      }
+      if (existing.hitobitoGroupId !== null) targetHitobitoGroupId = null;
+    } else if (organizationChanged && targetHitobitoGroupId === undefined) {
+      // Die alte Gruppe gehört zum bisherigen Verband und passt nicht mehr
+      targetHitobitoGroupId = null;
+    }
 
     if (data.contactUserId) {
       const candidate = await fastify.prisma.departmentMember.findFirst({
@@ -268,11 +285,11 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Vor dem Speichern prüfen (danach fände sich die Abteilung selbst) und nur bei anderen Abteilungen
-    if (targetHitobitoGroupId && targetHitobitoGroupId !== existing.hitobitoGroupId) {
+    if (targetHitobitoGroupId && (organizationChanged || targetHitobitoGroupId !== existing.hitobitoGroupId)) {
       const existingWithGroup = await fastify.prisma.department.findUnique({
         where: {
           organization_hitobitoGroupId: {
-            organization: existing.organization,
+            organization: targetOrganization,
             hitobitoGroupId: targetHitobitoGroupId,
           },
         },
@@ -286,7 +303,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     try {
-      await fastify.prisma.department.update({
+      await fastify.prisma.$transaction(async (tx) => {
+      await tx.department.update({
         where: { id: existing.id },
         data: {
           name: data.name,
@@ -299,10 +317,27 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
           qrColorPrimary: data.qrColorPrimary !== undefined ? data.qrColorPrimary : undefined,
           qrColorSecondary: data.qrColorSecondary !== undefined ? data.qrColorSecondary : undefined,
           contactUserId: data.contactUserId,
-          organization: data.organization !== undefined ? (data.organization as any) : undefined,
+          organization: organizationChanged ? targetOrganization : undefined,
           membersOnly: data.membersOnly,
           hitobitoGroupId: targetHitobitoGroupId,
         },
+      });
+      if (organizationChanged) {
+        // Verknüpfungen zum bisherigen Hitobito lösen: Stufen-Gruppen, automatische Leitungen und Heimabteilungen.
+        // Leitungen bleiben erhalten (jetzt MANUAL), damit die Abteilung nicht ohne Leitung dasteht.
+        await tx.departmentStufe.updateMany({
+          where: { departmentId: existing.id },
+          data: { hitobitoGroupId: null },
+        });
+        await tx.departmentMember.updateMany({
+          where: { departmentId: existing.id, leaderSource: 'CEVIDB' },
+          data: { leaderSource: 'MANUAL' },
+        });
+        await tx.user.updateMany({
+          where: { homeDepartmentId: existing.id, homeDepartmentSource: 'CEVIDB' },
+          data: { homeDepartmentSource: 'SELF' },
+        });
+      }
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -313,8 +348,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
 
     const newGroup = targetHitobitoGroupId;
     const attached =
-      newGroup && newGroup !== existing.hitobitoGroupId
-        ? await attachCeviDbGroup(fastify.prisma, existing.id, newGroup, existing.organization)
+      newGroup && (organizationChanged || newGroup !== existing.hitobitoGroupId)
+        ? await attachCeviDbGroup(fastify.prisma, existing.id, newGroup, targetOrganization)
         : 0;
 
     await recordAdminAction(fastify.prisma, request, {
@@ -327,6 +362,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         before: {
           name: existing.name,
           slug: existing.slug,
+          organization: existing.organization,
           hitobitoGroupId: existing.hitobitoGroupId,
           membersOnly: existing.membersOnly,
         },

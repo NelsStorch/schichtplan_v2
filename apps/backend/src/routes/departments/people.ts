@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import type { PrismaClient } from '../../db.js';
 import {
   normalizePermissions,
   UpdateDepartmentPersonSchema,
@@ -15,6 +16,25 @@ import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../../services/ceviNameL
 import { contactCandidateWhere, requireDepartmentPermission, canEditPerson, homeSource, canConfirmHome } from './shared.js';
 
 /** Personen der Abteilung: Rechte, Stufen, Zugehörigkeit, Protokoll, Mitglieder */
+class LastLeaderError extends Error {
+  constructor() {
+    super('Mindestens eine Vereinsleitung muss in der Abteilung verbleiben.');
+  }
+}
+
+type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
+
+/** Abteilung bis zum Ende der Transaktion sperren: Leitungs-Änderungen laufen so nacheinander */
+async function lockDepartment(tx: Tx, departmentId: string) {
+  await tx.$queryRaw`SELECT id FROM departments WHERE id = ${departmentId} FOR UPDATE`;
+}
+
+/** Nach der Änderung muss noch mindestens eine Leitung da sein, sonst wird alles zurückgerollt */
+async function assertLeaderRemains(tx: Tx, departmentId: string) {
+  const leaders = await tx.departmentMember.count({ where: { departmentId, role: 'ADMIN' } });
+  if (leaders === 0) throw new LastLeaderError();
+}
+
 const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
   /** Recht in der Abteilung der Subdomain prüfen (siehe shared.ts) */
   const requirePermission = (request: FastifyRequest, reply: FastifyReply, permission: DepartmentPermission) =>
@@ -248,7 +268,11 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         nextPermissions.join() !== currentPermissions.join();
 
       const stufenBefore = user.stufen.filter((s) => s.source === 'SELF');
+      const demotesLeader = roleChanged && currentRole === 'ADMIN' && effectiveRole !== 'ADMIN';
+      try {
       await fastify.prisma.$transaction(async (tx) => {
+        // Gleichzeitige Leitungs-Änderungen nacheinander, damit nie alle Leitungen auf einmal wegfallen
+        if (demotesLeader) await lockDepartment(tx, tenant.id);
         if (stufen) {
           const locked = new Set(user.stufen.filter((s) => s.source === 'CEVIDB').map((s) => s.stufeId));
           await tx.userStufe.deleteMany({ where: { userId, source: 'SELF', stufe: { departmentId: tenant.id } } });
@@ -276,7 +300,12 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
             });
           }
         }
+        if (demotesLeader) await assertLeaderRemains(tx, tenant.id);
       });
+      } catch (err) {
+        if (err instanceof LastLeaderError) return reply.status(400).send({ error: err.message });
+        throw err;
+      }
 
       const label = personLabel(user);
       if (roleChanged) {
@@ -482,19 +511,37 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           .status(400)
           .send({ error: 'Diese Zuordnung kommt aus Cevi.DB und lässt sich hier nicht ändern.' });
       }
-      await fastify.prisma.$transaction([
-        fastify.prisma.userStufe.deleteMany({
-          where: { userId: user.id, source: 'SELF', stufe: { departmentId: tenant.id } },
-        }),
-        fastify.prisma.departmentMember.updateMany({
-          where: { departmentId: tenant.id, userId: user.id },
-          data: { permissions: [] },
-        }),
-        fastify.prisma.user.update({
-          where: { id: user.id },
-          data: { homeDepartmentId: null, homeDepartmentSource: null, ...NO_HOME_CONFIRMATION, departmentSetupAt: null },
-        }),
-      ]);
+      const removesLeader = membership?.role === 'ADMIN';
+      try {
+        await fastify.prisma.$transaction(async (tx) => {
+          if (removesLeader) await lockDepartment(tx, tenant.id);
+          await tx.userStufe.deleteMany({
+            where: { userId: user.id, source: 'SELF', stufe: { departmentId: tenant.id } },
+          });
+          // Eine entfernte Vereinsleitung verliert auch die Leitung (sonst bliebe der Vollzugriff bestehen)
+          await tx.departmentMember.updateMany({
+            where: { departmentId: tenant.id, userId: user.id },
+            data: removesLeader ? { permissions: [], role: 'HELPER', leaderSource: null } : { permissions: [] },
+          });
+          await tx.user.update({
+            where: { id: user.id },
+            data: { homeDepartmentId: null, homeDepartmentSource: null, ...NO_HOME_CONFIRMATION, departmentSetupAt: null },
+          });
+          if (removesLeader) await assertLeaderRemains(tx, tenant.id);
+        });
+      } catch (err) {
+        if (err instanceof LastLeaderError) return reply.status(400).send({ error: err.message });
+        throw err;
+      }
+      if (removesLeader) {
+        await recordDepartmentAction(fastify.prisma, request.log, {
+          departmentId: tenant.id,
+          actorId: request.user.id,
+          action: 'LEADER_REVOKE',
+          targetUserId: user.id,
+          targetLabel: personLabel(user),
+        });
+      }
       await recordDepartmentAction(fastify.prisma, request.log, {
         departmentId: tenant.id,
         actorId: request.user.id,

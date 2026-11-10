@@ -121,7 +121,9 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const input = request.body as z.output<typeof RegisterHelperSchema>;
 
-    const { email, password, firstName, lastName, ceviName, phone } = input;
+    const { email, password, firstName, lastName, phone } = input;
+    // Neues Feld `nickname`, `ceviName` bleibt für ältere Clients
+    const nickname = input.nickname || input.ceviName;
     const cleanEmail = email.toLowerCase().trim();
     const existing = await fastify.prisma.user.findUnique({
       where: { email: cleanEmail },
@@ -165,7 +167,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
             passwordHash,
             firstName,
             lastName: lastName?.trim() || null,
-            nickname: ceviName || null,
+            nickname: nickname || null,
             phone: phone || null,
             emailVerified: false,
             emailVerifiedAt: null,

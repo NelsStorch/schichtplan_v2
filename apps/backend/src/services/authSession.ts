@@ -5,6 +5,7 @@ import {
   getRootDomain,
   getOrganizationSlugFromHost,
   getOrganization,
+  ORGANIZATIONS,
   type UserDto,
   type OrganizationType,
 } from '@schichtplan/shared';
@@ -36,7 +37,7 @@ export function getCookieDomain(hostname?: string): string | undefined {
 
   if (hostname) {
     const root = getRootDomain(hostname);
-    if (root && root !== 'localhost') {
+    if (root && root !== 'localhost' && isPlatformRootDomain(root)) {
       return `.${root}`;
     }
   }
@@ -71,14 +72,34 @@ export function clearAuthCookie(reply: FastifyReply) {
   });
 }
 
-// Eigene Domain (auch Staging), auf die nach dem Login weitergeleitet werden darf
-export function rootDomain(reqHost?: string): string {
+/** Domain aus der Umgebung (COOKIE_DOMAIN/DOMAIN), ohne führenden Punkt */
+function envRootDomain(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '').toLowerCase();
+}
+
+/**
+ * Ist das eine eigene Domain der Plattform (cevi-/pfadi-/jubla-/vereins-schichtplan.ch, deren dev.-Umgebung
+ * oder die Domain aus der Umgebung)? Nur solche Domains dürfen aus dem Host-Header übernommen werden:
+ * Sie landen in E-Mail-Links (Passwort-Reset mit Token), Cookies und Weiterleitungen.
+ */
+export function isPlatformRootDomain(root: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  const clean = root.toLowerCase();
+  if (clean === envRootDomain(env)) return true;
+  return Object.values(ORGANIZATIONS).some((org) => clean === org.domain || clean === `dev.${org.domain}`);
+}
+
+/**
+ * Eigene Domain (auch Staging), auf die nach dem Login weitergeleitet werden darf.
+ * Aus dem Host nur, wenn es eine Domain der Plattform ist; lokal «localhost»; sonst die Domain aus der Umgebung.
+ */
+export function rootDomain(reqHost?: string, env: NodeJS.ProcessEnv = process.env): string {
   if (reqHost) {
     const cleanHost = reqHost.toLowerCase().split(',')[0].trim().replace(/:\d+$/, '');
     const root = getRootDomain(cleanHost);
-    if (root) return root;
+    if (root === 'localhost') return env.NODE_ENV === 'production' ? envRootDomain(env) : 'localhost';
+    if (root && isPlatformRootDomain(root, env)) return root;
   }
-  return (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+  return envRootDomain(env);
 }
 
 export function cleanReturnTo(value: unknown, fallback = '/', reqHost?: string): string {
@@ -133,7 +154,7 @@ export function bootstrapAdminCeviDbIds(): Set<number> {
  */
 export function getLoginPortalBaseUrl(env: NodeJS.ProcessEnv = process.env, reqHost?: string): string {
   if (reqHost) {
-    const root = rootDomain(reqHost);
+    const root = rootDomain(reqHost, env);
     if (root && root !== 'localhost') {
       if (env.LOGIN_PORTAL_URL) {
         try {

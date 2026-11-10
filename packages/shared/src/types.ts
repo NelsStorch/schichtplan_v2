@@ -1007,7 +1007,7 @@ export interface DepartmentCreationEligibilityDto {
    * NO_ORTSGRUPPE (Leitungsrolle liegt in keiner Ortsgruppe), EXISTS (Gruppe hat schon eine Abteilung),
    * UNVERIFIED (Gruppenstruktur aus Cevi.DB fehlt, neu anmelden hilft)
    */
-  reason: 'NOT_CEVIDB' | 'NOT_LEADER' | 'NO_ORTSGRUPPE' | 'EXISTS' | 'UNVERIFIED' | null;
+  reason: 'NOT_CEVIDB' | 'NOT_LEADER' | 'NO_ORTSGRUPPE' | 'EXISTS' | 'UNVERIFIED' | 'LIMIT' | null;
   provider?: OrganizationType;
   /** Hitobito-Gruppe der neuen Abteilung: die Ortsgruppe oder, bei mehreren Jungscharen, die Jungschar */
   ortsgruppeId: number | null;

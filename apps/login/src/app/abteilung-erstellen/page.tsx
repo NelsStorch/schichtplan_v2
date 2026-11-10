@@ -204,6 +204,10 @@ function CreateDepartment() {
                   Zu {eligibility.existingDepartment.name} <ArrowUpRight />
                 </a>
               </>
+            ) : eligibility.reason === 'LIMIT' ? (
+              <p className="text-[15px] leading-relaxed text-fg-muted">
+                Du leitest bereits 3 Vereine. Für einen weiteren Verein melde dich bitte beim Support.
+              </p>
             ) : eligibility.reason === 'NOT_CEVIDB' ? (
               org.slug === 'verein' ? (
                 <>
