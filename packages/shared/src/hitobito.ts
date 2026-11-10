@@ -62,13 +62,11 @@ export const HITOBITO_CEVI_CONFIG: HitobitoConfig = {
     'Group::Abteilung::Abteilungsleiterin',
     'Group::Ortsgruppe::Abteilungsleiter',
     'Group::Ortsgruppe::Abteilungsleiterin',
-    'Group::Ortsgruppe::AdministratorCeviDB',
   ],
   departmentLeaderSuffixes: [
     '::abteilungsleiter',
     '::abteilungsleiterin',
     '::abteilungsleitung',
-    '::administratorcevidb',
   ],
   unitRoleClassPrefixes: [
     'Group::Stufe::',

@@ -127,7 +127,7 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
       expect(isDepartmentLeaderRole('Group::Jungschar::Abteilungsleiter', 'CEVI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Jungschar::Abteilungsleiterin', 'CEVI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Abteilung::Abteilungsleiter', 'CEVI')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Ortsgruppe::AdministratorCeviDB', 'CEVI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::Ortsgruppe::AdministratorCeviDB', 'CEVI')).toBe(false);
       expect(isDepartmentLeaderRole('Group::Stufe::Stufenleiter', 'CEVI')).toBe(false);
     });
 
