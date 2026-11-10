@@ -8,6 +8,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-7.x-1B222D.svg)](https://www.prisma.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38bdf8.svg)](https://tailwindcss.com/)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
 Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Web-Plattform zur Organisation von Schichtplänen, Einsätzen und Helferteams für Cevi-Abteilungen in der Schweiz.
 
@@ -286,5 +287,14 @@ Das Projekt ist für unterbruchfreies Deployment (**Zero-Downtime**) auf Linux-S
 * **Sichere Session-Cookies:** Wildcard-Cookie (`Domain=.cevi-schichtplan.ch`) mit `HttpOnly`, `SameSite=Lax` und `Secure`.
 * **Schutz administrativer Schnittstellen:** `admin.<domain>` erfordert Re-Authentifizierung, Cevi.DB-Herkunftsnachweis, Herkunftsüberprüfung (`Sec-Fetch-Site`) und automatische Rate-Limits.
 * Sicherheitsrelevante Schwachstellen können vertraulich gemeldet werden (siehe [SECURITY.md](SECURITY.md)).
+
+---
+
+## 📄 Lizenz
+
+Dieses Projekt ist unter der **GNU Affero General Public License Version 3 (AGPLv3)** lizenziert – siehe die Datei [LICENSE](LICENSE) für Details.
+
+Jede Modifikation und jeder Betrieb als Netzwerkdienst (SaaS) muss den vollständigen Quellcode gemäss AGPLv3 frei zugänglich machen.
+
 
 

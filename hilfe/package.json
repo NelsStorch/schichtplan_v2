@@ -2,6 +2,7 @@
   "name": "@schichtplan/hilfe",
   "version": "1.0.0",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "description": "Hilfe-Center hilfe.cevi-schichtplan.ch (statisch, Astro Starlight)",
   "type": "module",
   "scripts": {
