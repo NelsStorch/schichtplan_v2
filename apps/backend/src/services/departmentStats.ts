@@ -63,7 +63,7 @@ export async function computeDepartmentStats(
                     id: true,
                     firstName: true,
                     lastName: true,
-                    ceviName: true,
+                    nickname: true,
                     stufen: {
                       where: { stufe: { departmentId } },
                       select: { stufe: { select: { id: true, name: true } } },
@@ -103,6 +103,7 @@ export async function computeDepartmentStats(
     displayName: string;
     firstName: string;
     lastName: string | null;
+    nickname: string | null;
     ceviName: string | null;
     isGuest: boolean;
     stufen: Set<string>;
@@ -208,8 +209,9 @@ export async function computeDepartmentStats(
         let h = helpersMap.get(helperKey);
         if (!h) {
           const user = signup.user;
+          const nickname = user?.nickname ?? (user as { ceviName?: string | null })?.ceviName ?? null;
           const dispName = user
-            ? user.ceviName ? `${user.firstName} / ${user.ceviName}` : `${user.firstName} ${user.lastName || ''}`.trim()
+            ? nickname ? `${user.firstName} / ${nickname}` : `${user.firstName} ${user.lastName || ''}`.trim()
             : signup.guestName || 'Gast';
 
           h = {
@@ -217,7 +219,8 @@ export async function computeDepartmentStats(
             displayName: dispName,
             firstName: user ? user.firstName : signup.guestName || 'Gast',
             lastName: user ? user.lastName : null,
-            ceviName: user ? user.ceviName : null,
+            nickname,
+            ceviName: nickname,
             isGuest,
             stufen: new Set(),
             minutes: 0,
@@ -329,6 +332,7 @@ export async function computeDepartmentStats(
       displayName: h.displayName,
       firstName: h.firstName,
       lastName: h.lastName,
+      nickname: h.nickname,
       ceviName: h.ceviName,
       hours: round1(h.minutes / 60),
       minutes: h.minutes,

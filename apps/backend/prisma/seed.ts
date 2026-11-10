@@ -14,11 +14,12 @@ async function main() {
 
   // 1. Demo-Abteilung
   const department = await prisma.department.upsert({
-    where: { slug: 'demo' },
+    where: { organization_slug: { organization: 'CEVI', slug: 'demo' } },
     update: {},
     create: {
       name: 'Demo-Abteilung',
       slug: 'demo',
+      organization: 'CEVI',
       primaryColor: '#e11d48',
     },
   });

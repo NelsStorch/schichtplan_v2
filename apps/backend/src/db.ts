@@ -6,7 +6,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client.js';
 
 export { Prisma, PrismaClient } from './generated/prisma/client.js';
-export type { Department } from './generated/prisma/client.js';
+export type { Department, OrganizationType } from './generated/prisma/client.js';
 
 /** Ohne diese Grenzen warten Anfragen bei einer hängenden Datenbank unbegrenzt (Vorgabe des pg-Treibers: 0) */
 const DB_CONNECTION_TIMEOUT_MS = 5_000;

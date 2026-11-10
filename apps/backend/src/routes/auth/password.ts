@@ -133,7 +133,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     // Cevi-Name-Profil) gehört nicht nachweislich diesem Konto. Sonst könnte jemand eine fremde Adresse
     // besetzen und die Person damit von der Registrierung aussperren. Wie beim Cevi.DB-Login: freigeben.
     const releaseUnverified = Boolean(
-      existing && !existing.emailVerified && !existing.passwordHash && existing.ceviDbId === null
+      existing && !existing.emailVerified && !existing.passwordHash && existing.providerId === null
     );
 
     // Sonst nicht übernehmen: Ein bestehendes Konto bekäme von irgendwem ein Passwort und fremde Namen.
@@ -143,14 +143,14 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
       const loginPortalUrl = getLoginPortalBaseUrl();
       if (!accountExistsMailsByEmail.hit(cleanEmail)) await sendAccountExistsEmail({
         to: cleanEmail,
-        name: existing.ceviName || existing.firstName,
+        name: existing.nickname || existing.firstName,
         loginUrl: `${loginPortalUrl}/`,
         resetUrl: `${loginPortalUrl}/passwort-vergessen`,
       });
       return registrationAccepted(cleanEmail);
     }
 
-    let user: { id: string; ceviName: string | null; firstName: string };
+    let user: { id: string; nickname: string | null; firstName: string };
     try {
       user = await fastify.prisma.$transaction(async (tx) => {
         if (existing && releaseUnverified) {
@@ -164,7 +164,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
             passwordHash,
             firstName,
             lastName: lastName?.trim() || null,
-            ceviName: ceviName || null,
+            nickname: ceviName || null,
             phone: phone || null,
             emailVerified: false,
             emailVerifiedAt: null,
@@ -203,7 +203,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,
-      name: user.ceviName || user.firstName,
+      name: user.nickname || user.firstName,
       verificationUrl,
       deletesUnconfirmed: true,
     });
@@ -267,10 +267,10 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,
-      name: user.ceviName || user.firstName,
+      name: user.nickname || user.firstName,
       verificationUrl,
       // Unbestätigte Passwort-Konten löscht der Aufräumjob (Cevi-Name-Profile mit E-Mail nicht)
-      deletesUnconfirmed: Boolean(user.passwordHash && user.ceviDbId === null),
+      deletesUnconfirmed: Boolean(user.passwordHash && user.providerId === null),
     });
 
     return genericAnswer;
@@ -339,7 +339,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
       success: true,
       message: 'E-Mail-Adresse bestätigt. Melde dich jetzt mit deinem Passwort an.',
       email: updatedUser.email,
-      name: updatedUser.ceviName || updatedUser.firstName,
+      name: updatedUser.nickname || updatedUser.firstName,
     };
   });
 

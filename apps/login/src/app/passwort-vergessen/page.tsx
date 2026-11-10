@@ -4,12 +4,19 @@ import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { KeyRound, Mail } from 'lucide-react';
 import { Button, Callout, Field, Input } from '@schichtplan/ui';
+import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
 import { AuthShell } from '@/components/AuthShell';
 import { cleanReturnTo, withReturnTo } from '@/lib/destination';
 
 /** «Passwort vergessen»: E-Mail eingeben, der Link kommt per Mail (gleiche Antwort, ob es das Konto gibt oder nicht). */
 function ForgotPassword() {
   const searchParams = useSearchParams();
+  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrg(getOrganization(window.location.host));
+    }
+  }, []);
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
@@ -98,7 +105,9 @@ function ForgotPassword() {
               Zurück zur Anmeldung
             </Button>
             <p className="px-1 text-[13px] leading-relaxed text-fg-subtle">
-              Mit Cevi.DB oder Cevi-Name brauchst du kein Passwort: Melde dich einfach wieder so an.
+              {org.slug !== 'verein'
+                ? `Mit ${org.authProviderShort} oder ${org.nicknameTerm} brauchst du kein Passwort: Melde dich einfach wieder so an.`
+                : `Mit ${org.nicknameTerm} brauchst du kein Passwort: Melde dich einfach wieder so an.`}
             </p>
           </div>
         </form>

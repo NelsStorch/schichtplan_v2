@@ -1,11 +1,12 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import { Department } from '../db.js';
-import { RESERVED_SUBDOMAINS } from '@schichtplan/shared';
+import { Department, OrganizationType } from '../db.js';
+import { getOrganizationTypeFromHost, RESERVED_SUBDOMAINS } from '@schichtplan/shared';
 
 declare module 'fastify' {
   interface FastifyRequest {
     tenant: Department | null;
+    organization: OrganizationType;
   }
 }
 
@@ -44,15 +45,24 @@ export function tenantHeaderAllowed(
 
 const tenantPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorateRequest('tenant', null);
+  fastify.decorateRequest('organization', 'CEVI');
 
   fastify.addHook('preHandler', async (request) => {
+    const allowHeader = tenantHeaderAllowed(request.headers);
+    const headerOrg = request.headers['x-tenant-org'];
+    const organization: OrganizationType =
+      typeof headerOrg === 'string' && headerOrg.trim().length > 0 && allowHeader
+        ? getOrganizationTypeFromHost(headerOrg)
+        : getOrganizationTypeFromHost(request.headers.host);
+    request.organization = organization;
+
     // 1. Abteilung per Header: lokal (Next-Proxy, Tests) und für interne Aufrufe der Frontends
     //    (z. B. Link-Vorschau). Von aussen gilt in Produktion nur der Host: Traefik setzt immer
     //    X-Forwarded-For, eine Anfrage über den Proxy kann sich die Abteilung so nicht aussuchen.
     const headerSlug = request.headers['x-tenant-slug'];
     let slug: string | null = null;
 
-    if (typeof headerSlug === 'string' && headerSlug.trim().length > 0 && tenantHeaderAllowed(request.headers)) {
+    if (typeof headerSlug === 'string' && headerSlug.trim().length > 0 && allowHeader) {
       slug = headerSlug.trim().toLowerCase();
     } else {
       // 2. Extract from Host header
@@ -61,7 +71,7 @@ const tenantPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (slug) {
       const department = await fastify.prisma.department.findUnique({
-        where: { slug },
+        where: { organization_slug: { organization, slug } },
       });
       request.tenant = department;
     } else {

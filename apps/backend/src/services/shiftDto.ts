@@ -12,6 +12,7 @@ export function toResponsiblePersonDto(
       id: string;
       firstName: string;
       lastName: string | null;
+      nickname?: string | null;
       ceviName?: string | null;
       phone?: string | null;
       email?: string | null;
@@ -21,14 +22,16 @@ export function toResponsiblePersonDto(
 ): ResponsiblePersonDto {
   const allowPhone = contactVisibility === 'BOTH' || contactVisibility === 'PHONE';
   const allowEmail = (contactVisibility === 'BOTH' || contactVisibility === 'EMAIL') && Boolean(r.user.email && !PLACEHOLDER_EMAIL_REGEX.test(r.user.email));
+  const nickname = r.user.nickname ?? r.user.ceviName ?? null;
   return {
     id: r.user.id,
-    displayName: r.user.ceviName
-      ? `${r.user.firstName} / ${r.user.ceviName}`
+    displayName: nickname
+      ? `${r.user.firstName} / ${nickname}`
       : `${r.user.firstName} ${r.user.lastName ?? ''}`.trim(),
     firstName: r.user.firstName,
     lastName: r.user.lastName,
-    ceviName: r.user.ceviName,
+    nickname,
+    ceviName: nickname,
     phone: allowPhone ? r.user.phone : null,
     email: allowEmail ? r.user.email : null,
   };

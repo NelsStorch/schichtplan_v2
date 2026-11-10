@@ -1,5 +1,5 @@
 
-import { Prisma, PrismaClient } from '../../db.js';
+import { OrganizationType, Prisma, PrismaClient } from '../../db.js';
 import { z } from 'zod';
 import {
   type AdminDepartmentListItemDto,
@@ -100,6 +100,7 @@ export const departmentSelect = {
   id: true,
   name: true,
   slug: true,
+  organization: true,
   logoUrl: true,
   primaryColor: true,
   secondaryColor: true,
@@ -108,14 +109,14 @@ export const departmentSelect = {
   qrColorPrimary: true,
   qrColorSecondary: true,
   contactUserId: true,
-  contactUser: { select: { firstName: true, lastName: true, ceviName: true } },
-  ceviDbGroupId: true,
+  contactUser: { select: { firstName: true, lastName: true, nickname: true } },
+  hitobitoGroupId: true,
   membersOnly: true,
   createdAt: true,
   _count: { select: { members: true, homeUsers: true, events: true } },
   members: {
     where: { role: 'ADMIN' },
-    select: { user: { select: { id: true, firstName: true, lastName: true, ceviName: true } } },
+    select: { user: { select: { id: true, firstName: true, lastName: true, nickname: true } } },
   },
 } satisfies Prisma.DepartmentSelect;
 
@@ -139,7 +140,7 @@ export async function toDepartmentItems(prisma: PrismaClient, rows: DepartmentRo
         JOIN events e ON e.id = s."eventId"
         WHERE e."departmentId" IN (${Prisma.join(ids)})
         GROUP BY e."departmentId"`
-    : [];
+  : [];
   const upcomingMap = new Map(upcoming.map((u) => [u.departmentId, u._count._all]));
   const signupMap = new Map(signupStats.map((s) => [s.departmentId, s.n]));
 
@@ -147,6 +148,7 @@ export async function toDepartmentItems(prisma: PrismaClient, rows: DepartmentRo
     id: d.id,
     name: d.name,
     slug: d.slug,
+    organization: d.organization,
     logoUrl: d.logoUrl,
     primaryColor: d.primaryColor,
     secondaryColor: d.secondaryColor,
@@ -156,7 +158,8 @@ export async function toDepartmentItems(prisma: PrismaClient, rows: DepartmentRo
     qrColorSecondary: d.qrColorSecondary,
     contactUserId: d.contactUserId,
     contactName: d.contactUser ? personLabel(d.contactUser) : null,
-    ceviDbGroupId: d.ceviDbGroupId,
+    hitobitoGroupId: d.hitobitoGroupId,
+    ceviDbGroupId: d.hitobitoGroupId,
     membersOnly: d.membersOnly,
     memberCount: d._count.members,
     homeUserCount: d._count.homeUsers,
@@ -174,8 +177,13 @@ export async function toDepartmentItems(prisma: PrismaClient, rows: DepartmentRo
  * Bereits angemeldete Cevi.DB-Personen einer Gruppe der Abteilung zuordnen (Heimabteilung + Helfer*in),
  * wie beim Anlegen durch die Abteilungsleitung. Bestehende Rollen bleiben.
  */
-export async function attachCeviDbGroup(prisma: PrismaClient, departmentId: string, groupId: number) {
-  const people = await ceviDbGroupPeople(prisma, groupId);
+export async function attachCeviDbGroup(
+  prisma: PrismaClient,
+  departmentId: string,
+  groupId: number,
+  provider: OrganizationType = 'CEVI'
+) {
+  const people = await ceviDbGroupPeople(prisma, groupId, provider);
   if (!people.length) return 0;
   await prisma.$transaction([
     prisma.user.updateMany({

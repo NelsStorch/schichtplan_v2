@@ -57,7 +57,9 @@ describe('checkinUrl', () => {
 
 describe('personLabel', () => {
   it('nimmt Cevi-Name, sonst vollen Namen, sonst Gastnamen', () => {
+    expect(personLabel({ firstName: 'Nels', lastName: 'Storch', nickname: 'Inferno' })).toBe('Nels / Inferno');
     expect(personLabel({ firstName: 'Nels', lastName: 'Storch', ceviName: 'Inferno' })).toBe('Nels / Inferno');
+    expect(personLabel({ firstName: 'Anna', lastName: 'Muster', nickname: null })).toBe('Anna Muster');
     expect(personLabel({ firstName: 'Anna', lastName: 'Muster', ceviName: null })).toBe('Anna Muster');
     expect(personLabel(null, 'Max')).toBe('Max');
     expect(personLabel(null)).toBe('Gast');

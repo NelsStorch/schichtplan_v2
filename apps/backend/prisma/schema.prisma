@@ -12,10 +12,18 @@ datasource db {
   provider = "postgresql"
 }
 
+enum OrganizationType {
+  CEVI
+  PFADI
+  JUBLA
+  OTHER
+}
+
 model Department {
   id           String             @id @default(uuid())
   name         String
-  slug         String             @unique
+  slug         String
+  organization OrganizationType   @default(CEVI)
   logoUrl      String?
   primaryColor   String?            @default("#e11d48")
   secondaryColor String?            @map("secondary_color")
@@ -26,9 +34,9 @@ model Department {
   // Kontaktperson der Abteilung: Abteilungsleitung oder jemand mit dem Recht «Personen und Rechte verwalten»
   contactUserId String?           @map("contact_user_id")
   contactUser   User?             @relation("DepartmentContactUser", fields: [contactUserId], references: [id], onDelete: SetNull)
-  // Cevi.DB-Gruppe der Abteilung: die Ortsgruppe oder, wenn eine Ortsgruppe mehrere Jungscharen hat, die Jungschar.
-  // Wer sich mit Cevi.DB anmeldet und dort Rollen hat, wird automatisch Mitglied (siehe services/homeDepartment.ts).
-  ceviDbGroupId Int?              @unique
+  // Hitobito-Gruppe der Abteilung (Cevi.DB, PBS MiData oder Jubla-DB): die Ortsgruppe/Abteilung/Schar oder Jungschar.
+  // Wer sich mit Hitobito anmeldet und dort Rollen hat, wird automatisch Mitglied (siehe services/homeDepartment.ts).
+  hitobitoGroupId Int?              @map("hitobito_group_id")
   // Startseite (Liste der Anlässe) nur für Mitglieder (Vorgabe: an); öffentliche Anlässe bleiben per Link erreichbar
   membersOnly   Boolean           @default(true) @map("members_only")
   createdAt    DateTime           @default(now())
@@ -44,30 +52,33 @@ model Department {
   allowedInEvents EventAllowedDepartment[]
   auditLogs    DepartmentAuditLog[]
 
+  @@unique([organization, slug])
+  @@unique([organization, hitobitoGroupId])
   @@map("departments")
 }
 
 // Stufen einer Abteilung (z. B. «Hiskia», «Fröschli»). Gepflegt von der Abteilungsleitung.
 model DepartmentStufe {
-  id            String              @id @default(uuid())
-  departmentId  String              @map("department_id")
-  name          String
-  // Cevi.DB-Gruppe der Stufe: Cevi.DB-Personen mit einer Rolle in dieser Gruppe werden automatisch zugeordnet
-  ceviDbGroupId Int?                @map("cevidb_group_id")
-  sortOrder     Int                 @default(0) @map("sort_order")
-  createdAt     DateTime            @default(now()) @map("created_at")
-  department    Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  members       UserStufe[]
-  events        EventAllowedStufe[]
+  id              String              @id @default(uuid())
+  departmentId    String              @map("department_id")
+  name            String
+  // Hitobito-Gruppe der Stufe: Personen mit einer Rolle in dieser Gruppe werden automatisch zugeordnet
+  hitobitoGroupId Int?                @map("hitobito_group_id")
+  sortOrder       Int                 @default(0) @map("sort_order")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  department      Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  members         UserStufe[]
+  events          EventAllowedStufe[]
 
   @@unique([departmentId, name])
-  @@unique([departmentId, ceviDbGroupId])
+  @@unique([departmentId, hitobitoGroupId])
   @@map("department_stufen")
 }
 
-// Gruppenstruktur aus der Cevi.DB-Gruppen-API (Scope `groups`), beim Login aufgefrischt. Keine Personendaten.
-model CeviDbGroup {
-  id             Int      @id
+// Gruppenstruktur aus der Hitobito-Gruppen-API (Scope `groups`), beim Login aufgefrischt. Keine Personendaten.
+model HitobitoGroup {
+  provider       OrganizationType @default(CEVI)
+  id             Int
   name           String
   // Jungschar-Ebene der Gruppe (bei einer Jungschar ihre eigene ID), null ausserhalb einer Jungschar
   jungscharId    Int?     @map("jungschar_id")
@@ -76,13 +87,14 @@ model CeviDbGroup {
   jungscharCount Int?     @map("jungschar_count")
   fetchedAt      DateTime @map("fetched_at")
 
-  @@index([ortsgruppeId])
-  @@map("cevidb_groups")
+  @@id([provider, id])
+  @@index([provider, ortsgruppeId])
+  @@map("hitobito_groups")
 }
 
-// Stufen-Rollen einer Person laut Cevi.DB (Rollen mit Präfix Group::Stufe::), bei jedem Cevi.DB-Login ersetzt.
+// Stufen-Rollen einer Person laut Hitobito (Rollen mit Präfix Group::Stufe::), bei jedem Login ersetzt.
 // Unabhängig davon, ob eine Abteilung die Stufe schon erfasst hat (Vorschläge, «nur Leitende», Admin-Portal).
-model UserCeviDbStufe {
+model UserHitobitoStufe {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   groupId   Int      @map("group_id")
@@ -94,7 +106,7 @@ model UserCeviDbStufe {
 
   @@unique([userId, groupId])
   @@index([groupId])
-  @@map("user_cevidb_stufen")
+  @@map("user_hitobito_stufen")
 }
 
 // Stufe einer Person mit Rolle. Quelle CEVIDB wird bei jedem Cevi.DB-Login neu abgeglichen.
@@ -114,30 +126,28 @@ model UserStufe {
 }
 
 model User {
-  id            String             @id @default(uuid())
-  email         String?            @unique
-  passwordHash  String?
-  ceviDbId      Int?               @unique
-  firstName     String
-  lastName      String?
-  ceviName      String?
-  phone         String?
-  birthDate     DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
-  isGlobalAdmin Boolean            @default(false)
-  // Die frühere Spalte "ceviDbData" (rohes Cevi.DB-Profil) ist hier bewusst nicht mehr aufgeführt:
-  // geleert mit Migration 20261108120000, gelöscht wird sie erst mit dem Deploy NACH diesem Stand
-  // (vorher läuft beim Rollout noch Code, dessen Prisma-Client sie abfragt).
-  // Aus dem Cevi.DB-Profil beim Login abgeleitet (siehe services/cevidb.ts)
-  ceviDbOrtsgruppeId      Int?     @map("cevidb_ortsgruppe_id")
-  ceviDbOrtsgruppeName    String?  @map("cevidb_ortsgruppe_name")
-  ceviDbDepartmentLeader  Boolean  @default(false) @map("cevidb_department_leader")
-  ceviDbLeaderGroupName   String?  @map("cevidb_leader_group_name")
-  // Jungscharen der Rollen laut Cevi.DB-Gruppenstruktur; leer, solange sie nicht geprüft werden konnten
-  ceviDbJungscharIds      Int[]    @default([]) @map("cevidb_jungschar_ids")
+  id               String             @id @default(uuid())
+  email            String?            @unique
+  passwordHash     String?
+  provider         OrganizationType   @default(CEVI) @map("provider")
+  providerId       String?            @map("provider_id")
+  firstName        String
+  lastName         String?
+  nickname         String?            @map("nickname")
+  phone            String?
+  birthDate        DateTime?          // Geburtsdatum für Schicht-Altersrichtlinien (z.B. Bar ab 18)
+  isGlobalAdmin    Boolean            @default(false)
+  // Aus dem Hitobito-Profil beim Login abgeleitet (siehe services/cevidb.ts)
+  ortsgruppeId          Int?     @map("ortsgruppe_id")
+  ortsgruppeName        String?  @map("ortsgruppe_name")
+  departmentLeader      Boolean  @default(false) @map("department_leader")
+  leaderGroupName       String?  @map("leader_group_name")
+  // Jungscharen der Rollen laut Hitobito-Gruppenstruktur; leer, solange sie nicht geprüft werden konnten
+  jungscharIds          Int[]    @default([]) @map("jungschar_ids")
   // Gruppen der Abteilungsleitungs-Rollen (role.group_id), nicht aus dem selbst änderbaren Feld `ortsgruppe_id`
-  ceviDbLeaderGroupIds    Int[]    @default([]) @map("cevidb_leader_group_ids")
-  ceviDbSyncedAt DateTime?         // Zeitstempel der letzten Cevi.DB Synchronisation
-  // Heimabteilung: aus Cevi.DB (Ortsgruppe) oder beim Login selbst angegeben
+  leaderGroupIds        Int[]    @default([]) @map("leader_group_ids")
+  providerSyncedAt DateTime?     @map("provider_synced_at")
+  // Heimabteilung: aus Hitobito (Ortsgruppe) oder beim Login selbst angegeben
   homeDepartmentId     String?     @map("home_department_id")
   homeDepartmentSource String?     @map("home_department_source") // "CEVIDB", "SELF", "CONFIRMED" (selbst gewählt, von der Abteilungsleitung bestätigt)
   // Nur bei "CONFIRMED" gesetzt: Wer hat die Zugehörigkeit wann bestätigt? (Verlauf im Protokoll der Abteilung)
@@ -180,7 +190,7 @@ model User {
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
   memberships   DepartmentMember[]
   stufen        UserStufe[]
-  ceviDbStufen  UserCeviDbStufe[]
+  hitobitoStufen UserHitobitoStufe[]
   signups       ShiftSignup[]
   organizedEvents EventOrganizer[]
   eventAnswers  EventAnswer[]
@@ -197,6 +207,7 @@ model User {
   pushSubscriptions       PushSubscription[]
   cateringTokens          CateringToken[]
 
+  @@unique([provider, providerId])
   @@index([lastSeenOn])
   @@map("users")
 }

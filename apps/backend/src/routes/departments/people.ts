@@ -42,7 +42,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenant, access } = ctx;
       reply.header('Cache-Control', 'no-store');
       const withGuests = request.query.alle === '1';
-      const ortsgruppeId = await departmentOrtsgruppeId(fastify.prisma, tenant.ceviDbGroupId);
+      const ortsgruppeId = await departmentOrtsgruppeId(fastify.prisma, tenant.hitobitoGroupId, tenant.organization);
       const users = await fastify.prisma.user.findMany({
         where: {
           OR: [
@@ -58,19 +58,19 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         },
         select: {
           id: true,
-          ceviName: true,
+          nickname: true,
           firstName: true,
           lastName: true,
-          ceviDbDepartmentLeader: true,
+          departmentLeader: true,
           homeDepartmentId: true,
           homeDepartmentSource: true,
           passwordHash: true,
-          ceviDbId: true,
-          ceviDbOrtsgruppeId: true,
+          providerId: true,
+          ortsgruppeId: true,
           homeDepartmentConfirmedAt: true,
           email: true,
           phone: true,
-          homeDepartmentConfirmedBy: { select: { ceviName: true, firstName: true, lastName: true } },
+          homeDepartmentConfirmedBy: { select: { nickname: true, firstName: true, lastName: true } },
           memberships: {
             where: { departmentId: tenant.id },
             select: { role: true, permissions: true, leaderSource: true },
@@ -80,7 +80,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
             select: { stufeId: true, role: true, source: true, stufe: { select: { name: true, sortOrder: true } } },
           },
         },
-        orderBy: [{ ceviName: 'asc' }, { firstName: 'asc' }],
+        orderBy: [{ nickname: 'asc' }, { firstName: 'asc' }],
       });
       return users.map((u): DepartmentPersonDto => {
         const isHome = u.homeDepartmentId === tenant.id;
@@ -90,7 +90,8 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         return {
           userId: u.id,
           displayName: personLabel(u),
-          ceviName: u.ceviName,
+          nickname: u.nickname,
+          ceviName: u.nickname,
           firstName: u.firstName,
           lastName: u.lastName,
           isHomeDepartment: isHome,
@@ -105,7 +106,9 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           leaderSource:
             role === 'ADMIN' ? (membership?.leaderSource === 'CEVIDB' ? 'CEVIDB' : 'MANUAL') : null,
           canEdit: canEditPerson(access, request.user.id, { userId: u.id, role, permissions }),
-          isCeviDbDepartmentLeader: u.ceviDbDepartmentLeader,
+          departmentLeader: u.departmentLeader,
+          isDepartmentLeader: u.departmentLeader,
+          isCeviDbDepartmentLeader: u.departmentLeader,
           isCeviNameProfile: isCeviNameProfile(u),
           stufen: u.stufen
             .sort((a, b) => a.stufe.sortOrder - b.stufe.sortOrder)
@@ -151,8 +154,9 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           id: true,
           homeDepartmentId: true,
           passwordHash: true,
-          ceviDbId: true,
-          ceviName: true,
+          providerId: true,
+          provider: true,
+          nickname: true,
           firstName: true,
           lastName: true,
           memberships: { where: { departmentId: tenant.id }, select: { role: true, permissions: true } },
@@ -287,17 +291,18 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: request.params.userId, homeDepartmentId: tenant.id },
         select: {
           id: true,
-          ceviDbId: true,
-          ceviDbOrtsgruppeId: true,
+          providerId: true,
+          provider: true,
+          ortsgruppeId: true,
           homeDepartmentId: true,
           homeDepartmentSource: true,
-          ceviName: true,
+          nickname: true,
           firstName: true,
           lastName: true,
         },
       });
       if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
-      const ortsgruppeId = await departmentOrtsgruppeId(fastify.prisma, tenant.ceviDbGroupId);
+      const ortsgruppeId = await departmentOrtsgruppeId(fastify.prisma, tenant.hitobitoGroupId, tenant.organization);
       if (!canConfirmHome(access, request.user.id, user, tenant.id, ortsgruppeId)) {
         return reply
           .status(400)
@@ -345,7 +350,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const user = await fastify.prisma.user.findFirst({
         where: { id: request.params.userId, homeDepartmentId: tenant.id, homeDepartmentSource: 'CONFIRMED' },
-        select: { id: true, ceviName: true, firstName: true, lastName: true },
+        select: { id: true, nickname: true, firstName: true, lastName: true },
       });
       if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
       await fastify.prisma.user.update({
@@ -388,7 +393,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         select: {
           id: true,
           homeDepartmentSource: true,
-          ceviName: true,
+          nickname: true,
           firstName: true,
           lastName: true,
           memberships: { where: { departmentId: tenant.id }, select: { role: true, permissions: true } },
@@ -486,7 +491,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       reply.header('Cache-Control', 'no-store');
       const members = await fastify.prisma.departmentMember.findMany({
         where: contactCandidateWhere(ctx.tenant.id),
-        select: { role: true, user: { select: { id: true, ceviName: true, firstName: true, lastName: true } } },
+        select: { role: true, user: { select: { id: true, nickname: true, firstName: true, lastName: true } } },
       });
       return members
         .map((m) => ({ userId: m.user.id, displayName: personLabel(m.user), isLeader: m.role === 'ADMIN' }))
@@ -524,10 +529,11 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
               id: true,
               firstName: true,
               lastName: true,
-              ceviName: true,
+              nickname: true,
               email: true,
               passwordHash: true,
-              ceviDbId: true,
+              providerId: true,
+              provider: true,
             },
           },
         },
@@ -542,12 +548,13 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         role: m.role,
         firstName: m.user.firstName,
         lastName: m.user.lastName,
-        ceviName: m.user.ceviName,
+        nickname: m.user.nickname,
+        ceviName: m.user.nickname,
         email: m.user.email,
         // Nur Cevi-Name-Profil: kann eingeteilt, aber nicht ins OK aufgenommen werden
         isCeviNameProfile: isCeviNameProfile(m.user),
-        displayName: m.user.ceviName
-          ? `${m.user.ceviName} (${m.user.firstName} ${m.user.lastName})`
+        displayName: m.user.nickname
+          ? `${m.user.nickname} (${m.user.firstName} ${m.user.lastName})`
           : `${m.user.firstName} ${m.user.lastName}`,
       }));
     }

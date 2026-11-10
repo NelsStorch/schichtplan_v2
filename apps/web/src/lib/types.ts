@@ -55,6 +55,7 @@ export interface EventOrganizer {
   userId: string;
   userFirstName: string;
   userLastName: string;
+  userNickname?: string | null;
   userCeviName?: string | null;
   displayName: string;
   role: 'OK_LEAD' | 'OK_MEMBER';

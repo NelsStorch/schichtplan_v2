@@ -110,9 +110,9 @@ describe('refreshCeviDbGroups', () => {
     const rows = new Map<number, any>(initial.map((r) => [r.id, { jungscharId: null, ortsgruppeId: null, ...r }]));
     return {
       rows,
-      ceviDbGroup: {
+      hitobitoGroup: {
         findMany: async ({ where }: any) => where.id.in.flatMap((id: number) => rows.get(id) ?? []),
-        upsert: async ({ where, create }: any) => void rows.set(where.id, create),
+        upsert: async ({ where, create }: any) => void rows.set(where.provider_id?.id ?? where.id, create),
       },
     };
   }

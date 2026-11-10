@@ -57,15 +57,16 @@ const departmentStufenRoutes: FastifyPluginAsync = async (fastify) => {
 
     try {
       const count = await fastify.prisma.departmentStufe.count({ where: { departmentId: tenant.id } });
+      const hitobitoGroupId = input.hitobitoGroupId ?? input.ceviDbGroupId ?? null;
       const stufe = await fastify.prisma.departmentStufe.create({
         data: {
           departmentId: tenant.id,
           name: input.name,
-          ceviDbGroupId: input.ceviDbGroupId ?? null,
+          hitobitoGroupId,
           sortOrder: input.sortOrder ?? count,
         },
       });
-      if (stufe.ceviDbGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);
+      if (stufe.hitobitoGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);
       return reply.status(201).send(toStufeDto(stufe));
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -103,18 +104,19 @@ const departmentStufenRoutes: FastifyPluginAsync = async (fastify) => {
       if (!existing) return reply.status(404).send({ error: 'Stufe nicht gefunden' });
 
       try {
+        const hitobitoGroupId = input.hitobitoGroupId !== undefined ? input.hitobitoGroupId : input.ceviDbGroupId;
         const stufe = await fastify.prisma.departmentStufe.update({
           where: { id: existing.id },
           data: {
             name: input.name,
-            ceviDbGroupId: input.ceviDbGroupId,
+            hitobitoGroupId,
             sortOrder: input.sortOrder,
           },
         });
-        if (input.ceviDbGroupId !== undefined && input.ceviDbGroupId !== existing.ceviDbGroupId) {
+        if (hitobitoGroupId !== undefined && hitobitoGroupId !== existing.hitobitoGroupId) {
           // Zuordnungen aus Cevi.DB zur alten Gruppe gelten nicht mehr
           await fastify.prisma.userStufe.deleteMany({ where: { stufeId: stufe.id, source: 'CEVIDB' } });
-          if (stufe.ceviDbGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);
+          if (stufe.hitobitoGroupId !== null) await backfillCeviDbStufen(fastify.prisma, tenant.id);
         }
         return toStufeDto(stufe);
       } catch (err) {

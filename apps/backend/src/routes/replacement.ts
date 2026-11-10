@@ -63,7 +63,7 @@ const replacementRoutes: FastifyPluginAsync = async (fastify) => {
       if (!isSelf) {
         const performer = await fastify.prisma.user.findUnique({
           where: { id: request.user.id },
-          select: { firstName: true, lastName: true, ceviName: true },
+          select: { firstName: true, lastName: true, nickname: true },
         });
         byName = performer ? `${personLabel(performer)} (OK)` : 'OK';
       }

@@ -45,8 +45,8 @@ export function validateAnswers(
   return null;
 }
 
-const displayNameOf = (u: { ceviName: string | null; firstName: string; lastName: string | null }) =>
-  u.ceviName || `${u.firstName} ${u.lastName ?? ''}`.trim();
+const displayNameOf = (u: { nickname?: string | null; ceviName?: string | null; firstName: string; lastName: string | null }) =>
+  u.nickname || u.ceviName || `${u.firstName} ${u.lastName ?? ''}`.trim();
 
 /** Zugangs-Links, Pflichtangaben/Fragen und die Teilnehmerliste fürs OK */
 const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
@@ -107,7 +107,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
         where: { eventId: event.id },
         include: {
           grants: {
-            include: { user: { select: { id: true, ceviName: true, firstName: true, lastName: true } } },
+            include: { user: { select: { id: true, nickname: true, firstName: true, lastName: true } } },
             orderBy: { createdAt: 'asc' },
           },
         },
@@ -125,7 +125,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const boundUsers = boundUserIds.length
         ? await fastify.prisma.user.findMany({
             where: { id: { in: boundUserIds } },
-            select: { id: true, ceviName: true, firstName: true, lastName: true },
+            select: { id: true, nickname: true, firstName: true, lastName: true },
           })
         : [];
       const boundUserMap = new Map(boundUsers.map((u) => [u.id, u]));
@@ -366,7 +366,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           user: {
             select: {
               id: true,
-              ceviName: true,
+              nickname: true,
               firstName: true,
               lastName: true,
               email: true,
@@ -377,7 +377,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
                 select: { stufe: { select: { id: true, name: true, sortOrder: true } } },
                 orderBy: { stufe: { sortOrder: 'asc' } },
               },
-              ceviDbStufen: {
+              hitobitoStufen: {
                 select: { groupName: true, isPrimary: true },
                 orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }],
               },
@@ -436,7 +436,8 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
         const su = signups.find((s) => (s.user ? `u:${s.user.id}` === key : `g:${(s.guestName || '').toLowerCase()}` === key));
         rosterCandidates.push({
           personKey: key,
-          ceviName: su?.user?.ceviName ?? null,
+          nickname: su?.user?.nickname ?? null,
+          ceviName: su?.user?.nickname ?? null,
           firstName: p.firstName,
           lastName: p.lastName,
           guestName: su?.guestName ?? null,
@@ -516,11 +517,12 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           id: true,
           firstName: true,
           lastName: true,
-          ceviName: true,
+          nickname: true,
           birthDate: true,
           isGlobalAdmin: true,
-          ceviDbId: true,
-          ceviDbDepartmentLeader: true,
+          providerId: true,
+          provider: true,
+          departmentLeader: true,
           homeDepartmentId: true,
           homeDepartmentSource: true,
           homeDepartment: { select: { id: true, name: true } },
@@ -537,7 +539,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
               stufe: { select: { id: true, name: true, departmentId: true, sortOrder: true } },
             },
           },
-          ceviDbStufen: { select: { kind: true } },
+          hitobitoStufen: { select: { kind: true } },
           signups: {
             where: { shift: { eventId: event.id } },
             select: {
@@ -577,9 +579,9 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           const accessUser: AccessUser = {
             id: u.id,
             isGlobalAdmin: u.isGlobalAdmin,
-            ceviDbId: u.ceviDbId,
-            ceviDbDepartmentLeader: u.ceviDbDepartmentLeader,
-            ceviDbStufen: u.ceviDbStufen,
+            providerId: u.providerId,
+            departmentLeader: u.departmentLeader,
+            hitobitoStufen: u.hitobitoStufen,
             homeDepartmentId: u.homeDepartmentId,
             homeDepartmentSource: u.homeDepartmentSource,
             stufen: u.stufen.map((s) => ({ stufeId: s.stufeId, role: s.role, source: s.source })),
@@ -629,7 +631,8 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
 
         items.push({
           userId: u.id,
-          ceviName: u.ceviName,
+          nickname: u.nickname,
+          ceviName: u.nickname,
           firstName: u.firstName,
           lastName: u.lastName,
           displayName: personLabel(u),
@@ -657,7 +660,8 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       // Eindeutige Namen für alle Personen im Helfer-Pool berechnen (A1 für Druck-Sachen & Abteilungs-Pool)
       const poolCandidates: DisambiguationCandidate[] = items.map((i) => ({
         personKey: i.userId,
-        ceviName: i.ceviName,
+        nickname: i.nickname,
+        ceviName: i.nickname ?? i.ceviName ?? null,
         firstName: i.firstName,
         lastName: i.lastName,
         stufe: i.stufen[0]?.name ?? null,
@@ -713,7 +717,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: input.userId },
-        select: { id: true, firstName: true, lastName: true, ceviName: true },
+        select: { id: true, firstName: true, lastName: true, nickname: true },
       });
       if (!user) {
         return reply.status(404).send({ error: 'Person nicht gefunden' });

@@ -11,11 +11,13 @@ export function canChangeOwnEmail(user: {
   email: string | null;
   emailVerified: boolean;
   passwordHash: string | null;
-  ceviDbId: number | null;
+  providerId?: string | null;
+  ceviDbId?: number | null;
 }): boolean {
   const hasRealEmail = Boolean(user.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
   if (!hasRealEmail) return true;
-  return !user.emailVerified && !user.passwordHash && user.ceviDbId === null;
+  const hasProvider = user.providerId !== undefined ? Boolean(user.providerId) : user.ceviDbId !== null && user.ceviDbId !== undefined;
+  return !user.emailVerified && !user.passwordHash && !hasProvider;
 }
 
 /**
@@ -32,9 +34,9 @@ export async function applyProfileUpdate(
     where: { id: userId },
     select: {
       email: true,
-      ceviName: true,
+      nickname: true,
       passwordHash: true,
-      ceviDbId: true,
+      providerId: true,
       emailVerified: true,
       birthDate: true,
       homeDepartmentId: true,
@@ -73,16 +75,16 @@ export async function applyProfileUpdate(
     const date = new Date(`${input.birthDate}T00:00:00Z`);
     if (isNaN(date.getTime()) || date > new Date()) return { error: 'Ungültiges Geburtsdatum', status: 400 };
     // Bei Cevi.DB-Konten kommt das Geburtsdatum aus Cevi.DB (zählt für Altersgrenzen): dort ändern
-    if (user.ceviDbId !== null && user.birthDate && user.birthDate.getTime() !== date.getTime()) {
+    if (user.providerId !== null && user.birthDate && user.birthDate.getTime() !== date.getTime()) {
       return { error: 'Dein Geburtsdatum kommt aus Cevi.DB. Ändere es bitte dort.', status: 400 };
     }
     // Bei Cevi-Name-Profilen ist das Geburtsdatum Teil des Logins: pro Abteilung eindeutig mit dem Namen
-    if (user.ceviName && isCeviNameProfile(user)) {
+    if (user.nickname && isCeviNameProfile(user)) {
       const departmentIds = [
         ...new Set([user.homeDepartmentId, ...user.memberships.map((m) => m.departmentId)].filter(Boolean)),
       ] as string[];
       for (const departmentId of departmentIds) {
-        const clash = (await findCeviNameMatches(prisma, departmentId, user.ceviName, input.birthDate)).some(
+        const clash = (await findCeviNameMatches(prisma, departmentId, user.nickname, input.birthDate)).some(
           (m) => m.id !== userId
         );
         if (clash) {
@@ -100,7 +102,7 @@ export async function applyProfileUpdate(
     if (nextEmail !== user.email) {
       if (!canChangeOwnEmail(user)) {
         return {
-          error: user.ceviDbId !== null
+          error: user.providerId !== null
             ? 'Deine E-Mail kommt aus Cevi.DB. Ändere sie bitte dort.'
             : 'Deine E-Mail-Adresse lässt sich hier nicht mehr ändern.',
           status: 400,

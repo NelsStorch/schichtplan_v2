@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { CalendarDays, ClipboardCheck, Clock, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
-import type { EventRosterResponseDto } from '@schichtplan/shared';
+import { getOrganization, type EventRosterResponseDto } from '@schichtplan/shared';
 import { Button, Card, Chip, Dialog, Switch, cn, trackUi, useToast } from '@schichtplan/ui';
 import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
 import { useOkEvent } from '@/components/ok/OkContext';
@@ -18,6 +18,7 @@ import { PRINT_LAYOUTS, createShiftPlanPdf, downloadBlob, pdfFilename, printBlob
 export default function ExportPage() {
   const { event, base } = useOkEvent();
   const toast = useToast();
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [helperHoursOpen, setHelperHoursOpen] = useState(false);
@@ -83,11 +84,11 @@ export default function ExportPage() {
       const roster = await api<EventRosterResponseDto>(`/api/events/${event.slug}/roster`);
       const min = roster.minShiftsPerPerson;
       const rows: (string | number)[][] = [
-        ['Cevi-Name', 'Vorname', 'Nachname', 'Abteilung', 'Stufe', 'Alter am Anlass', 'Schichten', ...(min ? ['Soll erfüllt'] : []), 'Abgemeldet', 'Grund'],
+        [org.nicknameTerm, 'Vorname', 'Nachname', org.unitTerm, 'Stufe', 'Alter am Anlass', 'Schichten', ...(min ? ['Soll erfüllt'] : []), 'Abgemeldet', 'Grund'],
       ];
       for (const i of roster.items) {
         rows.push([
-          i.ceviName ?? '',
+          (i.nickname || i.ceviName) ?? '',
           i.firstName,
           i.lastName ?? '',
           i.departmentName ?? '',

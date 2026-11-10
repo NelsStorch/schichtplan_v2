@@ -7,6 +7,7 @@ function match(overrides: Partial<Match> = {}): Match {
   return {
     id: 'u1',
     passwordHash: null,
+    providerId: null,
     ceviDbId: null,
     isGlobalAdmin: false,
     memberships: [],

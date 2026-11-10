@@ -21,6 +21,7 @@ export interface HelperPersonStat {
   displayName: string;
   firstName?: string;
   lastName?: string;
+  nickname?: string | null;
   ceviName?: string | null;
   subName?: string | null;
   departmentName?: string | null;
@@ -123,6 +124,7 @@ export function computeHelperStats(
           displayName: su.displayName,
           firstName: su.userFirstName ?? undefined,
           lastName: su.userLastName ?? undefined,
+          nickname: su.userCeviName ?? null,
           ceviName: su.userCeviName ?? null,
           subName: isGuest
             ? 'Gast, vom OK eingetragen'
@@ -175,8 +177,9 @@ export function computeHelperStats(
           displayName: resp.displayName,
           firstName: resp.firstName,
           lastName: resp.lastName ?? undefined,
-          ceviName: resp.ceviName ?? null,
-          subName: resp.ceviName
+          nickname: resp.nickname ?? resp.ceviName ?? null,
+          ceviName: resp.nickname ?? resp.ceviName ?? null,
+          subName: (resp.nickname ?? resp.ceviName)
             ? `${resp.firstName} ${resp.lastName || ''}`.trim()
             : null,
           departmentName: null,
@@ -228,7 +231,10 @@ export function computeHelperStats(
         helper.departmentName = item.departmentName ?? helper.departmentName;
         helper.stufen = item.stufen?.map((s) => s.name) ?? helper.stufen;
         helper.age = item.age ?? helper.age;
-        if (item.ceviName) helper.ceviName = item.ceviName;
+        if (item.nickname || item.ceviName) {
+          helper.nickname = item.nickname ?? item.ceviName;
+          helper.ceviName = item.nickname ?? item.ceviName;
+        }
         if (item.firstName) helper.firstName = item.firstName;
         if (item.lastName) helper.lastName = item.lastName;
       }

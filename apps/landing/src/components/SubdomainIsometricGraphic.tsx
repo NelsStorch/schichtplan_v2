@@ -1,8 +1,34 @@
-
 import { Lock, Calendar, Users } from 'lucide-react';
-import { CeviLogo } from './CeviLogo';
+import type { OrganizationConfig } from '@schichtplan/shared';
+import { BrandLogo } from './CeviLogo';
 
-export function SubdomainIsometricGraphic({ className = '' }: { className?: string }) {
+export function SubdomainIsometricGraphic({
+  className = '',
+  org,
+}: {
+  className?: string;
+  org?: OrganizationConfig;
+}) {
+  const domain = org ? `.${org.domain}` : '.cevi-schichtplan.ch';
+  const slug =
+    org?.slug === 'pfadi'
+      ? 'st-georg'
+      : org?.slug === 'jubla'
+      ? 'wohlen'
+      : org?.slug === 'verein'
+      ? 'turnverein'
+      : 'illnau';
+  const name =
+    org?.slug === 'pfadi'
+      ? 'Pfadi St. Georg'
+      : org?.slug === 'jubla'
+      ? 'Jubla Wohlen'
+      : org?.slug === 'verein'
+      ? 'Turnverein Oberglatt'
+      : 'Cevi Illnau-Effretikon';
+  const unitTerm = org?.unitTerm ?? 'Abteilung';
+  const logoUrl = org?.logoUrl ?? '/images/cevi-logo.svg';
+
   return (
     <div className={`relative select-none w-full max-w-md mx-auto py-2 ${className}`}>
       {/* Mockup Browser Window */}
@@ -17,8 +43,8 @@ export function SubdomainIsometricGraphic({ className = '' }: { className?: stri
           {/* Address Bar */}
           <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-line text-2xs font-mono text-fg truncate">
             <Lock className="size-2.5 text-emerald-500 shrink-0" />
-            <span className="text-accent font-semibold shrink-0">illnau</span>
-            <span className="text-fg-subtle truncate">.cevi-schichtplan.ch</span>
+            <span className="text-accent font-semibold shrink-0">{slug}</span>
+            <span className="text-fg-subtle truncate">{domain}</span>
           </div>
         </div>
 
@@ -27,10 +53,10 @@ export function SubdomainIsometricGraphic({ className = '' }: { className?: stri
           {/* Department Header */}
           <div className="flex items-center justify-between pb-2.5 border-b border-line/60">
             <div className="flex items-center gap-2">
-              <CeviLogo className="size-6 shrink-0" />
+              <BrandLogo logoUrl={logoUrl} className="size-6 shrink-0" />
               <div>
-                <div className="font-display text-xs font-bold text-fg">Cevi Illnau-Effretikon</div>
-                <div className="text-[10px] text-fg-subtle">Schichtplanung der Abteilung</div>
+                <div className="font-display text-xs font-bold text-fg">{name}</div>
+                <div className="text-[10px] text-fg-subtle">Schichtplanung der {unitTerm}</div>
               </div>
             </div>
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[9px] font-bold text-accent-ink border border-accent/20">

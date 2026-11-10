@@ -38,6 +38,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import {
+  getOrganization,
   type DepartmentPersonDto,
   type EventDto,
   type ShiftDto,
@@ -83,6 +84,7 @@ export function useCommandItems(query: string) {
   const loginHref = useLoginHref();
   const { user, department, can, isDeptAdmin, logout } = usePortal();
   const { contextData, close, setActiveSubActionItem } = useCommandPalette();
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
 
   const [allEvents, setAllEvents] = useState<EventDto[]>([]);
   const [people, setPeople] = useState<DepartmentPerson[]>([]);
@@ -1248,7 +1250,7 @@ export function useCommandItems(query: string) {
       list.push({
         id: 'action-create-event',
         title: 'Neuen Anlass erstellen',
-        subtitle: 'Neues Cevi-Lager, Fest oder Veranstaltung erfassen',
+        subtitle: `Neues ${org.name}-Lager, Fest oder Veranstaltung erfassen`,
         section: 'ACTIONS',
         icon: <CalendarPlus className="size-4 text-accent-ink" />,
         keywords: ['anlass', 'event', 'neu', 'erstellen', 'veranstaltung'],
@@ -1270,7 +1272,7 @@ export function useCommandItems(query: string) {
     if (can('DEPARTMENT_SETTINGS') || isDeptAdmin) {
       list.push({
         id: 'action-dept-settings',
-        title: 'Abteilung bearbeiten',
+        title: `${org.unitTerm} bearbeiten`,
         subtitle: 'Name, Logo, Akzentfarbe und Startseiten-Einstellungen',
         section: 'ACTIONS',
         icon: <Settings2 className="size-4 text-accent-ink" />,
@@ -1287,10 +1289,10 @@ export function useCommandItems(query: string) {
       list.push({
         id: 'action-manage-stufen',
         title: 'Stufen verwalten',
-        subtitle: 'Stufen erfassen, Cevi.DB verknüpfen oder bearbeiten',
+        subtitle: `Stufen erfassen, ${org.authProviderShort || 'Verband'} verknüpfen oder bearbeiten`,
         section: 'ACTIONS',
         icon: <Wrench className="size-4 text-accent-ink" />,
-        keywords: ['stufen', 'gruppen', 'cevidb', 'verwalten'],
+        keywords: ['stufen', 'gruppen', ...(org.authProviderShort ? [org.authProviderShort.toLowerCase()] : []), 'verwalten'],
         onSelect: () => {
           recordRecentCommand('action-manage-stufen');
           router.push('/?stufen=1');
@@ -1963,7 +1965,7 @@ export function useCommandItems(query: string) {
             quickActions: personQuickActions,
             details: [
               { label: 'Name', value: `${person.firstName || ''} ${person.lastName || ''}`.trim() || person.name },
-              ...(person.ceviName ? [{ label: 'Cevi-Name', value: person.ceviName }] : []),
+              ...(person.ceviName ? [{ label: org.nicknameTerm, value: person.ceviName }] : []),
               ...(person.email ? [{ label: 'E-Mail', value: person.email }] : []),
               ...(person.phone ? [{ label: 'Telefon', value: person.phone }] : []),
               ...(activeEvent
@@ -2042,15 +2044,18 @@ export function useCommandItems(query: string) {
       });
     }
 
+    const helpBase = `https://hilfe.${org.domain}`;
+    const statusBase = `https://status.${org.domain}`;
+
     list.push({
       id: 'nav-help',
       title: 'Hilfe-Center öffnen',
-      subtitle: 'Anleitungen für Helfende, OK-Teams und Abteilungsleiter',
+      subtitle: `Anleitungen für Helfende, OK-Teams und ${org.unitTerm}sleiter`,
       section: 'NAVIGATION',
       icon: <LifeBuoy className="size-4" />,
       keywords: ['hilfe', 'anleitung', 'support', 'doku', 'faq'],
       onSelect: () => {
-        window.open('https://hilfe.cevi-schichtplan.ch', '_blank', 'noopener,noreferrer');
+        window.open(helpBase, '_blank', 'noopener,noreferrer');
         close();
       },
       subActions: [
@@ -2059,7 +2064,7 @@ export function useCommandItems(query: string) {
           title: 'In neuem Tab öffnen',
           icon: <ExternalLink className="size-3.5" />,
           onSelect: () => {
-            window.open('https://hilfe.cevi-schichtplan.ch', '_blank');
+            window.open(helpBase, '_blank');
           },
         },
       ],
@@ -2073,7 +2078,7 @@ export function useCommandItems(query: string) {
       icon: <ExternalLink className="size-4" />,
       keywords: ['status', 'uptime', 'server', 'betrieb'],
       onSelect: () => {
-        window.open('https://status.cevi-schichtplan.ch', '_blank', 'noopener,noreferrer');
+        window.open(statusBase, '_blank', 'noopener,noreferrer');
         close();
       },
     });
@@ -2128,10 +2133,10 @@ export function useCommandItems(query: string) {
       list.push({
         id: 'system-login',
         title: 'Anmelden',
-        subtitle: 'Mit Cevi.DB oder E-Mail/Passwort anmelden',
+        subtitle: org.authProviderShort ? `Mit ${org.authProviderShort} oder E-Mail/Passwort anmelden` : 'Mit E-Mail/Passwort anmelden',
         section: 'SYSTEM',
         icon: <LogIn className="size-4 text-accent-ink" />,
-        keywords: ['anmelden', 'login', 'einloggen', 'cevidb'],
+        keywords: ['anmelden', 'login', 'einloggen', ...(org.authProviderShort ? [org.authProviderShort.toLowerCase()] : [])],
         onSelect: () => {
           window.location.href = loginHref;
           close();

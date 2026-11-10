@@ -26,7 +26,7 @@ export async function deleteExpiredUnverifiedAccounts(
     where: {
       emailVerified: false,
       passwordHash: { not: null },
-      ceviDbId: null,
+      providerId: null,
       isGlobalAdmin: false,
       // Erst nach Ablauf der Frist, auch wenn der Link schon vorher gelöscht wurde
       createdAt: { lte: new Date(now.getTime() - UNVERIFIED_ACCOUNT_TTL_MS) },
@@ -51,7 +51,7 @@ export async function deleteExpiredUnverifiedAccounts(
     try {
       // Bedingungen beim Löschen nochmals prüfen: Dazwischen könnte die Adresse bestätigt worden sein
       const { count } = await prisma.user.deleteMany({
-        where: { id, emailVerified: false, passwordHash: { not: null }, ceviDbId: null, signups: { none: {} } },
+        where: { id, emailVerified: false, passwordHash: { not: null }, providerId: null, signups: { none: {} } },
       });
       deleted += count;
     } catch (err) {

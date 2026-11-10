@@ -23,7 +23,7 @@ export async function syncCeviDbLeadership(
 ) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { firstName: true, lastName: true, ceviName: true },
+    select: { firstName: true, lastName: true, nickname: true },
   });
   if (!user) return;
   const label = personLabel(user);

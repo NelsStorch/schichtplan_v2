@@ -41,7 +41,7 @@ export function googleCalendarSubscribeUrl(feedUrl: string): string {
 /**
  * Erzeugt den 1-Klick-Abonnement-Link für Outlook Web / Microsoft 365.
  */
-export function outlookCalendarSubscribeUrl(httpsUrl: string, name = 'Meine Cevi-Schichten'): string {
+export function outlookCalendarSubscribeUrl(httpsUrl: string, name = 'Meine Schichten'): string {
   return `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(httpsUrl)}&name=${encodeURIComponent(name)}`;
 }
 
@@ -65,11 +65,11 @@ export function downloadIcs(filename: string, entries: CalendarEntry[]) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Cevi Schichtplan//DE',
+    'PRODID:-//Schichtplan//DE',
     'CALSCALE:GREGORIAN',
     ...entries.flatMap((e) => [
       'BEGIN:VEVENT',
-      `UID:${e.uid}@cevi-schichtplan.ch`,
+      `UID:${e.uid}@schichtplan.ch`,
       `DTSTAMP:${stamp(new Date().toISOString())}`,
       `DTSTART:${stamp(e.start)}`,
       `DTEND:${stamp(e.end)}`,

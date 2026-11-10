@@ -15,7 +15,8 @@
 export interface DisambiguationCandidate {
   /** Eindeutige Kennung der Person (z. B. userId oder guest identifier) */
   personKey: string;
-  ceviName: string | null;
+  nickname?: string | null;
+  ceviName?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   guestName?: string | null;
@@ -25,17 +26,19 @@ export interface DisambiguationCandidate {
 
 /**
  * Ermittelt die Hauptstufe einer Person:
- * 1. ceviDbStufen mit isPrimary === true, sonst erste ceviDbStufe
+ * 1. hitobitoStufen / ceviDbStufen mit isPrimary === true, sonst erste Stufe
  * 2. erste zugeordnete Stufe aus stufen
  */
 export function extractPrimaryStufe(user: {
+  hitobitoStufen?: { groupName: string; isPrimary: boolean }[] | null;
   ceviDbStufen?: { groupName: string; isPrimary: boolean }[] | null;
   stufen?: { stufe: { name: string } }[] | null;
 } | null | undefined): string | null {
   if (!user) return null;
-  if (user.ceviDbStufen && user.ceviDbStufen.length > 0) {
-    const primary = user.ceviDbStufen.find((s) => s.isPrimary);
-    const name = primary?.groupName?.trim() || user.ceviDbStufen[0]?.groupName?.trim();
+  const stufenList = user.hitobitoStufen ?? user.ceviDbStufen;
+  if (stufenList && stufenList.length > 0) {
+    const primary = stufenList.find((s) => s.isPrimary);
+    const name = primary?.groupName?.trim() || stufenList[0]?.groupName?.trim();
     if (name) return name;
   }
   if (user.stufen && user.stufen.length > 0) {
@@ -69,7 +72,7 @@ export function disambiguatePersonNames(
   const withoutCeviName: DisambiguationCandidate[] = [];
 
   for (const c of candidates) {
-    const trimmed = c.ceviName?.trim();
+    const trimmed = (c.nickname ?? c.ceviName)?.trim();
     if (trimmed) {
       const norm = trimmed.toLowerCase();
       const list = byCeviName.get(norm) ?? [];

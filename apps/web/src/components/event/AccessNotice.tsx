@@ -1,7 +1,7 @@
 'use client';
 
 import { Building2, KeyRound, LogIn, ShieldCheck } from 'lucide-react';
-import { helpUrl } from '@schichtplan/shared';
+import { getOrganization, helpUrl } from '@schichtplan/shared';
 import { Callout, buttonClasses } from '@schichtplan/ui';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import type { EventDetails } from '@/lib/types';
@@ -9,6 +9,7 @@ import type { EventDetails } from '@/lib/types';
 /** Zeigt, ob und warum man sich (nicht) eintragen kann, mit dem passenden nächsten Schritt. */
 export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedIn: boolean }) {
   const loginHref = useLoginHref();
+  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
   const { access } = event.viewer;
 
   if (access.via === 'MANAGER' || access.via === 'RULES' || access.via === 'LINK') return null;
@@ -19,7 +20,7 @@ export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedI
     case 'LOGIN_REQUIRED':
       return (
         <Callout tone="info" title="Zum Eintragen anmelden">
-          <p>Ein Cevi-Name ohne Passwort reicht.</p>
+          <p>Ein {org.nicknameTerm} ohne Passwort reicht.</p>
           <a href={loginHref} className={buttonClasses({ size: 'sm', className: 'mt-3' })}>
             <LogIn /> Anmelden
           </a>
@@ -27,19 +28,19 @@ export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedI
       );
     case 'NO_DEPARTMENT':
       return (
-        <Callout tone="warning" title="Gib zuerst deine Abteilung an">
+        <Callout tone="warning" title={`Gib zuerst deine ${org.unitTerm} an`}>
           <p>Dieser Anlass ist für {event.audience}.</p>
           <a href={departmentSetupUrl()} className={buttonClasses({ size: 'sm', className: 'mt-3' })}>
-            <Building2 /> Abteilung angeben
+            <Building2 /> {org.unitTerm} angeben
           </a>
         </Callout>
       );
     case 'CEVIDB_REQUIRED':
       return (
-        <Callout tone="warning" title="Nur mit Cevi.DB-Login">
+        <Callout tone="warning" title={`Nur mit ${org.authProviderShort || 'Verbands'}-Login`}>
           <p>{access.message}</p>
           <a href={loginHref} className={buttonClasses({ size: 'sm', className: 'mt-3' })}>
-            <ShieldCheck /> Mit Cevi.DB anmelden
+            <ShieldCheck /> Mit {org.authProviderShort || 'Verband'} anmelden
           </a>
         </Callout>
       );

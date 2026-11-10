@@ -103,6 +103,7 @@ export const RegisterHelperSchema = z.object({
     .max(200, 'Passwort darf höchstens 200 Zeichen lang sein'),
   firstName: z.string().trim().min(2, 'Vorname erforderlich').max(80),
   lastName: z.string().trim().max(80).optional().or(z.literal('')),
+  nickname: z.string().trim().max(60).optional(),
   ceviName: z.string().trim().max(60).optional(),
   phone: z.string().trim().max(30).optional(),
 });
@@ -156,6 +157,7 @@ export type CeviNameRegisterInput = z.infer<typeof CeviNameRegisterSchema>;
 
 export const CreateEventOrganizerItemSchema = z.object({
   userId: z.string().uuid().optional(),
+  nickname: z.string().trim().max(60).optional(),
   ceviName: z.string().trim().max(60).optional(),
   email: z.string().email().max(254).optional(),
   role: z.enum(['OK_LEAD', 'OK_MEMBER']).default('OK_MEMBER'),
@@ -392,6 +394,7 @@ export type SetHomeDepartmentInput = z.infer<typeof SetHomeDepartmentSchema>;
 
 export const StufeInputSchema = z.object({
   name: z.string().trim().min(2, 'Name der Stufe ist zu kurz').max(60),
+  hitobitoGroupId: z.number().int().positive().max(2_147_483_647).optional().nullable(),
   ceviDbGroupId: z.number().int().positive().max(2_147_483_647).optional().nullable(),
   sortOrder: z.number().int().min(0).max(1000).optional(),
 });
@@ -415,6 +418,7 @@ export type UpdateDepartmentInput = z.infer<typeof UpdateDepartmentSchema>;
 
 export const AddEventOrganizerSchema = z.object({
   userId: z.string().uuid().optional(),
+  nickname: z.string().trim().max(60).optional(),
   ceviName: z.string().trim().max(60).optional(),
   email: z.string().email().max(254).optional(),
   role: z.enum(['OK_LEAD', 'OK_MEMBER']).default('OK_MEMBER'),
@@ -741,6 +745,8 @@ const CeviDbGroupIdSchema = z.number().int().positive().max(2_147_483_647);
 export const AdminCreateDepartmentSchema = z.object({
   name: z.string().trim().min(2, 'Name muss mindestens 2 Zeichen lang sein').max(80),
   slug: DepartmentSlugSchema,
+  organization: z.enum(['CEVI', 'PFADI', 'JUBLA', 'OTHER']).default('CEVI').optional(),
+  hitobitoGroupId: CeviDbGroupIdSchema.optional().nullable(),
   ceviDbGroupId: CeviDbGroupIdSchema.optional().nullable(),
   membersOnly: z.boolean().default(true),
   leaderUserId: z.string().uuid().optional().nullable(),
@@ -750,6 +756,8 @@ export type AdminCreateDepartmentInput = z.infer<typeof AdminCreateDepartmentSch
 
 export const AdminUpdateDepartmentSchema = UpdateDepartmentSchema.extend({
   slug: DepartmentSlugSchema.optional(),
+  organization: z.enum(['CEVI', 'PFADI', 'JUBLA', 'OTHER']).optional(),
+  hitobitoGroupId: CeviDbGroupIdSchema.optional().nullable(),
   ceviDbGroupId: CeviDbGroupIdSchema.optional().nullable(),
 });
 

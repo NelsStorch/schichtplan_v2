@@ -28,6 +28,7 @@ import {
   cancelDeadlineAt,
   cancelDeadlineText,
   isSignupTimeOpen,
+  getOrganization,
   type RequiredProfileField,
   type ShiftDto,
   type ShiftSignupDto,
@@ -38,7 +39,7 @@ import {
   Badge,
   Button,
   Callout,
-  CeviLogo,
+  BrandLogo,
   Chip,
   EmptyState,
   NotFoundView,
@@ -77,6 +78,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const toast = useToast();
   const confirm = useConfirm();
   const loginHref = useLoginHref();
+  const organization = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
   const { registerContextData } = useCommandPalette();
 
   const [event, setEvent] = useState<EventDetails | null>(null);
@@ -728,7 +730,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                       className="size-full object-cover"
                     />
                   ) : (
-                    <CeviLogo className="size-8" alt="" />
+                    <BrandLogo className="size-8" alt="" />
                   )}
                 </span>
                 <AccessTypeBadge type={event.accessType} leadersOnly={event.leadersOnly} tone="glass" />
@@ -857,7 +859,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                   <p>
                     Über diesen {event.viewer.pendingLink.kind === 'PERSONAL' ? 'persönlichen ' : 'Gruppen-'}Link
                     {event.viewer.pendingLink.label ? ` («${event.viewer.pendingLink.label}»)` : ''} kannst du dich für «{event.title}» eintragen.
-                    Melde dich kurz an, um den Zugang freizuschalten (ein Cevi-Name ohne Passwort reicht).
+                    Melde dich kurz an, um den Zugang freizuschalten (ein {organization.nicknameTerm} ohne Passwort reicht).
                   </p>
                   <a href={loginHref} className={buttonClasses({ size: 'sm', className: 'mt-3' })}>
                     <LogIn /> Anmelden und Zugang freischalten
@@ -889,15 +891,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
             <ul className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:px-0">
               {event.organizers?.map((org) => {
                 const lead = org.role === 'OK_LEAD';
+                const orgName = org.userNickname || org.userCeviName || org.userFirstName || org.displayName;
                 return (
                   <li
                     key={org.id}
                     className="flex shrink-0 snap-start items-center gap-2.5 rounded-full border border-line bg-surface py-1.5 pl-1.5 pr-4"
                   >
-                    <Avatar name={org.userCeviName || org.userFirstName} highlight={lead} size="sm" className="size-8" />
+                    <Avatar name={orgName} highlight={lead} size="sm" className="size-8" />
                     <span className="leading-tight">
                       <span className="flex items-center gap-1 text-sm font-semibold text-fg">
-                        {org.userCeviName || org.userFirstName}
+                        {orgName}
                         {lead ? <Crown className="size-3.5 text-accent-ink" /> : <Shield className="size-3.5 text-fg-subtle" />}
                       </span>
                       <span className="block text-xs text-fg-subtle">{org.roleTitle || (lead ? 'OK-Leitung' : 'OK-Mitglied')}</span>
@@ -905,7 +908,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
                     {canManageOk && (
                       <button
                         type="button"
-                        onClick={() => removeOrganizer(org.id, org.userCeviName || org.displayName)}
+                        onClick={() => removeOrganizer(org.id, orgName)}
                         aria-label={`${org.displayName} aus dem OK entfernen`}
                         className="-mr-2 ml-1 rounded-full p-1.5 text-fg-subtle transition hover:bg-danger/10 hover:text-danger-ink"
                       >

@@ -66,7 +66,7 @@ export function HelperHoursDialog({
     if (!q) return helpers;
     return helpers.filter((h) => {
       if (h.displayName.toLowerCase().includes(q)) return true;
-      if (h.ceviName && h.ceviName.toLowerCase().includes(q)) return true;
+      if ((h.nickname || h.ceviName) && (h.nickname || h.ceviName)!.toLowerCase().includes(q)) return true;
       if (h.departmentName && h.departmentName.toLowerCase().includes(q)) return true;
       if (h.stufen.some((s) => s.toLowerCase().includes(q))) return true;
       return false;
@@ -78,7 +78,7 @@ export function HelperHoursDialog({
     if (!q) return stufenStats;
     return stufenStats.filter((s) => {
       if (s.name.toLowerCase().includes(q)) return true;
-      if (s.helpers.some((h) => h.displayName.toLowerCase().includes(q) || (h.ceviName && h.ceviName.toLowerCase().includes(q)))) {
+      if (s.helpers.some((h) => h.displayName.toLowerCase().includes(q) || ((h.ceviName) && h.ceviName.toLowerCase().includes(q)))) {
         return true;
       }
       return false;

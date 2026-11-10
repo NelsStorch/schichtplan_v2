@@ -64,7 +64,8 @@ interface CandidateEntry {
     id: string | null;
     email: string | null;
     emailVerified: boolean;
-    ceviName: string | null;
+    nickname?: string | null;
+    ceviName?: string | null;
     firstName: string;
     shiftRemindersEnabled: boolean;
     emailReminderMinutes: number[];
@@ -192,7 +193,7 @@ export async function sendDueShiftReminders(
             id: true,
             email: true,
             emailVerified: true,
-            ceviName: true,
+            nickname: true,
             firstName: true,
             shiftRemindersEnabled: true,
             emailReminderMinutes: true,
@@ -237,7 +238,7 @@ export async function sendDueShiftReminders(
             id: true,
             email: true,
             emailVerified: true,
-            ceviName: true,
+            nickname: true,
             firstName: true,
             shiftRemindersEnabled: true,
             emailReminderMinutes: true,
@@ -289,7 +290,8 @@ export async function sendDueShiftReminders(
           id: s.user.id,
           email: s.user.email,
           emailVerified: s.user.emailVerified,
-          ceviName: s.user.ceviName,
+          nickname: s.user.nickname,
+          ceviName: s.user.nickname,
           firstName: s.user.firstName,
           shiftRemindersEnabled: s.user.shiftRemindersEnabled,
           emailReminderMinutes:
@@ -365,7 +367,8 @@ export async function sendDueShiftReminders(
         id: r.user.id,
         email: r.user.email,
         emailVerified: r.user.emailVerified,
-        ceviName: r.user.ceviName,
+        nickname: r.user.nickname,
+        ceviName: r.user.nickname,
         firstName: r.user.firstName,
         shiftRemindersEnabled: r.user.shiftRemindersEnabled,
         emailReminderMinutes:
@@ -427,7 +430,7 @@ export async function sendDueShiftReminders(
             try {
               ok = await send({
                 to: user.email,
-                name: user.ceviName || user.firstName,
+                name: user.nickname || user.ceviName || user.firstName,
                 eventTitle: shift.event.title,
                 shiftTitle,
                 timeRangeFormatted: timeFormatted,

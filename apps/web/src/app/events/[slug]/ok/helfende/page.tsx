@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } f
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, ChevronDown, ChevronUp, Clock, Filter, Mail, Plus, Search, UserCheck, UserMinus, UserPlus, Users, X } from 'lucide-react';
-import type { EventRosterResponseDto, ShiftCollisionCheckResult, ShiftDto } from '@schichtplan/shared';
+import { getOrganization, type EventRosterResponseDto, type ShiftCollisionCheckResult, type ShiftDto } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -63,6 +63,7 @@ function HelpersPage() {
   const params = useSearchParams();
   const toast = useToast();
   const confirm = useConfirm();
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
 
   const [roster, setRoster] = useState<EventRosterResponseDto | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
@@ -137,8 +138,8 @@ function HelpersPage() {
     const people: PersonRow[] = (roster?.items ?? []).map((i) => ({
       key: i.userId,
       userId: i.userId,
-      name: i.ceviName || `${i.firstName} ${i.lastName}`.trim(),
-      subName: i.ceviName ? `${i.firstName} ${i.lastName}`.trim() : null,
+      name: i.nickname || i.ceviName || `${i.firstName} ${i.lastName}`.trim(),
+      subName: (i.nickname || i.ceviName) ? `${i.firstName} ${i.lastName}`.trim() : null,
       departmentName: i.departmentName,
       stufen: i.stufen,
       age: i.age,
@@ -299,7 +300,7 @@ function HelpersPage() {
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
             <Input
               className="h-10 pl-9 text-sm"
-              placeholder="Name, Cevi-Name oder Stufe…"
+              placeholder={`Name, ${org.nicknameTerm} oder Stufe…`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Personen durchsuchen"
@@ -316,8 +317,8 @@ function HelpersPage() {
             </Select>
           )}
           {departments.length > 1 && (
-            <Select className="h-10 w-auto text-sm" value={dept} onChange={(e) => setDept(e.target.value)} aria-label="Abteilung">
-              <option value="ALL">Alle Abteilungen</option>
+            <Select className="h-10 w-auto text-sm" value={dept} onChange={(e) => setDept(e.target.value)} aria-label={org.unitTerm}>
+              <option value="ALL">Alle {org.unitTerm === 'Abteilung' ? 'Abteilungen' : org.unitTerm === 'Schar' ? 'Scharen' : 'Vereine'}</option>
               {departments.map((d) => (
                 <option key={d} value={d}>
                   {d}

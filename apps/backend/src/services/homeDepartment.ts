@@ -4,13 +4,13 @@
  * Alle anderen geben beides beim Login selbst an (Quelle SELF).
  * Grundlage sind die beim Login gespeicherten Spalten (users.ceviDb*) und user_cevidb_stufen.
  */
-import type { PrismaClient } from '../db.js';
+import type { OrganizationType, PrismaClient } from '../db.js';
 import type { CeviDbStufeDto, StufeRole, UserStufeDto } from '@schichtplan/shared';
 import { placeCeviDbPerson, type CeviDbDerived, type CeviDbPlacement } from './cevidb.js';
 
 type Db = Pick<
   PrismaClient,
-  'department' | 'departmentStufe' | 'user' | 'userStufe' | 'userCeviDbStufe' | 'ceviDbGroup'
+  'department' | 'departmentStufe' | 'user' | 'userStufe' | 'userHitobitoStufe' | 'hitobitoGroup'
 > & {
   $transaction?: any;
 };
@@ -26,21 +26,22 @@ async function runInTransaction<T>(prisma: Db, fn: (tx: any) => Promise<T>): Pro
 export async function resolveCeviDbPlacement(
   prisma: Db,
   derived: CeviDbDerived,
-  currentHomeDepartmentId: string | null
+  currentHomeDepartmentId: string | null,
+  provider: OrganizationType = 'CEVI'
 ): Promise<CeviDbPlacement> {
-  const roleGroups = await prisma.ceviDbGroup.findMany({ where: { id: { in: derived.roleGroupIds } } });
+  const roleGroups = await prisma.hitobitoGroup.findMany({ where: { provider, id: { in: derived.roleGroupIds } } });
   const ortsgruppeIds = roleGroups.map((g) => g.ortsgruppeId).filter((id): id is number => id !== null);
-  const ortsgruppen = await prisma.ceviDbGroup.findMany({ where: { id: { in: ortsgruppeIds } } });
+  const ortsgruppen = await prisma.hitobitoGroup.findMany({ where: { provider, id: { in: ortsgruppeIds } } });
   const groups = new Map([...roleGroups, ...ortsgruppen].map((g) => [g.id, g]));
 
   const departmentGroupIds = [...roleGroups.map((g) => g.jungscharId), ...ortsgruppeIds, derived.ortsgruppeId].filter(
     (id): id is number => id !== null
   );
   const departments = await prisma.department.findMany({
-    where: { ceviDbGroupId: { in: departmentGroupIds } },
-    select: { id: true, ceviDbGroupId: true },
+    where: { organization: provider, hitobitoGroupId: { in: departmentGroupIds } },
+    select: { id: true, hitobitoGroupId: true },
   });
-  const departmentByGroup = new Map(departments.map((d) => [d.ceviDbGroupId!, d.id]));
+  const departmentByGroup = new Map(departments.map((d) => [d.hitobitoGroupId!, d.id]));
   return placeCeviDbPerson(derived, groups, departmentByGroup, currentHomeDepartmentId);
 }
 
@@ -55,18 +56,18 @@ export async function storeCeviDbFields(
     await tx.user.update({
       where: { id: userId },
       data: {
-        ceviDbOrtsgruppeId: placement.verified ? placement.ortsgruppeId : derived.ortsgruppeId,
-        ceviDbOrtsgruppeName: placement.verified ? placement.ortsgruppeName : derived.ortsgruppeName,
-        ceviDbDepartmentLeader: derived.isDepartmentLeader,
-        ceviDbLeaderGroupName: derived.leaderGroupName,
-        ceviDbLeaderGroupIds: derived.leaderGroupIds,
+        ortsgruppeId: placement.verified ? placement.ortsgruppeId : derived.ortsgruppeId,
+        ortsgruppeName: placement.verified ? placement.ortsgruppeName : derived.ortsgruppeName,
+        departmentLeader: derived.isDepartmentLeader,
+        leaderGroupName: derived.leaderGroupName,
+        leaderGroupIds: derived.leaderGroupIds,
         // Ohne vollständige Gruppenstruktur bleibt der letzte geprüfte Stand
-        ...(placement.verified && placement.complete ? { ceviDbJungscharIds: placement.jungscharIds } : {}),
+        ...(placement.verified && placement.complete ? { jungscharIds: placement.jungscharIds } : {}),
       },
     });
-    await tx.userCeviDbStufe.deleteMany({ where: { userId } });
+    await tx.userHitobitoStufe.deleteMany({ where: { userId } });
     if (derived.stufen.length) {
-      await tx.userCeviDbStufe.createMany({
+      await tx.userHitobitoStufe.createMany({
         data: derived.stufen.map((s) => ({
           userId,
           groupId: s.groupId,
@@ -90,9 +91,16 @@ export async function autoCreateAllCeviDbDepartmentStufen(
   prisma: Db,
   departmentId: string
 ) {
-  const fromCeviDb = await prisma.userCeviDbStufe.findMany({
+  const department = await prisma.department.findUnique({
+    where: { id: departmentId },
+    select: { organization: true, hitobitoGroupId: true },
+  });
+  const provider: OrganizationType = department?.organization ?? 'CEVI';
+
+  const fromCeviDb = await prisma.userHitobitoStufe.findMany({
     where: {
       user: {
+        provider,
         OR: [
           { homeDepartmentId: departmentId },
           { memberships: { some: { departmentId } } },
@@ -103,13 +111,12 @@ export async function autoCreateAllCeviDbDepartmentStufen(
   });
   if (!fromCeviDb.length) return;
 
-  const department = await prisma.department.findUnique({
-    where: { id: departmentId },
-    select: { ceviDbGroupId: true },
-  });
-  const departmentGroupId = department?.ceviDbGroupId ?? null;
-  const structure = await prisma.ceviDbGroup.findMany({
-    where: { id: { in: [...fromCeviDb.map((s) => s.groupId), ...(departmentGroupId !== null ? [departmentGroupId] : [])] } },
+  const departmentGroupId = department?.hitobitoGroupId ?? null;
+  const structure = await prisma.hitobitoGroup.findMany({
+    where: {
+      provider,
+      id: { in: [...fromCeviDb.map((s) => s.groupId), ...(departmentGroupId !== null ? [departmentGroupId] : [])] },
+    },
   });
   const groupInfo = new Map(structure.map((g) => [g.id, g]));
   const departmentIsJungschar = departmentGroupId !== null && groupInfo.get(departmentGroupId)?.jungscharId === departmentGroupId;
@@ -123,12 +130,12 @@ export async function autoCreateAllCeviDbDepartmentStufen(
 
   const existingStufen = await prisma.departmentStufe.findMany({
     where: { departmentId },
-    select: { id: true, name: true, ceviDbGroupId: true, sortOrder: true },
+    select: { id: true, name: true, hitobitoGroupId: true, sortOrder: true },
   });
 
   let maxSortOrder = existingStufen.reduce((max, s) => Math.max(max, s.sortOrder), -1);
-  const byCeviDbGroupId = new Map(
-    existingStufen.filter((s) => s.ceviDbGroupId !== null).map((s) => [s.ceviDbGroupId!, s])
+  const byHitobitoGroupId = new Map(
+    existingStufen.filter((s) => s.hitobitoGroupId !== null).map((s) => [s.hitobitoGroupId!, s])
   );
   const byName = new Map(existingStufen.map((s) => [s.name.trim().toLowerCase(), s]));
 
@@ -142,18 +149,18 @@ export async function autoCreateAllCeviDbDepartmentStufen(
   }
 
   for (const [groupId, rawName] of uniqueGroups.entries()) {
-    if (byCeviDbGroupId.has(groupId)) {
+    if (byHitobitoGroupId.has(groupId)) {
       continue;
     }
 
     const groupName = rawName.trim();
     const matchByName = byName.get(groupName.toLowerCase());
-    if (matchByName && matchByName.ceviDbGroupId === null) {
+    if (matchByName && matchByName.hitobitoGroupId === null) {
       await prisma.departmentStufe.update({
         where: { id: matchByName.id },
-        data: { ceviDbGroupId: groupId },
+        data: { hitobitoGroupId: groupId },
       });
-      byCeviDbGroupId.set(groupId, { ...matchByName, ceviDbGroupId: groupId });
+      byHitobitoGroupId.set(groupId, { ...matchByName, hitobitoGroupId: groupId });
       createdOrLinkedAny = true;
       continue;
     }
@@ -169,11 +176,11 @@ export async function autoCreateAllCeviDbDepartmentStufen(
         data: {
           departmentId,
           name: nameToUse,
-          ceviDbGroupId: groupId,
+          hitobitoGroupId: groupId,
           sortOrder: maxSortOrder,
         },
       });
-      byCeviDbGroupId.set(groupId, created);
+      byHitobitoGroupId.set(groupId, created);
       byName.set(nameToUse.toLowerCase(), created);
       createdOrLinkedAny = true;
     } catch {
@@ -195,11 +202,18 @@ export async function autoCreateCeviDbDepartmentStufen(
 }
 
 /** Stufen aus Cevi.DB abgleichen: nur Stufen, die eine Abteilung mit ihrer Cevi.DB-Gruppe verknüpft hat. */
-export async function syncCeviDbStufen(prisma: Db, userId: string) {
-  const fromCeviDb = await prisma.userCeviDbStufe.findMany({ where: { userId } });
+export async function syncCeviDbStufen(prisma: Db, userId: string, provider?: OrganizationType) {
+  let effectiveProvider = provider;
+  if (!effectiveProvider) {
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { provider: true } });
+    effectiveProvider = u?.provider ?? 'CEVI';
+  }
+  const fromCeviDb = await prisma.userHitobitoStufe.findMany({ where: { userId } });
   const groupIds = fromCeviDb.map((s) => s.groupId);
   const linked = groupIds.length
-    ? await prisma.departmentStufe.findMany({ where: { ceviDbGroupId: { in: groupIds } } })
+    ? await prisma.departmentStufe.findMany({
+        where: { hitobitoGroupId: { in: groupIds }, department: { organization: effectiveProvider } },
+      })
     : [];
 
   await runInTransaction(prisma, async (tx) => {
@@ -207,7 +221,7 @@ export async function syncCeviDbStufen(prisma: Db, userId: string) {
       where: { userId, source: 'CEVIDB', stufeId: { notIn: linked.map((s) => s.id) } },
     });
     for (const stufe of linked) {
-      const kind = fromCeviDb.find((s) => s.groupId === stufe.ceviDbGroupId)?.kind;
+      const kind = fromCeviDb.find((s) => s.groupId === stufe.hitobitoGroupId)?.kind;
       const role: StufeRole = kind === 'LEITUNG' ? 'LEITUNG' : 'TEILNEHMER';
       await tx.userStufe.upsert({
         where: { userId_stufeId: { userId, stufeId: stufe.id } },
@@ -221,10 +235,17 @@ export async function syncCeviDbStufen(prisma: Db, userId: string) {
 /** Gehört in jedes Schreiben von homeDepartmentSource, das eine Bestätigung beendet */
 export const NO_HOME_CONFIRMATION = { homeDepartmentConfirmedAt: null, homeDepartmentConfirmedById: null };
 
-/** Ortsgruppe zur Cevi.DB-Gruppe einer Abteilung: die Gruppe selbst oder die Ortsgruppe ihrer Jungschar */
-export async function departmentOrtsgruppeId(prisma: Pick<Db, 'ceviDbGroup'>, groupId: number | null) {
+/** Ortsgruppe zur Hitobito-Gruppe einer Abteilung: die Gruppe selbst oder die Ortsgruppe ihrer Jungschar */
+export async function departmentOrtsgruppeId(
+  prisma: Pick<Db, 'hitobitoGroup'>,
+  groupId: number | null,
+  provider: OrganizationType = 'CEVI'
+) {
   if (groupId === null) return null;
-  const group = await prisma.ceviDbGroup.findUnique({ where: { id: groupId }, select: { ortsgruppeId: true } });
+  const group = await prisma.hitobitoGroup.findUnique({
+    where: { provider_id: { provider, id: groupId } },
+    select: { ortsgruppeId: true },
+  });
   return group?.ortsgruppeId ?? groupId;
 }
 
@@ -234,23 +255,30 @@ export async function departmentOrtsgruppeId(prisma: Pick<Db, 'ceviDbGroup'>, gr
  * `moveHome`: Die Heimabteilung folgt nur, wenn die Person keine hat oder nur in dieser Jungschar Rollen hat. Bei
  * Rollen in mehreren Jungscharen entscheidet die Hauptgruppe, und die ist hier nicht bekannt, sondern nur beim Login.
  */
-export async function ceviDbGroupPeople(prisma: Pick<Db, 'user' | 'ceviDbGroup'>, groupId: number) {
-  const group = await prisma.ceviDbGroup.findUnique({ where: { id: groupId } });
+export async function ceviDbGroupPeople(
+  prisma: Pick<Db, 'user' | 'hitobitoGroup'>,
+  groupId: number,
+  provider: OrganizationType = 'CEVI'
+) {
+  const group = await prisma.hitobitoGroup.findUnique({ where: { provider_id: { provider, id: groupId } } });
   const isJungschar = group?.jungscharId === groupId;
   const people = await prisma.user.findMany({
-    where: isJungschar ? { ceviDbJungscharIds: { has: groupId } } : { ceviDbOrtsgruppeId: groupId },
-    select: { id: true, homeDepartmentId: true, ceviDbJungscharIds: true, ceviDbLeaderGroupIds: true },
+    where: {
+      provider,
+      ...(isJungschar ? { jungscharIds: { has: groupId } } : { ortsgruppeId: groupId }),
+    },
+    select: { id: true, homeDepartmentId: true, jungscharIds: true, leaderGroupIds: true },
   });
   const jungscharen =
     group?.jungscharCount === 1
-      ? await prisma.ceviDbGroup.findMany({ where: { ortsgruppeId: groupId }, select: { jungscharId: true } })
+      ? await prisma.hitobitoGroup.findMany({ where: { provider, ortsgruppeId: groupId }, select: { jungscharId: true } })
       : [];
   const leaderGroupIds = new Set<number | null>(jungscharen.map((g) => g.jungscharId));
   if (isJungschar) leaderGroupIds.add(groupId);
   return people.map((p) => ({
     id: p.id,
-    isLeader: p.ceviDbLeaderGroupIds.some((id) => leaderGroupIds.has(id)),
-    moveHome: !isJungschar || p.homeDepartmentId === null || p.ceviDbJungscharIds.length === 1,
+    isLeader: p.leaderGroupIds.some((id) => leaderGroupIds.has(id)),
+    moveHome: !isJungschar || p.homeDepartmentId === null || p.jungscharIds.length === 1,
   }));
 }
 
@@ -264,7 +292,8 @@ export async function ceviDbGroupPeople(prisma: Pick<Db, 'user' | 'ceviDbGroup'>
 export async function syncCeviDbHomeDepartment(
   prisma: Db,
   user: { id: string; homeDepartmentSource: string | null; departmentSetupAt: Date | null },
-  placement: CeviDbPlacement
+  placement: CeviDbPlacement,
+  provider: OrganizationType = 'CEVI'
 ): Promise<{ id: string; slug: string } | null> {
   const select = { id: true, slug: true } as const;
   let department = placement.homeDepartmentId
@@ -296,9 +325,9 @@ export async function syncCeviDbHomeDepartment(
     if (current?.homeDepartmentId && user.homeDepartmentSource === 'CONFIRMED' && placement.complete) {
       const home = await prisma.department.findUnique({
         where: { id: current.homeDepartmentId },
-        select: { ceviDbGroupId: true },
+        select: { organization: true, hitobitoGroupId: true },
       });
-      if ((await departmentOrtsgruppeId(prisma, home?.ceviDbGroupId ?? null)) !== placement.ortsgruppeId) {
+      if ((await departmentOrtsgruppeId(prisma, home?.hitobitoGroupId ?? null, home?.organization ?? provider)) !== placement.ortsgruppeId) {
         await prisma.user.update({
           where: { id: user.id },
           data: { homeDepartmentSource: 'SELF', ...NO_HOME_CONFIRMATION },
@@ -330,24 +359,30 @@ export async function syncCeviDbHomeDepartment(
     }
   }
 
-  await syncCeviDbStufen(prisma, user.id);
+  await syncCeviDbStufen(prisma, user.id, provider);
   return department;
 }
 
 /** Neu mit Cevi.DB verknüpfte Stufe: bereits angemeldete Cevi.DB-Personen der Abteilung gleich zuordnen. */
 export async function backfillCeviDbStufen(prisma: Db, departmentId: string) {
+  const department = await prisma.department.findUnique({
+    where: { id: departmentId },
+    select: { organization: true },
+  });
+  const provider: OrganizationType = department?.organization ?? 'CEVI';
   const users = await prisma.user.findMany({
     where: {
       OR: [
         { homeDepartmentId: departmentId },
         { memberships: { some: { departmentId } } },
       ],
-      ceviDbId: { not: null },
+      provider,
+      providerId: { not: null },
     },
     select: { id: true },
   });
   for (const user of users) {
-    await syncCeviDbStufen(prisma, user.id);
+    await syncCeviDbStufen(prisma, user.id, provider);
   }
 }
 

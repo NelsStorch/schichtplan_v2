@@ -1,11 +1,14 @@
 'use client';
 
+import { useMemo } from 'react';
 import { CalendarDays, Clock, ExternalLink } from 'lucide-react';
+import { getOrganization } from '@schichtplan/shared';
 import { NotFoundView } from '@schichtplan/ui';
 import { usePortal } from '@/lib/portal';
 
 export default function NotFound() {
   const { department } = usePortal();
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
 
   return (
     <NotFoundView
@@ -26,7 +29,7 @@ export default function NotFound() {
         },
         {
           label: 'Hauptportal',
-          href: 'https://cevi-schichtplan.ch',
+          href: `https://${org.domain}`,
           external: true,
           icon: <ExternalLink className="size-3.5" />,
         },

@@ -49,7 +49,8 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       qrColorSecondary: request.tenant.qrColorSecondary,
       contactUserId: request.tenant.contactUserId,
       contactPerson: await loadContactPerson(fastify.prisma, request.tenant.contactUserId, Boolean(request.user)),
-      ceviDbGroupId: request.tenant.ceviDbGroupId,
+      hitobitoGroupId: request.tenant.hitobitoGroupId,
+      ceviDbGroupId: request.tenant.hitobitoGroupId,
       membersOnly: request.tenant.membersOnly,
       viewerIsMember: await isDepartmentInsider(fastify.prisma, request.tenant.id, request.user?.id),
       createdAt: request.tenant.createdAt.toISOString(),
@@ -66,9 +67,10 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         description: 'Liefert alle Abteilungen inklusive ihrer Stufen für Auswahldialoge und Anlassfreigaben.',
       },
     },
-    async (_request, reply) => {
+    async (request, reply) => {
     reply.header('Cache-Control', 'public, max-age=60');
     const departments = await fastify.prisma.department.findMany({
+      where: { organization: request.organization },
       select: {
         id: true,
         name: true,
@@ -144,8 +146,9 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         description: 'Öffentliche Übersicht aller aktiven Abteilungen mit Anzahlinformationen zu aktiven Anlässen.',
       },
     },
-    async () => {
+    async (request) => {
     const departments = await fastify.prisma.department.findMany({
+      where: { organization: request.organization },
       select: {
         id: true,
         name: true,
@@ -214,6 +217,11 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: NOT_ELIGIBLE_MESSAGES[reason], reason, existingDepartment: eligibility.existingDepartment });
       }
       const ceviDbGroupId = eligibility.ortsgruppeId;
+      const founderUser = await fastify.prisma.user.findUnique({
+        where: { id: request.user.id },
+        select: { provider: true },
+      });
+      const provider = founderUser?.provider ?? 'CEVI';
 
       try {
         const departmentResult = await fastify.prisma.$transaction(async (tx) => {
@@ -221,8 +229,9 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
             data: {
               name: departmentName,
               slug,
+              organization: provider,
               contactUserId: request.user.id,
-              ceviDbGroupId,
+              hitobitoGroupId: ceviDbGroupId,
             },
           });
           await tx.departmentMember.create({
@@ -235,7 +244,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
 
           // Alle bereits angemeldeten Cevi.DB-Personen dieser Gruppe werden Helfer*innen bzw. Abteilungsleitung
           // (nur über ihre eigene Leitungsrolle) und bekommen die neue Abteilung wenn möglich als Heimabteilung
-          const people = await ceviDbGroupPeople(tx, ceviDbGroupId);
+          const people = await ceviDbGroupPeople(tx, ceviDbGroupId, provider);
           await tx.user.updateMany({
             where: { id: { in: people.filter((p) => p.moveHome).map((p) => p.id) } },
             data: { homeDepartmentId: created.id, homeDepartmentSource: 'CEVIDB', ...NO_HOME_CONFIRMATION, departmentSetupAt: new Date() },

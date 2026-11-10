@@ -6,8 +6,9 @@ import { createRateLimiter } from './rateLimit.js';
  * mit Cevi-Name + Geburtsdatum an. Weil Geburtsdaten unter Bekannten kein Geheimnis sind, dürfen
  * solche Profile keine Rechte haben (nur Helfer*in), und nur sie lassen sich so anmelden.
  */
-export function isCeviNameProfile(user: { passwordHash: string | null; ceviDbId: number | null }): boolean {
-  return user.passwordHash === null && user.ceviDbId === null;
+export function isCeviNameProfile(user: { passwordHash?: string | null; providerId?: string | null; ceviDbId?: number | null }): boolean {
+  const hasProvider = Boolean(user.providerId) || Boolean(user.ceviDbId);
+  return user.passwordHash === null && !hasProvider;
 }
 
 export const CEVINAME_ROLE_ERROR =
@@ -32,14 +33,14 @@ export async function findCeviNameMatches(
 ) {
   return prisma.user.findMany({
     where: {
-      ceviName: { equals: ceviName.trim(), mode: 'insensitive' },
+      nickname: { equals: ceviName.trim(), mode: 'insensitive' },
       birthDate: dayRange(birthDate),
       OR: [{ homeDepartmentId: departmentId }, { memberships: { some: { departmentId } } }],
     },
     select: {
       id: true,
       passwordHash: true,
-      ceviDbId: true,
+      providerId: true,
       isGlobalAdmin: true,
       memberships: { select: { role: true, permissions: true } },
       organizedEvents: { select: { id: true }, take: 1 },
@@ -65,8 +66,8 @@ export function pickCeviNameMatch(
 ): { kind: 'LOGIN'; userId: string } | { kind: 'USE_CEVIDB' } | { kind: 'USE_PASSWORD' } | { kind: 'NONE' } {
   const open = matches.find((m) => isCeviNameProfile(m) && !hasRights(m));
   if (open) return { kind: 'LOGIN', userId: open.id };
-  if (matches.some((m) => m.ceviDbId !== null)) return { kind: 'USE_CEVIDB' };
-  if (matches.some((m) => m.passwordHash !== null)) return { kind: 'USE_PASSWORD' };
+  if (matches.some((m) => Boolean(m.providerId) || Boolean((m as { ceviDbId?: number | null }).ceviDbId))) return { kind: 'USE_CEVIDB' };
+  if (matches.some((m) => Boolean(m.passwordHash))) return { kind: 'USE_PASSWORD' };
   // Cevi-Name-Profil mit Rechten (aus der Zeit vor dieser Regel): nur noch über ein richtiges Konto
   if (matches.length > 0) return { kind: 'USE_PASSWORD' };
   return { kind: 'NONE' };
@@ -84,8 +85,8 @@ export async function resolveOrganizerUser(
   departmentId: string,
   who: { userId?: string; ceviName?: string; email?: string }
 ): Promise<{ user: { id: string } } | { error: string; status: number }> {
-  let user: { id: string; passwordHash: string | null; ceviDbId: number | null } | null = null;
-  const select = { id: true, passwordHash: true, ceviDbId: true } as const;
+  let user: { id: string; passwordHash: string | null; providerId: string | null } | null = null;
+  const select = { id: true, passwordHash: true, providerId: true } as const;
 
   if (who.userId) {
     user = await prisma.user.findUnique({ where: { id: who.userId }, select });
@@ -95,8 +96,8 @@ export async function resolveOrganizerUser(
     const name = who.ceviName.trim();
     const candidates = await prisma.user.findMany({
       where: {
-        ceviName: { equals: name, mode: 'insensitive' },
-        OR: [{ passwordHash: { not: null } }, { ceviDbId: { not: null } }],
+        nickname: { equals: name, mode: 'insensitive' },
+        OR: [{ passwordHash: { not: null } }, { providerId: { not: null } }],
       },
       select: { ...select, homeDepartmentId: true, memberships: { select: { departmentId: true } } },
     });
@@ -112,7 +113,7 @@ export async function resolveOrganizerUser(
         status: 409,
       };
     } else {
-      const onlyProfile = await prisma.user.count({ where: { ceviName: { equals: name, mode: 'insensitive' } } });
+      const onlyProfile = await prisma.user.count({ where: { nickname: { equals: name, mode: 'insensitive' } } });
       if (onlyProfile > 0) return { error: CEVINAME_ROLE_ERROR, status: 400 };
     }
   }

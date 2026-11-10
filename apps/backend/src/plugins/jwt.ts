@@ -115,7 +115,8 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
           id: true,
           email: true,
           isGlobalAdmin: true,
-          ceviDbId: true,
+          provider: true,
+          providerId: true,
           passwordChangedAt: true,
           lastSeenOn: true,
           homeDepartmentId: true,
@@ -131,13 +132,13 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     if (user.passwordChangedAt && issuedAt !== undefined && (issuedAt + 1) * 1000 <= user.passwordChangedAt.getTime()) {
       return false;
     }
-    if (!user.isGlobalAdmin && user.ceviDbId && bootstrapAdminCeviDbIds().has(user.ceviDbId)) {
+    if (!user.isGlobalAdmin && user.providerId && user.provider === 'CEVI' && bootstrapAdminCeviDbIds().has(Number(user.providerId))) {
       await fastify.prisma.user.update({
         where: { id: user.id },
         data: { isGlobalAdmin: true },
       });
       user.isGlobalAdmin = true;
-      fastify.log.info({ userId: user.id, ceviDbId: user.ceviDbId }, 'Cevi.DB-Person on-demand zum globalen Admin befördert');
+      fastify.log.info({ userId: user.id, providerId: user.providerId }, 'Cevi.DB-Person on-demand zum globalen Admin befördert');
     }
     request.user = {
       id: user.id,

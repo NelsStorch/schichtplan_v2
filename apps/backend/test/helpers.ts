@@ -3,7 +3,7 @@
  * mit `npx prisma migrate deploy`). Alle Tabellen werden vor jedem Test geleert.
  */
 import type { FastifyInstance, InjectOptions } from 'fastify';
-import { DEPARTMENT_PERMISSION_PRESETS } from '@schichtplan/shared';
+import { DEPARTMENT_PERMISSION_PRESETS, type OrganizationType } from '@schichtplan/shared';
 import { buildApp } from '../src/app.js';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -44,7 +44,10 @@ export async function createUser(
   data: Partial<{
     email: string | null;
     passwordHash: string | null;
+    provider: OrganizationType;
+    providerId: string | null;
     ceviDbId: number | null;
+    nickname: string | null;
     ceviName: string | null;
     phone: string | null;
     firstName: string;
@@ -56,12 +59,22 @@ export async function createUser(
     homeDepartmentSource: string | null;
   }> = {}
 ) {
+  const providerId =
+    data.providerId !== undefined
+      ? data.providerId
+      : data.ceviDbId !== undefined && data.ceviDbId !== null
+      ? String(data.ceviDbId)
+      : null;
+  const provider = data.provider ?? 'CEVI';
+  const nickname = data.nickname !== undefined ? data.nickname : data.ceviName ?? null;
+
   return app.prisma.user.create({
     data: {
       email: data.email === undefined ? `u${unique()}@example.com` : data.email,
       passwordHash: data.passwordHash ?? null,
-      ceviDbId: data.ceviDbId ?? null,
-      ceviName: data.ceviName ?? null,
+      provider,
+      providerId,
+      nickname,
       phone: data.phone ?? null,
       firstName: data.firstName ?? 'Test',
       lastName: data.lastName ?? 'Person',
@@ -73,7 +86,7 @@ export async function createUser(
         data.homeDepartmentSource !== undefined
           ? data.homeDepartmentSource
           : data.homeDepartmentId
-            ? (data.ceviDbId ? 'CEVIDB' : 'SELF')
+            ? (providerId ? 'CEVIDB' : 'SELF')
             : null,
     },
   });

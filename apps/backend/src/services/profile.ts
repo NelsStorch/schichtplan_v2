@@ -42,9 +42,10 @@ export function missingProfileFields(user: ProfileFieldsSource, required: string
 }
 
 /** «Falk (Max Muster)», ohne Platzhalter-Nachnamen und ohne Wiederholung des Cevi-Namens */
-export function personLabel(u: { ceviName: string | null; firstName: string; lastName: string | null }): string {
+export function personLabel(u: { nickname?: string | null; ceviName?: string | null; firstName: string; lastName: string | null }): string {
+  const name = u.nickname ?? u.ceviName;
   const lastName = u.lastName && u.lastName !== PLACEHOLDER_LAST_NAME ? u.lastName : '';
   const fullName = `${u.firstName} ${lastName}`.trim();
-  if (!u.ceviName) return fullName;
-  return fullName && fullName !== u.ceviName ? `${u.ceviName} (${fullName})` : u.ceviName;
+  if (!name) return fullName;
+  return fullName && fullName !== name ? `${name} (${fullName})` : name;
 }

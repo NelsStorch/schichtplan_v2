@@ -63,7 +63,7 @@ export async function sendDueCateringReminders(
             email: true,
             emailVerified: true,
             firstName: true,
-            ceviName: true,
+            nickname: true,
             emailNotifyCateringTokens: true,
             pushNotifyCateringTokens: true,
             _count: { select: { pushSubscriptions: true } },
@@ -131,7 +131,7 @@ export async function sendDueCateringReminders(
 
       if (!isDue) continue;
 
-      const recipientName = group.user?.ceviName || group.user?.firstName || group.guestName || 'Helfende Person';
+      const recipientName = group.user?.nickname || group.user?.firstName || group.guestName || 'Helfende Person';
       const count = group.tokens.length;
       const tokenNames = group.tokens.map((x) => x.title).join(', ');
       const targetUrl = `${eventUrl(event.department.slug, event.slug)}/meine-schichten`;

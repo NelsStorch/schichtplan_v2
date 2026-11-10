@@ -6,7 +6,7 @@
  * Schlägt etwas fehl, läuft der Login mit dem Zwischenspeicher weiter (siehe placeCeviDbPerson).
  */
 import type { FastifyBaseLogger } from 'fastify';
-import type { PrismaClient } from '../db.js';
+import type { OrganizationType, PrismaClient } from '../db.js';
 import { parseCeviDbGroupId, type CeviDbGroupInfo } from './cevidb.js';
 
 /** Solange gilt ein Eintrag als aktuell (die Gruppenstruktur ändert sich selten) */
@@ -20,7 +20,7 @@ const MAX_GROUPS = 40;
 const JUNGSCHAR_TYPE = 'Jungschar';
 const ORTSGRUPPE_TYPE = 'Ortsgruppe';
 
-type Db = Pick<PrismaClient, 'ceviDbGroup'>;
+type Db = Pick<PrismaClient, 'hitobitoGroup'>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -97,9 +97,10 @@ async function refreshGroups(
   baseUrl: string,
   accessToken: string,
   ids: number[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  provider: OrganizationType = 'CEVI'
 ) {
-  const cached = await prisma.ceviDbGroup.findMany({ where: { id: { in: ids } } });
+  const cached = await prisma.hitobitoGroup.findMany({ where: { provider, id: { in: ids } } });
   const now = Date.now();
   const fresh = new Set(cached.filter((g) => now - g.fetchedAt.getTime() < MAX_AGE_MS).map((g) => g.id));
   const queue = ids.filter((id) => !fresh.has(id));
@@ -120,13 +121,13 @@ async function refreshGroups(
 
   const fetchedAt = new Date();
   for (const info of results) {
-    await prisma.ceviDbGroup.upsert({
-      where: { id: info.id },
+    await prisma.hitobitoGroup.upsert({
+      where: { provider_id: { provider, id: info.id } },
       update: { ...info, fetchedAt },
-      create: { ...info, fetchedAt },
+      create: { provider, ...info, fetchedAt },
     });
   }
-  return prisma.ceviDbGroup.findMany({ where: { id: { in: ids } } });
+  return prisma.hitobitoGroup.findMany({ where: { provider, id: { in: ids } } });
 }
 
 /**
@@ -136,9 +137,9 @@ async function refreshGroups(
 export async function refreshCeviDbGroups(
   prisma: Db,
   log: FastifyBaseLogger,
-  options: { baseUrl: string; accessToken: string; grantedScopes: string; groupIds: number[] }
+  options: { baseUrl: string; accessToken: string; grantedScopes: string; groupIds: number[]; provider?: OrganizationType }
 ): Promise<void> {
-  const { baseUrl, accessToken, grantedScopes, groupIds } = options;
+  const { baseUrl, accessToken, grantedScopes, groupIds, provider = 'CEVI' } = options;
   if (groupIds.length === 0) return;
   if (!grantedScopes.split(/\s+/).includes('groups')) {
     log.warn('Cevi.DB: Token ohne Scope groups, Gruppenstruktur nicht aktualisiert');
@@ -147,11 +148,11 @@ export async function refreshCeviDbGroups(
   try {
     const signal = AbortSignal.timeout(TIME_BUDGET_MS);
     const ids = [...new Set(groupIds)].slice(0, MAX_GROUPS);
-    const groups = await refreshGroups(prisma, log, baseUrl, accessToken, ids, signal);
+    const groups = await refreshGroups(prisma, log, baseUrl, accessToken, ids, signal, provider);
     const parents = [...new Set(groups.flatMap((g) => [g.jungscharId, g.ortsgruppeId]))].filter(
       (id): id is number => id !== null && !ids.includes(id)
     );
-    if (parents.length) await refreshGroups(prisma, log, baseUrl, accessToken, parents, signal);
+    if (parents.length) await refreshGroups(prisma, log, baseUrl, accessToken, parents, signal, provider);
   } catch (err) {
     log.warn({ reason: err instanceof Error ? err.message : 'unbekannt' }, 'Cevi.DB: Gruppenstruktur nicht aktualisiert');
   }

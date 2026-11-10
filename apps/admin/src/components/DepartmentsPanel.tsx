@@ -15,9 +15,10 @@ import {
   Input,
   Skeleton,
   Switch,
+  cn,
   useToast,
 } from '@schichtplan/ui';
-import { SUBDOMAIN_REGEX, type AdminDepartmentListItemDto, type AdminUserListItemDto } from '@schichtplan/shared';
+import { SUBDOMAIN_REGEX, type AdminDepartmentListItemDto, type AdminUserListItemDto, type OrganizationType } from '@schichtplan/shared';
 import { send, errorMessage } from '../lib/api';
 import { downloadCsv } from '../lib/csv';
 import { DepartmentLogo } from './DepartmentDialog';
@@ -53,6 +54,7 @@ function CreateDepartmentDialog({
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
+  const [organization, setOrganization] = useState<OrganizationType>('CEVI');
   const [ceviDbGroupId, setCeviDbGroupId] = useState('');
   const [membersOnly, setMembersOnly] = useState(true);
   const [leader, setLeader] = useState<AdminUserListItemDto | null>(null);
@@ -71,6 +73,7 @@ function CreateDepartmentDialog({
     setName('');
     setSlug('');
     setSlugTouched(false);
+    setOrganization('CEVI');
     setCeviDbGroupId('');
     setMembersOnly(true);
     setLeader(null);
@@ -98,7 +101,8 @@ function CreateDepartmentDialog({
         {
           name: name.trim(),
           slug,
-          ceviDbGroupId: ceviDbGroupId ? Number(ceviDbGroupId) : null,
+          organization,
+          hitobitoGroupId: ceviDbGroupId ? Number(ceviDbGroupId) : null,
           membersOnly,
           leaderUserId: leader?.id ?? null,
         }
@@ -144,6 +148,25 @@ function CreateDepartmentDialog({
     >
       <form id="create-department" onSubmit={submit} className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Verband / Organisation" required>
+            <div className="flex gap-2">
+              {(['CEVI', 'PFADI', 'JUBLA', 'OTHER'] as const).map((org) => (
+                <button
+                  key={org}
+                  type="button"
+                  onClick={() => setOrganization(org)}
+                  className={cn(
+                    'flex-1 rounded-field py-2 text-xs font-semibold border transition',
+                    organization === org
+                      ? 'border-accent bg-accent/10 text-accent-ink font-bold'
+                      : 'border-line bg-surface-2 text-fg-muted hover:border-line-strong'
+                  )}
+                >
+                  {org === 'OTHER' ? 'Verein' : org === 'PFADI' ? 'Pfadi' : org === 'JUBLA' ? 'Jubla' : 'Cevi'}
+                </button>
+              ))}
+            </div>
+          </Field>
           <Field label="Name" required>
             <Input
               value={name}
@@ -218,6 +241,7 @@ export function DepartmentsPanel({
 }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [orgFilter, setOrgFilter] = useState<OrganizationType | 'ALL'>('ALL');
   const [internalCreating, setInternalCreating] = useState(false);
 
   const isCreating = creating || internalCreating;
@@ -233,10 +257,11 @@ export function DepartmentsPanel({
   const visible = all.filter(
     (d) =>
       matches(d, filter) &&
+      (orgFilter === 'ALL' || (d.organization ?? 'CEVI') === orgFilter) &&
       (!q ||
         d.name.toLowerCase().includes(q) ||
         d.slug.includes(q) ||
-        String(d.ceviDbGroupId ?? '').includes(q) ||
+        String(d.hitobitoGroupId ?? d.ceviDbGroupId ?? '').includes(q) ||
         d.leaders.some((l) => l.name.toLowerCase().includes(q)))
   );
 
@@ -313,13 +338,48 @@ export function DepartmentsPanel({
         </div>
       </div>
 
-      <ChipRow>
-        {filters.map((f) => (
-          <Chip key={f.id} selected={filter === f.id} count={all.filter((d) => matches(d, f.id)).length} onClick={() => setFilter(f.id)}>
-            {f.label}
-          </Chip>
-        ))}
-      </ChipRow>
+      <div className="space-y-2">
+        <ChipRow>
+          {filters.map((f) => (
+            <Chip key={f.id} selected={filter === f.id} count={all.filter((d) => matches(d, f.id)).length} onClick={() => setFilter(f.id)}>
+              {f.label}
+            </Chip>
+          ))}
+        </ChipRow>
+
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-2xs font-semibold uppercase tracking-wider text-fg-subtle mr-1">Verband:</span>
+          {(
+            [
+              ['ALL', 'Alle'],
+              ['CEVI', 'Cevi'],
+              ['PFADI', 'Pfadi'],
+              ['JUBLA', 'Jubla'],
+              ['OTHER', 'Vereine'],
+            ] as const
+          ).map(([key, label]) => {
+            const count = key === 'ALL' ? all.length : all.filter((d) => (d.organization ?? 'CEVI') === key).length;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setOrgFilter(key)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition',
+                  orgFilter === key
+                    ? 'bg-fg text-canvas shadow-xs font-semibold'
+                    : 'bg-surface-2 text-fg-muted hover:bg-surface-3 hover:text-fg'
+                )}
+              >
+                <span>{label}</span>
+                <span className={cn('text-2xs opacity-75', orgFilter === key ? 'text-canvas/80' : 'text-fg-subtle')}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {loading && !departments ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -347,7 +407,10 @@ export function DepartmentsPanel({
                     <DepartmentLogo name={d.name} logoUrl={d.logoUrl} color={d.primaryColor} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-display text-base font-semibold text-fg">{d.name}</span>
-                      <span className="block truncate font-mono text-xs text-fg-subtle">{d.slug}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="block truncate font-mono text-xs text-fg-subtle">{d.slug}</span>
+                        <Badge tone="outline" size="sm">{d.organization || 'CEVI'}</Badge>
+                      </span>
                     </span>
                     <ChevronRight className="size-4 shrink-0 text-fg-subtle" aria-hidden />
                   </span>
@@ -378,7 +441,14 @@ export function DepartmentsPanel({
                       </span>
                     )}
                     <span className="ml-auto flex gap-1.5">
-                      {d.ceviDbGroupId !== null ? <Badge tone="outline">Cevi.DB {d.ceviDbGroupId}</Badge> : <Badge>Ohne Cevi.DB</Badge>}
+                      {(d.hitobitoGroupId ?? d.ceviDbGroupId) !== null && (d.hitobitoGroupId ?? d.ceviDbGroupId) !== undefined ? (
+                        <Badge tone="outline">
+                          {d.organization === 'PFADI' ? 'MiData' : d.organization === 'JUBLA' ? 'Jubla-DB' : 'Cevi.DB'}{' '}
+                          {d.hitobitoGroupId ?? d.ceviDbGroupId}
+                        </Badge>
+                      ) : d.organization !== 'OTHER' ? (
+                        <Badge>Ohne Verband</Badge>
+                      ) : null}
                       {d.upcomingEventCount > 0 && <Badge tone="success">{d.upcomingEventCount} kommend</Badge>}
                     </span>
                   </span>

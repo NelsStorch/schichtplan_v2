@@ -12,11 +12,13 @@ import type {
   StufeRole,
   UserRole,
 } from './constants.js';
+import type { OrganizationType } from './organizations.js';
 
 export interface DepartmentDto {
   id: string;
   name: string;
   slug: string;
+  organization?: OrganizationType;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
@@ -28,7 +30,9 @@ export interface DepartmentDto {
   contactUserId?: string | null;
   /** Name immer, E-Mail nur für angemeldete Personen */
   contactPerson?: { displayName: string; email: string | null } | null;
-  /** Cevi.DB-Ortsgruppe; ohne sie funktionieren die Cevi.DB-Zugangstypen nicht */
+  /** Hitobito-Gruppe der Abteilung (Cevi.DB-Ortsgruppe / Pfadi-Abteilung / Jubla-Schar) */
+  hitobitoGroupId?: number | null;
+  /** Cevi.DB-Ortsgruppe; ohne sie funktionieren die Cevi.DB-Zugangstypen nicht (Alias für hitobitoGroupId) */
   ceviDbGroupId?: number | null;
   /** Startseite nur für Mitglieder (öffentliche Anlässe bleiben per Link erreichbar) */
   membersOnly?: boolean;
@@ -43,6 +47,7 @@ export interface EventOrganizerDto {
   userId: string;
   userFirstName: string;
   userLastName: string | null;
+  userNickname?: string | null;
   userCeviName?: string | null;
   displayName: string;
   role: string;
@@ -58,6 +63,7 @@ export interface ResponsiblePersonDto {
   displayName: string;
   firstName: string;
   lastName: string | null;
+  nickname?: string | null;
   ceviName?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -202,6 +208,7 @@ export interface ShiftSignupDto {
   displayName: string;
   userFirstName?: string | null;
   userLastName?: string | null;
+  userNickname?: string | null;
   userCeviName?: string | null;
   userBirthDate?: string | null;
   userAge?: number | null;
@@ -272,8 +279,11 @@ export interface EventTemplateDto {
 export interface UserDto {
   id: string;
   email?: string | null;
+  provider?: OrganizationType;
+  providerId?: string | null;
   firstName: string;
   lastName: string | null;
+  nickname: string | null;
   ceviName?: string | null;
   phone?: string | null;
   birthDate?: string | null;
@@ -283,7 +293,9 @@ export interface UserDto {
   /** Wirksame Rechte in der Abteilung der Subdomain (Abteilungsleitung und globale Admins: alle) */
   departmentPermissions?: DepartmentPermission[];
   ceviDbId?: number | null;
+  providerSyncedAt?: string | null;
   ceviDbSyncedAt?: string | null;
+  hasProviderAuth?: boolean;
   hasCeviDb?: boolean;
   /** Konto hat ein Passwort (E-Mail/Passwort-Login) */
   hasPassword?: boolean;
@@ -294,21 +306,33 @@ export interface UserDto {
   homeDepartment?: HomeDepartmentDto | null;
   /** Abteilung kommt aus Cevi.DB und ist dort festgelegt */
   homeDepartmentFromCeviDb?: boolean;
+  homeDepartmentFromProvider?: boolean;
   /** Quelle der Heimabteilung ("CEVIDB", "SELF", "CONFIRMED") */
   homeDepartmentSource?: string | null;
-  /** Cevi.DB Ortsgruppen-ID */
+  /** Hitobito Ortsgruppen-ID */
+  ortsgruppeId?: number | null;
+  /** Cevi.DB Ortsgruppen-ID (Alias) */
   ceviDbOrtsgruppeId?: number | null;
-  /** Cevi.DB Ortsgruppen-Name */
+  /** Hitobito Ortsgruppen-Name */
+  ortsgruppeName?: string | null;
+  /** Cevi.DB Ortsgruppen-Name (Alias) */
   ceviDbOrtsgruppeName?: string | null;
-  /** Hat eine Leitungsrolle laut Cevi.DB */
+  /** Hat eine Leitungsrolle laut Provider/Hitobito */
+  departmentLeader?: boolean;
+  /** Hat eine Leitungsrolle laut Cevi.DB (Alias) */
   ceviDbDepartmentLeader?: boolean;
   /** Gruppe der Leitungsrolle */
+  leaderGroupName?: string | null;
   ceviDbLeaderGroupName?: string | null;
   /** IDs aller Gruppen mit Leitungsrolle */
+  leaderGroupIds?: number[];
   ceviDbLeaderGroupIds?: number[];
   /** Verknüpfte Jungschar-Gruppen */
+  jungscharIds?: number[];
   ceviDbJungscharIds?: number[];
-  /** Cevi.DB Stufen der Person */
+  /** Hitobito Stufen der Person */
+  hitobitoStufen?: HitobitoStufeDto[];
+  /** Cevi.DB Stufen der Person (Alias) */
   ceviDbStufen?: CeviDbStufeDto[];
   stufen?: UserStufeDto[];
   /** Hat die Abteilung noch nicht angegeben (auch nicht «keine») */
@@ -353,6 +377,7 @@ export interface DepartmentStufeDto {
   id: string;
   departmentId: string;
   name: string;
+  hitobitoGroupId?: number | null;
   ceviDbGroupId: number | null;
   sortOrder: number;
 }
@@ -377,6 +402,7 @@ export interface DepartmentDirectoryItemDto {
 
 /** Vorschlag für eine Stufe: Cevi.DB-Gruppe, die bei Mitgliedern der Abteilung vorkommt */
 export interface StufeSuggestionDto {
+  hitobitoGroupId?: number;
   ceviDbGroupId: number;
   name: string;
   personCount: number;
@@ -439,6 +465,7 @@ export interface DepartmentTopHelperDto {
   displayName: string;
   firstName?: string;
   lastName?: string | null;
+  nickname?: string | null;
   ceviName?: string | null;
   hours: number;
   minutes: number;
@@ -468,7 +495,8 @@ export interface DepartmentStatsResponseDto {
 export interface DepartmentPersonDto {
   userId: string;
   displayName: string;
-  ceviName: string | null;
+  nickname: string | null;
+  ceviName?: string | null;
   firstName: string;
   lastName: string | null;
   /** Heimabteilung ist diese Abteilung (sonst nur wegen einer Rolle in der Liste) */
@@ -491,7 +519,10 @@ export interface DepartmentPersonDto {
   leaderSource: 'CEVIDB' | 'MANUAL' | null;
   /** Darf die angemeldete Person Rechte und Stufen dieser Person ändern? */
   canEdit: boolean;
-  /** Hat in Cevi.DB eine Abteilungsleitungs-Rolle (CEVIDB_DEPARTMENT_LEADER_ROLES) */
+  /** Hat in Hitobito / Cevi.DB eine Abteilungsleitungs-Rolle */
+  departmentLeader?: boolean;
+  isDepartmentLeader?: boolean;
+  /** Hat in Cevi.DB eine Abteilungsleitungs-Rolle (CEVIDB_DEPARTMENT_LEADER_ROLES) (Alias) */
   isCeviDbDepartmentLeader: boolean;
   /** Nur Cevi-Name-Profil (ohne Cevi.DB und Passwort): kann keine Rollen bekommen */
   isCeviNameProfile: boolean;
@@ -636,7 +667,8 @@ export interface EventRosterStufeDto {
 
 export interface EventRosterItemDto {
   userId: string;
-  ceviName: string | null;
+  nickname: string | null;
+  ceviName?: string | null;
   firstName: string;
   lastName: string | null;
   displayName: string;
@@ -664,6 +696,7 @@ export interface EventRosterResponseDto {
 }
 
 export interface QuickLoginDto {
+  nickname?: string;
   ceviName: string;
   firstName?: string;
   lastName?: string;
@@ -701,16 +734,19 @@ export interface AdminUserMembershipDto {
 }
 
 export interface AdminUserListItemDto {
-  potentialDuplicateOf?: { id: string; name: string; ceviName: string | null; email: string | null } | null;
+  potentialDuplicateOf?: { id: string; name: string; nickname?: string | null; ceviName: string | null; email: string | null } | null;
   id: string;
   email: string | null;
   emailVerified?: boolean;
   firstName: string;
   lastName: string | null;
-  ceviName: string | null;
+  nickname: string | null;
+  ceviName?: string | null;
   phone: string | null;
   birthDate: string | null;
   isGlobalAdmin: boolean;
+  provider?: OrganizationType;
+  providerId?: string | null;
   ceviDbId: number | null;
   loginMethods: LoginMethod[];
   signupCount: number;
@@ -719,9 +755,13 @@ export interface AdminUserListItemDto {
   homeDepartmentName?: string | null;
   homeDepartmentSlug?: string | null;
   homeDepartmentSource?: string | null;
+  ortsgruppeId?: number | null;
   ceviDbOrtsgruppeId?: number | null;
+  ortsgruppeName?: string | null;
   ceviDbOrtsgruppeName?: string | null;
+  departmentLeader?: boolean;
   ceviDbDepartmentLeader?: boolean;
+  leaderGroupName?: string | null;
   ceviDbLeaderGroupName?: string | null;
   /** Letzter Tag mit Nutzung (YYYY-MM-DD, Schweizer Zeit), null = seit Einführung nicht gesehen */
   lastSeenOn?: string | null;
@@ -761,8 +801,8 @@ export interface AdminUserSignupDto {
   createdAt: string;
 }
 
-/** Stufe einer Person, abgeleitet aus ihren Cevi.DB-Rollen (z. B. «Hiskia» als Stufenleiter*in) */
-export interface CeviDbStufeDto {
+/** Stufe einer Person, abgeleitet aus ihren Hitobito-Rollen (z. B. «Hiskia» als Stufenleiter*in) */
+export interface HitobitoStufeDto {
   groupId: number;
   groupName: string;
   /** Stärkste Rolle in der Stufe: Leitung, Teilnehmer*in oder andere Rolle */
@@ -773,9 +813,12 @@ export interface CeviDbStufeDto {
   isPrimary: boolean;
 }
 
+/** Alias für HitobitoStufeDto für Abwärtskompatibilität */
+export type CeviDbStufeDto = HitobitoStufeDto;
+
 export interface AdminUserDetailDto extends AdminUserListItemDto {
-  /** Stufen laut Cevi.DB (leer ohne Cevi.DB-Login) */
-  stufen: CeviDbStufeDto[];
+  /** Stufen laut Hitobito/Cevi.DB (leer ohne Hitobito-Login) */
+  stufen: HitobitoStufeDto[];
   organizedEvents: AdminUserOrganizerDto[];
   /** Die neusten Eintragungen (maximal 50) */
   signups: AdminUserSignupDto[];
@@ -806,12 +849,14 @@ export interface AdminDepartmentListItemDto {
   id: string;
   name: string;
   slug: string;
+  organization?: OrganizationType;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
   qrStyle: 'CORNERS' | 'GRADIENT' | 'SOLID' | null;
   contactUserId: string | null;
   contactName: string | null;
+  hitobitoGroupId?: number | null;
   ceviDbGroupId: number | null;
   membersOnly: boolean;
   /** Personen mit Abteilungsrolle (department_members) */
@@ -831,7 +876,8 @@ export interface AdminDepartmentPersonDto {
   userId: string;
   firstName: string;
   lastName: string | null;
-  ceviName: string | null;
+  nickname: string | null;
+  ceviName?: string | null;
   email: string | null;
   isGlobalAdmin: boolean;
   loginMethods: LoginMethod[];
@@ -847,6 +893,7 @@ export interface AdminDepartmentPersonDto {
 export interface AdminDepartmentStufeDto {
   id: string;
   name: string;
+  hitobitoGroupId?: number | null;
   ceviDbGroupId: number | null;
   memberCount: number;
 }
@@ -961,7 +1008,8 @@ export interface DepartmentCreationEligibilityDto {
    * UNVERIFIED (Gruppenstruktur aus Cevi.DB fehlt, neu anmelden hilft)
    */
   reason: 'NOT_CEVIDB' | 'NOT_LEADER' | 'NO_ORTSGRUPPE' | 'EXISTS' | 'UNVERIFIED' | null;
-  /** Cevi.DB-Gruppe der neuen Abteilung: die Ortsgruppe oder, bei mehreren Jungscharen, die Jungschar */
+  provider?: OrganizationType;
+  /** Hitobito-Gruppe der neuen Abteilung: die Ortsgruppe oder, bei mehreren Jungscharen, die Jungschar */
   ortsgruppeId: number | null;
   /** Name dieser Gruppe (z. B. "Weiningen-Geroldswil" oder "Effretikon"), Vorschlag für den Namen */
   ortsgruppeName: string | null;

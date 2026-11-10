@@ -46,10 +46,10 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         select: {
           id: true,
           isGlobalAdmin: true,
-          ceviDbId: true,
+          providerId: true,
           firstName: true,
           lastName: true,
-          ceviName: true,
+          nickname: true,
           homeDepartmentId: true,
           homeDepartment: { select: { name: true } },
         },
@@ -59,7 +59,7 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (isGlobalAdmin !== undefined && isGlobalAdmin !== user.isGlobalAdmin) {
       // Admins melden sich mit Cevi.DB an (stärker als ein eigenes Passwort, siehe adminSecurity.ts)
-      if (isGlobalAdmin && user.ceviDbId === null) {
+      if (isGlobalAdmin && user.providerId === null) {
         return reply.status(400).send({
           error: 'Globale Admins brauchen ein Konto mit Cevi.DB. Die Person soll sich zuerst einmal mit Cevi.DB anmelden.',
         });
@@ -82,7 +82,7 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       });
       const actor = await fastify.prisma.user.findUnique({
         where: { id: request.user.id },
-        select: { firstName: true, lastName: true, ceviName: true },
+        select: { firstName: true, lastName: true, nickname: true },
       });
       notifyAdminChange(fastify.prisma, request, {
         granted: isGlobalAdmin,
@@ -171,9 +171,9 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
             email: true,
             firstName: true,
             lastName: true,
-            ceviName: true,
+            nickname: true,
             isGlobalAdmin: true,
-            ceviDbId: true,
+            providerId: true,
             passwordHash: true,
           },
         })
@@ -186,9 +186,9 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
             email: true,
             firstName: true,
             lastName: true,
-            ceviName: true,
+            nickname: true,
             isGlobalAdmin: true,
-            ceviDbId: true,
+            providerId: true,
             passwordHash: true,
           },
         })

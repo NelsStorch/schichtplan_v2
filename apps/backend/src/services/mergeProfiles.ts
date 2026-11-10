@@ -15,15 +15,16 @@ type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
  */
 export async function mergeCeviNameProfilesInto(
   prisma: PrismaClient,
-  target: { id: string; ceviName: string | null; birthDate: Date | null },
+  target: { id: string; nickname?: string | null; ceviName?: string | null; birthDate: Date | null },
   departmentIds: string[]
 ): Promise<number> {
-  if (!target.ceviName || !target.birthDate || departmentIds.length === 0) return 0;
+  const nickname = target.nickname ?? target.ceviName ?? null;
+  if (!nickname || !target.birthDate || departmentIds.length === 0) return 0;
   const birthDate = target.birthDate.toISOString().slice(0, 10);
 
   const sourceIds = new Set<string>();
   for (const departmentId of new Set(departmentIds)) {
-    for (const match of await findCeviNameMatches(prisma, departmentId, target.ceviName, birthDate)) {
+    for (const match of await findCeviNameMatches(prisma, departmentId, nickname, birthDate)) {
       if (match.id !== target.id && isCeviNameProfile(match)) sourceIds.add(match.id);
     }
   }
@@ -53,7 +54,7 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
     where: { id: targetId },
     data: {
       phone: target.phone || source.phone,
-      ceviName: target.ceviName || source.ceviName,
+      nickname: target.nickname || source.nickname,
       birthDate: target.birthDate ?? source.birthDate,
       lastName:
         (!target.lastName || target.lastName === PLACEHOLDER_LAST_NAME) && source.lastName !== PLACEHOLDER_LAST_NAME

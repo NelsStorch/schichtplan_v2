@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { ArrowUpRight, Building2 } from 'lucide-react';
 import type { DepartmentCreationEligibilityDto, UserDto } from '@schichtplan/shared';
 import { getDepartmentUrl } from '@schichtplan/shared/redirect';
-import { Button, Callout, CeviLogo, Field, Input, ThemeToggle, buttonClasses } from '@schichtplan/ui';
+import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
+import { Button, Callout, BrandLogo, Field, Input, ThemeToggle, buttonClasses } from '@schichtplan/ui';
 import { cleanReturnTo, finalDestination, withReturnTo } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
@@ -20,8 +21,8 @@ const slugify = (value: string) =>
     .slice(0, 30);
 
 /** Name der Ortsgruppe ohne Zusatz, z. B. «Illnau-Effretikon» -> Subdomain «illnau-effretikon» */
-const suggestedName = (e: DepartmentCreationEligibilityDto) =>
-  e.ortsgruppeName ? `Cevi ${e.ortsgruppeName}` : e.leaderGroupName ? `Cevi ${e.leaderGroupName}` : '';
+const suggestedName = (e: DepartmentCreationEligibilityDto, org: OrganizationConfig) =>
+  e.ortsgruppeName ? `${org.orgName} ${e.ortsgruppeName}` : e.leaderGroupName ? `${org.orgName} ${e.leaderGroupName}` : '';
 
 /**
  * Abteilung anlegen: erscheint nach dem Cevi.DB-Login einer Abteilungsleitung, deren Ortsgruppe
@@ -30,6 +31,13 @@ const suggestedName = (e: DepartmentCreationEligibilityDto) =>
 function CreateDepartment() {
   const searchParams = useSearchParams();
   const returnTo = cleanReturnTo(searchParams.get('return_to'));
+
+  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrg(getOrganization(window.location.host));
+    }
+  }, []);
 
   const [eligibility, setEligibility] = useState<DepartmentCreationEligibilityDto | null>(null);
   const [user, setUser] = useState<UserDto | null>(null);
@@ -50,9 +58,11 @@ function CreateDepartment() {
       const res = await fetch('/api/departments/creation-eligibility', { cache: 'no-store' });
       const data = (await res.json()) as DepartmentCreationEligibilityDto;
       setEligibility(data);
-      const proposal = suggestedName(data);
+      const currentOrg = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+      setOrg(currentOrg);
+      const proposal = suggestedName(data, currentOrg);
       setName(proposal);
-      setSlug(slugify(data.ortsgruppeName ?? proposal.replace(/^Cevi /, '')));
+      setSlug(slugify(data.ortsgruppeName ?? proposal.replace(new RegExp(`^${currentOrg.orgName}\\s+`, 'i'), '')));
     })().catch(() => setError('Die Angaben konnten nicht geladen werden. Bitte lade die Seite neu.'));
   }, []);
 
@@ -90,8 +100,8 @@ function CreateDepartment() {
 
       <header className="relative mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
         <span className="flex items-center gap-2.5">
-          <CeviLogo className="size-8" alt="" />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">Cevi Schichtplan</span>
+          <BrandLogo className="size-8" alt="" />
+          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">{org.name}</span>
         </span>
         <ThemeToggle />
       </header>
@@ -112,22 +122,22 @@ function CreateDepartment() {
               <Building2 className="size-6" />
             </span>
             <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg text-balance">
-              {eligibility.ortsgruppeName ?? 'Deine Abteilung'} hat noch keinen Schichtplan
+              {eligibility.ortsgruppeName ?? `Deine ${org.unitTerm}`} hat noch keinen Schichtplan
             </h1>
             <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
-              Du bist laut Cevi.DB Abteilungsleitung
-              {eligibility.leaderGroupName ? ` (${eligibility.leaderGroupName})` : ''}. Lege den Schichtplan für eure
-              Abteilung jetzt an. Alle aus eurer Abteilung, die sich mit Cevi.DB anmelden, gehören automatisch dazu.
+              Du bist laut {org.authProviderShort} Leitung
+              {eligibility.leaderGroupName ? ` (${eligibility.leaderGroupName})` : ''}. Lege den Schichtplan für eure{' '}
+              {org.unitTerm} jetzt an. Alle aus eurer {org.unitTerm}, die sich mit {org.authProviderShort} anmelden, gehören automatisch dazu.
             </p>
 
             <div className="mt-8 space-y-5">
               {error && <Callout tone="danger">{error}</Callout>}
-              <Field label="Name der Abteilung" required>
+              <Field label={`Name der ${org.unitTerm}`} required>
                 <Input
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
-                    if (!slugTouched) setSlug(slugify(e.target.value.replace(/^Cevi\s+/i, '')));
+                    if (!slugTouched) setSlug(slugify(e.target.value.replace(new RegExp(`^${org.orgName}\\s+`, 'i'), '')));
                   }}
                   minLength={2}
                   maxLength={80}
@@ -137,7 +147,7 @@ function CreateDepartment() {
               <Field
                 label="Subdomain"
                 required
-                hint={`${slug || 'abteilung'}.${rootHost}. Lässt sich später nicht ändern.`}
+                hint={`${slug || 'portal'}.${rootHost}. Lässt sich später nicht ändern.`}
               >
                 <Input
                   value={slug}
@@ -155,14 +165,14 @@ function CreateDepartment() {
 
               <Callout tone="info">
                 <p>
-                  Du wirst Hauptverantwortliche*r (Abteilungsleitung im Schichtplan). Das lässt sich später unter
-                  «Abteilung → Personen» ändern. Name, Logo, Farbe und Stufen kannst du jederzeit anpassen, nur die
+                  Du wirst Hauptverantwortliche*r ({org.unitTerm}-Leitung im Schichtplan). Das lässt sich später unter
+                  «{org.unitTerm} → Personen» ändern. Name, Logo, Farbe und Stufen kannst du jederzeit anpassen, nur die
                   Subdomain bleibt fest.
                 </p>
               </Callout>
 
               <Button type="submit" size="lg" className="w-full" loading={saving} disabled={name.trim().length < 2 || slug.length < 3}>
-                Abteilung anlegen
+                {org.unitTerm} anlegen
               </Button>
               <Button type="button" variant="ghost" className="w-full" onClick={later}>
                 Später
@@ -172,12 +182,12 @@ function CreateDepartment() {
         ) : (
           <div className="animate-fade-up space-y-6">
             <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg">
-              Abteilung anlegen
+              {org.unitTerm} anlegen
             </h1>
             {eligibility.reason === 'EXISTS' && eligibility.existingDepartment ? (
               <>
                 <p className="text-[15px] leading-relaxed text-fg-muted">
-                  Für deine Abteilung gibt es schon einen Schichtplan: {eligibility.existingDepartment.name}.
+                  Für eure {org.unitTerm} gibt es schon einen Schichtplan: {eligibility.existingDepartment.name}.
                 </p>
                 <a
                   href={getDepartmentUrl(eligibility.existingDepartment.slug)}
@@ -189,8 +199,8 @@ function CreateDepartment() {
             ) : eligibility.reason === 'NOT_CEVIDB' ? (
               <>
                 <p className="text-[15px] leading-relaxed text-fg-muted">
-                  Eine neue Abteilung kann nur die Abteilungsleitung anlegen. Melde dich dazu mit Cevi.DB an, dort
-                  sehen wir deine Rolle und eure Ortsgruppe.
+                  Eine neue {org.unitTerm} kann nur die Leitung anlegen. Melde dich dazu mit {org.authProviderShort} an, dort
+                  sehen wir deine Rolle und eure Gruppe.
                 </p>
                 <a
                   href={`/api/auth/cevidb/login?returnTo=${encodeURIComponent(
@@ -198,25 +208,25 @@ function CreateDepartment() {
                   )}`}
                   className={buttonClasses({ size: 'lg', className: 'w-full justify-between' })}
                 >
-                  Mit Cevi.DB anmelden <ArrowUpRight />
+                  Mit {org.authProviderShort} anmelden <ArrowUpRight />
                 </a>
               </>
             ) : eligibility.reason === 'UNVERIFIED' ? (
               <p className="text-[15px] leading-relaxed text-fg-muted">
-                Wir konnten deine Gruppe in Cevi.DB gerade nicht prüfen. Melde dich bitte nochmals mit Cevi.DB an.
+                Wir konnten deine Gruppe in {org.authProviderShort} gerade nicht prüfen. Melde dich bitte nochmals mit {org.authProviderShort} an.
               </p>
             ) : eligibility.reason === 'NO_ORTSGRUPPE' ? (
               <p className="text-[15px] leading-relaxed text-fg-muted">
-                In Cevi.DB ist für dich keine Ortsgruppe hinterlegt. Melde dich bei der Cevi.DB-Verwaltung eurer Abteilung.
+                In {org.authProviderShort} ist für dich keine Gruppe hinterlegt. Melde dich bei der Mitgliederverwaltung eurer {org.unitTerm}.
               </p>
             ) : (
               <div className="space-y-4">
-                <Callout tone="info" title="Nur für die Abteilungsleitung">
+                <Callout tone="info" title={`Nur für die ${org.unitTerm}-Leitung`}>
                   <p className="text-[14px] leading-relaxed">
-                    Einen neuen Schichtplan für eine Abteilung kann nur die Abteilungsleitung anlegen (offizielle Rolle «Abteilungsleiter*in» in Cevi.DB).
+                    Einen neuen Schichtplan für eine {org.unitTerm} kann nur die offizielle Leitung in {org.authProviderShort} anlegen.
                   </p>
                   <p className="mt-2 text-[14px] leading-relaxed">
-                    <strong>Was du tun kannst:</strong> Bitte eure Abteilungsleitung, den Schichtplan einmalig anzulegen. Danach kann sie dir unter <em>Abteilung → Personen</em> das Recht <strong>Anlässe erstellen</strong> geben, damit du selbstständig Anlässe erstellen kannst – oder sie erstellt den Anlass direkt für dich.
+                    <strong>Was du tun kannst:</strong> Bitte eure Leitung, den Schichtplan einmalig anzulegen. Danach kann sie dir unter <em>{org.unitTerm} → Personen</em> das Recht <strong>Anlässe erstellen</strong> geben, damit du selbstständig Anlässe erstellen kannst – oder sie erstellt den Anlass direkt für dich.
                   </p>
                 </Callout>
               </div>

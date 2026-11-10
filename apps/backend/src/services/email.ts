@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { MailKind } from '@schichtplan/shared';
+import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
 import { escapeIcsText, foldIcsLine, formatIcsUtc } from './calendarFeed.js';
 import { trackUsage } from './usageStats.js';
 
@@ -84,6 +85,8 @@ export interface EmailTemplateOptions {
   /** Direktlink zum Abbestellen / Verwalten im Footer */
   unsubscribeUrl?: string;
   unsubscribeLabel?: string;
+  /** Optionale Organisation für dynamisches Branding (Logo, Farben, Footer, Domain) */
+  organization?: string;
 }
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -243,11 +246,14 @@ export function renderEmailTemplate({
   accentColor,
   unsubscribeUrl,
   unsubscribeLabel,
+  organization,
 }: EmailTemplateOptions): string {
-  const brandColor = accentColor && HEX_COLOR_RE.test(accentColor) ? accentColor : '#e11d48';
-  const logoUrl = 'https://cevi-schichtplan.ch/images/cevi-logo.png';
-  const subtitle = headerSubtitle?.trim() || 'Schweizer Plattform für Abteilungsanlässe';
-  const signature = signatureName?.trim() || 'Dein Cevi Schichtplan Team';
+  const org = getOrganization(organization);
+  const brandColor = accentColor && HEX_COLOR_RE.test(accentColor) ? accentColor : org.primaryColor;
+  const brandName = org.name;
+  const logoUrl = `https://${org.domain}${org.logoUrl}`;
+  const subtitle = headerSubtitle?.trim() || `Schweizer Plattform für ${org.targetGroup}`;
+  const signature = signatureName?.trim() || `Dein ${org.name} Team`;
 
   let calloutBg = '#fafaf9';
   let calloutBorder = '#e4e1de';
@@ -399,11 +405,11 @@ export function renderEmailTemplate({
                           <table role="presentation" cellpadding="0" cellspacing="0">
                             <tr>
                               <td valign="middle" style="padding-right: 14px;">
-                                <img src="${logoUrl}" width="38" height="38" alt="Cevi Logo" style="display: block; width: 38px; height: 38px; border-radius: 10px;" />
+                                <img src="${logoUrl}" width="38" height="38" alt="${escapeHtml(brandName)} Logo" style="display: block; width: 38px; height: 38px; border-radius: 10px;" />
                               </td>
                               <td valign="middle">
                                 <span class="email-brand-name" style="display: block; font-size: 17px; font-weight: 800; color: #1c1917; letter-spacing: -0.02em; line-height: 1.15;">
-                                  Cevi Schichtplan
+                                  ${escapeHtml(brandName)}
                                 </span>
                                 <span class="email-brand-sub" style="display: block; font-size: 11.5px; font-weight: 600; color: #716b66; letter-spacing: 0.02em; margin-top: 2px;">
                                   ${escapeHtml(subtitle)}
@@ -520,8 +526,8 @@ export function renderEmailTemplate({
                       <tr>
                         <td align="left" valign="middle">
                           <p style="margin: 0;">
-                            &copy; ${new Date().getFullYear()} <strong>Cevi Schichtplan</strong> &bull;
-                            <a href="https://cevi-schichtplan.ch" style="color: #716b66; text-decoration: underline;">cevi-schichtplan.ch</a>
+                            &copy; ${new Date().getFullYear()} <strong>${escapeHtml(brandName)}</strong> &bull;
+                            <a href="https://${org.domain}" style="color: #716b66; text-decoration: underline;">${org.domain}</a>
                             &bull;
                             <a href="https://hilfe.cevi-schichtplan.ch" style="color: #716b66; text-decoration: underline;">Hilfe</a>
                             ${

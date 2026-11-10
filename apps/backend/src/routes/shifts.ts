@@ -138,7 +138,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           responsibles: {
             include: {
               user: {
-                select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
               },
             },
             orderBy: { createdAt: 'asc' },
@@ -294,7 +294,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               responsibles: {
                 include: {
                   user: {
-                    select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                    select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
                   },
                 },
                 orderBy: { createdAt: 'asc' },
@@ -490,14 +490,14 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           tasks: { include: { signups: true } },
           responsibles: {
             include: {
-              user: { select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true } },
+              user: { select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true } },
             },
             orderBy: { createdAt: 'asc' },
           },
           // Nur Namen: das ganze User-Objekt enthielte Passwort-Hash, E-Mail und Cevi.DB-Rohdaten
           signups: {
             include: {
-              user: { select: { id: true, firstName: true, lastName: true, ceviName: true } },
+              user: { select: { id: true, firstName: true, lastName: true, nickname: true } },
               task: true,
             },
           },
@@ -550,7 +550,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           },
           signups: {
             include: {
-              user: { select: { id: true, email: true, emailVerified: true, ceviName: true, firstName: true } },
+              user: { select: { id: true, email: true, emailVerified: true, nickname: true, firstName: true } },
               task: { select: { title: true } },
             },
           },
@@ -581,7 +581,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           if (s.user?.email && s.user.emailVerified && !PLACEHOLDER_EMAIL_REGEX.test(s.user.email)) {
             void sendShiftCancelledEmail({
               to: s.user.email,
-              name: s.user.ceviName || s.user.firstName,
+              name: s.user.nickname || s.user.firstName,
               eventTitle: shift.event.title,
               shiftTitle,
               timeRangeFormatted: timeFormatted,
@@ -697,7 +697,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           responsibles: {
             include: {
               user: {
-                select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
               },
             },
             orderBy: { createdAt: 'asc' },
@@ -772,7 +772,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               where: { shiftId: { in: shiftIds } },
               include: {
                 shift: true,
-                user: { select: { id: true, email: true, emailVerified: true, ceviName: true, firstName: true } },
+                user: { select: { id: true, email: true, emailVerified: true, nickname: true, firstName: true } },
                 task: { select: { title: true } },
               },
             });
@@ -787,7 +787,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                 if (s.user?.email && s.user.emailVerified && !PLACEHOLDER_EMAIL_REGEX.test(s.user.email)) {
                   void sendShiftCancelledEmail({
                     to: s.user.email,
-                    name: s.user.ceviName || s.user.firstName,
+                    name: s.user.nickname || s.user.firstName,
                     eventTitle: event.title,
                     shiftTitle,
                     timeRangeFormatted: timeFormatted,

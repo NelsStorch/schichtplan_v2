@@ -67,7 +67,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_dev_proxy"
-      - "traefik.http.routers.schichtplan-dev-api.rule=(Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || Host(`admin.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) || HostRegexp(`^[a-z0-9-]+[.]${DOMAIN_DEV:-dev.cevi-schichtplan.ch}$$`)) && !Host(`status.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`) && (PathPrefix(`/api`) || Path(`/health`))"
+      - "traefik.http.routers.schichtplan-dev-api.rule=(Host(`dev.cevi-schichtplan.ch`) || Host(`dev.pfadi-schichtplan.ch`) || Host(`dev.jubla-schichtplan.ch`) || Host(`dev.vereins-schichtplan.ch`) || Host(`login.dev.cevi-schichtplan.ch`) || Host(`login.dev.pfadi-schichtplan.ch`) || Host(`login.dev.jubla-schichtplan.ch`) || Host(`login.dev.vereins-schichtplan.ch`) || Host(`admin.dev.cevi-schichtplan.ch`) || HostRegexp(`^[a-z0-9-]+[.](dev[.]cevi-schichtplan[.]ch|dev[.]pfadi-schichtplan[.]ch|dev[.]jubla-schichtplan[.]ch|dev[.]vereins-schichtplan[.]ch)$$`)) && !Host(`status.dev.cevi-schichtplan.ch`) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.schichtplan-dev-api.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-dev-api.tls.certresolver=myresolver"
       # Höher als schichtplan-api (100) in Prod: dessen HostRegexp matcht auch dev.<domain>, ein Gleichstand wäre nur Glückssache
@@ -127,7 +127,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_dev_proxy"
-      - "traefik.http.routers.schichtplan-dev-landing.rule=Host(`${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-landing.rule=Host(`dev.cevi-schichtplan.ch`) || Host(`dev.pfadi-schichtplan.ch`) || Host(`dev.jubla-schichtplan.ch`) || Host(`dev.vereins-schichtplan.ch`)"
       - "traefik.http.routers.schichtplan-dev-landing.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-dev-landing.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-dev-landing.priority=20"

@@ -363,7 +363,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
             responsibles: {
               include: {
                 user: {
-                  select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                  select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
                 },
               },
               orderBy: { createdAt: 'asc' },
@@ -371,7 +371,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
             signups: {
               include: {
                 user: {
-                  select: { id: true, firstName: true, lastName: true, ceviName: true },
+                  select: { id: true, firstName: true, lastName: true, nickname: true },
                 },
               },
               orderBy: { createdAt: 'asc' },
@@ -383,12 +383,12 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                 dayCutoffTime: true,
                 contactVisibility: true,
                 contactUser: {
-                  select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                  select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
                 },
                 dayResponsibles: {
                   include: {
                     user: {
-                      select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                      select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
                     },
                   },
                   orderBy: { createdAt: 'asc' },
@@ -426,7 +426,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
 
           item.coHelpers = ds.signups
             .filter((su) => su.userId !== request.user.id)
-            .map((su) => (su.user ? su.user.ceviName || su.user.firstName : su.guestName || 'Gast'))
+            .map((su) => (su.user ? su.user.nickname || su.user.firstName : su.guestName || 'Gast'))
             .filter(Boolean);
 
           item.filledSlots = ds.signups.length;

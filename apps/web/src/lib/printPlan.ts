@@ -1,4 +1,4 @@
-import type { DepartmentDto, ShiftDto, ShiftSignupDto } from '@schichtplan/shared';
+import { getOrganization, type DepartmentDto, type ShiftDto, type ShiftSignupDto } from '@schichtplan/shared';
 import { dayKeyToIso, fmtDateRange, fmtDayMonth, fmtShortDate, fmtShortWeekday, fmtWeekday, groupByBusinessDay, fmtTimeRange } from './format';
 import type { EventDetails } from './types';
 
@@ -196,15 +196,14 @@ async function rasterize(url: string, maxSize = 360): Promise<string | null> {
   }
 }
 
-const CEVI_LOGO = '/images/cevi-logo.png';
-
 export async function buildPlanDocument(
   event: EventDetails,
   department: DepartmentDto | null,
   options: PrintPlanOptions,
   loadImage: (url: string) => Promise<string | null> = rasterize
 ): Promise<PlanDocument> {
-  const ceviLogo = await loadImage(CEVI_LOGO);
+  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+  const brandLogo = await loadImage(org.logoUrl);
   let logo: string | null = null;
   for (const url of [event.logoUrl, department?.logoUrl]) {
     if (url && !logo) logo = await loadImage(url);
@@ -228,8 +227,8 @@ export async function buildPlanDocument(
     stand: new Intl.DateTimeFormat('de-CH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Zurich' }).format(new Date()),
     department: department?.name ?? null,
     accent: /^#[0-9a-f]{6}$/i.test(department?.primaryColor ?? '') ? department!.primaryColor! : DEFAULT_ACCENT,
-    logo: logo ?? ceviLogo,
-    ceviLogo: logo ? ceviLogo : null,
+    logo: logo ?? brandLogo,
+    ceviLogo: logo ? brandLogo : null,
     days: options.layout === 'personen' ? [] : buildDays(event, options),
     people,
   };

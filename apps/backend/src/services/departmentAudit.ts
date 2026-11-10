@@ -39,7 +39,7 @@ export async function recordDepartmentAction(
     if (entry.actorId) {
       const actor = await prisma.user.findUnique({
         where: { id: entry.actorId },
-        select: { firstName: true, lastName: true, ceviName: true },
+        select: { firstName: true, lastName: true, nickname: true },
       });
       actorName = actor ? personLabel(actor) : 'Unbekannt';
     }

@@ -44,7 +44,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
   async function performerLabel(userId: string): Promise<string> {
     const performer = await fastify.prisma.user.findUnique({
       where: { id: userId },
-      select: { firstName: true, lastName: true, ceviName: true },
+      select: { firstName: true, lastName: true, nickname: true },
     });
     return performer ? `${personLabel(performer)} (OK)` : 'OK';
   }
@@ -90,7 +90,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
         include: {
           shift: true,
           task: true,
-          user: { select: { firstName: true, lastName: true, ceviName: true } },
+          user: { select: { firstName: true, lastName: true, nickname: true } },
         },
       });
       if (!signup || signup.shift.eventId !== event.id) {
@@ -191,7 +191,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
 
       const me = await fastify.prisma.user.findUnique({
         where: { id: request.user.id },
-        select: { firstName: true, lastName: true, ceviName: true },
+        select: { firstName: true, lastName: true, nickname: true },
       });
       const signups = await fastify.prisma.shiftSignup.findMany({
         where: { userId: request.user.id, shift: { eventId: event.id } },

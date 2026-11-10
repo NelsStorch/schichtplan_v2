@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import {
+  getOrganization,
   type DepartmentStatsResponseDto,
 } from '@schichtplan/shared';
 import { Badge, Button, EmptyState, Input, Skeleton, Switch, cn, useToast } from '@schichtplan/ui';
@@ -38,6 +39,7 @@ export function DepartmentStatsPanel() {
   const [countAttendedOnly, setCountAttendedOnly] = useState(false);
   const [includeSetupTeardown, setIncludeSetupTeardown] = useState(true);
   const [helperSearch, setHelperSearch] = useState('');
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
   const [activeSubTab, setActiveSubTab] = useState<'helpers' | 'events' | 'stufen'>('helpers');
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -83,9 +85,9 @@ export function DepartmentStatsPanel() {
       const matchName = h.displayName.toLowerCase().includes(q);
       const matchFirst = h.firstName ? h.firstName.toLowerCase().includes(q) : false;
       const matchLast = h.lastName?.toLowerCase().includes(q) ?? false;
-      const matchCevi = h.ceviName?.toLowerCase().includes(q) ?? false;
+      const matchNickname = (h.nickname || h.ceviName)?.toLowerCase().includes(q) ?? false;
       const matchStufe = h.stufen.some((s) => s.toLowerCase().includes(q));
-      return matchName || matchFirst || matchLast || matchCevi || matchStufe;
+      return matchName || matchFirst || matchLast || matchNickname || matchStufe;
     });
   }, [data?.topHelpers, helperSearch]);
 
@@ -95,12 +97,12 @@ export function DepartmentStatsPanel() {
 
     const deptSlug = department?.slug || 'abteilung';
     const yearLabel = data.year === 'ALL' ? 'alle-jahre' : String(data.year);
-    const filename = `cevi-helferstunden-${deptSlug}-${yearLabel}.csv`;
+    const filename = `${org.slug}-helferstunden-${deptSlug}-${yearLabel}.csv`;
 
     const rows: (string | number | null | undefined)[][] = [];
 
     // Titelzeilen
-    rows.push([`Cevi Schichtplan - Jahresauswertung ${department?.name ?? ''}`]);
+    rows.push([`${org.name} Schichtplan - Jahresauswertung ${department?.name ?? ''}`]);
     rows.push([`Jahr: ${data.year === 'ALL' ? 'Alle erfassten Jahre' : data.year}`]);
     rows.push([`Stand: ${new Date().toLocaleDateString('de-CH')}`]);
     rows.push([
@@ -126,7 +128,7 @@ export function DepartmentStatsPanel() {
     rows.push([
       'Rang',
       'Name',
-      'Cevi-Name',
+      org.nicknameTerm,
       'Stufen',
       'Anzahl Anlässe',
       'Schichten gesamt',
@@ -140,7 +142,7 @@ export function DepartmentStatsPanel() {
       rows.push([
         idx + 1,
         `${h.firstName || h.displayName} ${h.lastName || ''}`.trim(),
-        h.ceviName || '',
+        h.nickname || h.ceviName || '',
         h.stufen.join(', ') || 'Ohne Stufe',
         h.eventCount,
         h.shiftCount,
@@ -522,9 +524,9 @@ export function DepartmentStatsPanel() {
                         2. Rang (Silber)
                       </span>
                       <h4 className="mt-1 text-base font-bold text-fg truncate" title={data.topHelpers[1].displayName}>
-                        {data.topHelpers[1].ceviName || data.topHelpers[1].displayName}
+                        {data.topHelpers[1].nickname || data.topHelpers[1].ceviName || data.topHelpers[1].displayName}
                       </h4>
-                      {data.topHelpers[1].ceviName && data.topHelpers[1].firstName && (
+                      {(data.topHelpers[1].nickname || data.topHelpers[1].ceviName) && data.topHelpers[1].firstName && (
                         <p className="text-xs text-fg-muted truncate">
                           {data.topHelpers[1].firstName} {data.topHelpers[1].lastName || ''}
                         </p>
@@ -546,9 +548,9 @@ export function DepartmentStatsPanel() {
                         1. Rang (Gold) 🏆
                       </span>
                       <h4 className="mt-1 text-lg font-bold text-fg truncate" title={data.topHelpers[0].displayName}>
-                        {data.topHelpers[0].ceviName || data.topHelpers[0].displayName}
+                        {data.topHelpers[0].nickname || data.topHelpers[0].ceviName || data.topHelpers[0].displayName}
                       </h4>
-                      {data.topHelpers[0].ceviName && data.topHelpers[0].firstName && (
+                      {(data.topHelpers[0].nickname || data.topHelpers[0].ceviName) && data.topHelpers[0].firstName && (
                         <p className="text-xs text-fg-muted truncate">
                           {data.topHelpers[0].firstName} {data.topHelpers[0].lastName || ''}
                         </p>
@@ -572,9 +574,9 @@ export function DepartmentStatsPanel() {
                         3. Rang (Bronze)
                       </span>
                       <h4 className="mt-1 text-base font-bold text-fg truncate" title={data.topHelpers[2].displayName}>
-                        {data.topHelpers[2].ceviName || data.topHelpers[2].displayName}
+                        {data.topHelpers[2].nickname || data.topHelpers[2].ceviName || data.topHelpers[2].displayName}
                       </h4>
-                      {data.topHelpers[2].ceviName && data.topHelpers[2].firstName && (
+                      {(data.topHelpers[2].nickname || data.topHelpers[2].ceviName) && data.topHelpers[2].firstName && (
                         <p className="text-xs text-fg-muted truncate">
                           {data.topHelpers[2].firstName} {data.topHelpers[2].lastName || ''}
                         </p>
@@ -613,7 +615,7 @@ export function DepartmentStatsPanel() {
                   <thead className="border-b border-border bg-surface-2 text-fg-muted">
                     <tr>
                       <th className="py-2.5 px-3 font-semibold w-12 text-center">#</th>
-                      <th className="py-2.5 px-3 font-semibold">Name / Cevi-Name</th>
+                      <th className="py-2.5 px-3 font-semibold">Name / {org.nicknameTerm}</th>
                       <th className="py-2.5 px-3 font-semibold">Stufen</th>
                       <th className="py-2.5 px-3 font-semibold text-right">Anlässe</th>
                       <th className="py-2.5 px-3 font-semibold text-right">Schichten</th>
@@ -636,9 +638,9 @@ export function DepartmentStatsPanel() {
                           </td>
                           <td className="py-2.5 px-3 font-medium text-fg">
                             <div className="flex items-center gap-1.5">
-                              {h.ceviName ? (
+                              {(h.nickname || h.ceviName) ? (
                                 <>
-                                  <span className="font-bold text-accent-ink">«{h.ceviName}»</span>
+                                  <span className="font-bold text-accent-ink">«{h.nickname || h.ceviName}»</span>
                                   {h.firstName && <span className="text-fg-muted text-xs">({h.firstName} {h.lastName || ''})</span>}
                                 </>
                               ) : (

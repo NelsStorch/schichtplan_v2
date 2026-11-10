@@ -99,7 +99,7 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
         },
         include: {
           user: {
-            select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+            select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
           },
         },
         orderBy: { createdAt: 'asc' },
@@ -185,7 +185,7 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
         },
         include: {
           user: {
-            select: { id: true, firstName: true, lastName: true, ceviName: true },
+            select: { id: true, firstName: true, lastName: true, nickname: true },
           },
         },
       });
@@ -193,8 +193,8 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
       return {
         id: organizer.id,
         userId: organizer.userId,
-        displayName: organizer.user.ceviName
-          ? `${organizer.user.firstName} / ${organizer.user.ceviName}`
+        displayName: organizer.user.nickname
+          ? `${organizer.user.firstName} / ${organizer.user.nickname}`
           : `${organizer.user.firstName} ${organizer.user.lastName}`,
         role: organizer.role,
         roleTitle: organizer.roleTitle,
@@ -307,7 +307,7 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
           shift: true,
           task: true,
           user: {
-            select: { id: true, firstName: true, lastName: true, ceviName: true },
+            select: { id: true, firstName: true, lastName: true, nickname: true },
           },
         },
       });
@@ -322,18 +322,18 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
           const performerUser = request.user
             ? await fastify.prisma.user.findUnique({
                 where: { id: request.user.id },
-                select: { firstName: true, lastName: true, ceviName: true },
+                select: { firstName: true, lastName: true, nickname: true },
               })
             : null;
           const performerName = performerUser
-            ? (performerUser.ceviName ? `${performerUser.firstName} / ${performerUser.ceviName}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
+            ? (performerUser.nickname ? `${performerUser.firstName} / ${performerUser.nickname}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
             : null;
           const pLabel = performerName ? `${performerName} (OK)` : 'OK';
 
           await fastify.prisma.shiftSignupLog.createMany({
             data: signupsToCancel.map((su) => {
               const hName = su.user
-                ? (su.user.ceviName ? `${su.user.firstName} / ${su.user.ceviName}` : `${su.user.firstName} ${su.user.lastName}`.trim())
+                ? (su.user.nickname ? `${su.user.firstName} / ${su.user.nickname}` : `${su.user.firstName} ${su.user.lastName}`.trim())
                 : (su.guestName || 'Gast');
               return {
                 eventId: event.id,

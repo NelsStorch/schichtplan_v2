@@ -61,7 +61,7 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { email },
-        select: { id: true, passwordHash: true, ceviName: true, firstName: true },
+        select: { id: true, passwordHash: true, nickname: true, firstName: true },
       });
       // Nur Passwort-Konten: Cevi.DB- und Cevi-Name-Konten melden sich anders an
       if (!user?.passwordHash) return { success: true, message: GENERIC_MESSAGE };
@@ -88,7 +88,7 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
       const resetUrl = `${getLoginPortalBaseUrl()}/passwort-zuruecksetzen?token=${token}`;
       const sent = await sendPasswordResetEmail({
         to: email,
-        name: user.ceviName || user.firstName,
+        name: user.nickname || user.firstName,
         resetUrl,
         expiresHours: PASSWORD_RESET_TTL_HOURS,
       });

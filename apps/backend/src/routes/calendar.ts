@@ -48,7 +48,7 @@ const calendarRoutes: FastifyPluginAsync = async (fastify) => {
         id: true,
         firstName: true,
         lastName: true,
-        ceviName: true,
+        nickname: true,
       },
     });
 
@@ -58,7 +58,7 @@ const calendarRoutes: FastifyPluginAsync = async (fastify) => {
 
     const shifts = await getUserCalendarShifts(fastify.prisma, user.id);
     const domain = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
-    const userDisplayName = user.ceviName || user.firstName;
+    const userDisplayName = user.nickname || user.firstName;
 
     const ics = buildIcsFeed({
       userDisplayName,

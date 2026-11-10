@@ -67,10 +67,10 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       id: true,
       firstName: true,
       lastName: true,
-      ceviName: true,
+      nickname: true,
       email: true,
       isGlobalAdmin: true,
-      ceviDbId: true,
+      providerId: true,
       passwordHash: true,
       homeDepartmentId: true,
       homeDepartmentSource: true,
@@ -88,7 +88,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.prisma.departmentStufe.findMany({
         where: { departmentId },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true, ceviDbGroupId: true, _count: { select: { members: true } } },
+        select: { id: true, name: true, hitobitoGroupId: true, _count: { select: { members: true } } },
       }),
       fastify.prisma.event.findMany({
         where: { departmentId },
@@ -128,7 +128,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
           userId: user.id,
           firstName: user.firstName,
           lastName: user.lastName,
-          ceviName: user.ceviName,
+          nickname: user.nickname,
+          ceviName: user.nickname,
           email: user.email,
           isGlobalAdmin: user.isGlobalAdmin,
           loginMethods: loginMethods(user),
@@ -141,7 +142,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       stufen: stufen.map((s) => ({
         id: s.id,
         name: s.name,
-        ceviDbGroupId: s.ceviDbGroupId,
+        hitobitoGroupId: s.hitobitoGroupId,
+        ceviDbGroupId: s.hitobitoGroupId,
         memberCount: s._count.members,
       })),
       events: await toEventItems(fastify.prisma, eventRows),
@@ -166,11 +168,13 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
     const input = request.body as z.output<typeof AdminCreateDepartmentSchema>;
-    const { name, slug, ceviDbGroupId, membersOnly, leaderUserId } = input;
+    const { name, slug, membersOnly, leaderUserId } = input;
+    const hitobitoGroupId = input.ceviDbGroupId ?? (input as any).hitobitoGroupId;
+    const organization = (input.organization as any) || 'CEVI';
 
-    if (ceviDbGroupId) {
+    if (hitobitoGroupId) {
       const existingWithGroup = await fastify.prisma.department.findUnique({
-        where: { ceviDbGroupId },
+        where: { organization_hitobitoGroupId: { organization, hitobitoGroupId } },
         select: { id: true, name: true, slug: true },
       });
       if (existingWithGroup) {
@@ -183,7 +187,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     if (leaderUserId) {
       const leader = await fastify.prisma.user.findUnique({
         where: { id: leaderUserId },
-        select: { passwordHash: true, ceviDbId: true },
+        select: { passwordHash: true, providerId: true },
       });
       if (!leader) return reply.status(400).send({ error: 'Die gewählte Abteilungsleitung gibt es nicht.' });
       if (isCeviNameProfile(leader)) return reply.status(400).send({ error: CEVINAME_ROLE_ERROR });
@@ -195,7 +199,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           name,
           slug,
-          ceviDbGroupId: ceviDbGroupId ?? null,
+          organization,
+          hitobitoGroupId: hitobitoGroupId ?? null,
           // Erste Abteilungsleitung ist auch die Kontaktperson
           contactUserId: leaderUserId ?? null,
           membersOnly,
@@ -212,14 +217,14 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       throw err;
     }
 
-    const attached = ceviDbGroupId ? await attachCeviDbGroup(fastify.prisma, created.id, ceviDbGroupId) : 0;
+    const attached = hitobitoGroupId ? await attachCeviDbGroup(fastify.prisma, created.id, hitobitoGroupId, organization) : 0;
 
     await recordAdminAction(fastify.prisma, request, {
       action: 'DEPARTMENT_CREATE',
       targetType: 'DEPARTMENT',
       targetId: created.id,
       targetLabel: `${created.name} (${created.slug})`,
-      details: { ceviDbGroupId: ceviDbGroupId ?? null, leaderUserId: leaderUserId ?? null, attached },
+      details: { hitobitoGroupId: hitobitoGroupId ?? null, leaderUserId: leaderUserId ?? null, attached },
     });
     return reply.status(201).send({ department: created, attached });
   });
@@ -242,10 +247,11 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
     const input = request.body as z.output<typeof AdminUpdateDepartmentSchema>;
     const data = input;
+    const targetHitobitoGroupId = data.ceviDbGroupId !== undefined ? data.ceviDbGroupId : (data as any).hitobitoGroupId;
 
     const existing = await fastify.prisma.department.findUnique({
       where: { id: request.params.id },
-      select: { id: true, name: true, slug: true, ceviDbGroupId: true, membersOnly: true },
+      select: { id: true, name: true, slug: true, organization: true, hitobitoGroupId: true, membersOnly: true },
     }).catch(() => null);
     if (!existing) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
 
@@ -262,9 +268,14 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Vor dem Speichern prüfen (danach fände sich die Abteilung selbst) und nur bei anderen Abteilungen
-    if (data.ceviDbGroupId && data.ceviDbGroupId !== existing.ceviDbGroupId) {
+    if (targetHitobitoGroupId && targetHitobitoGroupId !== existing.hitobitoGroupId) {
       const existingWithGroup = await fastify.prisma.department.findUnique({
-        where: { ceviDbGroupId: data.ceviDbGroupId },
+        where: {
+          organization_hitobitoGroupId: {
+            organization: existing.organization,
+            hitobitoGroupId: targetHitobitoGroupId,
+          },
+        },
         select: { id: true, name: true, slug: true },
       });
       if (existingWithGroup && existingWithGroup.id !== existing.id) {
@@ -288,8 +299,9 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
           qrColorPrimary: data.qrColorPrimary !== undefined ? data.qrColorPrimary : undefined,
           qrColorSecondary: data.qrColorSecondary !== undefined ? data.qrColorSecondary : undefined,
           contactUserId: data.contactUserId,
+          organization: data.organization !== undefined ? (data.organization as any) : undefined,
           membersOnly: data.membersOnly,
-          ceviDbGroupId: data.ceviDbGroupId,
+          hitobitoGroupId: targetHitobitoGroupId,
         },
       });
     } catch (err) {
@@ -299,9 +311,11 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       throw err;
     }
 
-    const newGroup = data.ceviDbGroupId;
+    const newGroup = targetHitobitoGroupId;
     const attached =
-      newGroup && newGroup !== existing.ceviDbGroupId ? await attachCeviDbGroup(fastify.prisma, existing.id, newGroup) : 0;
+      newGroup && newGroup !== existing.hitobitoGroupId
+        ? await attachCeviDbGroup(fastify.prisma, existing.id, newGroup, existing.organization)
+        : 0;
 
     await recordAdminAction(fastify.prisma, request, {
       action: 'DEPARTMENT_UPDATE',
@@ -313,7 +327,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         before: {
           name: existing.name,
           slug: existing.slug,
-          ceviDbGroupId: existing.ceviDbGroupId,
+          hitobitoGroupId: existing.hitobitoGroupId,
           membersOnly: existing.membersOnly,
         },
         attached,
@@ -399,7 +413,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         fastify.prisma.user
           .findUnique({
             where: { id: userId },
-            select: { id: true, passwordHash: true, ceviDbId: true, firstName: true, lastName: true, ceviName: true },
+            select: { id: true, passwordHash: true, providerId: true, firstName: true, lastName: true, nickname: true },
           })
           .catch(() => null),
       ]);
@@ -505,7 +519,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
             role: true,
             permissions: true,
             department: { select: { name: true } },
-            user: { select: { firstName: true, lastName: true, ceviName: true } },
+            user: { select: { firstName: true, lastName: true, nickname: true } },
           },
         })
         .catch(() => null);

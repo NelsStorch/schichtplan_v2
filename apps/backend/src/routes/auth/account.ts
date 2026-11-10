@@ -86,8 +86,8 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
           email: true,
           firstName: true,
           lastName: true,
-          ceviName: true,
-          ceviDbId: true,
+          nickname: true,
+          providerId: true,
           passwordHash: true,
           isGlobalAdmin: true,
         },
@@ -98,7 +98,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Nur Accounts über Cevi.DB oder Passwort dürfen sich selbst löschen
-      if (user.ceviDbId === null && !user.passwordHash) {
+      if (user.providerId === null && !user.passwordHash) {
         return reply.status(403).send({
           error: 'Nur Konten mit Cevi.DB oder Passwort können sich selbst löschen.',
         });
@@ -132,7 +132,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
           data: { createdById: null },
         });
 
-        // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserCeviDbStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
+        // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserHitobitoStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
         await tx.user.delete({
           where: { id: userId },
         });
@@ -141,12 +141,12 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       clearAuthCookie(reply);
       trackUsage('ACCOUNT_DELETE');
 
-      const userDisplayName = user.ceviName
-        ? `${user.ceviName} (${user.firstName} ${user.lastName})`
+      const userDisplayName = user.nickname
+        ? `${user.nickname} (${user.firstName} ${user.lastName})`
         : `${user.firstName} ${user.lastName}`;
 
       request.log.info(
-        { userId, email: user.email, name: userDisplayName, ceviDbId: user.ceviDbId, hasPassword: Boolean(user.passwordHash) },
+        { userId, email: user.email, name: userDisplayName, providerId: user.providerId, hasPassword: Boolean(user.passwordHash) },
         'Person hat ihr Konto selbst gelöscht'
       );
 
@@ -173,7 +173,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.id;
       const current = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { homeDepartmentId: true, homeDepartmentSource: true, ceviDbId: true },
+        select: { homeDepartmentId: true, homeDepartmentSource: true, providerId: true },
       });
       if (!current) return reply.status(404).send({ error: 'Person nicht gefunden' });
 
@@ -226,7 +226,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (departmentId) {
-        if (current.ceviDbId !== null) {
+        if (current.providerId !== null) {
           await autoCreateCeviDbDepartmentStufen(fastify.prisma, departmentId, userId);
           await syncCeviDbStufen(fastify.prisma, userId);
         }

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { headers } from 'next/headers';
+import { getOrganization } from '@schichtplan/shared';
 
 /**
  * Bausteine für Link-Vorschau-Bilder (Open Graph, 1200×630) mit `next/og`.
@@ -24,10 +25,17 @@ export async function getRequestOrigin(): Promise<{ origin: string; host: string
   return { origin: `${proto}://${host}`, host };
 }
 
+const SUPPORTED_ROOT_DOMAINS = [
+  'cevi-schichtplan.ch',
+  'pfadi-schichtplan.ch',
+  'jubla-schichtplan.ch',
+  'vereins-schichtplan.ch',
+];
+
 /**
- * Host aus der Anfrage, aber nur die eigene Domain (DOMAIN, Standard cevi-schichtplan.ch, samt Subdomains)
- * oder lokal localhost. Sonst die Hauptdomain: Mit dem Ursprung lädt der Server Logos nach, und er
- * landet als absolute URL in der Link-Vorschau.
+ * Host aus der Anfrage, aber nur die eigene Domain (DOMAIN, Standard cevi-schichtplan.ch, samt Subdomains
+ * und weiteren Verbandsdomains) oder lokal localhost. Sonst die Hauptdomain: Mit dem Ursprung lädt der
+ * Server Logos nach, und er landet als absolute URL in der Link-Vorschau.
  */
 export function trustedHost(value: string | null | undefined, rootDomain = process.env.DOMAIN || 'cevi-schichtplan.ch'): string {
   const root = rootDomain.replace(/^\./, '').toLowerCase();
@@ -35,7 +43,8 @@ export function trustedHost(value: string | null | undefined, rootDomain = proce
   if (!/^[a-z0-9.-]+(:\d+)?$/.test(host) && !/^\[::1\](:\d+)?$/.test(host)) return root;
   const hostname = host.replace(/:\d+$/, '');
   const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(hostname) || hostname.endsWith('.localhost');
-  const isOwn = hostname === root || hostname.endsWith(`.${root}`);
+  const isKnownRoot = SUPPORTED_ROOT_DOMAINS.some((d) => hostname === d || hostname.endsWith(`.${d}`));
+  const isOwn = hostname === root || hostname.endsWith(`.${root}`) || isKnownRoot;
   return isLocal || isOwn ? host : root;
 }
 
@@ -46,6 +55,20 @@ export async function loadCeviLogo(): Promise<string | null> {
     return `data:image/png;base64,${file.toString('base64')}`;
   } catch {
     return null;
+  }
+}
+
+/** Verbandslogo (Cevi, Pfadi, Jubla oder Verein) passend zum Host laden */
+export async function loadBrandLogo(host?: string): Promise<string | null> {
+  const org = getOrganization(host);
+  try {
+    const filename = org.slug === 'pfadi' ? 'pfadi-logo.svg' : org.slug === 'jubla' ? 'jubla-logo.svg' : org.slug === 'verein' ? 'verein-logo.svg' : 'cevi-logo.png';
+    const filePath = path.join(process.cwd(), 'public', 'images', filename);
+    const file = await readFile(filePath);
+    const mime = filename.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
+    return `data:${mime};base64,${file.toString('base64')}`;
+  } catch {
+    return loadCeviLogo();
   }
 }
 

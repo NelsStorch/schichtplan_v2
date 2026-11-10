@@ -102,7 +102,7 @@ export function ShiftPlanPdf({ doc }: { doc: PlanDocument }) {
   const wide = doc.landscape;
   const footerText = [doc.department, `${doc.title} · ${doc.subtitle}`, `Stand ${doc.stand}`].filter(Boolean).join('  ·  ');
   return (
-    <Document title={`${doc.subtitle} – ${doc.title}`} author={doc.department ?? 'Cevi Schichtplan'} creator="Cevi Schichtplan" language="de-CH">
+    <Document title={`${doc.subtitle} – ${doc.title}`} author={doc.department ?? 'Schichtplan'} creator="Schichtplan" language="de-CH">
       <Page size="A4" orientation={wide ? 'landscape' : 'portrait'} style={s.page}>
         {/* Seitenzahl: dynamische Texte mit `bottom` landen ausserhalb der Seite, darum von oben gerechnet */}
         <Text

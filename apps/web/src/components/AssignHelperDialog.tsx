@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AlertTriangle, ArrowDownUp, Ban, Clock, Filter, Search, UserCheck } from 'lucide-react';
-import { ageAt } from '@schichtplan/shared';
+import { ageAt, getOrganization } from '@schichtplan/shared';
 import type {
   EventRosterItemDto,
   EventRosterResponseDto,
@@ -84,6 +84,8 @@ function AssignHelperForm({
     () => task?.id ?? (tasks.find((t) => t.filled < t.requiredSlots) ?? tasks[0])?.id ?? ''
   );
   const chosenTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
+
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
 
   // Filter
   const [search, setSearch] = useState('');
@@ -319,7 +321,7 @@ function AssignHelperForm({
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
               <Input
                 className="pl-9"
-                placeholder="Name, Cevi-Name oder Stufe suchen …"
+                placeholder={`Name, ${org.nicknameTerm} oder Stufe suchen …`}
                 value={search}
                 autoFocus
                 onChange={(e) => setSearch(e.target.value)}
@@ -451,7 +453,7 @@ function AssignHelperForm({
         </div>
       ) : (
         <div className="space-y-3">
-          <Field label="Name oder Cevi-Name" required>
+          <Field label={`Name oder ${org.nicknameTerm}`} required>
             <Input value={guestName} autoFocus placeholder="z.B. Peter Meier / Schnägg" onChange={(e) => setGuestName(e.target.value)} />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">

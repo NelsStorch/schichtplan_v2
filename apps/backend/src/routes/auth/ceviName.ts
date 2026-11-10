@@ -46,7 +46,12 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const { departmentSlug, ceviName, birthDate, returnTo } = input;
 
     const department = await fastify.prisma.department.findUnique({
-      where: { slug: departmentSlug.toLowerCase() },
+      where: {
+        organization_slug: {
+          organization: request.organization,
+          slug: departmentSlug.toLowerCase(),
+        },
+      },
       select: { id: true, name: true },
     });
     if (!department) {
@@ -108,7 +113,12 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const { departmentSlug, ceviName, birthDate, firstName, lastName, phone, stufen, returnTo } = input;
 
     const department = await fastify.prisma.department.findUnique({
-      where: { slug: departmentSlug.toLowerCase() },
+      where: {
+        organization_slug: {
+          organization: request.organization,
+          slug: departmentSlug.toLowerCase(),
+        },
+      },
       select: { id: true, name: true },
     });
     if (!department) {
@@ -148,7 +158,7 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const user = await fastify.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
-          ceviName: cleanCeviName,
+          nickname: cleanCeviName,
           firstName: firstName?.trim() || cleanCeviName,
           lastName: lastName?.trim() || null,
           birthDate: new Date(`${birthDate}T00:00:00Z`),
@@ -179,14 +189,15 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
   /** Cookie setzen und Profil zurückgeben (Login und Registrierung mit Cevi-Name) */
   async function signInCeviNameProfile(
     reply: FastifyReply,
-    user: { id: string; email: string | null; ceviName: string | null; isGlobalAdmin: boolean },
+    user: { id: string; email: string | null; nickname?: string | null; ceviName?: string | null; isGlobalAdmin: boolean },
     returnTo: string | undefined
   ) {
+    const nick = user.nickname ?? user.ceviName ?? 'helfer';
     const token = fastify.signAuthToken({
       id: user.id,
       email:
         user.email ||
-        `${(user.ceviName ?? 'helfer').toLowerCase().replace(/[^a-z0-9]/g, '')}@guest.cevi-schichtplan.ch`,
+        `${nick.toLowerCase().replace(/[^a-z0-9]/g, '')}@guest.cevi-schichtplan.ch`,
       isGlobalAdmin: user.isGlobalAdmin,
       amr: 'ceviname',
     });

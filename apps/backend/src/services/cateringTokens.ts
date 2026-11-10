@@ -423,7 +423,7 @@ export async function getCateringOverview(
           guestName: true,
           attendance: true,
           user: {
-            select: { firstName: true, lastName: true, ceviName: true },
+            select: { firstName: true, lastName: true, nickname: true },
           },
           shift: {
             select: { id: true, title: true, startTime: true, endTime: true },
@@ -437,7 +437,7 @@ export async function getCateringOverview(
         select: { id: true, title: true, startTime: true, endTime: true },
       },
       user: {
-        select: { firstName: true, lastName: true, ceviName: true },
+        select: { firstName: true, lastName: true, nickname: true },
       },
     },
     orderBy: [{ redeemedAt: 'desc' }, { createdAt: 'asc' }],

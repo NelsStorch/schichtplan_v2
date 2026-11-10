@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Link2 } from 'lucide-react';
-import { Button, Callout, CeviLogo, Field, Input, ThemeToggle } from '@schichtplan/ui';
+import { Button, Callout, BrandLogo, Field, Input, ThemeToggle } from '@schichtplan/ui';
+import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
 import { cleanReturnTo, withReturnTo } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
@@ -14,6 +15,12 @@ import { AuthFooter } from '@/components/AuthFooter';
  */
 function LinkAccount() {
   const searchParams = useSearchParams();
+  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrg(getOrganization(window.location.host));
+    }
+  }, []);
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [info, setInfo] = useState<{ email: string | null; name: string } | null>(null);
   const [missing, setMissing] = useState(false);
@@ -63,8 +70,8 @@ function LinkAccount() {
 
       <header className="relative mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
         <span className="flex items-center gap-2.5">
-          <CeviLogo className="size-8" alt="" />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">Cevi Schichtplan</span>
+          <BrandLogo className="size-8" alt="" />
+          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">{org.name}</span>
         </span>
         <ThemeToggle />
       </header>
@@ -76,7 +83,7 @@ function LinkAccount() {
               Verknüpfung abgelaufen
             </h1>
             <p className="text-[15px] leading-relaxed text-fg-muted">
-              Melde dich bitte nochmals mit Cevi.DB an. Danach fragen wir wieder nach deinem Passwort.
+              Melde dich bitte nochmals mit {org.authProviderShort} an. Danach fragen wir wieder nach deinem Passwort.
             </p>
             <Button size="lg" className="w-full" onClick={() => (window.location.href = withReturnTo('/', returnTo))}>
               Zur Anmeldung
@@ -97,7 +104,7 @@ function LinkAccount() {
             </h1>
             <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
               Zu <span className="font-medium text-fg">{info.email}</span> gibt es ein Konto mit Passwort. Gib das
-              Passwort ein, dann verbinden wir es mit Cevi.DB. Deine Schichten und Rollen bleiben, und du meldest
+              Passwort ein, dann verbinden wir es mit {org.authProviderShort}. Deine Schichten und Rollen bleiben, und du meldest
               dich danach auf beide Arten an.
             </p>
 

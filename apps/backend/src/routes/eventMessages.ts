@@ -70,7 +70,7 @@ const userSelect = {
   id: true,
   firstName: true,
   lastName: true,
-  ceviName: true,
+  nickname: true,
   email: true,
   emailVerified: true,
   pushNotifyMessages: true,
@@ -234,8 +234,8 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           select: {
             ...userSelect,
             isGlobalAdmin: true,
-            ceviDbId: true,
-            ceviDbDepartmentLeader: true,
+            providerId: true,
+            departmentLeader: true,
             homeDepartmentId: true,
             homeDepartmentSource: true,
             memberships: {
@@ -246,7 +246,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
               where: { stufe: { departmentId: { in: targetDeptIds } } },
               select: { stufeId: true, role: true, source: true },
             },
-            ceviDbStufen: { select: { kind: true } },
+            hitobitoStufen: { select: { kind: true } },
             signups: {
               where: { shift: { eventId: event.id } },
               select: { id: true },
@@ -273,9 +273,9 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           const accessUser: AccessUser = {
             id: u.id,
             isGlobalAdmin: u.isGlobalAdmin,
-            ceviDbId: u.ceviDbId,
-            ceviDbDepartmentLeader: u.ceviDbDepartmentLeader,
-            ceviDbStufen: u.ceviDbStufen,
+            providerId: u.providerId,
+            departmentLeader: u.departmentLeader,
+            hitobitoStufen: u.hitobitoStufen,
             homeDepartmentId: u.homeDepartmentId,
             homeDepartmentSource: u.homeDepartmentSource,
             stufen: u.stufen,

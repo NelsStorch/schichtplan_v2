@@ -8,6 +8,7 @@ import {
   STUFE_ROLES,
   departmentRoleLabel,
   formatZurichDate,
+  getOrganization,
   type DepartmentPermission,
   type DepartmentPersonDto,
   type DepartmentStufeDto,
@@ -51,14 +52,16 @@ export function DepartmentPeoplePanel() {
     load();
   }, [load]);
 
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+
   // Was ich vergeben darf: Abteilungsleitung alles (null), sonst nur weniger als die eigenen Rechte
   const grantable = useMemo(() => (isDeptAdmin ? null : new Set(permissions)), [isDeptAdmin, permissions]);
 
   const remove = async (person: DepartmentPersonDto) => {
     const ok = await confirm({
-      title: `${person.ceviName || person.firstName} entfernen?`,
+      title: `${person.nickname || person.ceviName || person.firstName} entfernen?`,
       description:
-        'Die Person gehört danach nicht mehr zur Abteilung, verliert ihre Rechte hier und wird beim nächsten Login erneut gefragt.',
+        `Die Person gehört danach nicht mehr zur ${org.unitTerm}, verliert ihre Rechte hier und wird beim nächsten Login erneut gefragt.`,
       confirmLabel: 'Entfernen',
       tone: 'danger',
     });
@@ -73,11 +76,11 @@ export function DepartmentPeoplePanel() {
   };
 
   const confirmHome = async (person: DepartmentPersonDto) => {
-    const name = person.ceviName || person.firstName;
+    const name = person.nickname || person.ceviName || person.firstName;
     const ok = await confirm({
       title: `${name} bestätigen?`,
       description:
-        'Die Person gehört laut dir zu eurer Abteilung und zählt danach auch bei Anlässen «Abteilungs-intern, Cevi.DB». Das steht im Protokoll.',
+        `Die Person gehört laut dir zu eurer ${org.unitTerm} und zählt danach auch bei internen Anlässen. Das steht im Protokoll.`,
       confirmLabel: 'Bestätigen',
     });
     if (!ok) return;
@@ -138,14 +141,14 @@ export function DepartmentPeoplePanel() {
 
       {leaders.length > 0 && (
         <p className="flex flex-wrap items-center gap-1.5 text-xs text-fg-muted">
-          <Crown className="size-3.5 text-accent-ink" /> Abteilungsleitung:
-          <span className="font-semibold text-fg">{leaders.map((p) => p.ceviName || p.firstName).join(', ')}</span>
+          <Crown className="size-3.5 text-accent-ink" /> {org.unitTerm}-Leitung:
+          <span className="font-semibold text-fg">{leaders.map((p) => p.nickname || p.ceviName || p.firstName).join(', ')}</span>
         </p>
       )}
       {missingLeaders.length > 0 && (
         <p className="text-xs text-warning-ink">
-          In Cevi.DB Abteilungsleitung, hier noch nicht: {missingLeaders.map((p) => p.ceviName || p.firstName).join(', ')}.
-          Das wird beim nächsten Cevi.DB-Login der Person nachgeführt.
+          In {org.authProviderShort} Leitung, hier noch nicht: {missingLeaders.map((p) => p.nickname || p.ceviName || p.firstName).join(', ')}.
+          Das wird beim nächsten {org.authProviderShort}-Login der Person nachgeführt.
         </p>
       )}
 

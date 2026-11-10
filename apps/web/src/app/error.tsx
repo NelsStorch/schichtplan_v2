@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { CalendarDays, Clock, ExternalLink } from 'lucide-react';
+import { getOrganization } from '@schichtplan/shared';
 import { ErrorView } from '@schichtplan/ui';
 import { usePortal } from '@/lib/portal';
 
@@ -13,6 +14,7 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   const { department } = usePortal();
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
 
   useEffect(() => {
     console.error('Unhandled app error:', error);
@@ -39,7 +41,7 @@ export default function ErrorPage({
         },
         {
           label: 'Hauptportal',
-          href: 'https://cevi-schichtplan.ch',
+          href: `https://${org.domain}`,
           external: true,
           icon: <ExternalLink className="size-3.5" />,
         },

@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Bell, Building2, Database, Trash2 } from 'lucide-react';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   PLACEHOLDER_LAST_NAME,
   STUFE_ROLES,
   getLoginUrl,
+  getOrganization,
   type UserDto,
 } from '@schichtplan/shared';
 import {
@@ -32,6 +33,7 @@ export default function DepartmentProfilePage() {
   const { user, setUser, loading } = usePortal();
   const confirm = useConfirm();
   const toast = useToast();
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', birthDate: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -137,7 +139,7 @@ export default function DepartmentProfilePage() {
     }
   };
 
-  const name = user ? user.ceviName || user.firstName : '';
+  const name = user ? user.nickname || user.ceviName || user.firstName : '';
   const fullName = user
     ? [user.firstName, user.lastName === PLACEHOLDER_LAST_NAME ? '' : user.lastName].join(' ').trim()
     : '';
@@ -158,7 +160,7 @@ export default function DepartmentProfilePage() {
                 </p>
                 {user.hasCeviDb && (
                   <Badge size="sm" className="mt-2">
-                    <Database className="size-3" /> Cevi.DB
+                    <Database className="size-3" /> {org.authProviderShort || 'Verband'}
                   </Badge>
                 )}
               </div>
@@ -183,8 +185,8 @@ export default function DepartmentProfilePage() {
               <div>
                 <h2 className="text-sm font-semibold text-fg-subtle">Deine Angaben</h2>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Manche Anlässe brauchen sie für die Eintragung. Bei Cevi.DB-Konten werden Name, E-Mail und
-                  Geburtsdatum bei jedem Login aus Cevi.DB aktualisiert.
+                  Manche Anlässe brauchen sie für die Eintragung. Bei {org.authProviderShort || 'Verbands'}-Konten werden Name, E-Mail und
+                  Geburtsdatum bei jedem Login aus {org.authProviderShort || 'dem Verband'} aktualisiert.
                 </p>
               </div>
               {message && <Callout tone={message.tone}>{message.text}</Callout>}
@@ -212,7 +214,7 @@ export default function DepartmentProfilePage() {
                     placeholder="+41 79 000 00 00"
                   />
                 </Field>
-                <Field label="Geburtsdatum" hint={birthDateFromCeviDb ? 'Aus Cevi.DB, nur dort änderbar' : undefined}>
+                <Field label="Geburtsdatum" hint={birthDateFromCeviDb ? `Aus ${org.authProviderShort || 'Verband'}, nur dort änderbar` : undefined}>
                   <Input
                     type="date"
                     value={form.birthDate}
@@ -290,7 +292,7 @@ export default function DepartmentProfilePage() {
                   <div>
                     <h2 className="text-sm font-semibold text-danger-ink">Konto löschen</h2>
                     <p className="mt-1 text-xs text-fg-muted">
-                      Löscht dein Konto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem Cevi Schichtplan.
+                      Löscht dein Konto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem {org.name} Schichtplan.
                     </p>
                   </div>
                   <Button

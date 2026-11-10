@@ -5,11 +5,11 @@ const sizeClasses: Record<string, string> = {
   xl: 'w-20 h-20',
 };
 
-export function CeviLogo({
+export function BrandLogo({
   className,
   size = 'md',
   logoUrl,
-  alt = 'Cevi Logo',
+  alt = 'Logo',
 }: {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -29,3 +29,5 @@ export function CeviLogo({
     </div>
   );
 }
+
+export const CeviLogo = BrandLogo;

@@ -4,27 +4,27 @@ import { FeedbackProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import type { Metadata, Viewport } from 'next';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { JsonLd } from '@/components/JsonLd';
-
-const TITLE = 'Cevi Schichtplan · Helferliste & Schichtplan für Cevi-Abteilungen';
-// Höchstens ~155 Zeichen, sonst kürzt Google die Beschreibung
-const DESCRIPTION =
-  'Kostenlose Helferliste online für Chilbi, Lager und Anlässe von Cevi-Abteilungen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.';
+import { getOrganization } from '@schichtplan/shared';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { origin } = await getRequestOrigin();
+  const { origin, host } = await getRequestOrigin();
+  const org = getOrganization(host);
+  const title = `${org.name} · Helferliste & Schichtplan für ${org.targetGroup}`;
+  const description = org.metaDescription;
+
   const image = {
     url: `${origin}/og`,
     ...OG_SIZE,
-    alt: 'Cevi Schichtplan: Kostenlose Schicht- und Helferplanung für Cevi-Abteilungen',
+    alt: `${org.name}: Kostenlose Schicht- und Helferplanung für ${org.targetGroup}`,
   };
 
   return {
     metadataBase: new URL(origin),
-    title: { default: TITLE, template: '%s · Cevi Schichtplan' },
-    description: DESCRIPTION,
-    authors: [{ name: 'Cevi Schichtplan', url: `${origin}/` }],
-    creator: 'Cevi Schichtplan Team',
-    publisher: 'Cevi Schichtplan',
+    title: { default: title, template: `%s · ${org.name}` },
+    description,
+    authors: [{ name: org.name, url: `${origin}/` }],
+    creator: `${org.name} Team`,
+    publisher: org.name,
     formatDetection: {
       email: false,
       address: false,
@@ -34,24 +34,23 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: `${origin}/`,
     },
     icons: {
-      // Nur das SVG: Sonst laden manche Browser zusätzlich das 54-KB-PNG
-      icon: [{ url: '/images/cevi-logo.svg', type: 'image/svg+xml' }],
-      apple: '/images/cevi-logo.png',
+      icon: [{ url: org.logoUrl, type: 'image/svg+xml' }],
+      apple: org.logoUrl,
     },
     openGraph: {
       type: 'website',
-      siteName: 'Cevi Schichtplan',
+      siteName: org.name,
       locale: 'de_CH',
       alternateLocale: ['de_DE'],
-      title: TITLE,
-      description: DESCRIPTION,
+      title,
+      description,
       url: `${origin}/`,
       images: [image],
     },
     twitter: {
       card: 'summary_large_image',
-      title: TITLE,
-      description: DESCRIPTION,
+      title,
+      description,
       images: [image],
     },
     robots: {
@@ -81,13 +80,14 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { origin } = await getRequestOrigin();
+  const { origin, host } = await getRequestOrigin();
+  const org = getOrganization(host);
 
   return (
     <html lang="de-CH" className={`${fontVariables} scroll-smooth`} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <ThemeScript />
-        <JsonLd origin={origin} />
+        <JsonLd origin={origin} org={org} />
         <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM context" />
         <link rel="alternate" type="text/markdown" href="/llms-full.txt" title="Full LLM context" />
       </head>

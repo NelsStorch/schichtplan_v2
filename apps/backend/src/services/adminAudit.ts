@@ -23,7 +23,7 @@ export async function recordAdminAction(prisma: PrismaClient, request: FastifyRe
   try {
     const admin = await prisma.user.findUnique({
       where: { id: request.user.id },
-      select: { firstName: true, lastName: true, ceviName: true },
+      select: { firstName: true, lastName: true, nickname: true },
     });
     await prisma.adminAuditLog.create({
       data: {

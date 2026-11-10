@@ -32,15 +32,16 @@ export const userSelect = {
   emailVerified: true,
   firstName: true,
   lastName: true,
-  ceviName: true,
+  nickname: true,
   phone: true,
   birthDate: true,
   isGlobalAdmin: true,
-  ceviDbId: true,
-  ceviDbOrtsgruppeId: true,
-  ceviDbOrtsgruppeName: true,
-  ceviDbDepartmentLeader: true,
-  ceviDbLeaderGroupName: true,
+  provider: true,
+  providerId: true,
+  ortsgruppeId: true,
+  ortsgruppeName: true,
+  departmentLeader: true,
+  leaderGroupName: true,
   homeDepartmentId: true,
   homeDepartmentSource: true,
   homeDepartment: { select: { id: true, name: true, slug: true } },
@@ -62,9 +63,9 @@ export const userSelect = {
 
 type UserRow = Prisma.UserGetPayload<{ select: typeof userSelect }>;
 
-export function loginMethods(user: Pick<UserRow, 'ceviDbId' | 'passwordHash'>): LoginMethod[] {
+export function loginMethods(user: Pick<UserRow, 'providerId' | 'passwordHash'>): LoginMethod[] {
   const methods: LoginMethod[] = [];
-  if (user.ceviDbId !== null) methods.push('CEVIDB');
+  if (user.providerId !== null) methods.push('CEVIDB');
   if (user.passwordHash) methods.push('PASSWORD');
   if (methods.length === 0) methods.push('CEVINAME');
   return methods;
@@ -72,19 +73,23 @@ export function loginMethods(user: Pick<UserRow, 'ceviDbId' | 'passwordHash'>): 
 
 export function toListItem(
   user: UserRow,
-  potentialDuplicateOf: { id: string; name: string; ceviName: string | null; email: string | null } | null = null
+  potentialDuplicateOf: { id: string; name: string; nickname?: string | null; ceviName: string | null; email: string | null } | null = null
 ): AdminUserListItemDto {
+  const numericCeviDbId = user.providerId && /^\d+$/.test(user.providerId) ? Number(user.providerId) : null;
   return {
     id: user.id,
     email: user.email,
     emailVerified: user.emailVerified,
     firstName: user.firstName,
     lastName: user.lastName,
-    ceviName: user.ceviName,
+    nickname: user.nickname,
+    ceviName: user.nickname,
     phone: user.phone,
     birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
     isGlobalAdmin: user.isGlobalAdmin,
-    ceviDbId: user.ceviDbId,
+    provider: user.provider,
+    providerId: user.providerId,
+    ceviDbId: numericCeviDbId,
     loginMethods: loginMethods(user),
     signupCount: user._count.signups,
     memberships: user.memberships.map((m) => ({
@@ -98,10 +103,14 @@ export function toListItem(
     homeDepartmentName: user.homeDepartment?.name ?? null,
     homeDepartmentSlug: user.homeDepartment?.slug ?? null,
     homeDepartmentSource: user.homeDepartmentSource,
-    ceviDbOrtsgruppeId: user.ceviDbOrtsgruppeId,
-    ceviDbOrtsgruppeName: user.ceviDbOrtsgruppeName,
-    ceviDbDepartmentLeader: user.ceviDbDepartmentLeader,
-    ceviDbLeaderGroupName: user.ceviDbLeaderGroupName,
+    ortsgruppeId: user.ortsgruppeId,
+    ceviDbOrtsgruppeId: user.ortsgruppeId,
+    ortsgruppeName: user.ortsgruppeName,
+    ceviDbOrtsgruppeName: user.ortsgruppeName,
+    departmentLeader: user.departmentLeader,
+    ceviDbDepartmentLeader: user.departmentLeader,
+    leaderGroupName: user.leaderGroupName,
+    ceviDbLeaderGroupName: user.leaderGroupName,
     lastSeenOn: user.lastSeenOn ? user.lastSeenOn.toISOString().slice(0, 10) : null,
     potentialDuplicateOf: potentialDuplicateOf ?? null,
     createdAt: user.createdAt.toISOString(),
@@ -125,12 +134,12 @@ export async function findDuplicateUsers(prisma: any) {
         u1."id", 
         u2."id" as "duplicateId", 
         TRIM(CONCAT(u2."firstName", ' ', COALESCE(NULLIF(u2."lastName", '(Helfer)'), ''))) as "duplicateName",
-        u2."ceviName" as "duplicateCeviName",
+        u2."nickname" as "duplicateCeviName",
         u2."email" as "duplicateEmail"
       FROM "users" u1
       JOIN "users" u2 ON u1."id" != u2."id" AND (
-        (u1."ceviName" IS NOT NULL AND u1."ceviName" != '' AND u1."birthDate" IS NOT NULL 
-         AND LOWER(u1."ceviName") = LOWER(u2."ceviName") AND u1."birthDate" = u2."birthDate")
+        (u1."nickname" IS NOT NULL AND u1."nickname" != '' AND u1."birthDate" IS NOT NULL 
+         AND LOWER(u1."nickname") = LOWER(u2."nickname") AND u1."birthDate" = u2."birthDate")
         OR
         (u1."email" IS NOT NULL AND u1."email" != '' AND LOWER(u1."email") = LOWER(u2."email"))
       )
@@ -159,23 +168,23 @@ function searchFilter(q: string | undefined): Prisma.UserWhereInput[] {
     const fields: Prisma.UserWhereInput[] = [
       { firstName: { contains: term, mode: 'insensitive' } },
       { lastName: { contains: term, mode: 'insensitive' } },
-      { ceviName: { contains: term, mode: 'insensitive' } },
+      { nickname: { contains: term, mode: 'insensitive' } },
       { email: { contains: term, mode: 'insensitive' } },
       { phone: { contains: term } },
     ];
-    // Cevi.DB-ID ist ein Int4: längere Zahlen würden die Abfrage sprengen
-    if (/^\d{1,9}$/.test(term)) fields.push({ ceviDbId: Number(term) });
+    // Hitobito/Provider ID
+    if (/^\d{1,9}$/.test(term)) fields.push({ providerId: term });
     return { OR: fields };
   });
 }
 
 function methodFilter(method: 'cevidb' | 'password' | 'ceviname' | 'stale_ceviname' | undefined): Prisma.UserWhereInput[] {
-  if (method === 'cevidb') return [{ ceviDbId: { not: null } }];
+  if (method === 'cevidb') return [{ providerId: { not: null } }];
   if (method === 'password') return [{ passwordHash: { not: null } }];
-  if (method === 'ceviname') return [{ ceviDbId: null, passwordHash: null }];
+  if (method === 'ceviname') return [{ providerId: null, passwordHash: null }];
   if (method === 'stale_ceviname') {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    return [{ ceviDbId: null, passwordHash: null, signups: { none: {} }, createdAt: { lt: thirtyDaysAgo } }];
+    return [{ providerId: null, passwordHash: null, signups: { none: {} }, createdAt: { lt: thirtyDaysAgo } }];
   }
   return [];
 }
@@ -225,11 +234,11 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       signups,
     ] = await fastify.prisma.$transaction([
       fastify.prisma.user.count(),
-      fastify.prisma.user.count({ where: { ceviDbId: { not: null } } }),
+      fastify.prisma.user.count({ where: { providerId: { not: null } } }),
       fastify.prisma.user.count({ where: { passwordHash: { not: null } } }),
-      fastify.prisma.user.count({ where: { ceviDbId: null, passwordHash: null } }),
+      fastify.prisma.user.count({ where: { providerId: null, passwordHash: null } }),
       fastify.prisma.user.count({
-        where: { ceviDbId: null, passwordHash: null, signups: { none: {} }, createdAt: { lt: thirtyDaysAgo } },
+        where: { providerId: null, passwordHash: null, signups: { none: {} }, createdAt: { lt: thirtyDaysAgo } },
       }),
       fastify.prisma.user.count({ where: { isGlobalAdmin: true } }),
       fastify.prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
@@ -334,7 +343,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: request.params.id },
         select: {
           ...userSelect,
-          ceviDbStufen: true,
+          hitobitoStufen: true,
           organizedEvents: {
             select: {
               role: true,
@@ -385,7 +394,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       const detail: AdminUserDetailDto = {
         ...toListItem(user),
-        stufen: user.ceviDbStufen
+        stufen: user.hitobitoStufen
           .map(toCeviDbStufeDto)
           .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.groupName.localeCompare(b.groupName, 'de')),
         organizedEvents: user.organizedEvents.map((o) => ({
@@ -443,7 +452,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
           email: true,
           firstName: true,
           lastName: true,
-          ceviName: true,
+          nickname: true,
           isGlobalAdmin: true,
         },
       });
@@ -477,14 +486,14 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
           data: { createdById: null },
         });
 
-        // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserCeviDbStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
+        // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserHitobitoStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
         await tx.user.delete({
           where: { id: targetUserId },
         });
       });
 
-      const userDisplayName = user.ceviName
-        ? `${user.ceviName} (${user.firstName} ${user.lastName})`
+      const userDisplayName = user.nickname
+        ? `${user.nickname} (${user.firstName} ${user.lastName})`
         : `${user.firstName} ${user.lastName}`;
 
       await recordAdminAction(fastify.prisma, request, {
@@ -516,7 +525,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const user = await fastify.prisma.user.findUnique({
         where: { id: request.params.id },
-        select: { id: true, email: true, firstName: true, lastName: true, ceviName: true, passwordHash: true },
+        select: { id: true, email: true, firstName: true, lastName: true, nickname: true, passwordHash: true },
       });
       if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
       if (!user.email && !user.passwordHash) {
@@ -537,7 +546,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       ]);
 
       const resetUrl = `${getLoginPortalBaseUrl()}/passwort-zuruecksetzen?token=${token}`;
-      const name = user.ceviName ? `${user.ceviName} (${user.firstName} ${user.lastName})` : `${user.firstName} ${user.lastName}`;
+      const name = user.nickname ? `${user.nickname} (${user.firstName} ${user.lastName})` : `${user.firstName} ${user.lastName}`;
 
       await recordAdminAction(fastify.prisma, request, {
         action: 'USER_PASSWORD_RESET_LINK_GENERATE',
@@ -574,7 +583,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       const users = await fastify.prisma.user.findMany({
         where: { id: { in: filteredIds } },
-        select: { id: true, firstName: true, lastName: true, ceviName: true, isGlobalAdmin: true },
+        select: { id: true, firstName: true, lastName: true, nickname: true, isGlobalAdmin: true },
       });
 
       if (users.some((u) => u.isGlobalAdmin)) {

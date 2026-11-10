@@ -204,10 +204,10 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
       // Sofortige Willkommens-Benachrichtigung an das neu aktivierte Gerät senden
       const user = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { firstName: true, ceviName: true, homeDepartment: { select: { slug: true } } },
+        select: { firstName: true, nickname: true, homeDepartment: { select: { slug: true } } },
       });
       if (user) {
-        const displayName = user.ceviName || user.firstName;
+        const displayName = user.nickname || user.firstName;
         const domain = (process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
         const slug = request.tenant?.slug || user.homeDepartment?.slug;
         const targetUrl = slug ? `https://${slug}.${domain}/` : `https://${domain}/profil`;
@@ -298,13 +298,13 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { firstName: true, ceviName: true, homeDepartment: { select: { slug: true } } },
+        select: { firstName: true, nickname: true, homeDepartment: { select: { slug: true } } },
       });
       if (!user) {
         return reply.status(404).send({ error: 'Person nicht gefunden' });
       }
 
-      const displayName = user.ceviName || user.firstName;
+      const displayName = user.nickname || user.firstName;
       const domain = (process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
       const slug = request.tenant?.slug || user.homeDepartment?.slug;
       const targetUrl = slug ? `https://${slug}.${domain}/` : `https://${domain}/profil`;

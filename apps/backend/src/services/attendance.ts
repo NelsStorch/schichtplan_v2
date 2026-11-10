@@ -37,11 +37,12 @@ export function checkinUrl(
 
 /** Name wie im Protokoll: «Vorname / Cevi-Name», sonst «Vorname Nachname», sonst Gastname */
 export function personLabel(
-  user: { firstName: string; lastName?: string | null; ceviName?: string | null } | null | undefined,
+  user: { firstName: string; lastName?: string | null; nickname?: string | null; ceviName?: string | null } | null | undefined,
   guestName?: string | null
 ): string {
   if (user) {
-    return user.ceviName ? `${user.firstName} / ${user.ceviName}` : `${user.firstName} ${user.lastName ?? ''}`.trim();
+    const nick = user.nickname ?? user.ceviName;
+    return nick ? `${user.firstName} / ${nick}` : `${user.firstName} ${user.lastName ?? ''}`.trim();
   }
   return guestName || 'Gast';
 }

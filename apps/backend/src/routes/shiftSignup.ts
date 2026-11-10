@@ -258,7 +258,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
             email: true,
             firstName: true,
             lastName: true,
-            ceviName: true,
+            nickname: true,
             phone: true,
             birthDate: true,
           },
@@ -339,7 +339,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
               : `Du bist zur gleichen Zeit bereits für die Schicht «${first.shiftTitle}» (${timeStr}) eingetragen.`;
           } else {
             const name =
-              targetUser?.ceviName ||
+              targetUser?.nickname ||
               (targetUser ? `${targetUser.firstName} ${targetUser.lastName}`.trim() : guestName) ||
               'Diese Person';
             error = first.taskTitle
@@ -561,7 +561,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
                 id: true,
                 firstName: true,
                 lastName: true,
-                ceviName: true,
+                nickname: true,
                 birthDate: true,
               },
             },
@@ -581,7 +581,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
       const signup = result.signup;
 
       const displayName =
-        signup.user?.ceviName ||
+        signup.user?.nickname ||
         (signup.user ? `${signup.user.firstName} ${signup.user.lastName}`.trim() : null) ||
         signup.guestName ||
         'Helfer*in';
@@ -596,12 +596,12 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
           } else {
             performerUser = await fastify.prisma.user.findUnique({
               where: { id: request.user.id },
-              select: { firstName: true, lastName: true, ceviName: true },
+              select: { firstName: true, lastName: true, nickname: true },
             });
           }
         }
         const performerName = performerUser
-          ? (performerUser.ceviName ? `${performerUser.firstName} / ${performerUser.ceviName}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
+          ? (performerUser.nickname ? `${performerUser.firstName} / ${performerUser.nickname}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
           : null;
 
         await fastify.prisma.shiftSignupLog.create({
@@ -736,15 +736,15 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
           } else {
             performerUser = await fastify.prisma.user.findUnique({
               where: { id: request.user.id },
-              select: { firstName: true, lastName: true, ceviName: true },
+              select: { firstName: true, lastName: true, nickname: true },
             });
           }
         }
         const performerName = performerUser
-          ? (performerUser.ceviName ? `${performerUser.firstName} / ${performerUser.ceviName}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
+          ? (performerUser.nickname ? `${performerUser.firstName} / ${performerUser.nickname}` : `${performerUser.firstName} ${performerUser.lastName}`.trim())
           : null;
         const helperName =
-          existingSignup.user?.ceviName ||
+          existingSignup.user?.nickname ||
           (existingSignup.user ? `${existingSignup.user.firstName} ${existingSignup.user.lastName}`.trim() : null) ||
           existingSignup.guestName ||
           'Helfer*in';

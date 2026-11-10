@@ -16,6 +16,7 @@ import {
 import {
   Button,
   Callout,
+  BrandLogo,
   CeviLogo,
   Field,
   Input,
@@ -23,7 +24,14 @@ import {
   cn,
 } from '@schichtplan/ui';
 import { getLandingUrl } from '@schichtplan/shared/redirect';
-import type { CeviNameLoginErrorCode, DepartmentDirectoryItemDto, StufeRole, UserDto } from '@schichtplan/shared';
+import {
+  type CeviNameLoginErrorCode,
+  type DepartmentDirectoryItemDto,
+  type StufeRole,
+  type UserDto,
+  getOrganization,
+  type OrganizationConfig,
+} from '@schichtplan/shared';
 import { afterLogin, cleanReturnTo, departmentSlugFromReturnTo, withReturnTo } from '@/lib/destination';
 import { AuthShell } from '@/components/AuthShell';
 import { PasswordInput } from '@/components/PasswordInput';
@@ -67,15 +75,25 @@ function getPasswordStrength(pwd: string): {
   }
 }
 
-// Fehlercodes, mit denen das Backend nach einem gescheiterten Cevi.DB-Login hierher zurückleitet
-const loginErrors: Record<string, string> = {
-  cevidb_unavailable:
-    'Die Anmeldung mit Cevi.DB ist im Moment nicht verfügbar. Melde dich bitte mit E-Mail oder Cevi-Name an.',
-  cevidb_denied: 'Die Anmeldung bei Cevi.DB wurde abgebrochen.',
-  cevidb_failed: 'Die Anmeldung mit Cevi.DB hat nicht geklappt. Bitte versuche es nochmals.',
-  cevidb_email_taken:
-    'Die E-Mail aus deinem Cevi.DB-Profil gehört schon zu einem anderen Cevi.DB-Konto. Melde dich bitte bei den Betreibern des Schichtplans.',
-};
+// Dynamische Fehlermeldungen für Hitobito & Verbands-Logins
+function getLoginErrorMessage(code: string, org: OrganizationConfig): string | null {
+  switch (code) {
+    case 'cevidb_unavailable':
+    case 'hitobito_unavailable':
+      return `Die Anmeldung mit ${org.authProviderShort} ist im Moment nicht verfügbar. Melde dich bitte mit E-Mail oder ${org.nicknameTerm} an.`;
+    case 'cevidb_denied':
+    case 'hitobito_denied':
+      return `Die Anmeldung bei ${org.authProviderShort} wurde abgebrochen.`;
+    case 'cevidb_failed':
+    case 'hitobito_failed':
+      return `Die Anmeldung mit ${org.authProviderShort} hat nicht geklappt. Bitte versuche es nochmals.`;
+    case 'cevidb_email_taken':
+    case 'hitobito_email_taken':
+      return `Die E-Mail aus deinem ${org.authProviderShort}-Profil gehört schon zu einem anderen Konto. Melde dich bitte bei den Betreibern des Schichtplans.`;
+    default:
+      return null;
+  }
+}
 
 /** Hostname des Ziels (z. B. illnau.cevi-schichtplan.ch), damit sichtbar ist, wohin es nach dem Login geht. */
 function destinationHost(returnTo: string | null): string | null {
@@ -89,6 +107,13 @@ function destinationHost(returnTo: string | null): string | null {
 
 function LoginContent() {
   const searchParams = useSearchParams();
+  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrg(getOrganization(window.location.host));
+    }
+  }, []);
+
   // Erst im Browser auswerten (braucht window.location): sonst rendert der Server ohne Ziel und
   // der Browser mit Ziel, und React meldet einen Hydration-Fehler
   const [returnTo, setReturnTo] = useState<string | null>(null);
@@ -142,9 +167,14 @@ function LoginContent() {
   const [regCeviName, setRegCeviName] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(
-    () => loginErrors[searchParams.get('error') ?? ''] ?? null
-  );
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const errCode = searchParams.get('error');
+    if (errCode) {
+      setError(getLoginErrorMessage(errCode, org) ?? 'Ein Fehler ist aufgetreten.');
+    }
+  }, [searchParams, org]);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Fokus-Management für Barrierefreiheit bei Fehlern
@@ -221,7 +251,7 @@ function LoginContent() {
   const handleCeviNameResponse = async (res: Response) => {
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setSuccess(`Hallo ${data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
+      setSuccess(`Hallo ${data.user.nickname || data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
       setTimeout(() => {
         window.location.href = afterLogin(data.user, returnTo);
       }, 700);
@@ -367,9 +397,9 @@ function LoginContent() {
           <Callout tone="danger">
             {error}
           </Callout>
-          {errorAction === 'cevidb' && (
+          {errorAction === 'cevidb' && org.slug !== 'verein' && (
             <a href={cevidbAuthUrl} className={buttonClasses({ className: 'w-full justify-between' })}>
-              Mit Cevi.DB anmelden <ArrowUpRight className="size-4" />
+              Mit {org.authProviderShort} anmelden <ArrowUpRight className="size-4" />
             </a>
           )}
           {errorAction === 'password' && (
@@ -427,14 +457,14 @@ function LoginContent() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={department.logoUrl} alt={department.name} className="size-full object-cover" />
               ) : (
-                <CeviLogo className="size-5" alt="" />
+                <BrandLogo className="size-5" alt="" />
               )}
             </div>
             <div className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-fg">{department.name}</span>
               <span className="inline-flex items-center gap-1.5 text-2xs font-medium text-accent-ink">
                 <span className="size-1.5 rounded-full bg-accent" />
-                Abteilungsportal
+                {org.unitTerm}-Portal
               </span>
             </div>
           </div>
@@ -452,7 +482,7 @@ function LoginContent() {
             <p className="mt-2.5 text-[14px] leading-relaxed text-fg-muted">
               Du bist angemeldet als{' '}
               <strong className="font-semibold text-fg">
-                {existingUser.ceviName || existingUser.firstName}
+                {existingUser.nickname || existingUser.ceviName || existingUser.firstName}
                 {existingUser.lastName ? ` ${existingUser.lastName}` : ''}
               </strong>
               {existingUser.email ? ` (${existingUser.email})` : ''}.
@@ -515,48 +545,71 @@ function LoginContent() {
                   </p>
                 ) : (
                   <p className="mt-2 text-[14px] leading-relaxed text-fg-muted">
-                    Ein Login für alle Abteilungen und Anlässe.
+                    Ein Login für alle {org.unitTermPlural} und Anlässe.
                   </p>
                 )}
 
                 <div className="mt-7 space-y-3">
                   {feedback}
 
-                  <div>
-                    <span className="mb-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-accent-ink">
-                      <ShieldCheck className="size-3.5" />
-                      Empfohlen für Leitende & OK
-                    </span>
-                    <a
-                      href={cevidbAuthUrl}
-                      onClick={() => setRedirecting(true)}
-                      aria-busy={redirecting || undefined}
-                      className={buttonClasses({
-                        size: 'lg',
-                        className: cn(
-                          'w-full justify-between shadow-soft transition-all duration-200',
-                          redirecting && 'pointer-events-none opacity-80'
-                        ),
-                      })}
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <ShieldCheck className="size-4.5 opacity-90 text-white" />
-                        <span>{redirecting ? 'Weiterleitung zu Cevi.DB …' : 'Mit Cevi.DB anmelden'}</span>
+                  {org.slug !== 'verein' ? (
+                    <div>
+                      <span className="mb-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-accent-ink">
+                        <ShieldCheck className="size-3.5" />
+                        Empfohlen für Leitende & OK
                       </span>
-                      {redirecting ? (
-                        <span
-                          aria-hidden
-                          className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
-                        />
-                      ) : (
-                        <ArrowUpRight className="size-4" />
-                      )}
-                    </a>
-                    <div className="mt-1.5 flex items-center justify-between px-1 text-[12px] text-fg-subtle">
-                      <span>Offizieller Verbands-Login</span>
-                      <span className="font-mono text-[11px] text-fg-muted">db.cevi.ch</span>
+                      <a
+                        href={cevidbAuthUrl}
+                        onClick={() => setRedirecting(true)}
+                        aria-busy={redirecting || undefined}
+                        className={buttonClasses({
+                          size: 'lg',
+                          className: cn(
+                            'w-full justify-between shadow-soft transition-all duration-200',
+                            redirecting && 'pointer-events-none opacity-80'
+                          ),
+                        })}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <ShieldCheck className="size-4.5 opacity-90 text-white" />
+                          <span>{redirecting ? `Weiterleitung zu ${org.authProviderShort} …` : `Mit ${org.authProviderShort} anmelden`}</span>
+                        </span>
+                        {redirecting ? (
+                          <span
+                            aria-hidden
+                            className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+                          />
+                        ) : (
+                          <ArrowUpRight className="size-4" />
+                        )}
+                      </a>
+                      <div className="mt-1.5 flex items-center justify-between px-1 text-[12px] text-fg-subtle">
+                        <span>Offizieller Verbands-Login</span>
+                        <span className="font-mono text-[11px] text-fg-muted">
+                          {org.slug === 'pfadi' ? 'midata.scouts.ch' : org.slug === 'jubla' ? 'db.jubla.ch' : 'db.cevi.ch'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <Button
+                        type="button"
+                        size="lg"
+                        onClick={() => goTo('password')}
+                        className="w-full justify-between shadow-soft"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <KeyRound className="size-4.5" />
+                          <span>Mit E-Mail & Passwort anmelden</span>
+                        </span>
+                        <ChevronRight className="size-4" />
+                      </Button>
+                      <div className="mt-1.5 flex items-center justify-between px-1 text-[12px] text-fg-subtle">
+                        <span>Konto für Helfer*innen & OK</span>
+                        <span>Passwortgeschützt</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="my-6 flex items-center gap-4 text-xs text-fg-subtle">
@@ -566,32 +619,61 @@ function LoginContent() {
                 </div>
 
                 <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface/70">
-                  {/* E-Mail & Passwort: Empfohlener Standard für alle Helfenden */}
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => goTo('password')}
-                      className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
-                    >
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors group-hover:bg-emerald-500/20">
-                        <KeyRound className="size-[18px]" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold text-fg">Mit E-Mail & Passwort</span>
-                          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                            Empfohlen für Helfende
+                  {/* E-Mail & Passwort / Registrierung */}
+                  {org.slug !== 'verein' ? (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => goTo('password')}
+                        className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors group-hover:bg-emerald-500/20">
+                          <KeyRound className="size-[18px]" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-fg">Mit E-Mail & Passwort</span>
+                            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                              Empfohlen für Helfende
+                            </span>
+                          </span>
+                          <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
+                            Sicheres Konto für Schichten, Profil & Benachrichtigungen
                           </span>
                         </span>
-                        <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
-                          Sicheres Konto für Schichten, Profil & Benachrichtigungen
+                        <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                      </button>
+                    </li>
+                  ) : (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('register');
+                          goTo('password');
+                        }}
+                        className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors group-hover:bg-emerald-500/20">
+                          <KeyRound className="size-[18px]" />
                         </span>
-                      </span>
-                      <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
-                    </button>
-                  </li>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-fg">Neues Vereinskonto erstellen</span>
+                            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                              Kostenlos
+                            </span>
+                          </span>
+                          <span className="mt-0.5 block text-xs leading-snug text-fg-subtle">
+                            E-Mail-Adresse und persönliches Passwort wählen
+                          </span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-fg-subtle transition-transform duration-200 group-hover:translate-x-0.5" />
+                      </button>
+                    </li>
+                  )}
 
-                  {/* Cevi-Name: De-priorisierter Fallback für Personen ohne E-Mail */}
+                  {/* Spitzname / Cevi-Name: Fallback für Personen ohne E-Mail */}
                   {department && (
                     <li>
                       <button
@@ -604,7 +686,7 @@ function LoginContent() {
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium text-fg">Mit Cevi-Name</span>
+                            <span className="text-sm font-medium text-fg">Mit {org.nicknameTerm}</span>
                             <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-fg-subtle">
                               Ohne Passwort (eingeschränkt)
                             </span>
@@ -635,7 +717,7 @@ function LoginContent() {
             {view === 'ceviname' && department && (
               <form key="ceviname" onSubmit={handleQuickSubmit}>
                 <h1 className="font-display text-[1.65rem] font-semibold leading-[1.15] tracking-tight text-fg">
-                  Mit Cevi-Name anmelden
+                  Mit {org.nicknameTerm} anmelden
                 </h1>
                 <p className="mt-1.5 text-[14px] leading-relaxed text-fg-muted">
                   Eingeschränkter Zugang für {department.name} ohne Passwort.
@@ -644,7 +726,7 @@ function LoginContent() {
                 <div className="mt-6 space-y-4.5">
                   {feedback}
 
-                  <Field label="Cevi-Name oder Vorname" required>
+                  <Field label={`${org.nicknameTerm} oder Vorname`} required>
                     <Input
                       type="text"
                       value={quickCeviName}
@@ -704,7 +786,7 @@ function LoginContent() {
 
                   <Callout tone="warning" title="Wichtiger Sicherheitshinweis: Kein Passwort-Schutz">
                     <p className="mt-1 text-[13px] leading-relaxed text-fg">
-                      Dieses Profil hat <strong>kein Passwort</strong>. Jede Person, die deinen Cevi-Namen und dein Geburtsdatum kennt, kann sich in deinen Account einloggen.
+                      Dieses Profil hat <strong>kein Passwort</strong>. Jede Person, die deinen {org.nicknameTerm} und dein Geburtsdatum kennt, kann sich in deinen Account einloggen.
                     </p>
                     <p className="mt-2 text-xs leading-relaxed text-fg-muted">
                       Wir empfehlen dir stattdessen die{' '}
@@ -800,8 +882,8 @@ function LoginContent() {
                     {loading ? 'Profil wird angelegt …' : 'Profil anlegen und weiter'}
                   </Button>
                   <p className="px-1 text-[12px] leading-relaxed text-fg-subtle">
-                    Beim nächsten Mal meldest du dich hier wieder mit Cevi-Name und Geburtsdatum an. Für Aufgaben im OK
-                    brauchst du ein Konto mit Cevi.DB oder mit E-Mail und Passwort.
+                    Beim nächsten Mal meldest du dich hier wieder mit {org.nicknameTerm} und Geburtsdatum an. Für Aufgaben im OK
+                    brauchst du ein Konto mit {org.slug === 'verein' ? 'E-Mail und Passwort' : `${org.authProviderShort} oder mit E-Mail und Passwort`}.
                   </p>
                 </div>
               </form>
@@ -845,7 +927,7 @@ function LoginContent() {
                 <p className="mt-1 text-[14px] leading-relaxed text-fg-muted">
                   {authMode === 'login'
                     ? 'Melde dich mit deiner E-Mail und deinem persönlichen Passwort an.'
-                    : 'Erstelle ein passwortgeschütztes Konto für alle Abteilungen.'}
+                    : `Erstelle ein passwortgeschütztes Konto für alle ${org.unitTermPlural}.`}
                 </p>
 
                 <div className="mt-6 space-y-4.5">
@@ -874,7 +956,7 @@ function LoginContent() {
                         </Field>
                       </div>
 
-                      <Field label="Cevi-Name (freiwillig)" hint="Dein Pfadiname oder Spitzname, falls vorhanden">
+                      <Field label={`${org.nicknameTerm} (freiwillig)`} hint={`Dein ${org.nicknameTerm}, falls vorhanden`}>
                         <Input
                           type="text"
                           value={regCeviName}

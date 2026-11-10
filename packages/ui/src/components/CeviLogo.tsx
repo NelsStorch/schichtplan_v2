@@ -2,16 +2,24 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../utils/cn';
+import { getOrganization } from '@schichtplan/shared';
 
 const FALLBACK = '/images/cevi-logo.svg';
 const sizes = { sm: 'size-8', md: 'size-12', lg: 'size-16', xl: 'size-20' };
 
-/** Abteilungs-/Event-Logo mit Fallback aufs offizielle Cevi-Logo (auch bei kaputter URL). */
-export function CeviLogo({
+function resolveDefaultLogo(): string {
+  if (typeof window !== 'undefined') {
+    return getOrganization(window.location.host).logoUrl;
+  }
+  return FALLBACK;
+}
+
+/** Abteilungs-/Event-Logo mit Fallback aufs Verbands-Logo (Pfadi, Jubla, Verein, Cevi). */
+export function BrandLogo({
   className,
   size = 'md',
   logoUrl,
-  alt = 'Cevi Logo',
+  alt = 'Logo',
 }: {
   className?: string;
   size?: keyof typeof sizes;
@@ -19,17 +27,20 @@ export function CeviLogo({
   alt?: string;
 }) {
   const ref = useRef<HTMLImageElement>(null);
+  const [fallback, setFallback] = useState(FALLBACK);
   const [src, setSrc] = useState(logoUrl || FALLBACK);
 
   useEffect(() => {
-    setSrc(logoUrl || FALLBACK);
+    const defaultLogo = resolveDefaultLogo();
+    setFallback(defaultLogo);
+    setSrc(logoUrl || defaultLogo);
   }, [logoUrl]);
 
   // Ein Ladefehler vor der Hydration löst onError nie aus: deshalb nach dem Mount nachprüfen.
   useEffect(() => {
     const img = ref.current;
-    if (img && img.complete && img.naturalWidth === 0 && src !== FALLBACK) setSrc(FALLBACK);
-  }, [src]);
+    if (img && img.complete && img.naturalWidth === 0 && src !== fallback) setSrc(fallback);
+  }, [src, fallback]);
 
   return (
     <span className={cn('relative inline-flex shrink-0 select-none items-center justify-center', className ?? sizes[size])}>
@@ -38,9 +49,11 @@ export function CeviLogo({
         ref={ref}
         src={src}
         alt={alt}
-        onError={() => src !== FALLBACK && setSrc(FALLBACK)}
+        onError={() => src !== fallback && setSrc(fallback)}
         className="size-full object-contain"
       />
     </span>
   );
 }
+
+export const CeviLogo = BrandLogo;

@@ -103,7 +103,7 @@ describe.skipIf(!hasTestDb)('Admin-Portal: Abteilungen, Anlässe, Rollen', () =>
     const { cookie } = await admin();
     const department = await createDepartment(app);
     const person = await createUser(app, { ceviDbId: 77 });
-    await app.prisma.user.update({ where: { id: person.id }, data: { ceviDbOrtsgruppeId: 4242 } });
+    await app.prisma.user.update({ where: { id: person.id }, data: { ortsgruppeId: 4242 } });
 
     const res = await inject(app, {
       method: 'PATCH',

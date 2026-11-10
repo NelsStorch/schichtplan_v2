@@ -18,13 +18,15 @@ export const toStufeDto = (s: {
   id: string;
   departmentId: string;
   name: string;
-  ceviDbGroupId: number | null;
+  hitobitoGroupId?: number | null;
+  ceviDbGroupId?: number | null;
   sortOrder: number;
 }): DepartmentStufeDto => ({
   id: s.id,
   departmentId: s.departmentId,
   name: s.name,
-  ceviDbGroupId: s.ceviDbGroupId,
+  hitobitoGroupId: s.hitobitoGroupId ?? s.ceviDbGroupId ?? null,
+  ceviDbGroupId: s.hitobitoGroupId ?? s.ceviDbGroupId ?? null,
   sortOrder: s.sortOrder,
 });
 
@@ -57,7 +59,7 @@ export async function loadContactPerson(
   if (!contactUserId) return null;
   const user = await prisma.user.findUnique({
     where: { id: contactUserId },
-    select: { ceviName: true, firstName: true, lastName: true, email: true, emailVerified: true },
+    select: { nickname: true, firstName: true, lastName: true, email: true, emailVerified: true },
   });
   if (!user) return null;
   return { displayName: personLabel(user), email: loggedIn ? usableEmail(user) : null };
@@ -96,30 +98,34 @@ export async function departmentCreationEligibility(
     ...extra,
   });
 
-  // Die ceviDb*-Spalten schreibt nur der Cevi.DB-Login
+  // Die provider*-Spalten schreibt nur der Hitobito-Login
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      ceviDbId: true,
-      ceviDbDepartmentLeader: true,
-      ceviDbLeaderGroupIds: true,
-      ceviDbLeaderGroupName: true,
+      provider: true,
+      providerId: true,
+      departmentLeader: true,
+      leaderGroupIds: true,
+      leaderGroupName: true,
     },
   });
-  if (!user || user.ceviDbId === null) return denied('NOT_CEVIDB');
+  if (!user || user.providerId === null) return denied('NOT_CEVIDB');
+  const provider = user.provider;
 
-  const leaderGroupName = user.ceviDbLeaderGroupName;
-  if (!user.ceviDbDepartmentLeader) return denied('NOT_LEADER');
+  const leaderGroupName = user.leaderGroupName;
+  if (!user.departmentLeader) return denied('NOT_LEADER');
 
-  const leaderGroups = await prisma.ceviDbGroup.findMany({ where: { id: { in: user.ceviDbLeaderGroupIds } } });
-  if (leaderGroups.length === 0 || leaderGroups.length < user.ceviDbLeaderGroupIds.length) {
+  const leaderGroups = await prisma.hitobitoGroup.findMany({ where: { provider, id: { in: user.leaderGroupIds } } });
+  if (leaderGroups.length === 0 || leaderGroups.length < user.leaderGroupIds.length) {
     return denied('UNVERIFIED', { leaderGroupName });
   }
 
   let firstExisting: DepartmentCreationEligibilityDto | null = null;
   for (const group of leaderGroups) {
     if (group.ortsgruppeId === null) continue;
-    const ortsgruppe = await prisma.ceviDbGroup.findUnique({ where: { id: group.ortsgruppeId } });
+    const ortsgruppe = await prisma.hitobitoGroup.findUnique({
+      where: { provider_id: { provider, id: group.ortsgruppeId } },
+    });
     if (!ortsgruppe || ortsgruppe.jungscharCount === null) return denied('UNVERIFIED', { leaderGroupName });
 
     const perJungschar = ortsgruppe.jungscharCount > 1 && group.jungscharId !== null;
@@ -128,7 +134,7 @@ export async function departmentCreationEligibility(
     const name = perJungschar ? group.name.replace(/^JS\s+/i, '') : ortsgruppe.name;
 
     const existing = await prisma.department.findUnique({
-      where: { ceviDbGroupId: groupId },
+      where: { organization_hitobitoGroupId: { organization: provider, hitobitoGroupId: groupId } },
       select: { name: true, slug: true },
     });
     if (!existing) {
@@ -183,8 +189,10 @@ export function canConfirmHome(
   actorId: string,
   target: {
     id: string;
-    ceviDbId: number | null;
-    ceviDbOrtsgruppeId: number | null;
+    providerId?: string | null;
+    ceviDbId?: number | null;
+    ortsgruppeId?: number | null;
+    ceviDbOrtsgruppeId?: number | null;
     homeDepartmentId: string | null;
     homeDepartmentSource: string | null;
   },
@@ -194,10 +202,10 @@ export function canConfirmHome(
   return (
     actor.hasFullAccess &&
     target.id !== actorId &&
-    target.ceviDbId !== null &&
+    (target.providerId != null || target.ceviDbId != null) &&
     target.homeDepartmentId === departmentId &&
     target.homeDepartmentSource === 'SELF' &&
     ortsgruppeId !== null &&
-    target.ceviDbOrtsgruppeId === ortsgruppeId
+    (target.ortsgruppeId ?? target.ceviDbOrtsgruppeId) === ortsgruppeId
   );
 }

@@ -80,9 +80,9 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
       if (flags.isManager || flags.can.ATTENDANCE) {
         const staffUser = await fastify.prisma.user.findUnique({
           where: { id: request.user.id },
-          select: { ceviName: true, firstName: true },
+          select: { nickname: true, firstName: true },
         });
-        return { name: staffUser?.ceviName || staffUser?.firstName || 'OK' };
+        return { name: staffUser?.nickname || staffUser?.firstName || 'OK' };
       }
     }
 
@@ -214,7 +214,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
               userId: true,
               guestName: true,
               attendance: true,
-              user: { select: { firstName: true, lastName: true, ceviName: true } },
+              user: { select: { firstName: true, lastName: true, nickname: true } },
               shift: {
                 select: {
                   id: true,
@@ -239,7 +239,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
             },
           },
           user: {
-            select: { firstName: true, lastName: true, ceviName: true },
+            select: { firstName: true, lastName: true, nickname: true },
           },
         },
       });
@@ -361,7 +361,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
               id: true,
               guestName: true,
               attendance: true,
-              user: { select: { firstName: true, lastName: true, ceviName: true } },
+              user: { select: { firstName: true, lastName: true, nickname: true } },
               shift: {
                 select: {
                   id: true,
@@ -384,7 +384,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
             },
           },
           user: {
-            select: { firstName: true, lastName: true, ceviName: true },
+            select: { firstName: true, lastName: true, nickname: true },
           },
         },
       });

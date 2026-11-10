@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, BarChart3, Building2, CalendarPlus, CalendarX2, Clock, Lock, LogIn, Plus, Settings2 } from 'lucide-react';
-import type { EventDto } from '@schichtplan/shared';
+import { getOrganization, type EventDto } from '@schichtplan/shared';
 import { Button, Card, EmptyState, NotFoundView, Skeleton, buttonClasses } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { DepartmentSettingsDialog } from '@/components/DepartmentSettingsDialog';
@@ -18,6 +18,7 @@ import type { MyShift } from '@/lib/types';
 export default function DepartmentHomePage() {
   const router = useRouter();
   const { department, user, loading, error, can } = usePortal();
+  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
   const canCreate = can('EVENTS_CREATE');
   // «Abteilung»-Dialog: Einstellungen, Stufen oder Personen (je nach Recht nur einzelne Reiter)
   const canOpenDepartment = can('DEPARTMENT_SETTINGS') || can('STUFEN_MANAGE') || can('PEOPLE_VIEW');
@@ -113,7 +114,7 @@ export default function DepartmentHomePage() {
               {canOpenDepartment && (
                 <div className="mt-6 flex flex-wrap gap-2">
                   <Button variant="secondary" size="sm" onClick={() => { setInitialDeptTab('general'); setShowDeptForm(true); }}>
-                    <Settings2 /> Abteilung
+                    <Settings2 /> {org.unitTerm}
                   </Button>
                   {(can('PEOPLE_VIEW') || can('DEPARTMENT_SETTINGS')) && (
                     <Button variant="secondary" size="sm" onClick={() => { setInitialDeptTab('stats'); setShowDeptForm(true); }}>
@@ -232,18 +233,20 @@ function NextShiftCard({ shift }: { shift: MyShift }) {
 }
 
 function TenantNotFound() {
+  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+  const homeHref = `https://${org.domain}`;
   return (
     <NotFoundView
-      badge="Abteilung unbekannt"
-      title="Abteilung nicht gefunden"
-      description="Unter dieser Adresse ist noch kein Schichtplan eingerichtet. Prüfe die Web-Adresse oder such deine Abteilung auf dem Hauptportal."
-      homeHref="https://cevi-schichtplan.ch"
+      badge={`${org.unitTerm} unbekannt`}
+      title={`${org.unitTerm} nicht gefunden`}
+      description={`Unter dieser Adresse ist noch kein Schichtplan eingerichtet. Prüfe die Web-Adresse oder such deine ${org.unitTerm} auf dem Hauptportal.`}
+      homeHref={homeHref}
       homeLabel="Zum Hauptportal"
       showBackStep={false}
       secondaryActions={[
         {
-          label: 'Neue Abteilung registrieren',
-          href: 'https://cevi-schichtplan.ch/?registrieren=1',
+          label: `Neue ${org.unitTerm} registrieren`,
+          href: `${homeHref}/?registrieren=1`,
           external: true,
         },
       ]}
@@ -255,21 +258,22 @@ function TenantNotFound() {
 function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
   const { department } = usePortal();
   const loginHref = useLoginHref();
+  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
   return (
     <AppShell>
       <div className="mx-auto max-w-xl px-4 pt-16 sm:px-6 sm:pt-24">
         <EmptyState
           icon={<Lock />}
-          title={department?.name ?? 'Abteilung'}
+          title={department?.name ?? org.unitTerm}
           description={
             loggedIn
-              ? 'Diese Abteilung zeigt ihre Anlässe nur Mitgliedern. Gehörst du dazu, gib deine Abteilung an. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.'
-              : 'Diese Abteilung zeigt ihre Anlässe nur Mitgliedern. Melde dich an, um zu sehen, ob du dazugehörst. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.'
+              ? `Diese ${org.unitTerm} zeigt ihre Anlässe nur Mitgliedern. Gehörst du dazu, gib deine ${org.unitTerm} an. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.`
+              : `Diese ${org.unitTerm} zeigt ihre Anlässe nur Mitgliedern. Melde dich an, um zu sehen, ob du dazugehörst. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.`
           }
           action={
             loggedIn ? (
               <a href={departmentSetupUrl()} className={buttonClasses({})}>
-                <Building2 /> Abteilung angeben
+                <Building2 /> {org.unitTerm} angeben
               </a>
             ) : (
               <a href={loginHref} className={buttonClasses({})}>

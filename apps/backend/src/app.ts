@@ -45,6 +45,13 @@ function hasPinoPretty(): boolean {
   }
 }
 
+export const ALLOWED_PLATFORM_DOMAINS = [
+  'cevi-schichtplan.ch',
+  'pfadi-schichtplan.ch',
+  'jubla-schichtplan.ch',
+  'vereins-schichtplan.ch',
+];
+
 /** Darf diese Herkunft (Origin-Header) mit Cookies auf die API zugreifen? */
 export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalhost: boolean): boolean {
   let url: URL;
@@ -54,8 +61,17 @@ export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalho
     return false;
   }
   const host = url.hostname.toLowerCase();
-  const root = rootDomain.toLowerCase();
-  if (url.protocol === 'https:' && (host === root || host.endsWith(`.${root}`))) return true;
+  const roots = new Set([
+    rootDomain.toLowerCase().replace(/^\./, ''),
+    ...ALLOWED_PLATFORM_DOMAINS,
+  ]);
+
+  if (url.protocol === 'https:') {
+    for (const r of roots) {
+      if (host === r || host.endsWith(`.${r}`)) return true;
+    }
+  }
+
   return (
     allowLocalhost &&
     (url.protocol === 'http:' || url.protocol === 'https:') &&

@@ -151,19 +151,19 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
         include: {
           ...accessEventInclude,
           contactUser: {
-            select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+            select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
           },
           dayResponsibles: {
             include: {
               user: {
-                select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
               },
             },
             orderBy: { createdAt: 'asc' },
           },
           organizers: {
             include: {
-              user: { select: { id: true, firstName: true, lastName: true, ceviName: true } },
+              user: { select: { id: true, firstName: true, lastName: true, nickname: true } },
             },
             orderBy: { createdAt: 'asc' },
           },
@@ -173,7 +173,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
               responsibles: {
                 include: {
                   user: {
-                    select: { id: true, firstName: true, lastName: true, ceviName: true, phone: true, email: true },
+                    select: { id: true, firstName: true, lastName: true, nickname: true, phone: true, email: true },
                   },
                 },
                 orderBy: { createdAt: 'asc' },
@@ -187,7 +187,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
                       id: true,
                       firstName: true,
                       lastName: true,
-                      ceviName: true,
+                      nickname: true,
                       birthDate: true,
                       phone: true,
                       email: true,
@@ -196,7 +196,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
                         select: { stufe: { select: { id: true, name: true, sortOrder: true } } },
                         orderBy: { stufe: { sortOrder: 'asc' } },
                       },
-                      ceviDbStufen: {
+                      hitobitoStufen: {
                         select: { groupName: true, isPrimary: true },
                         orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }],
                       },
@@ -364,9 +364,10 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
           userId: o.userId,
           userFirstName: o.user.firstName,
           userLastName: o.user.lastName,
-          userCeviName: o.user.ceviName,
-          displayName: o.user.ceviName
-            ? `${o.user.firstName} / ${o.user.ceviName}`
+          userNickname: o.user.nickname,
+          userCeviName: o.user.nickname,
+          displayName: o.user.nickname
+            ? `${o.user.firstName} / ${o.user.nickname}`
             : `${o.user.firstName} ${o.user.lastName}`,
           role: o.role,
           roleTitle: o.roleTitle,
@@ -385,7 +386,8 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
               if (!disambiguationCandidates.has(personKey)) {
                 disambiguationCandidates.set(personKey, {
                   personKey,
-                  ceviName: su.user?.ceviName ?? null,
+                  nickname: su.user?.nickname ?? null,
+                  ceviName: su.user?.nickname ?? null,
                   firstName: su.user?.firstName ?? null,
                   lastName: su.user?.lastName ?? null,
                   guestName: su.guestName ?? null,
@@ -404,7 +406,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
               const personKey = su.user?.id || `guest:${su.id}`;
               const displayName = showName
                 ? disambiguatedNames.get(personKey) ||
-                  su.user?.ceviName ||
+                  su.user?.nickname ||
                   (su.user ? `${su.user.firstName} ${su.user.lastName}`.trim() : null) ||
                   su.guestName ||
                   'Helfer*in'
@@ -426,7 +428,8 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
               displayName,
               userFirstName: showName ? su.user?.firstName || null : null,
               userLastName: showName ? su.user?.lastName || null : null,
-              userCeviName: showName ? su.user?.ceviName || null : null,
+              userNickname: showName ? su.user?.nickname || null : null,
+              userCeviName: showName ? su.user?.nickname || null : null,
               userBirthDate: access.isManager && su.user?.birthDate ? su.user.birthDate.toISOString() : null,
               userAge,
               createdAt: su.createdAt.toISOString(),

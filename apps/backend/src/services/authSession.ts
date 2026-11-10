@@ -2,7 +2,11 @@ import { FastifyInstance, FastifyReply } from 'fastify';
 import crypto from 'crypto';
 import {
   safeReturnTo,
+  getRootDomain,
+  getOrganizationSlugFromHost,
+  getOrganization,
   type UserDto,
+  type OrganizationType,
 } from '@schichtplan/shared';
 import { AUTH_COOKIE_NAME } from '../plugins/jwt.js';
 import {
@@ -25,19 +29,30 @@ export const accountExistsMailsByEmail = createRateLimiter(60 * 60 * 1000, 1);
 /** Falsche Passwörter beim Verknüpfen: nach 5 ist die Verknüpfung weg */
 export const MAX_LINK_ATTEMPTS = 5;
 
-export function getCookieDomain(): string | undefined {
+export function getCookieDomain(hostname?: string): string | undefined {
+  if (process.env.NODE_ENV !== 'production' && (!hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost'))) {
+    return undefined; // Localhost / Dev
+  }
+
+  if (hostname) {
+    const root = getRootDomain(hostname);
+    if (root && root !== 'localhost') {
+      return `.${root}`;
+    }
+  }
+
   if (process.env.COOKIE_DOMAIN) {
     return process.env.COOKIE_DOMAIN;
   }
   if (process.env.NODE_ENV === 'production') {
-    const domain = process.env.DOMAIN || 'cevi-schichtplan.ch';
+    const domain = (process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
     return `.${domain}`;
   }
   return undefined; // Localhost / Dev
 }
 
 export function setAuthCookie(reply: FastifyReply, token: string) {
-  const domain = getCookieDomain();
+  const domain = getCookieDomain(reply.request?.hostname);
   reply.setCookie(AUTH_COOKIE_NAME, token, {
     path: '/',
     domain,
@@ -48,13 +63,25 @@ export function setAuthCookie(reply: FastifyReply, token: string) {
   });
 }
 
+export function clearAuthCookie(reply: FastifyReply) {
+  const domain = getCookieDomain(reply.request?.hostname);
+  reply.clearCookie(AUTH_COOKIE_NAME, {
+    path: '/',
+    domain,
+  });
+}
+
 // Eigene Domain (auch Staging), auf die nach dem Login weitergeleitet werden darf
-export function rootDomain(): string {
+export function rootDomain(reqHost?: string): string {
+  if (reqHost) {
+    const root = getRootDomain(reqHost);
+    if (root && root !== 'localhost') return root;
+  }
   return (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
 }
 
-export function cleanReturnTo(value: unknown, fallback = '/'): string {
-  return safeReturnTo(value, rootDomain(), {
+export function cleanReturnTo(value: unknown, fallback = '/', reqHost?: string): string {
+  return safeReturnTo(value, rootDomain(reqHost), {
     allowLocalhost: process.env.NODE_ENV !== 'production',
     fallback,
   });
@@ -63,9 +90,11 @@ export function cleanReturnTo(value: unknown, fallback = '/'): string {
 /** Zurück zur Login-Seite mit Fehlercode, statt rohes JSON im Browser anzuzeigen. */
 export function loginErrorUrl(
   code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_failed' | 'cevidb_email_taken',
-  returnTo: string | null
+  returnTo: string | null,
+  reqHost?: string
 ) {
-  const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
+  const root = rootDomain(reqHost);
+  const base = process.env.NODE_ENV === 'production' ? `https://login.${root}` : '';
   return `${base}/?error=${code}${returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : ''}`;
 }
 
@@ -73,11 +102,12 @@ export function loginErrorUrl(
  * Ziel nach dem Login, wenn keines angegeben ist: die eigene Abteilung, sonst die Landingpage.
  * (Früher ging es auf "/" der Login-Seite zurück, die dann wieder das Login zeigte.)
  */
-export function defaultDestination(homeDepartmentSlug: string | null): string {
+export function defaultDestination(homeDepartmentSlug: string | null, reqHost?: string): string {
   if (process.env.NODE_ENV !== 'production') {
     return homeDepartmentSlug ? `http://${homeDepartmentSlug}.localhost:3000/` : 'http://localhost:3001/';
   }
-  return homeDepartmentSlug ? `https://${homeDepartmentSlug}.${rootDomain()}/` : `https://${rootDomain()}/`;
+  const root = rootDomain(reqHost);
+  return homeDepartmentSlug ? `https://${homeDepartmentSlug}.${root}/` : `https://${root}/`;
 }
 
 /**
@@ -97,20 +127,21 @@ export function bootstrapAdminCeviDbIds(): Set<number> {
  * Host-Header: Die Adresse landet in E-Mails (Passwort-Reset, Bestätigung) und Weiterleitungen.
  * Lokal (ausserhalb von Produktion) LOGIN_PORTAL_URL oder der Next-Dev-Server auf Port 3002.
  */
-export function getLoginPortalBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+export function getLoginPortalBaseUrl(env: NodeJS.ProcessEnv = process.env, reqHost?: string): string {
   if (env.NODE_ENV !== 'production') return (env.LOGIN_PORTAL_URL || 'http://localhost:3002').replace(/\/$/, '');
-  const domain = (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+  const domain = reqHost ? rootDomain(reqHost) : (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
   return `https://login.${domain}`;
 }
 
 /** Redirect-URI für Cevi.DB-OAuth: CEVIDB_REDIRECT_URI, sonst der Callback auf dem Login-Portal */
-export function getCeviDbRedirectUri(env: NodeJS.ProcessEnv = process.env): string {
-  return env.CEVIDB_REDIRECT_URI || `${getLoginPortalBaseUrl(env)}/api/auth/cevidb/callback`;
+export function getCeviDbRedirectUri(env: NodeJS.ProcessEnv = process.env, reqHost?: string): string {
+  return env.CEVIDB_REDIRECT_URI || `${getLoginPortalBaseUrl(env, reqHost)}/api/auth/cevidb/callback`;
 }
 
 /** Login-Seite (login.<domain>), z. B. für die Abfrage der Abteilung nach dem Cevi.DB-Login */
-export function loginPageUrl(path: string, returnTo: string) {
-  const base = process.env.NODE_ENV === 'production' ? `https://login.${rootDomain()}` : '';
+export function loginPageUrl(path: string, returnTo: string, reqHost?: string) {
+  const root = rootDomain(reqHost);
+  const base = process.env.NODE_ENV === 'production' ? `https://login.${root}` : '';
   return returnTo ? `${base}${path}?return_to=${encodeURIComponent(returnTo)}` : `${base}${path}`;
 }
 
@@ -132,6 +163,7 @@ export interface PendingLink {
   userId: string;
   expires: number;
   failedAttempts: number;
+  provider?: OrganizationType;
 }
 export const pendingLinks = new Map<string, PendingLink>();
 
@@ -173,22 +205,41 @@ export async function loadUserDto(
   return {
     id: user.id,
     email: user.email,
+    provider: user.provider,
+    providerId: user.providerId,
     firstName: user.firstName,
     lastName: user.lastName,
-    ceviName: user.ceviName,
+    nickname: user.nickname,
+    ceviName: user.nickname,
     phone: user.phone,
     birthDate: user.birthDate ? user.birthDate.toISOString().split('T')[0] : null,
     isGlobalAdmin: user.isGlobalAdmin,
     departmentRole: user.memberships[0] ? (user.memberships[0].role === 'ADMIN' ? 'ADMIN' : 'HELPER') : null,
     departmentPermissions: tenantId ? [...accessFrom(user.memberships[0], user.isGlobalAdmin).permissions] : [],
-    ceviDbId: user.ceviDbId,
-    ceviDbSyncedAt: user.ceviDbSyncedAt ? user.ceviDbSyncedAt.toISOString() : null,
-    hasCeviDb: Boolean(user.ceviDbId),
+    ceviDbId: user.providerId && /^\d+$/.test(user.providerId) ? Number(user.providerId) : null,
+    providerSyncedAt: user.providerSyncedAt ? user.providerSyncedAt.toISOString() : null,
+    ceviDbSyncedAt: user.providerSyncedAt ? user.providerSyncedAt.toISOString() : null,
+    hasProviderAuth: Boolean(user.providerId),
+    hasCeviDb: Boolean(user.providerId && user.provider === 'CEVI'),
     hasPassword: Boolean(user.passwordHash),
     emailVerified: user.emailVerified,
-    canSelfDelete: Boolean(user.ceviDbId !== null || user.passwordHash !== null),
+    canSelfDelete: Boolean(user.providerId !== null || user.passwordHash !== null),
     homeDepartment: user.homeDepartment,
     homeDepartmentFromCeviDb: user.homeDepartmentSource === 'CEVIDB',
+    homeDepartmentFromProvider: user.homeDepartmentSource === 'CEVIDB',
+    homeDepartmentSource: user.homeDepartmentSource,
+    ortsgruppeId: user.ortsgruppeId,
+    ceviDbOrtsgruppeId: user.ortsgruppeId,
+    ortsgruppeName: user.ortsgruppeName,
+    ceviDbOrtsgruppeName: user.ortsgruppeName,
+    departmentLeader: user.departmentLeader,
+    ceviDbDepartmentLeader: user.departmentLeader,
+    leaderGroupName: user.leaderGroupName,
+    ceviDbLeaderGroupName: user.leaderGroupName,
+    leaderGroupIds: user.leaderGroupIds,
+    ceviDbLeaderGroupIds: user.leaderGroupIds,
+    jungscharIds: user.jungscharIds,
+    ceviDbJungscharIds: user.jungscharIds,
     stufen: user.stufen
       .sort((a, b) => a.stufe.sortOrder - b.stufe.sortOrder || a.stufe.name.localeCompare(b.stufe.name, 'de'))
       .map(toUserStufeDto),
@@ -221,13 +272,6 @@ export async function ensureHelperMembership(
   });
 }
 
-export function clearAuthCookie(reply: FastifyReply) {
-  const domain = getCookieDomain();
-  reply.clearCookie(AUTH_COOKIE_NAME, {
-    path: '/',
-    domain,
-  });
-}
 
 /** Antwort auf eine Registrierung, gleich ob das Konto neu ist oder die E-Mail schon eines hat */
 export function registrationAccepted(email: string) {

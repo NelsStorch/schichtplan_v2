@@ -4,7 +4,8 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Check, Database, Search, UsersRound } from 'lucide-react';
 import type { DepartmentDirectoryItemDto, StufeRole, UserDto } from '@schichtplan/shared';
-import { Button, Callout, CeviLogo, Input, ThemeToggle, cn } from '@schichtplan/ui';
+import { getOrganization, type OrganizationConfig } from '@schichtplan/shared';
+import { Button, Callout, BrandLogo, Input, ThemeToggle, cn } from '@schichtplan/ui';
 import { cleanReturnTo, finalDestination } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
@@ -19,6 +20,13 @@ const ROLE_OPTIONS: { value: StufeRole | null; label: string }[] = [
 function DepartmentSetup() {
   const searchParams = useSearchParams();
   const returnTo = cleanReturnTo(searchParams.get('return_to'));
+
+  const [org, setOrg] = useState<OrganizationConfig>(() => getOrganization('cevi-schichtplan.ch'));
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrg(getOrganization(window.location.host));
+    }
+  }, []);
 
   const [user, setUser] = useState<UserDto | null>(null);
   const [departments, setDepartments] = useState<DepartmentDirectoryItemDto[] | null>(null);
@@ -101,18 +109,18 @@ function DepartmentSetup() {
 
       <header className="relative mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
         <span className="flex items-center gap-2.5">
-          <CeviLogo className="size-8" alt="" />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">Cevi Schichtplan</span>
+          <BrandLogo className="size-8" alt="" />
+          <span className="font-display text-[15px] font-semibold tracking-tight text-fg">{org.name}</span>
         </span>
         <ThemeToggle />
       </header>
 
       <main id="inhalt" className="relative mx-auto w-full max-w-[30rem] flex-1 px-5 pb-16 pt-6 sm:pt-10">
         <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg text-balance">
-          {user ? `Hallo ${user.ceviName || user.firstName}.` : 'Deine Abteilung'} Zu welcher Abteilung gehörst du?
+          {user ? `Hallo ${user.nickname || user.ceviName || user.firstName}.` : `Deine ${org.unitTerm}`} Zu welcher {org.unitTerm} gehörst du?
         </h1>
         <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
-          Manche Anlässe sind nur für eine Abteilung oder einzelne Stufen. Du kannst das später jederzeit ändern.
+          Manche Anlässe sind nur für eine {org.unitTerm} oder einzelne Stufen. Du kannst das später jederzeit ändern.
         </p>
 
         <div className="mt-8 space-y-6">
@@ -133,11 +141,11 @@ function DepartmentSetup() {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-fg">{selectedDepartment.name}</span>
-                    <span className="block text-[13px] text-fg-subtle">Aus deinem Cevi.DB-Profil übernommen</span>
+                    <span className="block text-[13px] text-fg-subtle">Aus deinem {org.authProviderShort}-Profil übernommen</span>
                   </span>
                 </div>
               ) : (
-                <section aria-label="Abteilung wählen" className="space-y-3">
+                <section aria-label={`${org.unitTerm} wählen`} className="space-y-3">
                   {departments.length > 6 && (
                     <div className="relative">
                       <Search
@@ -148,8 +156,8 @@ function DepartmentSetup() {
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Abteilung suchen"
-                        aria-label="Abteilung suchen"
+                        placeholder={`${org.unitTerm} suchen`}
+                        aria-label={`${org.unitTerm} suchen`}
                         className="pl-11"
                       />
                     </div>
@@ -169,14 +177,14 @@ function DepartmentSetup() {
                       />
                     ))}
                     {visible.length === 0 && (
-                      <li className="px-5 py-4 text-sm text-fg-subtle">Keine Abteilung gefunden.</li>
+                      <li className="px-5 py-4 text-sm text-fg-subtle">Keine {org.unitTerm} gefunden.</li>
                     )}
                   </ul>
                   <ul role="radiogroup" className="overflow-hidden rounded-card border border-line bg-surface/70">
                     <DepartmentOption
                       selected={selected === NONE}
                       onSelect={() => choose(NONE)}
-                      title="Ich gehöre zu keiner Abteilung"
+                      title={`Ich gehöre zu keiner ${org.unitTerm}`}
                       subtitle="Eltern, Ehemalige, Freund*innen und Gäste"
                       icon={<UsersRound className="size-[18px]" />}
                     />
@@ -285,7 +293,7 @@ function DepartmentOption({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" className="size-full object-cover" />
           ) : (
-            (icon ?? <CeviLogo className="size-6" alt="" />)
+            (icon ?? <BrandLogo className="size-6" alt="" />)
           )}
         </span>
         <span className="min-w-0 flex-1">

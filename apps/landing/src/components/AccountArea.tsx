@@ -103,8 +103,8 @@ export function PrimaryCta({ loginLabel, className }: { loginLabel: string; clas
   );
 }
 
-/** Abteilung anlegen passiert im Login-Portal (nur Abteilungsleitung mit Cevi.DB) */
-export function CreateDepartmentButton() {
+/** Abteilung/Schar anlegen passiert im Login-Portal (nur Leitung mit Verband-Login) */
+export function CreateDepartmentButton({ unitTerm = 'Abteilung' }: { unitTerm?: string }) {
   return (
     <button
       type="button"
@@ -113,7 +113,7 @@ export function CreateDepartmentButton() {
       }}
       className="font-semibold text-accent hover:underline inline-flex items-center gap-0.5"
     >
-      Schichtplan für deine Abteilung einrichten <ArrowRight className="size-3" />
+      Schichtplan für deine {unitTerm} einrichten <ArrowRight className="size-3" />
     </button>
   );
 }

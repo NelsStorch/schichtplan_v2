@@ -48,11 +48,14 @@ export function isVerifiedHomeSource(source: string | null): boolean {
 export interface AccessUser {
   id: string;
   isGlobalAdmin: boolean;
-  ceviDbId: number | null;
-  /** Abteilungsleitung laut Cevi.DB (beim Login gespeichert) */
-  ceviDbDepartmentLeader: boolean;
-  /** Stufen-Rollen laut Cevi.DB, auch in Stufen, die keine Abteilung erfasst hat */
-  ceviDbStufen: { kind: string }[];
+  providerId?: string | null;
+  ceviDbId?: number | null;
+  /** Abteilungsleitung laut Provider/Hitobito (beim Login gespeichert) */
+  departmentLeader?: boolean;
+  ceviDbDepartmentLeader?: boolean;
+  /** Stufen-Rollen laut Provider, auch in Stufen, die keine Abteilung erfasst hat */
+  hitobitoStufen?: { kind: string }[];
+  ceviDbStufen?: { kind: string }[];
   homeDepartmentId: string | null;
   homeDepartmentSource: string | null;
   stufen: { stufeId: string; role: string; source: string }[];
@@ -61,9 +64,9 @@ export interface AccessUser {
 export const accessUserSelect = {
   id: true,
   isGlobalAdmin: true,
-  ceviDbId: true,
-  ceviDbDepartmentLeader: true,
-  ceviDbStufen: { select: { kind: true } },
+  providerId: true,
+  departmentLeader: true,
+  hitobitoStufen: { select: { kind: true } },
   homeDepartmentId: true,
   homeDepartmentSource: true,
   stufen: { select: { stufeId: true, role: true, source: true } },
@@ -144,7 +147,8 @@ export function checkRules(event: AccessEvent, user: AccessUser, departmentName:
   const audience = audienceLabel(event, departmentName);
   const deny = (reason: EventAccessReason, message: string): RuleResult => ({ ok: false, reason, message });
 
-  if (cfg.ceviDb && user.ceviDbId === null) {
+  const hasProviderId = user.providerId !== null && user.providerId !== undefined ? Boolean(user.providerId) : user.ceviDbId !== null && user.ceviDbId !== undefined;
+  if (cfg.ceviDb && !hasProviderId) {
     return deny('CEVIDB_REQUIRED', 'Für diesen Anlass brauchst du einen Cevi.DB-Login. Melde dich bitte mit Cevi.DB an.');
   }
 
@@ -182,11 +186,13 @@ export function checkRules(event: AccessEvent, user: AccessUser, departmentName:
 
   if (event.leadersOnly) {
     const leadsStufe = relevantStufen.some((s) => s.role === 'LEITUNG');
-    // Abteilungsleitung laut Cevi.DB zählt immer, bei «alle Abteilungen» auch jede Stufenleitung aus Cevi.DB
+    // Abteilungsleitung laut Provider/Hitobito zählt immer, bei «alle Abteilungen» auch jede Stufenleitung
+    const isDeptLeader = user.departmentLeader ?? user.ceviDbDepartmentLeader ?? false;
+    const hitobitoStufen = user.hitobitoStufen ?? user.ceviDbStufen ?? [];
     const ceviDbLeader =
-      user.ceviDbId !== null &&
-      (user.ceviDbDepartmentLeader ||
-        (cfg.scope === 'ANY' && user.ceviDbStufen.some((s) => s.kind === 'LEITUNG')));
+      hasProviderId &&
+      (isDeptLeader ||
+        (cfg.scope === 'ANY' && hitobitoStufen.some((s) => s.kind === 'LEITUNG')));
     if (!leadsStufe && !ceviDbLeader) {
       return deny('LEADERS_ONLY', 'Dieser Anlass ist nur für Leitende.');
     }

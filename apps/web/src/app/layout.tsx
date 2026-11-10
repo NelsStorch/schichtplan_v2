@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import { getOrganization } from '@schichtplan/shared';
 import { FeedbackProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
@@ -15,28 +16,29 @@ const DESCRIPTION = 'Schichten für Chilbi, Lager und Cevi-Anlässe: anschauen, 
  * Anlässe können intern oder «nur für Mitglieder» sein, ihre Titel gehören nicht in eine öffentliche Vorschau.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const { origin } = await getRequestOrigin();
+  const { origin, host } = await getRequestOrigin();
+  const org = getOrganization(host);
   const department = await getDepartmentPreview();
-  const title = department ? `${department.name} · Cevi Schichtplan` : 'Cevi Schichtplan';
+  const brandName = `${org.name} Schichtplan`;
+  const title = department ? `${department.name} · ${brandName}` : brandName;
   const image = { url: `${origin}/og`, ...OG_SIZE, alt: title };
   const description = department
     ? `Schichten und Anlässe der ${department.name}: anschauen, eintragen, fertig.`
-    : DESCRIPTION;
+    : `Schichten für Chilbi, Lager und ${org.name}-Anlässe: anschauen, eintragen, fertig.`;
   return {
     metadataBase: new URL(origin),
-    title: { default: title, template: '%s · Cevi Schichtplan' },
+    title: { default: title, template: `%s · ${brandName}` },
     description,
     robots: { index: false, follow: false },
     manifest: '/manifest.json',
     icons: {
       icon: [
-        { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
-        { url: '/images/cevi-logo.png', type: 'image/png' },
+        { url: org.logoUrl, type: 'image/svg+xml' },
       ],
-      apple: '/images/cevi-logo.png',
+      apple: org.logoUrl,
     },
     appleWebApp: { capable: true, title: 'Schichtplan', statusBarStyle: 'black-translucent' },
-    openGraph: { type: 'website', siteName: 'Cevi Schichtplan', locale: 'de_CH', title, description, url: '/', images: [image] },
+    openGraph: { type: 'website', siteName: brandName, locale: 'de_CH', title, description, url: '/', images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   };
 }

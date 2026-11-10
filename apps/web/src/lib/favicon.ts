@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect } from 'react';
+import { getOrganization } from '@schichtplan/shared';
 
 /**
  * Aktualisiert das Browser-Tab-Favicon dynamisch im DOM.
- * Unterstützt Cevi-Logo, Abteilungs-Logos und Event-spezifische Logos.
+ * Unterstützt Verbandslogo, Abteilungs-Logos und Event-spezifische Logos.
  */
 export function updateFavicon(iconUrl?: string | null) {
   if (typeof document === 'undefined') return;
 
-  const url = iconUrl && iconUrl.trim().length > 0 ? iconUrl.trim() : '/images/cevi-logo.svg';
+  const defaultUrl = getOrganization(typeof window !== 'undefined' ? window.location.host : '').logoUrl;
+  const url = iconUrl && iconUrl.trim().length > 0 ? iconUrl.trim() : defaultUrl;
 
   // Standard Favicon
   let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");

@@ -55,9 +55,10 @@ export function getRootDomain(hostname?: string): string {
     return 'localhost';
   }
 
-  // Erkennung von dev.cevi-schichtplan.ch (und allfälligen Subdomains wie login.dev.cevi-schichtplan.ch)
-  if (host === 'dev.cevi-schichtplan.ch' || host.endsWith('.dev.cevi-schichtplan.ch')) {
-    return 'dev.cevi-schichtplan.ch';
+  // Erkennung von dev-Umgebungen (z. B. dev.cevi-schichtplan.ch, login.dev.pfadi-schichtplan.ch)
+  const devMatch = host.match(/(?:^|\.)(dev\.[a-z0-9-]+\.[a-z]+)$/);
+  if (devMatch) {
+    return devMatch[1];
   }
 
   // Standard für cevi-schichtplan.ch und sonstige 2-Level-Domains

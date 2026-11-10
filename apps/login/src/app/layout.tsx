@@ -3,26 +3,24 @@ import './globals.css';
 import { ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
-
-const TITLE = 'Anmelden · Cevi Schichtplan';
-const DESCRIPTION = 'Zentrales Login für Leiter*innen und Helfer*innen des Cevi Schichtplans';
+import { getOrganization } from '@schichtplan/shared';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { origin } = await getRequestOrigin();
-  const image = { url: `${origin}/og`, ...OG_SIZE, alt: 'Anmelden beim Cevi Schichtplan' };
+  const { origin, host } = await getRequestOrigin();
+  const org = getOrganization(host);
+  const title = `Anmelden · ${org.name}`;
+  const description = `Zentrales Login für Leiter*innen und Helfer*innen des ${org.name}s`;
+  const image = { url: `${origin}/og`, ...OG_SIZE, alt: `Anmelden beim ${org.name}` };
   return {
     metadataBase: new URL(origin),
-    title: { default: TITLE, template: '%s · Cevi Schichtplan' },
-    description: DESCRIPTION,
+    title: { default: title, template: `%s · ${org.name}` },
+    description,
     icons: {
-      icon: [
-        { url: '/images/cevi-logo.svg', type: 'image/svg+xml' },
-        { url: '/images/cevi-logo.png', type: 'image/png' },
-      ],
-      apple: '/images/cevi-logo.png',
+      icon: [{ url: org.logoUrl, type: 'image/svg+xml' }],
+      apple: org.logoUrl,
     },
-    openGraph: { type: 'website', siteName: 'Cevi Schichtplan', locale: 'de_CH', title: TITLE, description: DESCRIPTION, url: '/', images: [image] },
-    twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION, images: [image] },
+    openGraph: { type: 'website', siteName: org.name, locale: 'de_CH', title, description, url: '/', images: [image] },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
   };
 }
 

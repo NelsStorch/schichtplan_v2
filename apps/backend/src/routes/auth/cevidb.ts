@@ -20,6 +20,12 @@ import { trackUsage } from '../../services/usageStats.js';
 import { syncCeviDbLeadership } from '../../services/departmentLeaders.js';
 
 import {
+  getOrganizationSlugFromHost,
+  getOrganizationByDbType,
+  type OrganizationType,
+} from '@schichtplan/shared';
+
+import {
   MAX_LINK_ATTEMPTS,
   setAuthCookie,
   cleanReturnTo,
@@ -39,14 +45,43 @@ import {
 } from '../../services/authSession.js';
 
 
+interface HitobitoProviderConfig {
+  type: OrganizationType;
+  baseUrl: string;
+  clientId: string;
+  clientSecret: string;
+}
+
+function getHitobitoConfigFor(orgSlugOrHost?: string | null): HitobitoProviderConfig {
+  const orgSlug = getOrganizationSlugFromHost(orgSlugOrHost);
+  if (orgSlug === 'pfadi') {
+    return {
+      type: 'PFADI',
+      baseUrl: process.env.MIDATA_BASE_URL || 'https://midata.scouts.ch',
+      clientId: process.env.MIDATA_CLIENT_ID || process.env.CEVIDB_CLIENT_ID || '',
+      clientSecret: process.env.MIDATA_CLIENT_SECRET || process.env.CEVIDB_CLIENT_SECRET || '',
+    };
+  }
+  if (orgSlug === 'jubla') {
+    return {
+      type: 'JUBLA',
+      baseUrl: process.env.JUBLADB_BASE_URL || 'https://db.jubla.ch',
+      clientId: process.env.JUBLADB_CLIENT_ID || process.env.CEVIDB_CLIENT_ID || '',
+      clientSecret: process.env.JUBLADB_CLIENT_SECRET || process.env.CEVIDB_CLIENT_SECRET || '',
+    };
+  }
+  return {
+    type: 'CEVI',
+    baseUrl: process.env.CEVIDB_BASE_URL || 'https://db.cevi.ch',
+    clientId: process.env.CEVIDB_CLIENT_ID || '',
+    clientSecret: process.env.CEVIDB_CLIENT_SECRET || '',
+  };
+}
+
 /** Anmeldung über Cevi.DB (OAuth), inkl. Verknüpfen mit einem bestehenden Passwort-Konto */
 const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
-  const CEVIDB_BASE_URL = process.env.CEVIDB_BASE_URL || 'https://db.cevi.ch';
-  const CEVIDB_CLIENT_ID = process.env.CEVIDB_CLIENT_ID || '';
-  const CEVIDB_CLIENT_SECRET = process.env.CEVIDB_CLIENT_SECRET || '';
-
   // 1. Cevi.DB OAuth Login Redirect
-  fastify.get<{ Querystring: { returnTo?: string; tenantSlug?: string } }>(
+  fastify.get<{ Querystring: { returnTo?: string; tenantSlug?: string; org?: string } }>(
     '/api/auth/cevidb/login',
     {
       schema: {
@@ -56,29 +91,33 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
         querystring: z.object({
           returnTo: z.string().optional().describe('Ziel-URL nach erfolgreicher Anmeldung'),
           tenantSlug: z.string().optional().describe('Subdomain der Abteilung'),
+          org: z.string().optional().describe('Verbands-Kürzel (cevi, pfadi, jubla)'),
         }),
       },
     },
     async (request, reply) => {
-      // Aus der Konfiguration, nicht aus dem Host-Header
-      const redirectUri = getCeviDbRedirectUri();
+      const reqHost = request.hostname;
+      const targetOrg = request.query.org || reqHost || request.query.returnTo;
+      const providerConfig = getHitobitoConfigFor(targetOrg);
+      const redirectUri = getCeviDbRedirectUri(process.env, reqHost);
 
       // Ohne Ziel bestimmt der Callback die Weiterleitung (eigene Abteilung oder Landingpage)
       const returnTo = request.query.returnTo
-        ? cleanReturnTo(request.query.returnTo)
+        ? cleanReturnTo(request.query.returnTo, '/', reqHost)
         : request.tenant
-          ? defaultDestination(request.tenant.slug)
+          ? defaultDestination(request.tenant.slug, reqHost)
           : null;
 
-      if (!CEVIDB_CLIENT_ID) {
-        fastify.log.error('Cevi.DB OAuth ist nicht konfiguriert (CEVIDB_CLIENT_ID fehlt in der Umgebung)');
-        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo));
+      if (!providerConfig.clientId) {
+        fastify.log.error(`${providerConfig.type} OAuth ist nicht konfiguriert (CLIENT_ID fehlt in der Umgebung)`);
+        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, reqHost));
       }
 
       const stateObj = {
         token: crypto.randomBytes(16).toString('hex'),
         returnTo,
         tenantSlug: request.query.tenantSlug || request.tenant?.slug || null,
+        provider: providerConfig.type,
       };
 
       const stateEncoded = Buffer.from(JSON.stringify(stateObj)).toString('base64url');
@@ -91,9 +130,9 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
         maxAge: 60 * 10, // 10 Minuten
       });
 
-      const authUrl = new URL(`${CEVIDB_BASE_URL}/oauth/authorize`);
+      const authUrl = new URL(`${providerConfig.baseUrl}/oauth/authorize`);
       authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('client_id', CEVIDB_CLIENT_ID);
+      authUrl.searchParams.set('client_id', providerConfig.clientId);
       authUrl.searchParams.set('redirect_uri', redirectUri);
       authUrl.searchParams.set('scope', cevidbConfig().oauthScopes);
       authUrl.searchParams.set('state', stateEncoded);
@@ -123,35 +162,37 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
       // null = kein Ziel angegeben (direkt auf der Login-Seite angemeldet)
       let returnTo: string | null = null;
       let tenantSlug: string | null = null;
+      let providerType: OrganizationType = 'CEVI';
 
       try {
         if (state) {
           const parsedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
-          returnTo = parsedState.returnTo ? cleanReturnTo(parsedState.returnTo) : null;
+          returnTo = parsedState.returnTo ? cleanReturnTo(parsedState.returnTo, '/', request.hostname) : null;
           tenantSlug = parsedState.tenantSlug || null;
+          if (parsedState.provider) providerType = parsedState.provider;
         }
       } catch (err) {
         // Fallback default
       }
 
-      // Abbruch durch die Person auf Cevi.DB (z. B. Zugriff verweigert)
+      const providerConfig = getHitobitoConfigFor(providerType);
+      const redirectUri = getCeviDbRedirectUri(process.env, request.hostname);
+
+      // Abbruch durch die Person auf Hitobito (z. B. Zugriff verweigert)
       if (error) {
-        return reply.redirect(loginErrorUrl('cevidb_denied', returnTo));
+        return reply.redirect(loginErrorUrl('cevidb_denied', returnTo, request.hostname));
       }
 
       // state muss zum Cookie aus /cevidb/login passen, sonst könnte ein fremder Code untergeschoben werden
       if (!code || !state || state !== request.cookies.cevidb_oauth_state) {
-        fastify.log.warn('Cevi.DB Callback ohne gültigen Code oder state');
-        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
+        fastify.log.warn('Hitobito Callback ohne gültigen Code oder state');
+        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
       }
-
-      // Aus der Konfiguration, nicht aus dem Host-Header
-      const redirectUri = getCeviDbRedirectUri();
 
       let profile: any;
       try {
         // Code gegen Token tauschen
-        const tokenRes = await fetch(`${CEVIDB_BASE_URL}/oauth/token`, {
+        const tokenRes = await fetch(`${providerConfig.baseUrl}/oauth/token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -159,8 +200,8 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
           },
           body: new URLSearchParams({
             grant_type: 'authorization_code',
-            client_id: CEVIDB_CLIENT_ID,
-            client_secret: CEVIDB_CLIENT_SECRET,
+            client_id: providerConfig.clientId,
+            client_secret: providerConfig.clientSecret,
             redirect_uri: redirectUri,
             code,
           }),
@@ -169,9 +210,9 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (!tokenRes.ok) {
           const errText = await tokenRes.text();
-          fastify.log.error(`Cevi.DB Token-Abruf fehlgeschlagen: ${errText}`);
+          fastify.log.error(`${providerConfig.type} Token-Abruf fehlgeschlagen: ${errText}`);
           trackCeviDbFailure();
-          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
+          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
         }
 
         const tokenData = (await tokenRes.json()) as {
@@ -184,7 +225,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
         const accessToken = tokenData.access_token;
 
         // Profil abrufen
-        const profileRes = await fetch(`${CEVIDB_BASE_URL}/oauth/profile`, {
+        const profileRes = await fetch(`${providerConfig.baseUrl}/oauth/profile`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             'X-Scope': 'with_roles',
@@ -194,16 +235,16 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
         });
 
         if (!profileRes.ok) {
-          fastify.log.error('Cevi.DB Profilabruf fehlgeschlagen');
+          fastify.log.error(`${providerConfig.type} Profilabruf fehlgeschlagen`);
           trackCeviDbFailure();
-          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
+          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
         }
 
         profile = await profileRes.json();
 
         // Falls OIDC aktiv ist, versuche zusätzlich Userinfo für allfällige extra Felder abzurufen
         try {
-          const userinfoRes = await fetch(`${CEVIDB_BASE_URL}/oauth/userinfo`, {
+          const userinfoRes = await fetch(`${providerConfig.baseUrl}/oauth/userinfo`, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
               Accept: 'application/json',
@@ -227,20 +268,20 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Gruppenstruktur zu den Rollen: hier, weil das Token nur jetzt da ist (wird nicht gespeichert)
         await refreshCeviDbGroups(fastify.prisma, fastify.log, {
-          baseUrl: CEVIDB_BASE_URL,
+          baseUrl: providerConfig.baseUrl,
           accessToken,
           grantedScopes: profile._meta.grantedScopes,
           groupIds: ceviDbRoleGroupIds(profile),
         });
       } catch (err) {
-        fastify.log.error(err, 'Cevi.DB nicht erreichbar');
+        fastify.log.error(err, `${providerConfig.type} nicht erreichbar`);
         trackCeviDbFailure();
-        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo));
+        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
       }
 
       trackUsage('EXTERNAL', { dim: 'CEVIDB_OK' });
       reply.clearCookie('cevidb_oauth_state', { path: '/' });
-      return reply.redirect(await finishCeviDbLogin(reply, profile, returnTo, tenantSlug));
+      return reply.redirect(await finishCeviDbLogin(reply, profile, returnTo, tenantSlug, undefined, providerConfig.type));
     }
   );
 
@@ -279,13 +320,17 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
     profile: any,
     returnTo: string | null,
     tenantSlug: string | null,
-    linkConfirmedUserId?: string
+    linkConfirmedUserId?: string,
+    targetProvider: OrganizationType = 'CEVI'
   ): Promise<string> {
     const ceviDbId = profile.id;
-    const email = (profile.email || `cevidb_${ceviDbId}@cevi-schichtplan.ch`).toLowerCase();
-    const firstName = profile.first_name || profile.given_name || 'Cevianer*in';
+    const providerId = String(profile.id);
+    const provider = targetProvider;
+    const org = getOrganizationByDbType(provider);
+    const email = (profile.email || `${provider.toLowerCase()}_${providerId}@${org.domain}`).toLowerCase();
+    const firstName = profile.first_name || profile.given_name || 'Mitglied';
     const lastName = profile.last_name || profile.family_name || '';
-    const ceviName = profile.nickname || null;
+    const nickname = profile.nickname || null;
 
     let birthDate: Date | null = null;
     if (profile.birthday) {
@@ -297,29 +342,31 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     const now = new Date();
 
-    // Benutzer finden: zuerst über die Cevi.DB-ID, sonst über die E-Mail (E-Mails sind eindeutig)
-    let user = await fastify.prisma.user.findUnique({ where: { ceviDbId } });
+    // Benutzer finden: zuerst über die Provider-ID, sonst über die E-Mail (E-Mails sind eindeutig)
+    let user = await fastify.prisma.user.findUnique({
+      where: { provider_providerId: { provider, providerId } },
+    });
     if (!user) {
       let byEmail = await fastify.prisma.user.findUnique({ where: { email } });
       if (byEmail && !byEmail.emailVerified && byEmail.id !== linkConfirmedUserId) {
         // Unbestätigte Adresse (Registrierung ohne Bestätigung oder selbst ins Profil geschrieben):
-        // Sie gehört nicht nachweislich diesem Konto. Cevi.DB bestätigt sie, das andere Konto verliert sie.
+        // Sie gehört nicht nachweislich diesem Konto. Der Provider bestätigt sie, das andere Konto verliert sie.
         // Sonst könnte jemand mit fremder E-Mail ein Konto vorbereiten und es so übernehmen oder sperren.
         await fastify.prisma.$transaction([
           fastify.prisma.emailVerificationToken.deleteMany({ where: { userId: byEmail.id } }),
           fastify.prisma.user.update({ where: { id: byEmail.id }, data: { email: null } }),
         ]);
-        fastify.log.warn({ userId: byEmail.id, ceviDbId }, 'Cevi.DB-Login: unbestätigte E-Mail von anderem Konto gelöst');
+        fastify.log.warn({ userId: byEmail.id, ceviDbId }, `${provider}-Login: unbestätigte E-Mail von anderem Konto gelöst`);
         byEmail = null;
       }
-      if (byEmail && byEmail.ceviDbId !== null) {
-        // E-Mail gehört schon zu einer anderen Cevi.DB-Person: nicht überschreiben
-        fastify.log.warn({ userId: byEmail.id, ceviDbId }, 'Cevi.DB-Login: E-Mail gehört zu anderem Cevi.DB-Konto');
-        return loginErrorUrl('cevidb_email_taken', returnTo);
+      if (byEmail && byEmail.providerId !== null) {
+        // E-Mail gehört schon zu einer anderen Person des Providers: nicht überschreiben
+        fastify.log.warn({ userId: byEmail.id, ceviDbId }, `${provider}-Login: E-Mail gehört zu anderem Provider-Konto`);
+        return loginErrorUrl('cevidb_email_taken', returnTo, reply.request?.hostname);
       }
       if (byEmail && byEmail.passwordHash && byEmail.id !== linkConfirmedUserId) {
         // Passwort-Konto mit gleicher E-Mail: erst nach Passwort verknüpfen (login.<domain>/konto-verknuepfen)
-        const token = createPendingLink({ profile, returnTo, tenantSlug, userId: byEmail.id });
+        const token = createPendingLink({ profile, returnTo, tenantSlug, userId: byEmail.id, provider });
         reply.setCookie(PENDING_LINK_COOKIE, token, {
           path: '/',
           httpOnly: true,
@@ -327,47 +374,47 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
           sameSite: 'lax',
           maxAge: PENDING_LINK_TTL_SECONDS,
         });
-        return loginPageUrl('/konto-verknuepfen', returnTo ?? '');
+        return loginPageUrl('/konto-verknuepfen', returnTo ?? '', reply.request?.hostname);
       }
       user = byEmail;
     }
 
-    // Cevi.DB ist die Quelle: Was dort steht, ersetzt die lokalen Werte bei jedem Login. Die Adresse
-    // übernehmen wir bewusst nicht (Datensparsamkeit; wer sie braucht, fragt beim Anlass danach). Die
-    // Handynummer liefert Cevi.DB nicht (Scope `with_roles` hat keine Telefonnummern).
+    // Hitobito ist die Quelle: Was dort steht, ersetzt die lokalen Werte bei jedem Login.
     if (!user) {
       trackUsage('REGISTER', { dim: 'cevidb' });
       user = await fastify.prisma.user.create({
         data: {
           email,
-          ceviDbId,
+          provider,
+          providerId,
           firstName,
           lastName,
-          ceviName,
+          nickname,
           birthDate,
           emailVerified: true,
           emailVerifiedAt: now,
-          ceviDbSyncedAt: now,
+          providerSyncedAt: now,
         },
       });
     } else {
       user = await fastify.prisma.user.update({
         where: { id: user.id },
         data: {
-          ceviDbId,
-          ceviName: ceviName || user.ceviName,
+          provider,
+          providerId,
+          nickname: nickname || user.nickname,
           firstName: firstName || user.firstName,
           lastName: lastName || user.lastName,
           birthDate: birthDate || user.birthDate,
           ...(await ceviDbEmailUpdate(user, profile.email)),
           emailVerified: true,
           emailVerifiedAt: user.emailVerifiedAt || now,
-          ceviDbSyncedAt: now,
+          providerSyncedAt: now,
         },
       });
     }
 
-    if (!user.isGlobalAdmin && typeof ceviDbId === 'number' && bootstrapAdminCeviDbIds().has(ceviDbId)) {
+    if (provider === 'CEVI' && !user.isGlobalAdmin && typeof ceviDbId === 'number' && bootstrapAdminCeviDbIds().has(ceviDbId)) {
       user = await fastify.prisma.user.update({
         where: { id: user.id },
         data: { isGlobalAdmin: true },
@@ -395,7 +442,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
     let tenantDepartmentId: string | null = null;
     if (tenantSlug) {
       const department = await fastify.prisma.department.findUnique({
-        where: { slug: tenantSlug },
+        where: { organization_slug: { organization: provider, slug: tenantSlug } },
         select: { id: true },
       });
       if (department) {
@@ -470,10 +517,10 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
     if (!link) return reply.status(404).send({ error: 'Keine offene Verknüpfung. Melde dich nochmals mit Cevi.DB an.' });
     const user = await fastify.prisma.user.findUnique({
       where: { id: link.userId },
-      select: { email: true, ceviName: true, firstName: true },
+      select: { email: true, nickname: true, firstName: true },
     });
     if (!user) return reply.status(404).send({ error: 'Das Konto gibt es nicht mehr.' });
-    return { email: user.email, name: user.ceviName || user.firstName, returnTo: link.returnTo };
+    return { email: user.email, name: user.nickname || user.firstName, returnTo: link.returnTo };
   });
 
   fastify.post(
@@ -512,8 +559,8 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     pendingLinks.delete(token!);
     reply.clearCookie(PENDING_LINK_COOKIE, { path: '/' });
-    const redirectUrl = await finishCeviDbLogin(reply, link.profile, link.returnTo, link.tenantSlug, user.id);
-    fastify.log.info({ userId: user.id }, 'Passwort-Konto mit Cevi.DB verknüpft');
+    const redirectUrl = await finishCeviDbLogin(reply, link.profile, link.returnTo, link.tenantSlug, user.id, link.provider || 'CEVI');
+    fastify.log.info({ userId: user.id }, 'Passwort-Konto mit Provider verknüpft');
     trackUsage('ACCOUNT_LINK');
     return { redirectUrl };
   });
