@@ -15,7 +15,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import {
+import {
   normalizePermissions,
   type AdminDepartmentListItemDto,
   type AdminUserDetailDto,
