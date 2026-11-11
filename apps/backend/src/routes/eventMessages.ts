@@ -5,6 +5,7 @@ import {
   SendEventMessageSchema,
   accessTypeConfig,
   businessDayKey,
+  getVocabulary,
   toZurichInput,
   type EventMessageDto,
   type EventMessageResultDto,
@@ -375,10 +376,11 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
       const signatureName = `OK ${event.title} (${event.department.name})`;
 
       // Versand im Hintergrund, damit grosse Listen die Anfrage nicht blockieren. Fehlschläge landen im Verlauf.
+      const defaultGreeting = getVocabulary(event.department.organization).member;
       void (async () => {
         let failed = 0;
         for (const r of withEmail) {
-          const greetingName = r.label?.trim() || 'Cevianer*in';
+          const greetingName = r.label?.trim() || defaultGreeting;
           const personalizedBody = body.replace(/\{name\}/gi, greetingName);
           const html = renderEmailTemplate({
             preheader: `${subject} – Nachricht vom OK ${event.title}`,
@@ -412,7 +414,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         // Zusätzlich Browser-Push an alle ausgewählten Empfänger*innen (auch ohne E-Mail), sofern aktiviert
         for (const r of recipients) {
           if (r.pushNotifyMessages === false) continue;
-          const greetingName = r.label?.trim() || 'Cevianer*in';
+          const greetingName = r.label?.trim() || defaultGreeting;
           const previewText = body
             .replace(/\{name\}/gi, greetingName)
             .replace(/\s+/g, ' ')

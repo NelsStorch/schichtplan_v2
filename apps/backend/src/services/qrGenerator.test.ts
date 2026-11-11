@@ -92,4 +92,18 @@ describe('qrGenerator', () => {
     expect(pdfBuf.subarray(0, 4).toString('utf8')).toBe('%PDF');
     expect(pdfBuf.length).toBeGreaterThan(5000);
   });
+
+  it('erzeugt Check-in-PDF mit Verbandsangaben für Pfadi (ohne Cevi-Logo-Fallback)', async () => {
+    const pdfBuf = await generateCheckinPdf({
+      text: 'https://schleife.pfadi-schichtplan.ch/events/lager/checkin?code=xyz',
+      title: 'Sommerlager',
+      departmentName: 'Pfadi Schleife',
+      color: '#16a34a',
+    });
+
+    expect(pdfBuf).toBeInstanceOf(Buffer);
+    expect(pdfBuf.subarray(0, 4).toString('utf8')).toBe('%PDF');
+    const pdfStr = pdfBuf.toString('binary');
+    expect(pdfStr).toContain('Pfadi Schichtplan');
+  });
 });

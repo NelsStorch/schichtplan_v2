@@ -59,6 +59,12 @@ describe('Adressen nur aus der Konfiguration', () => {
 
     // Localhost bleibt lokal
     expect(getLoginPortalBaseUrl({ NODE_ENV: 'development' }, 'localhost:3000')).toBe('http://localhost:3002');
+
+    // domainOrOrg Parameter (z. B. aus dem Admin-Portal oder bei user.homeDepartment)
+    expect(getLoginPortalBaseUrl({ NODE_ENV: 'production' }, 'admin.cevi-schichtplan.ch', 'PFADI')).toBe('https://login.pfadi-schichtplan.ch');
+    expect(getLoginPortalBaseUrl({ NODE_ENV: 'production' }, 'admin.dev.cevi-schichtplan.ch', 'PFADI')).toBe('https://login.dev.pfadi-schichtplan.ch');
+    expect(getLoginPortalBaseUrl({ NODE_ENV: 'production' }, 'admin.cevi-schichtplan.ch', 'JUBLA')).toBe('https://login.jubla-schichtplan.ch');
+    expect(getLoginPortalBaseUrl({ NODE_ENV: 'production' }, 'admin.cevi-schichtplan.ch', 'OTHER')).toBe('https://login.vereins-schichtplan.ch');
   });
 
   it('loginErrorUrl und loginPageUrl unterstuetzen Multi-Domain ueber reqHost', () => {

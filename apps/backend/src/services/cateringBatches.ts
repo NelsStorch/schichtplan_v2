@@ -11,6 +11,7 @@ import {
 } from './qrGenerator.js';
 import {
   DEFAULT_CATERING_TOKEN_ITEMS,
+  getOrganizationByDbType,
   type CateringBatchDto,
   type CateringBatchMode,
   type PhysicalCardScanResultDto,
@@ -331,7 +332,7 @@ export async function generateBatchPdf(
   const batch = await prisma.cateringBatch.findFirst({
     where: { id: batchId, eventId },
     include: {
-      event: { select: { title: true, slug: true, department: { select: { name: true, slug: true } } } },
+      event: { select: { title: true, slug: true, department: { select: { name: true, slug: true, organization: true } } } },
       tokens: {
         orderBy: [{ cardNumber: 'asc' }, { title: 'asc' }],
       },
@@ -339,6 +340,8 @@ export async function generateBatchPdf(
   });
 
   if (!batch) throw new Error('Tranche nicht gefunden');
+
+  const orgConfig = getOrganizationByDbType(batch.event.department.organization);
 
   // Gruppiere Tokens nach Karte (über qrCode & cardNumber)
   const cardsMap = new Map<
@@ -374,7 +377,7 @@ export async function generateBatchPdf(
     margin: 0,
     info: {
       Title: `${batch.title} – ${batch.event.title}`,
-      Author: 'Cevi Schichtplan',
+      Author: orgConfig.name,
     },
   });
 
@@ -401,7 +404,7 @@ export async function generateBatchPdf(
 
   // Gleiches Design wie der Check-in-Aushang: Abteilungsfarben, QR-Stil und Logo in der Mitte
   const palette = resolveQrPalette(branding.color, branding.secondaryColor, branding.qrStyle);
-  const logo = preparePdfLogo(doc, await resolveLogo(branding.logoUrl, prisma));
+  const logo = preparePdfLogo(doc, await resolveLogo(branding.logoUrl, prisma, batch.event.department.organization));
   const accent = palette.isTwoTone ? palette.secondary : palette.primary;
   const label = batch.mode === 'COMBI' ? 'KOMBI-GUTSCHEIN' : 'HELFER-BON';
   const departmentLine = `${batch.event.department.name} · ${batch.title}`.toUpperCase();

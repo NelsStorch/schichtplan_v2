@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
+import { getOrganizationByDbType } from '@schichtplan/shared';
 import { sendEmail } from './email.js';
 import { sendPushToUser } from './webPush.js';
 import { eventUrl } from './shiftReminders.js';
@@ -159,6 +160,7 @@ export async function sendDueCateringReminders(
       const email = (group.user?.emailVerified && group.user?.email) ? group.user.email : group.guestEmail;
       if (email && (group.user ? group.user.emailNotifyCateringTokens !== false : true)) {
         try {
+          const orgName = getOrganizationByDbType(event.department.organization).name;
           await sendEmail({
             to: email,
             organization: event.department.organization,
@@ -184,7 +186,7 @@ export async function sendDueCateringReminders(
                   <a href="${targetUrl}" style="background-color: #0284c7; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 12px 28px; border-radius: 9999px; display: inline-block;">Gutscheine öffnen</a>
                 </div>
                 <div style="text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-                  Cevi Schichtplan · <a href="${targetUrl}" style="color: #64748b;">Benachrichtigungseinstellungen ändern</a>
+                  ${orgName} · <a href="${targetUrl}" style="color: #64748b;">Benachrichtigungseinstellungen ändern</a>
                 </div>
               </div>
             `,

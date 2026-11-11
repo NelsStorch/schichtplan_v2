@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   CeviNameQuickLoginSchema,
   CeviNameRegisterSchema,
+  getVocabulary,
 } from '@schichtplan/shared';
 import {
   RATE_LIMIT_ERROR,
@@ -64,27 +65,28 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const matches = await findCeviNameMatches(fastify.prisma, department.id, ceviName, birthDate);
     const result = pickCeviNameMatch(matches);
+    const vocab = getVocabulary(request.organization);
     // Nur ein erfolgreicher Login ist kein Fehlversuch
     if (result.kind === 'LOGIN') releaseCeviNameAttempt(department.id, ceviName);
     if (result.kind === 'USE_CEVIDB') {
       trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_USE_CEVIDB', departmentId: department.id });
       return reply.status(403).send({
         code: 'USE_CEVIDB',
-        error: 'Zu diesem Cevi-Namen gibt es ein Konto mit Cevi.DB. Melde dich bitte mit Cevi.DB an.',
+        error: `Zu diesem ${vocab.nickname} gibt es ein Konto mit ${vocab.authProvider}. Melde dich bitte mit ${vocab.authProvider} an.`,
       });
     }
     if (result.kind === 'USE_PASSWORD') {
       trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_USE_PASSWORD', departmentId: department.id });
       return reply.status(403).send({
         code: 'USE_PASSWORD',
-        error: 'Zu diesem Cevi-Namen gibt es ein geschütztes Konto. Melde dich bitte mit E-Mail und Passwort an.',
+        error: `Zu diesem ${vocab.nickname} gibt es ein geschütztes Konto. Melde dich bitte mit E-Mail und Passwort an.`,
       });
     }
     if (result.kind === 'NONE') {
       trackUsage('LOGIN_FAILED', { dim: 'CEVINAME_NOT_FOUND', departmentId: department.id });
       return reply.status(404).send({
         code: 'NOT_FOUND',
-        error: `Bei ${department.name} gibt es noch kein Profil mit diesem Cevi-Namen und Geburtsdatum.`,
+        error: `Bei ${department.name} gibt es noch kein Profil mit diesem ${vocab.nickname} und Geburtsdatum.`,
       });
     }
 
@@ -134,13 +136,14 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     // Kein Treffer verrät nichts: kein Fehlversuch
     if (matches.length === 0) releaseCeviNameAttempt(department.id, ceviName);
     if (matches.length > 0) {
+      const vocab = getVocabulary(request.organization);
       const result = pickCeviNameMatch(matches);
       return reply.status(409).send({
         code: result.kind === 'USE_CEVIDB' ? 'USE_CEVIDB' : result.kind === 'USE_PASSWORD' ? 'USE_PASSWORD' : 'EXISTS',
         error:
           result.kind === 'LOGIN'
-            ? 'Dieses Profil gibt es schon. Melde dich mit Cevi-Name und Geburtsdatum an.'
-            : 'Zu diesem Cevi-Namen und Geburtsdatum gibt es schon ein Konto. Melde dich damit an.',
+            ? `Dieses Profil gibt es schon. Melde dich mit ${vocab.nickname} und Geburtsdatum an.`
+            : `Zu diesem ${vocab.nickname} und Geburtsdatum gibt es schon ein Konto. Melde dich damit an.`,
       });
     }
 

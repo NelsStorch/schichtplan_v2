@@ -1,4 +1,4 @@
-import { evaluateContrast, getOrganization, type ContrastEvaluation } from '@schichtplan/shared';
+import { evaluateContrast, getOrganization, type ContrastEvaluation, type OrganizationType } from '@schichtplan/shared';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import type { PrismaClient } from '../db.js';
@@ -13,6 +13,7 @@ export interface ResolvedLogo {
   buffer?: Buffer;
   mimeType?: string;
   isCeviDefault: boolean;
+  organization?: OrganizationType;
 }
 
 /**
@@ -24,16 +25,17 @@ export function isFinderPattern(r: number, c: number, n: number): boolean {
 
 /**
  * Holt ein Abteilungslogo (aus der Datenbank wenn /api/uploads/...,
- * oder Fallback auf das Standard-Cevi-Logo).
+ * oder Fallback auf das Verbands-Logo).
  * Externe HTTP-Aufrufe sind aus Sicherheitsgründen (SSRF-Schutz) deaktiviert;
  * es werden ausschliesslich auf dem Server hochgeladene Abteilungslogos verwendet.
  */
 export async function resolveLogo(
   logoUrl?: string | null,
-  prisma?: PrismaClient
+  prisma?: PrismaClient,
+  organization?: OrganizationType
 ): Promise<ResolvedLogo> {
   if (!logoUrl) {
-    return { isCeviDefault: true };
+    return { isCeviDefault: organization === 'CEVI' || !organization, organization };
   }
 
   // Lokaler Upload in der Datenbank
@@ -46,6 +48,7 @@ export async function resolveLogo(
           buffer: Buffer.from(upload.data),
           mimeType: upload.mimeType,
           isCeviDefault: false,
+          organization,
         };
       }
     } catch {
@@ -53,7 +56,7 @@ export async function resolveLogo(
     }
   }
 
-  return { isCeviDefault: true };
+  return { isCeviDefault: organization === 'CEVI' || !organization, organization };
 }
 
 export type QrStyle = 'CORNERS' | 'GRADIENT' | 'SOLID';
@@ -81,15 +84,17 @@ export function resolveQrPalette(
 /** Logo einmal ins PDF laden und danach beliebig oft zeichnen (sonst wird es pro Bon neu eingebettet) */
 export interface PdfLogo {
   image: unknown | null;
+  organization?: OrganizationType;
 }
 
 export function preparePdfLogo(doc: PDFKit.PDFDocument, logo: ResolvedLogo): PdfLogo {
-  if (logo.isCeviDefault || !logo.buffer || !logo.mimeType) return { image: null };
-  if (!logo.mimeType.includes('png') && !logo.mimeType.includes('jpeg')) return { image: null };
+  const organization = logo.organization;
+  if (logo.isCeviDefault || !logo.buffer || !logo.mimeType) return { image: null, organization };
+  if (!logo.mimeType.includes('png') && !logo.mimeType.includes('jpeg')) return { image: null, organization };
   try {
-    return { image: (doc as unknown as { openImage(src: Buffer): unknown }).openImage(logo.buffer) };
+    return { image: (doc as unknown as { openImage(src: Buffer): unknown }).openImage(logo.buffer), organization };
   } catch {
-    return { image: null };
+    return { image: null, organization };
   }
 }
 
@@ -99,10 +104,12 @@ export function drawPdfLogo(doc: PDFKit.PDFDocument, logo: PdfLogo, x: number, y
       doc.image(logo.image as Buffer, x, y, { fit: [size, size], align: 'center', valign: 'center' });
       return;
     } catch {
-      // Fallback aufs Cevi-Logo
+      // Fallback
     }
   }
-  drawCeviLogoVector(doc, x, y, size);
+  if (!logo.organization || logo.organization === 'CEVI') {
+    drawCeviLogoVector(doc, x, y, size);
+  }
 }
 
 /**
@@ -297,12 +304,12 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
   const palette = resolveQrPalette(options.color, options.secondaryColor, options.qrStyle);
   const { primary: primaryColor, secondary: secondaryColor, isTwoTone } = palette;
 
-  const logo = await resolveLogo(options.logoUrl, options.prisma);
   const footerOrg = getOrganization(options.text);
+  const logo = await resolveLogo(options.logoUrl, options.prisma, footerOrg.dbType);
 
   return new Promise((resolve, reject) => {
     // A4: 595.28 x 841.89 pt
-    const doc = new PDFDocument({ size: 'A4', margin: 36 });
+    const doc = new PDFDocument({ size: 'A4', margin: 36, info: { Title: options.title || 'Helfer-Check-in', Author: footerOrg.name } });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(chunk));
@@ -319,12 +326,12 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
     }
 
     // 2. Kopfbereich
-    const deptName = options.departmentName || 'Cevi Schichtplan';
+    const deptName = options.departmentName || footerOrg.name;
     doc
       .font('Helvetica-Bold')
       .fontSize(9.5)
       .fillColor('#6b7280')
-      .text('CEVI SCHICHTPLAN  ·  OFFIZIELLER HELFER-AUSHANG', 40, 36);
+      .text(`${footerOrg.name.toUpperCase()}  ·  OFFIZIELLER HELFER-AUSHANG`, 40, 36);
 
     doc
       .font('Helvetica')

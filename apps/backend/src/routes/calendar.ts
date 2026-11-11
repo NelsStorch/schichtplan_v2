@@ -64,7 +64,8 @@ const calendarRoutes: FastifyPluginAsync = async (fastify) => {
     const rawHost = String(request.headers.host || '').split(':')[0].trim().toLowerCase();
     const isLocalHost = rawHost === 'localhost' || rawHost === '127.0.0.1' || rawHost.endsWith('.localhost');
     const org = getOrganization(rawHost);
-    const domain = isLocalHost ? rawHost : (rawHost.startsWith('dev.') ? `dev.${org.domain}` : org.domain);
+    const isStaging = rawHost.startsWith('dev.') || rawHost.includes('.dev.');
+    const domain = isLocalHost ? rawHost : (isStaging ? `dev.${org.domain}` : org.domain);
     const userDisplayName = user.nickname || user.firstName;
 
     const ics = buildIcsFeed({

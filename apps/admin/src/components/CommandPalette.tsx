@@ -25,7 +25,7 @@ import {
   type AdminEventListItemDto,
   type AdminUserListItemDto,
 } from '@schichtplan/shared';
-import { api } from '../lib/api';
+import { api, departmentUrl } from '../lib/api';
 import { fullName } from '../lib/format';
 import type { AdminTab } from './DashboardPanel';
 
@@ -177,7 +177,7 @@ export function CommandPalette({
       },
     })),
     ...matchedDepartments.map((d) => {
-      const deptUrl = `https://${d.slug}.cevi-schichtplan.ch`;
+      const deptUrl = departmentUrl(d.slug, '/', d.organization);
       return {
         id: `dept-${d.id}`,
         category: 'Abteilungen',

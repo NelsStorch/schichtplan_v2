@@ -76,6 +76,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         id: true,
         name: true,
         slug: true,
+        organization: true,
         logoUrl: true,
         stufen: { select: { id: true, name: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] },
       },
@@ -154,6 +155,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         id: true,
         name: true,
         slug: true,
+        organization: true,
         logoUrl: true,
         primaryColor: true,
         _count: {

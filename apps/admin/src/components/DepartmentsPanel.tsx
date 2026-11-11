@@ -18,7 +18,7 @@ import {
   cn,
   useToast,
 } from '@schichtplan/ui';
-import { SUBDOMAIN_REGEX, type AdminDepartmentListItemDto, type AdminUserListItemDto, type OrganizationType } from '@schichtplan/shared';
+import { SUBDOMAIN_REGEX, getOrganizationByDbType, type AdminDepartmentListItemDto, type AdminUserListItemDto, type OrganizationType } from '@schichtplan/shared';
 import { send, errorMessage } from '../lib/api';
 import { downloadCsv } from '../lib/csv';
 import { DepartmentLogo } from './DepartmentDialog';
@@ -174,7 +174,7 @@ function CreateDepartmentDialog({
                 setName(e.target.value);
                 if (!slugTouched) setSlug(suggestSlug(e.target.value));
               }}
-              placeholder="Cevi Musterdorf"
+              placeholder={organization === 'PFADI' ? 'Pfadi Musterdorf' : organization === 'JUBLA' ? 'Jubla Musterdorf' : organization === 'OTHER' ? 'Verein Musterdorf' : 'Cevi Musterdorf'}
               maxLength={80}
               ref={nameRef}
             />
@@ -182,7 +182,7 @@ function CreateDepartmentDialog({
           <Field
             label="Subdomain"
             required
-            hint={slug ? `${slug}.cevi-schichtplan.ch` : 'Kleinbuchstaben, Zahlen, Bindestriche'}
+            hint={slug ? `${slug}.${getOrganizationByDbType(organization).domain}` : 'Kleinbuchstaben, Zahlen, Bindestriche'}
             error={slug && !slugValid ? 'Mindestens 3 Zeichen, nur a–z, 0–9 und -' : undefined}
           >
             <Input
@@ -196,8 +196,8 @@ function CreateDepartmentDialog({
             />
           </Field>
           <Field
-            label="Cevi.DB-Gruppe (ID)"
-            hint="Optional. Die Ortsgruppe, oder die Jungschar, wenn die Ortsgruppe mehrere hat. Bereits angemeldete Personen werden sofort zugeordnet."
+            label={organization === 'OTHER' ? 'Verbands-Gruppe (ID)' : `${getOrganizationByDbType(organization).authProviderShort}-Gruppe (ID)`}
+            hint="Optional. Die Ortsgruppe oder Abteilung. Bereits angemeldete Personen werden sofort zugeordnet."
             error={groupValid ? undefined : 'Nur Ziffern'}
           >
             <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
@@ -208,7 +208,7 @@ function CreateDepartmentDialog({
           <PersonPicker value={leader} onChange={setLeader} placeholder="Optional: Person suchen" />
           {leaderInvalid && (
             <p className="text-xs text-danger-ink">
-              Cevi-Name-Profile können keine Abteilungsleitung sein. Die Person braucht Cevi.DB oder ein Passwort.
+              {getOrganizationByDbType(organization).nicknameTerm}-Profile können keine Abteilungsleitung sein. Die Person braucht {organization === 'OTHER' ? 'ein Passwort' : `${getOrganizationByDbType(organization).authProviderShort} oder ein Passwort`}.
             </p>
           )}
         </div>

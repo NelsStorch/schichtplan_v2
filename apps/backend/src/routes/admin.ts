@@ -528,7 +528,16 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const user = await fastify.prisma.user.findUnique({
         where: { id: request.params.id },
-        select: { id: true, email: true, firstName: true, lastName: true, nickname: true, passwordHash: true },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          nickname: true,
+          passwordHash: true,
+          provider: true,
+          homeDepartment: { select: { organization: true } },
+        },
       });
       if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
       if (!user.email && !user.passwordHash) {
@@ -548,7 +557,8 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         }),
       ]);
 
-      const resetUrl = `${getLoginPortalBaseUrl(process.env, request.headers.host)}/passwort-zuruecksetzen?token=${token}`;
+      const org = user.homeDepartment?.organization ?? user.provider;
+      const resetUrl = `${getLoginPortalBaseUrl(process.env, request.headers.host, org)}/passwort-zuruecksetzen?token=${token}`;
       const name = user.nickname ? `${user.nickname} (${user.firstName} ${user.lastName})` : `${user.firstName} ${user.lastName}`;
 
       await recordAdminAction(fastify.prisma, request, {

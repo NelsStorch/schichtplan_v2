@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { getOrganizationTypeFromHost } from '@schichtplan/shared';
 
 /**
  * Nur lokale Entwicklung: leitet /api/* an das Backend weiter (in Produktion
@@ -12,14 +13,17 @@ export function middleware(request: NextRequest) {
 
   const target = new URL(request.nextUrl.pathname + request.nextUrl.search, backend);
   const headers = new Headers(request.headers);
-  const hostParts = (request.headers.get('host') ?? '').split(':')[0].split('.');
+  const host = (request.headers.get('host') ?? '').split(':')[0].toLowerCase();
+  const hostParts = host.split('.');
+  const isLocalhost = host.endsWith('.localhost') || host === 'localhost';
   const slug =
-    hostParts.length === 2 && hostParts[1] === 'localhost'
+    hostParts.length >= 2 && isLocalhost && host !== 'localhost'
       ? hostParts[0]
       : (process.env.DEV_TENANT_SLUG ?? 'demo');
   headers.set('x-tenant-slug', slug);
-  // Verband für lokale Tests umschaltbar (cevi, pfadi, jubla, verein), Vorgabe Cevi
-  headers.set('x-tenant-org', process.env.DEV_TENANT_ORG ?? 'cevi');
+  // Verband für lokale Tests umschaltbar (cevi, pfadi, jubla, verein), sonst aus Host erkannt
+  const detectedOrg = getOrganizationTypeFromHost(host);
+  headers.set('x-tenant-org', process.env.DEV_TENANT_ORG ?? detectedOrg.toLowerCase());
 
   return NextResponse.rewrite(target, { request: { headers } });
 }

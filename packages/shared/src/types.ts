@@ -397,6 +397,7 @@ export interface DepartmentDirectoryItemDto {
   id: string;
   name: string;
   slug: string;
+  organization?: OrganizationType;
   logoUrl?: string | null;
   stufen: { id: string; name: string }[];
 }

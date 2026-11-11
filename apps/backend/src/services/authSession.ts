@@ -158,24 +158,38 @@ export function bootstrapAdminCeviDbIds(): Set<number> {
  * Wenn reqHost übergeben wurde und nicht zu env.LOGIN_PORTAL_URL passt (oder env.LOGIN_PORTAL_URL cevi
  * enthält, aber reqHost verein/pfadi/jubla ist), muss zwingend https://login.${rootDomain(reqHost)} verwendet werden!
  */
-export function getLoginPortalBaseUrl(env: NodeJS.ProcessEnv = process.env, reqHost?: string): string {
-  if (reqHost) {
-    const root = rootDomain(reqHost, env);
-    if (root && root !== 'localhost') {
-      if (env.LOGIN_PORTAL_URL) {
-        try {
-          const parsed = new URL(env.LOGIN_PORTAL_URL);
-          const portalRoot = getRootDomain(parsed.hostname);
-          if (portalRoot === root) {
-            return env.LOGIN_PORTAL_URL.replace(/\/$/, '');
-          }
-        } catch {
-          // ungültige LOGIN_PORTAL_URL
-        }
-      }
-      return `https://login.${root}`;
+export function getLoginPortalBaseUrl(
+  env: NodeJS.ProcessEnv = process.env,
+  reqHost?: string,
+  domainOrOrg?: OrganizationType | string
+): string {
+  let root = domainOrOrg
+    ? getOrganization(domainOrOrg).domain
+    : reqHost
+    ? rootDomain(reqHost, env)
+    : null;
+
+  if (reqHost && root && root !== 'localhost') {
+    const cleanHost = reqHost.toLowerCase().split(',')[0].trim().replace(/:\d+$/, '');
+    if ((cleanHost.startsWith('dev.') || cleanHost.includes('.dev.')) && !root.startsWith('dev.')) {
+      root = `dev.${root}`;
     }
-    return (env.LOGIN_PORTAL_URL || 'http://localhost:3002').replace(/\/$/, '');
+    if (env.LOGIN_PORTAL_URL) {
+      try {
+        const parsed = new URL(env.LOGIN_PORTAL_URL);
+        const portalRoot = getRootDomain(parsed.hostname);
+        if (portalRoot === root) {
+          return env.LOGIN_PORTAL_URL.replace(/\/$/, '');
+        }
+      } catch {
+        // ungültige LOGIN_PORTAL_URL
+      }
+    }
+    return `https://login.${root}`;
+  }
+
+  if (root && root !== 'localhost' && env.NODE_ENV === 'production') {
+    return `https://login.${root}`;
   }
 
   if (env.NODE_ENV !== 'production') {
