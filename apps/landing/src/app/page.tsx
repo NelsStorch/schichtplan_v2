@@ -64,7 +64,7 @@ export default async function LandingPage() {
               <ThemeToggle className="size-8 sm:size-9" />
 
               <a
-                href={helpUrl()}
+                href={helpUrl('/', host)}
                 className={buttonClasses({
                   variant: 'ghost',
                   size: 'sm',
@@ -393,7 +393,7 @@ export default async function LandingPage() {
                     />
 
                     <a
-                      href={helpUrl()}
+                      href={helpUrl('/', host)}
                       className={buttonClasses({
                         variant: 'secondary',
                         size: 'md',
@@ -427,10 +427,10 @@ export default async function LandingPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-5">
-              <a href={helpUrl()} className="hover:text-fg transition">
+              <a href={helpUrl('/', host)} className="hover:text-fg transition">
                 Hilfe
               </a>
-              <a href={statusUrl()} className="hover:text-fg transition">
+              <a href={statusUrl('/', host)} className="hover:text-fg transition">
                 Status
               </a>
               <Link href="/datenschutz" className="hover:text-fg transition">

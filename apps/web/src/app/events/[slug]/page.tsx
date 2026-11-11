@@ -28,7 +28,6 @@ import {
   cancelDeadlineAt,
   cancelDeadlineText,
   isSignupTimeOpen,
-  getOrganization,
   type RequiredProfileField,
   type ShiftDto,
   type ShiftSignupDto,
@@ -48,6 +47,7 @@ import {
   cn,
   trackUi,
   useConfirm,
+  useOrganization,
   useToast,
 } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
@@ -78,7 +78,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const toast = useToast();
   const confirm = useConfirm();
   const loginHref = useLoginHref();
-  const organization = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const organization = useOrganization();
   const { registerContextData } = useCommandPalette();
 
   const [event, setEvent] = useState<EventDetails | null>(null);

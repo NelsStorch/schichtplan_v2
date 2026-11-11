@@ -15,7 +15,8 @@ import { Button, buttonClasses } from './Button';
 import { Badge } from './Badge';
 import { CeviLogo } from './CeviLogo';
 import { ThemeToggle } from '../theme/ThemeToggle';
-import { getLandingUrl, getOrganization } from '@schichtplan/shared';
+import { ORGANIZATIONS, getLandingUrl, getOrganization } from '@schichtplan/shared';
+import { useOrganizationSlug } from './OrganizationContext';
 
 export interface NotFoundAction {
   label: string;
@@ -102,10 +103,15 @@ export function NotFoundView({
   const [wisdomIndex, setWisdomIndex] = useState(0);
   const [canGoBack, setCanGoBack] = useState(false);
 
-  const org = typeof window !== 'undefined' ? getOrganization(window.location.host) : undefined;
+  const orgSlug = useOrganizationSlug();
+  const org = orgSlug
+    ? ORGANIZATIONS[orgSlug]
+    : typeof window !== 'undefined'
+      ? getOrganization(window.location.host)
+      : undefined;
   const orgName = org?.name ?? 'Schichtplan';
   const orgDomain = org?.domain ?? 'cevi-schichtplan.ch';
-  const landingUrl = typeof window !== 'undefined' ? getLandingUrl() : 'https://cevi-schichtplan.ch';
+  const landingUrl = typeof window !== 'undefined' ? getLandingUrl() : `https://${orgDomain}`;
   const displayLogoUrl = departmentLogoUrl || org?.logoUrl || '/images/cevi-logo.svg';
 
   useEffect(() => {

@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { CalendarDays, ClipboardCheck, Clock, Download, FileSpreadsheet, Printer, Users } from 'lucide-react';
-import { getOrganization, type EventRosterResponseDto } from '@schichtplan/shared';
-import { Button, Card, Chip, Dialog, Switch, cn, trackUi, useToast } from '@schichtplan/ui';
+import { type EventRosterResponseDto } from '@schichtplan/shared';
+import { Button, Card, Chip, Dialog, Switch, cn, trackUi, useOrganization, useToast } from '@schichtplan/ui';
 import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
@@ -18,7 +18,7 @@ import { PRINT_LAYOUTS, createShiftPlanPdf, downloadBlob, pdfFilename, printBlob
 export default function ExportPage() {
   const { event, base } = useOkEvent();
   const toast = useToast();
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [helperHoursOpen, setHelperHoursOpen] = useState(false);

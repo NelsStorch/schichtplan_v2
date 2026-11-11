@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, BarChart3, Building2, CalendarPlus, CalendarX2, Clock, Lock, LogIn, Plus, Settings2 } from 'lucide-react';
-import { getOrganization, type EventDto } from '@schichtplan/shared';
-import { Button, Card, EmptyState, NotFoundView, Skeleton, buttonClasses } from '@schichtplan/ui';
+import { type EventDto } from '@schichtplan/shared';
+import { Button, Card, EmptyState, NotFoundView, Skeleton, buttonClasses, useOrganization } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
 import { DepartmentSettingsDialog } from '@/components/DepartmentSettingsDialog';
 import { EventFormDialog } from '@/components/EventFormDialog';
@@ -18,7 +18,7 @@ import type { MyShift } from '@/lib/types';
 export default function DepartmentHomePage() {
   const router = useRouter();
   const { department, user, loading, error, can } = usePortal();
-  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+  const org = useOrganization();
   const canCreate = can('EVENTS_CREATE');
   // «Abteilung»-Dialog: Einstellungen, Stufen oder Personen (je nach Recht nur einzelne Reiter)
   const canOpenDepartment = can('DEPARTMENT_SETTINGS') || can('STUFEN_MANAGE') || can('PEOPLE_VIEW');
@@ -233,7 +233,7 @@ function NextShiftCard({ shift }: { shift: MyShift }) {
 }
 
 function TenantNotFound() {
-  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+  const org = useOrganization();
   const homeHref = `https://${org.domain}`;
   return (
     <NotFoundView
@@ -258,7 +258,7 @@ function TenantNotFound() {
 function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
   const { department } = usePortal();
   const loginHref = useLoginHref();
-  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+  const org = useOrganization();
   return (
     <AppShell>
       <div className="mx-auto max-w-xl px-4 pt-16 sm:px-6 sm:pt-24">

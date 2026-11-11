@@ -1,15 +1,15 @@
 'use client';
 
 import { Building2, KeyRound, LogIn, ShieldCheck } from 'lucide-react';
-import { getOrganization, helpUrl } from '@schichtplan/shared';
-import { Callout, buttonClasses } from '@schichtplan/ui';
+import { helpUrl } from '@schichtplan/shared';
+import { Callout, buttonClasses, useOrganization } from '@schichtplan/ui';
 import { departmentSetupUrl, useLoginHref } from '@/lib/api';
 import type { EventDetails } from '@/lib/types';
 
 /** Zeigt, ob und warum man sich (nicht) eintragen kann, mit dem passenden nächsten Schritt. */
 export function AccessNotice({ event, loggedIn }: { event: EventDetails; loggedIn: boolean }) {
   const loginHref = useLoginHref();
-  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+  const org = useOrganization();
   const { access } = event.viewer;
 
   if (access.via === 'MANAGER' || access.via === 'RULES' || access.via === 'LINK') return null;

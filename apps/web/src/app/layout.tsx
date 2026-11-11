@@ -1,7 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
-import { getOrganization } from '@schichtplan/shared';
-import { FeedbackProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
+import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
+import { FeedbackProvider, OrganizationProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { CommandPalette, CommandPaletteProvider } from '@/components/command';
@@ -52,13 +52,16 @@ export const viewport: Viewport = {
   themeColor: '#e11d48',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { host } = await getRequestOrigin();
+  const orgSlug = getOrganizationSlugFromHost(host);
   return (
     <html lang="de-CH" className={fontVariables} suppressHydrationWarning>
       <head>
         <ThemeScript />
       </head>
       <body className="min-h-[100dvh]">
+        <OrganizationProvider slug={orgSlug}>
         <FeedbackProvider>
           <PortalProvider>
             <CommandPaletteProvider>
@@ -68,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </PortalProvider>
           <ServiceWorkerRegister />
         </FeedbackProvider>
+        </OrganizationProvider>
         <UsageTracker app="web" />
       </body>
     </html>

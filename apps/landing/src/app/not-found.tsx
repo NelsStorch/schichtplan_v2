@@ -2,9 +2,10 @@
 
 import { LifeBuoy, LogIn } from 'lucide-react';
 import { helpUrl, loginBaseUrl } from '@schichtplan/shared';
-import { NotFoundView } from '@schichtplan/ui';
+import { NotFoundView, useOrganization } from '@schichtplan/ui';
 
 export default function NotFound() {
+  const org = useOrganization();
   return (
     <NotFoundView
       homeHref="/"
@@ -12,13 +13,13 @@ export default function NotFound() {
       secondaryActions={[
         {
           label: 'Hilfe-Center',
-          href: helpUrl(),
+          href: helpUrl('/', org.domain),
           external: true,
           icon: <LifeBuoy className="size-3.5" />,
         },
         {
           label: 'Zentrales Login',
-          href: loginBaseUrl(),
+          href: loginBaseUrl(org.domain),
           external: true,
           icon: <LogIn className="size-3.5" />,
         },

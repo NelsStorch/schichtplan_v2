@@ -1,14 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   DEPARTMENT_PERMISSIONS,
-  getOrganization,
   isDepartmentPermission,
   type DepartmentAuditEntryDto,
   type OrganizationConfig,
 } from '@schichtplan/shared';
-import { Button, EmptyState, Skeleton, useToast } from '@schichtplan/ui';
+import { Button, EmptyState, Skeleton, useOrganization, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { fmtShortDate } from '@/lib/format';
 
@@ -49,7 +48,7 @@ function changeText(entry: DepartmentAuditEntryDto, org: OrganizationConfig): st
 /** Protokoll der Abteilung: wer wem welche Rechte gegeben hat, Abteilungsleitung, Stufen */
 export function DepartmentAuditPanel() {
   const toast = useToast();
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
   const [items, setItems] = useState<DepartmentAuditEntryDto[] | null>(null);
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);

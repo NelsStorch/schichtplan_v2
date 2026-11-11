@@ -18,10 +18,9 @@ import {
   Users,
 } from 'lucide-react';
 import {
-  getOrganization,
   type DepartmentStatsResponseDto,
 } from '@schichtplan/shared';
-import { Badge, Button, EmptyState, Input, Skeleton, Switch, cn, useToast } from '@schichtplan/ui';
+import { Badge, Button, EmptyState, Input, Skeleton, Switch, cn, useOrganization, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportFile';
 import { fmtShortDate } from '@/lib/format';
@@ -39,7 +38,7 @@ export function DepartmentStatsPanel() {
   const [countAttendedOnly, setCountAttendedOnly] = useState(false);
   const [includeSetupTeardown, setIncludeSetupTeardown] = useState(true);
   const [helperSearch, setHelperSearch] = useState('');
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
   const [activeSubTab, setActiveSubTab] = useState<'helpers' | 'events' | 'stufen'>('helpers');
   const [generatingPdf, setGeneratingPdf] = useState(false);
 

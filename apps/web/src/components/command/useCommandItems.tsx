@@ -37,14 +37,13 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import {
-  getOrganization,
+import {
   type DepartmentPersonDto,
   type EventDto,
   type ShiftDto,
   type ShiftSignupDto,
 } from '@schichtplan/shared';
-import { useToast, type BadgeTone } from '@schichtplan/ui';
+import { useOrganization, useToast, type BadgeTone } from '@schichtplan/ui';
 import { api, errorMessage, useLoginHref } from '@/lib/api';
 import { eventStatus } from '@/components/EventTile';
 import { fmtShortDate, fmtShortWeekday, fmtTimeRange, shiftName } from '@/lib/format';
@@ -84,7 +83,7 @@ export function useCommandItems(query: string) {
   const loginHref = useLoginHref();
   const { user, department, can, isDeptAdmin, logout } = usePortal();
   const { contextData, close, setActiveSubActionItem } = useCommandPalette();
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
 
   const [allEvents, setAllEvents] = useState<EventDto[]>([]);
   const [people, setPeople] = useState<DepartmentPerson[]>([]);

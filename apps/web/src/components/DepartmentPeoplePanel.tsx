@@ -8,14 +8,13 @@ import {
   STUFE_ROLES,
   departmentRoleLabel,
   formatZurichDate,
-  getOrganization,
   type OrganizationConfig,
   type DepartmentPermission,
   type DepartmentPersonDto,
   type DepartmentStufeDto,
   type StufeRole,
 } from '@schichtplan/shared';
-import { Badge, Button, Callout, EmptyState, Input, Skeleton, cn, useConfirm, useToast } from '@schichtplan/ui';
+import { Badge, Button, Callout, EmptyState, Input, Skeleton, cn, useConfirm, useOrganization, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 import { PermissionEditor } from './PermissionEditor';
@@ -53,7 +52,7 @@ export function DepartmentPeoplePanel() {
     load();
   }, [load]);
 
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
 
   // Was ich vergeben darf: Abteilungsleitung alles (null), sonst nur weniger als die eigenen Rechte
   const grantable = useMemo(() => (isDeptAdmin ? null : new Set(permissions)), [isDeptAdmin, permissions]);

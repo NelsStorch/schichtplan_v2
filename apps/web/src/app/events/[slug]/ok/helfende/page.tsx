@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } f
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, ChevronDown, ChevronUp, Clock, Filter, Mail, Plus, Search, UserCheck, UserMinus, UserPlus, Users, X } from 'lucide-react';
-import { getOrganization, type EventRosterResponseDto, type ShiftCollisionCheckResult, type ShiftDto } from '@schichtplan/shared';
+import { type EventRosterResponseDto, type ShiftCollisionCheckResult, type ShiftDto } from '@schichtplan/shared';
 import {
   Avatar,
   Badge,
@@ -20,6 +20,7 @@ import {
   Skeleton,
   cn,
   useConfirm,
+  useOrganization,
   useToast,
 } from '@schichtplan/ui';
 import { HelperHoursDialog } from '@/components/ok/HelperHoursDialog';
@@ -63,7 +64,7 @@ function HelpersPage() {
   const params = useSearchParams();
   const toast = useToast();
   const confirm = useConfirm();
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
 
   const [roster, setRoster] = useState<EventRosterResponseDto | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);

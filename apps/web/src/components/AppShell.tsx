@@ -28,6 +28,7 @@ import {
   buttonClasses,
   cn,
   useConfirm,
+  useOrganization,
   useToast,
 } from '@schichtplan/ui';
 import {
@@ -53,6 +54,7 @@ const NAV = [
 export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
   const pathname = usePathname();
   const { department, user } = usePortal();
+  const org = useOrganization();
   const [accountOpen, setAccountOpen] = useState(false);
   const loginHref = useLoginHref();
 
@@ -64,7 +66,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
             <CeviLogo className="size-9" logoUrl={department?.logoUrl} alt="" />
             <span className="min-w-0 leading-tight">
               <span className="block truncate font-display text-[15px] font-bold tracking-tight text-fg">
-                {department?.name ?? 'Cevi Schichtplan'}
+                {department?.name ?? org.name}
               </span>
               <span className="block text-2xs font-medium text-fg-subtle">Schichtplan</span>
             </span>
@@ -135,16 +137,16 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
       <footer className="border-t border-line/70 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-6 text-xs text-fg-subtle md:px-6">
           <p>
-            © {new Date().getFullYear()} {department?.name ?? 'Cevi'}
+            © {new Date().getFullYear()} {department?.name ?? org.orgName}
           </p>
           <div className="flex items-center gap-5">
-            <a href={helpUrl()} className="transition hover:text-fg">
+            <a href={helpUrl('/', org.domain)} className="transition hover:text-fg">
               Hilfe
             </a>
-            <a href={statusUrl()} className="transition hover:text-fg">
+            <a href={statusUrl('/', org.domain)} className="transition hover:text-fg">
               Status
             </a>
-            <a href={privacyUrl()} className="transition hover:text-fg">
+            <a href={privacyUrl(org.domain)} className="transition hover:text-fg">
               Datenschutz
             </a>
             <a
@@ -153,13 +155,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
             >
               {typeof window !== 'undefined' && window.location.hostname.includes('.')
                 ? getRootDomain(window.location.hostname)
-                : department?.organization === 'PFADI'
-                ? 'pfadi-schichtplan.ch'
-                : department?.organization === 'JUBLA'
-                ? 'jubla-schichtplan.ch'
-                : department?.organization === 'OTHER'
-                ? 'vereins-schichtplan.ch'
-                : 'cevi-schichtplan.ch'}
+                : org.domain}
             </a>
           </div>
         </div>
@@ -225,6 +221,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
 
 function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, setUser, department, logout } = usePortal();
+  const org = useOrganization();
   const confirm = useConfirm();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
@@ -497,7 +494,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
                   <Smartphone className="size-4 text-accent" /> App installieren
                 </Button>
               )}
-              <a href={helpUrl()} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
+              <a href={helpUrl('/', org.domain)} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
                 <LifeBuoy className="size-4 text-accent" /> Hilfe &amp; Anleitungen
               </a>
             </div>

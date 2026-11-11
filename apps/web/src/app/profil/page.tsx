@@ -2,14 +2,13 @@
 
 import Link from 'next/link';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Bell, Building2, Database, Trash2 } from 'lucide-react';
 import {
   PLACEHOLDER_EMAIL_REGEX,
   PLACEHOLDER_LAST_NAME,
   STUFE_ROLES,
   getLoginUrl,
-  getOrganization,
   type UserDto,
 } from '@schichtplan/shared';
 import {
@@ -22,6 +21,7 @@ import {
   NotificationSettings,
   buttonClasses,
   useConfirm,
+  useOrganization,
   useToast,
 } from '@schichtplan/ui';
 import { AppShell } from '@/components/AppShell';
@@ -33,7 +33,7 @@ export default function DepartmentProfilePage() {
   const { user, setUser, loading } = usePortal();
   const confirm = useConfirm();
   const toast = useToast();
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', birthDate: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);

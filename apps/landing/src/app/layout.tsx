@@ -1,10 +1,16 @@
 import './globals.css';
 import { fontVariables } from '@schichtplan/ui/fonts';
-import { FeedbackProvider, ThemeScript, UsageTracker, accentVars } from '@schichtplan/ui';
+import {
+  FeedbackProvider,
+  OrganizationProvider,
+  ThemeScript,
+  UsageTracker,
+  accentVars,
+} from '@schichtplan/ui';
 import type { Metadata, Viewport } from 'next';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { JsonLd } from '@/components/JsonLd';
-import { getOrganization } from '@schichtplan/shared';
+import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { origin, host } = await getRequestOrigin();
@@ -102,7 +108,9 @@ export default async function RootLayout({
         <link rel="alternate" type="text/markdown" href="/llms-full.txt" title="Full LLM context" />
       </head>
       <body className="min-h-[100dvh] bg-canvas text-fg antialiased flex flex-col selection:bg-accent selection:text-white grain">
-        <FeedbackProvider>{children}</FeedbackProvider>
+        <OrganizationProvider slug={getOrganizationSlugFromHost(host)}>
+          <FeedbackProvider>{children}</FeedbackProvider>
+        </OrganizationProvider>
         <UsageTracker app="landing" />
       </body>
     </html>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AlertTriangle, ArrowDownUp, Ban, Clock, Filter, Search, UserCheck } from 'lucide-react';
-import { ageAt, getOrganization } from '@schichtplan/shared';
+import { ageAt } from '@schichtplan/shared';
 import type {
   EventRosterItemDto,
   EventRosterResponseDto,
@@ -10,7 +10,7 @@ import type {
   ShiftDto,
   ShiftTaskDto,
 } from '@schichtplan/shared';
-import { Avatar, Badge, Button, Callout, Chip, Dialog, Field, Input, Select, Skeleton, cn, useToast } from '@schichtplan/ui';
+import { Avatar, Badge, Button, Callout, Chip, Dialog, Field, Input, Select, Skeleton, cn, useOrganization, useToast } from '@schichtplan/ui';
 import { api, errorMessage, ApiError } from '@/lib/api';
 import { fmtShortWeekday, fmtTime, fmtWeekday, fmtTimeRange, shiftName } from '@/lib/format';
 import { shiftTasks } from '@/components/event/shift-utils';
@@ -85,7 +85,7 @@ function AssignHelperForm({
   );
   const chosenTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useOrganization();
 
   // Filter
   const [search, setSearch] = useState('');
