@@ -59,7 +59,7 @@ export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalho
   const host = url.hostname.toLowerCase();
   const ownRoot = rootDomain.toLowerCase().replace(/^\./, '');
   // Die anderen Verbands-Domains in derselben Umgebung: Staging (dev.…) nur dev.-Domains, Produktion nur Prod-Domains
-  const isStaging = ownRoot.startsWith('dev.');
+  const isStaging = ownRoot.startsWith('dev.') || ownRoot.includes('.dev.');
   const roots = new Set([ownRoot, ...ALLOWED_PLATFORM_DOMAINS.map((d) => (isStaging ? `dev.${d}` : d))]);
 
   if (url.protocol === 'https:') {

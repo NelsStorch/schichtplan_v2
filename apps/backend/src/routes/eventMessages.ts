@@ -393,6 +393,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
             ctaText: 'Zum Schichtplan',
             ctaUrl: targetEventUrl,
             footerNote: `Du erhältst diese Nachricht, weil du beim Anlass «${event.title}» von ${event.department.name} dabei bist.`,
+            organization: event.department.organization,
           });
           const text = `${personalizedBody.trim()}\n\n--\nNachricht von ${senderName} (OK ${event.title})${
             replyTo ? ` · Antworten gehen direkt an ${replyTo}.` : ''

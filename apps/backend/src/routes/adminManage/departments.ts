@@ -8,6 +8,7 @@ import {
   AdminUpdateDepartmentSchema,
   type AdminDepartmentDetailDto,
   normalizePermissions,
+  getVocabulary,
 } from '@schichtplan/shared';
 import { autoCreateAllCeviDbDepartmentStufen, NO_HOME_CONFIRMATION } from '../../services/homeDepartment.js';
 import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../../services/ceviNameLogin.js';
@@ -176,8 +177,9 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         select: { id: true, name: true, slug: true },
       });
       if (existingWithGroup) {
+        const vocab = getVocabulary(organization);
         return reply.status(409).send({
-          error: `Für diese Cevi.DB-Gruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
+          error: `Für diese ${vocab.authProvider}-Gruppe existiert bereits die ${vocab.department} «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
         });
       }
     }
@@ -291,8 +293,9 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         select: { id: true, name: true, slug: true },
       });
       if (existingWithGroup && existingWithGroup.id !== existing.id) {
+        const vocab = getVocabulary(targetOrganization);
         return reply.status(409).send({
-          error: `Für diese Cevi.DB-Gruppe existiert bereits die Abteilung «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
+          error: `Für diese ${vocab.authProvider}-Gruppe existiert bereits die ${vocab.department} «${existingWithGroup.name}» (${existingWithGroup.slug}).`,
         });
       }
     }

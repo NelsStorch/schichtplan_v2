@@ -17,6 +17,7 @@ import {
 } from '@schichtplan/ui';
 import {
   normalizePermissions,
+  getVocabulary,
   type AdminDepartmentListItemDto,
   type AdminUserDetailDto,
   type AdminUserListItemDto,
@@ -263,6 +264,7 @@ export function UserDialog({
   const loadingDetail = Boolean(preview) && !loaded && !error;
   const isSelf = Boolean(user && currentUserId && user.id === currentUserId);
   const ceviNameOnly = Boolean(user?.loginMethods.includes('CEVINAME'));
+  const providerVocab = getVocabulary(user?.provider ?? 'CEVI');
 
   /** Änderung speichern, danach Detail und Listen neu laden */
   const change = async (action: () => Promise<unknown>, success: string) => {
@@ -579,12 +581,12 @@ export function UserDialog({
                     }
                   />
                 </div>
-                <Fact label="Cevi.DB-ID">
+                <Fact label={`${providerVocab.authProvider}-ID`}>
                   {user.ceviDbId !== null ? <span className="font-mono tabular">{user.ceviDbId}</span> : <Missing />}
                 </Fact>
                 {user.ceviDbId !== null && (
                   <>
-                    <Fact label="Cevi.DB-Ortsgruppe">
+                    <Fact label={`${providerVocab.authProvider}-Gruppe`}>
                       {user.ceviDbOrtsgruppeName ? (
                         <span>
                           {user.ceviDbOrtsgruppeName}
@@ -598,7 +600,7 @@ export function UserDialog({
                         <Missing />
                       )}
                     </Fact>
-                    <Fact label="Cevi.DB-Abteilungsleitung">
+                    <Fact label={`${providerVocab.authProvider}-${providerVocab.departmentLeader}`}>
                       {user.ceviDbDepartmentLeader ? (
                         <span className="inline-flex items-center gap-1.5 font-medium text-accent-ink">
                           Ja
@@ -660,7 +662,7 @@ export function UserDialog({
                     )}
                     {user.homeDepartmentSource && (
                       <Badge tone="outline">
-                        {user.homeDepartmentSource === 'CEVIDB' ? 'aus Cevi.DB' : 'selbst gewählt'}
+                        {user.homeDepartmentSource === 'CEVIDB' ? `aus ${providerVocab.authProvider}` : 'selbst gewählt'}
                       </Badge>
                     )}
                   </div>
@@ -855,8 +857,8 @@ export function UserDialog({
                         />
                         {mergeTarget && !ceviNameOnly && mergeTarget.loginMethods.includes('CEVINAME') && (
                           <p className="text-xs text-danger-ink">
-                            Ein Konto mit Cevi.DB oder Passwort kann nicht in ein reines Cevi-Name-Profil überführt
-                            werden. Bitte öffne stattdessen das Cevi-Name-Profil und führe es hierher zusammen.
+                            Ein Konto mit {providerVocab.authProvider} oder Passwort kann nicht in ein reines Schnelllogin-Profil überführt
+                            werden. Bitte öffne stattdessen das Schnelllogin-Profil und führe es hierher zusammen.
                           </p>
                         )}
                         <div className="flex justify-end">

@@ -31,11 +31,11 @@ export const AuditQuerySchema = z.object({
 export const isUniqueViolation = (err: unknown) =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 
-/** Welches Feld eine Unique-Verletzung ausgelöst hat (slug oder ceviDbGroupId) */
+/** Welches Feld eine Unique-Verletzung ausgelöst hat (slug oder ceviDbGroupId/hitobitoGroupId) */
 export function uniqueConflictMessage(err: Prisma.PrismaClientKnownRequestError) {
   const target = JSON.stringify(err.meta ?? {});
   if (target.includes('slug')) return 'Diese Subdomain ist bereits vergeben.';
-  if (/cevi_?db_?group/i.test(target)) return 'Diese Cevi.DB-Ortsgruppe gehört bereits zu einer anderen Abteilung.';
+  if (/cevi_?db_?group|hitobito/i.test(target)) return 'Diese Verbands-Gruppe gehört bereits zu einer anderen Abteilung.';
   return 'Ein Wert ist bereits vergeben.';
 }
 

@@ -1,5 +1,6 @@
 import {
   formatMinutes,
+  zurichDayKey,
   type DepartmentEventStatDto,
   type DepartmentStatsResponseDto,
   type DepartmentStatsSummaryDto,
@@ -28,7 +29,8 @@ export async function computeDepartmentStats(
   departmentId: string,
   options: DepartmentStatsOptions = {}
 ): Promise<DepartmentStatsResponseDto> {
-  const currentYear = new Date().getFullYear();
+  const zurichYear = (d: Date | string) => Number(zurichDayKey(d).slice(0, 4));
+  const currentYear = zurichYear(new Date());
   const selectedYear = options.year ?? currentYear;
   const countAttendedOnly = options.countAttendedOnly ?? false;
   const includeSetupTeardown = options.includeSetupTeardown ?? true;
@@ -88,14 +90,14 @@ export async function computeDepartmentStats(
   const yearSet = new Set<number>();
   yearSet.add(currentYear);
   for (const ev of allEvents) {
-    yearSet.add(ev.startDate.getFullYear());
+    yearSet.add(zurichYear(ev.startDate));
   }
   const availableYears = Array.from(yearSet).sort((a, b) => b - a);
 
   // 3. Nach gewähltem Jahr filtern
   const events = selectedYear === 'ALL'
     ? allEvents
-    : allEvents.filter((ev) => ev.startDate.getFullYear() === selectedYear);
+    : allEvents.filter((ev) => zurichYear(ev.startDate) === selectedYear);
 
   // 4. Helfer-Aggregation
   interface HelperAcc {

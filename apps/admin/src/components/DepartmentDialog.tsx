@@ -25,6 +25,7 @@ import {
   DEPARTMENT_PERMISSIONS,
   isDepartmentPermission,
   normalizePermissions,
+  getVocabulary,
   type AdminDepartmentDetailDto,
   type AdminDepartmentPersonDto,
   type AdminUserListItemDto,
@@ -471,6 +472,8 @@ function SettingsTab({
   onDeleted: () => void;
 }) {
   const toast = useToast();
+  const vocab = getVocabulary(detail.organization);
+  const isVerein = detail.organization === 'OTHER';
   const [name, setName] = useState(detail.name);
   const [slug, setSlug] = useState(detail.slug);
   const [ceviDbGroupId, setCeviDbGroupId] = useState(detail.ceviDbGroupId?.toString() ?? '');
@@ -503,7 +506,7 @@ function SettingsTab({
       });
       toast({
         title: 'Abteilung gespeichert',
-        description: result.attached ? `${result.attached} Personen aus der Cevi.DB-Gruppe zugeordnet.` : undefined,
+        description: result.attached ? `${result.attached} Personen aus der ${vocab.authProvider}-Gruppe zugeordnet.` : undefined,
         tone: 'success',
       });
       onSaved();
@@ -534,13 +537,15 @@ function SettingsTab({
               className="font-mono"
             />
           </Field>
-          <Field
-            label="Cevi.DB-Gruppe (ID)"
-            hint="Die Ortsgruppe, oder die Jungschar, wenn die Ortsgruppe mehrere hat. Personen mit Rollen darin werden beim Cevi.DB-Login automatisch zugeordnet."
-            error={groupValid ? undefined : 'Nur Ziffern'}
-          >
-            <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
-          </Field>
+          {!isVerein && (
+            <Field
+              label={`${vocab.authProvider}-Gruppe (ID)`}
+              hint={`Die Gruppe in ${vocab.authProvider}. Personen mit Rollen darin werden beim ${vocab.authProvider}-Login automatisch zugeordnet.`}
+              error={groupValid ? undefined : 'Nur Ziffern'}
+            >
+              <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
+            </Field>
+          )}
           <Field label="Kontaktperson" hint="Abteilungsleitung oder wer «Personen und Rechte verwalten» darf.">
             <Select value={contactUserId} onChange={(e) => setContactUserId(e.target.value)}>
               <option value="">Keine Kontaktperson</option>
@@ -664,6 +669,7 @@ export function DepartmentDialog({
   }, [departmentId]);
 
   const loaded = detail && detail.id === departmentId ? detail : null;
+  const vocab = getVocabulary(loaded?.organization);
   const refresh = () => {
     setReload((n) => n + 1);
     onChanged();
@@ -678,8 +684,8 @@ export function DepartmentDialog({
       });
       toast({
         tone: 'success',
-        title: 'Stufen synchronisiert',
-        description: `${res.created} Stufen aus Cevi.DB angelegt oder aktualisiert.`,
+        title: `${vocab.groupPlural} synchronisiert`,
+        description: `${res.created} ${vocab.groupPlural} aus ${vocab.authProvider} angelegt oder aktualisiert.`,
       });
       refresh();
     } catch (err) {
@@ -696,7 +702,7 @@ export function DepartmentDialog({
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'personen', label: 'Personen', count: loaded?.people.length },
     { id: 'anlaesse', label: 'Anlässe', count: loaded?.eventCount },
-    { id: 'stufen', label: 'Stufen', count: loaded?.stufen.length },
+    { id: 'stufen', label: vocab.groupPlural, count: loaded?.stufen.length },
     { id: 'vorlagen', label: 'Vorlagen', count: loaded?.templates?.length },
     { id: 'einstellungen', label: 'Einstellungen' },
     { id: 'protokoll', label: 'Protokoll', count: loaded?.audit.length },
@@ -757,7 +763,7 @@ export function DepartmentDialog({
           </dl>
           <p className="mt-3 text-xs text-fg-subtle">
             Angelegt am {formatDate(loaded.createdAt)}
-            {loaded.ceviDbGroupId !== null && <> · Cevi.DB-Gruppe {loaded.ceviDbGroupId}</>}
+            {loaded.ceviDbGroupId !== null && <> · {vocab.authProvider}-Gruppe {loaded.ceviDbGroupId}</>}
             {loaded.membersOnly ? ' · Startseite nur für Mitglieder' : ' · Startseite öffentlich'}
           </p>
 
@@ -794,19 +800,19 @@ export function DepartmentDialog({
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-fg-subtle">
-                    Stufen verknüpfen Helfer automatisch über Cevi.DB oder können von der Leitung gepflegt werden.
+                    {vocab.groupPlural} verknüpfen Helfer automatisch über {vocab.authProvider} oder können von der Leitung gepflegt werden.
                   </p>
                   {loaded.ceviDbGroupId && (
                     <Button size="sm" variant="secondary" onClick={syncStufen} disabled={syncingStufen}>
                       <RefreshCw className={cn('size-3.5', syncingStufen && 'animate-spin')} />
-                      {syncingStufen ? 'Wird abgeglichen …' : 'Mit Cevi.DB abgleichen'}
+                      {syncingStufen ? 'Wird abgeglichen …' : `Mit ${vocab.authProvider} abgleichen`}
                     </Button>
                   )}
                 </div>
                 {loaded.stufen.length === 0 ? (
                   <EmptyState
-                    title="Keine Stufen"
-                    description="Stufen entstehen beim Cevi.DB-Login oder können hier synchronisiert werden."
+                    title={`Keine ${vocab.groupPlural}`}
+                    description={`${vocab.groupPlural} entstehen beim ${vocab.authProvider}-Login oder können hier synchronisiert werden.`}
                     className="py-8"
                   />
                 ) : (
@@ -816,7 +822,7 @@ export function DepartmentDialog({
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-fg">{s.name}</span>
                           <span className="block text-xs text-fg-subtle">
-                            {s.ceviDbGroupId !== null ? `Cevi.DB-Gruppe ${s.ceviDbGroupId}` : 'Ohne Cevi.DB'}
+                            {s.ceviDbGroupId !== null ? `${vocab.authProvider}-Gruppe ${s.ceviDbGroupId}` : `Ohne ${vocab.authProvider}`}
                           </span>
                         </span>
                         <Badge>{s.memberCount} Personen</Badge>

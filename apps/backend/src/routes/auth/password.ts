@@ -8,6 +8,7 @@ import {
   RegisterHelperSchema,
   VerifyEmailSchema,
   ResendVerificationSchema,
+  getOrganizationByDbType,
 } from '@schichtplan/shared';
 import { sendAccountExistsEmail, sendVerificationEmail } from '../../services/email.js';
 import {
@@ -90,7 +91,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     const token = fastify.signAuthToken({
       id: user.id,
-      email: user.email || `${user.id}@cevi-schichtplan.ch`,
+      email: user.email || `${user.id}@${getOrganizationByDbType(request.organization).domain}`,
       isGlobalAdmin: user.isGlobalAdmin,
       amr: 'password',
     });

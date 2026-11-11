@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import {
+  zurichDayKey,
   type DepartmentStatsResponseDto,
 } from '@schichtplan/shared';
 import { Badge, Button, EmptyState, Input, Skeleton, Switch, cn, useOrganization, useToast } from '@schichtplan/ui';
@@ -34,7 +35,7 @@ export function DepartmentStatsPanel() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DepartmentStatsResponseDto | null>(null);
 
-  const [selectedYear, setSelectedYear] = useState<number | 'ALL'>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'ALL'>(() => Number(zurichDayKey(new Date()).slice(0, 4)));
   const [countAttendedOnly, setCountAttendedOnly] = useState(false);
   const [includeSetupTeardown, setIncludeSetupTeardown] = useState(true);
   const [helperSearch, setHelperSearch] = useState('');

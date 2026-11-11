@@ -4,6 +4,7 @@ import {
   CeviNameQuickLoginSchema,
   CeviNameRegisterSchema,
   getVocabulary,
+  getOrganizationByDbType,
 } from '@schichtplan/shared';
 import {
   RATE_LIMIT_ERROR,
@@ -196,11 +197,12 @@ const ceviNameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     returnTo: string | undefined
   ) {
     const nick = user.nickname ?? user.ceviName ?? 'helfer';
+    const orgDomain = getOrganizationByDbType(reply.request?.organization).domain;
     const token = fastify.signAuthToken({
       id: user.id,
       email:
         user.email ||
-        `${nick.toLowerCase().replace(/[^a-z0-9]/g, '')}@guest.cevi-schichtplan.ch`,
+        `${nick.toLowerCase().replace(/[^a-z0-9]/g, '')}@guest.${orgDomain}`,
       isGlobalAdmin: user.isGlobalAdmin,
       amr: 'ceviname',
     });

@@ -488,7 +488,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     const token = fastify.signAuthToken({
       id: user.id,
-      email: user.email || `${user.id}@cevi-schichtplan.ch`,
+      email: user.email || `${user.id}@${getOrganizationByDbType(provider).domain}`,
       isGlobalAdmin: user.isGlobalAdmin,
       amr: 'cevidb',
     });

@@ -190,10 +190,11 @@ export async function getUserCalendarShifts(
   ]);
 
   const map = new Map<string, CalendarShiftItem>();
+  const orgDomain = (org?: OrganizationType) => (org ? getOrganizationByDbType(org).domain : 'cevi-schichtplan.ch');
 
   for (const su of signups) {
     map.set(su.shift.id, {
-      uid: `shift-${su.shift.id}-${userId}@cevi-schichtplan.ch`,
+      uid: `shift-${su.shift.id}-${userId}@${orgDomain(su.shift.event.department.organization)}`,
       shiftId: su.shift.id,
       title: su.shift.title,
       category: su.shift.category,
@@ -219,7 +220,7 @@ export async function getUserCalendarShifts(
       existing.responsibleRole = 'Schichtleitung';
     } else {
       map.set(sr.shift.id, {
-        uid: `shift-${sr.shift.id}-${userId}@cevi-schichtplan.ch`,
+        uid: `shift-${sr.shift.id}-${userId}@${orgDomain(sr.shift.event.department.organization)}`,
         shiftId: sr.shift.id,
         title: sr.shift.title,
         category: sr.shift.category,
@@ -251,7 +252,7 @@ export async function getUserCalendarShifts(
             : 'Tagesleitung';
         } else {
           map.set(s.id, {
-            uid: `shift-${s.id}-${userId}@cevi-schichtplan.ch`,
+            uid: `shift-${s.id}-${userId}@${orgDomain(dr.event.department.organization)}`,
             shiftId: s.id,
             title: s.title,
             category: s.category,

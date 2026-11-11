@@ -51,9 +51,9 @@ export function fullName(user: Pick<AdminUserListItemDto, 'firstName' | 'lastNam
 }
 
 export const methodLabels: Record<LoginMethod, string> = {
-  CEVIDB: 'Cevi.DB',
+  CEVIDB: 'Hitobito / Verband',
   PASSWORD: 'Passwort',
-  CEVINAME: 'Nur Cevi-Name',
+  CEVINAME: 'Schnelllogin',
 };
 
 /** Rolle in einer Abteilung (Protokoll-Einträge von vor den einzelnen Rechten können noch PLANNER enthalten) */

@@ -290,9 +290,9 @@ export function UsersPanel({
   const filters: { id: Filter; label: string; count?: number }[] = [
     { id: 'all', label: 'Alle', count: chipCount('all', overview?.users) },
     { id: 'duplicates', label: 'Mögliche Dubletten', count: chipCount('duplicates', overview?.duplicateUsers) },
-    { id: 'cevidb', label: 'Cevi.DB', count: chipCount('cevidb', overview?.cevidbUsers) },
+    { id: 'cevidb', label: 'Hitobito / Verband', count: chipCount('cevidb', overview?.cevidbUsers) },
     { id: 'password', label: 'Passwort', count: chipCount('password', overview?.passwordUsers) },
-    { id: 'ceviname', label: 'Nur Cevi-Name', count: chipCount('ceviname', overview?.guestUsers) },
+    { id: 'ceviname', label: 'Nur Schnelllogin', count: chipCount('ceviname', overview?.guestUsers) },
     { id: 'stale_ceviname', label: 'Verwaist (>30 T.)', count: chipCount('stale_ceviname', overview?.staleGuestUsers) },
     { id: 'admin', label: 'Admins', count: chipCount('admin', overview?.globalAdmins) },
   ];
@@ -315,7 +315,7 @@ export function UsersPanel({
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, Cevi-Name, E-Mail, Telefon oder Cevi.DB-ID"
+              placeholder="Name, Spitzname, E-Mail, Telefon oder Verbands-ID"
               aria-label="Personen suchen"
               autoComplete="off"
               className="h-12 w-full rounded-field border border-line bg-surface-2 pl-11 pr-11 text-base text-fg outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-fg-subtle hover:border-line-strong focus:border-accent focus:bg-surface focus:ring-4 focus:ring-accent/15 sm:text-[15px] [&::-webkit-search-cancel-button]:hidden"

@@ -290,7 +290,7 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { firstName: true, nickname: true, homeDepartment: { select: { slug: true } } },
+        select: { firstName: true, nickname: true, homeDepartment: { select: { slug: true, organization: true } } },
       });
       if (!user) {
         return reply.status(404).send({ error: 'Person nicht gefunden' });
@@ -298,8 +298,9 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
 
       const displayName = user.nickname || user.firstName;
       const slug = request.tenant?.slug || user.homeDepartment?.slug;
+      const targetOrg = request.tenant?.organization || user.homeDepartment?.organization || request.organization;
       const targetUrl = slug
-        ? getDepartmentUrl(slug, '/', request.tenant?.organization || request.organization)
+        ? getDepartmentUrl(slug, '/', targetOrg)
         : getLandingUrl('/profil', request.headers.host);
 
       const result = await sendPushToUser(
