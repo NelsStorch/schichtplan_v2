@@ -1,3 +1,5 @@
+import { getOrganization, type OrganizationType } from './organizations.js';
+
 // Platzhalter-Basis, um relative Pfade so aufzulösen, wie es der Browser tut
 const RELATIVE_BASE = 'https://relative.invalid';
 
@@ -86,26 +88,35 @@ export function getDepartmentSetupUrl(targetUrl?: string): string {
 }
 
 /**
- * Link auf eine Abteilungs-Subdomain (z. B. illnau.cevi-schichtplan.ch oder illnau.dev.cevi-schichtplan.ch).
+ * Link auf eine Abteilungs-Subdomain (z. B. illnau.cevi-schichtplan.ch oder illnau.dev.pfadi-schichtplan.ch).
+ * Unterstützt optional die Organisation oder Verbandsdomain für domänenübergreifende Links (z. B. aus dem Admin-Portal).
  */
-export function getDepartmentUrl(slug: string, path = '/'): string {
-  if (typeof window === 'undefined') return `/${slug}${path}`;
-  const { hostname, protocol } = window.location;
+export function getDepartmentUrl(slug: string, path = '/', domainOrOrg?: OrganizationType | string): string {
+  const cleanPath = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
+  if (typeof window === 'undefined' && !domainOrOrg) return `/${slug}${cleanPath}`;
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) {
-    return `http://${slug}.localhost:3000${path}`;
+    return `http://${slug}.localhost:3000${cleanPath}`;
   }
-  const root = getRootDomain(hostname);
-  return `${protocol}//${slug}.${root}${path}`;
+  let root = domainOrOrg ? getOrganization(domainOrOrg).domain : getRootDomain(hostname);
+  if (hostname && (hostname.startsWith('dev.') || hostname.includes('.dev.')) && !root.startsWith('dev.')) {
+    root = `dev.${root}`;
+  }
+  return `${protocol}//${slug}.${root}${cleanPath}`;
 }
 
 /** Landingpage (cevi-schichtplan.ch bzw. lokal Port 3001) */
-export function getLandingUrl(path = '/'): string {
-  if (typeof window === 'undefined') return path;
-  const { hostname, protocol } = window.location;
+export function getLandingUrl(path = '/', host?: string): string {
+  const cleanPath = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
+  const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
+  if (!currentHost) return cleanPath || '/';
+  const hostname = currentHost.split(':')[0].trim().toLowerCase();
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) {
-    return `http://localhost:3001${path}`;
+    return `http://localhost:3001${cleanPath}`;
   }
-  return `${protocol}//${getRootDomain(hostname)}${path}`;
+  const root = getRootDomain(hostname);
+  return `https://${root}${cleanPath}`;
 }
 
 /**
@@ -114,7 +125,8 @@ export function getLandingUrl(path = '/'): string {
  */
 export function helpUrl(path = '/', host?: string): string {
   const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
-  const root = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
+  const rawRoot = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
+  const root = rawRoot === 'localhost' ? getOrganization(currentHost).domain : rawRoot;
   const cleanPath = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
   return `https://hilfe.${root}${cleanPath}`;
 }
@@ -124,7 +136,8 @@ export function helpUrl(path = '/', host?: string): string {
  */
 export function statusUrl(path = '/', host?: string): string {
   const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
-  const root = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
+  const rawRoot = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
+  const root = rawRoot === 'localhost' ? getOrganization(currentHost).domain : rawRoot;
   const cleanPath = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
   return `https://status.${root}${cleanPath}`;
 }
@@ -133,6 +146,7 @@ export function statusUrl(path = '/', host?: string): string {
 export function privacyUrl(host?: string): string {
   const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
   const root = currentHost ? getRootDomain(currentHost) : 'cevi-schichtplan.ch';
+  if (root === 'localhost') return 'http://localhost:3001/datenschutz';
   return `https://${root}/datenschutz`;
 }
 
@@ -145,6 +159,6 @@ export function loginBaseUrl(host?: string): string {
 }
 
 /** Ziel nach dem Login ohne return_to: eigene Abteilung, sonst Landingpage (nie zurück aufs Login). */
-export function getDefaultDestination(homeDepartmentSlug?: string | null): string {
-  return homeDepartmentSlug ? getDepartmentUrl(homeDepartmentSlug) : getLandingUrl();
+export function getDefaultDestination(homeDepartmentSlug?: string | null, domainOrOrg?: OrganizationType | string): string {
+  return homeDepartmentSlug ? getDepartmentUrl(homeDepartmentSlug, '/', domainOrOrg) : getLandingUrl('/', typeof domainOrOrg === 'string' ? domainOrOrg : undefined);
 }

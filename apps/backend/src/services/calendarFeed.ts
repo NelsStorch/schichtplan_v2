@@ -1,6 +1,11 @@
 import crypto from 'node:crypto';
 import type { PrismaClient } from '../db.js';
-import { toZurichInput } from '@schichtplan/shared';
+import {
+  toZurichInput,
+  getOrganization,
+  getOrganizationByDbType,
+  type OrganizationType,
+} from '@schichtplan/shared';
 
 export interface CalendarShiftItem {
   uid: string;
@@ -16,6 +21,7 @@ export interface CalendarShiftItem {
   eventSlug: string;
   departmentName: string;
   departmentSlug: string;
+  departmentOrganization?: OrganizationType;
   isResponsible: boolean;
   responsibleRole: string | null;
 }
@@ -129,7 +135,7 @@ export async function getUserCalendarShifts(
                 id: true,
                 title: true,
                 slug: true,
-                department: { select: { name: true, slug: true } },
+                department: { select: { name: true, slug: true, organization: true } },
               },
             },
           },
@@ -151,7 +157,7 @@ export async function getUserCalendarShifts(
                 id: true,
                 title: true,
                 slug: true,
-                department: { select: { name: true, slug: true } },
+                department: { select: { name: true, slug: true, organization: true } },
               },
             },
           },
@@ -171,7 +177,7 @@ export async function getUserCalendarShifts(
             id: true,
             title: true,
             slug: true,
-            department: { select: { name: true, slug: true } },
+            department: { select: { name: true, slug: true, organization: true } },
             shifts: {
               where: {
                 endTime: { gte: fromDate },
@@ -200,6 +206,7 @@ export async function getUserCalendarShifts(
       eventSlug: su.shift.event.slug,
       departmentName: su.shift.event.department.name,
       departmentSlug: su.shift.event.department.slug,
+      departmentOrganization: su.shift.event.department.organization,
       isResponsible: false,
       responsibleRole: null,
     });
@@ -225,6 +232,7 @@ export async function getUserCalendarShifts(
         eventSlug: sr.shift.event.slug,
         departmentName: sr.shift.event.department.name,
         departmentSlug: sr.shift.event.department.slug,
+        departmentOrganization: sr.shift.event.department.organization,
         isResponsible: true,
         responsibleRole: 'Schichtleitung',
       });
@@ -256,6 +264,7 @@ export async function getUserCalendarShifts(
             eventSlug: dr.event.slug,
             departmentName: dr.event.department.name,
             departmentSlug: dr.event.department.slug,
+            departmentOrganization: dr.event.department.organization,
             isResponsible: true,
             responsibleRole: 'Tagesleitung',
           });
@@ -274,15 +283,17 @@ export async function getUserCalendarShifts(
  */
 export function buildIcsFeed(options: BuildFeedOptions): string {
   const { userDisplayName, shifts, domain = 'cevi-schichtplan.ch' } = options;
+  const hostDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const baseOrg = getOrganization(hostDomain);
   const nowUtc = formatIcsUtc(new Date());
   const calName = userDisplayName
-    ? `Cevi Schichtplan (${userDisplayName})`
-    : 'Cevi Schichtplan';
+    ? `${baseOrg.name} (${userDisplayName})`
+    : baseOrg.name;
 
   const rawLines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Cevi Schichtplan//DE',
+    `PRODID:-//${baseOrg.name}//DE`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeIcsText(calName)}`,
@@ -298,11 +309,13 @@ export function buildIcsFeed(options: BuildFeedOptions): string {
       : (s.taskTitle || 'Schicht');
     const summary = `${rolePrefix}${titlePart} · ${s.eventTitle}`;
 
-    const hostDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
     const isLocal = hostDomain.includes('localhost') || /^\d+\.\d+\.\d+\.\d+/.test(hostDomain);
+    const org = s.departmentOrganization ? getOrganizationByDbType(s.departmentOrganization) : getOrganization(hostDomain);
+    const isStaging = hostDomain.startsWith('dev.') || hostDomain.includes('.dev.');
+    const effectiveHost = isLocal ? hostDomain : (isStaging ? `dev.${org.domain}` : org.domain);
     const eventUrl = isLocal
       ? `http://${hostDomain}/events/${s.eventSlug}`
-      : `https://${s.departmentSlug}.${hostDomain}/events/${s.eventSlug}`;
+      : `https://${s.departmentSlug}.${effectiveHost}/events/${s.eventSlug}`;
 
     const descParts = [
       s.isResponsible ? `Rolle: ${s.responsibleRole || 'Leitung'}` : null,

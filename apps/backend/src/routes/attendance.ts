@@ -362,7 +362,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
           : request.tenant.secondaryColor;
 
         file = await fetchCeviQrCode(format, {
-          text: checkinUrl(request.tenant.slug, event.slug, event.checkinToken),
+          text: checkinUrl(request.tenant.slug, event.slug, event.checkinToken, request.tenant.organization),
           title: event.title,
           subtitle: 'Anwesenheit: QR-Code scannen und einchecken',
           color: qrColor,

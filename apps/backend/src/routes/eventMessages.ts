@@ -83,7 +83,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
       where: { departmentId_slug: { departmentId: tenantId, slug } },
       include: {
         ...accessEventInclude,
-        department: { select: { slug: true, name: true, primaryColor: true } },
+        department: { select: { slug: true, name: true, primaryColor: true, organization: true } },
         contactUser: { select: userSelect },
       },
     });
@@ -370,7 +370,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           ? ` · Antworten gehen direkt an <a href="mailto:${escapeHtml(replyTo)}" style="text-decoration: underline;">${escapeHtml(replyTo)}</a>.`
           : '.'
       }</p>`;
-      const targetEventUrl = eventUrl(event.department.slug, event.slug);
+      const targetEventUrl = eventUrl(event.department.slug, event.slug, event.department.organization);
       const fromName = `${event.title} (${event.department.name})`;
       const signatureName = `OK ${event.title} (${event.department.name})`;
 
@@ -405,6 +405,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
             fromName,
             autoSubmitted: false,
             kind: 'OK_MESSAGE',
+            organization: event.department.organization,
           });
           if (!ok) failed++;
         }

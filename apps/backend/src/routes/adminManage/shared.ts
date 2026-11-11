@@ -49,7 +49,7 @@ export const eventSelect = {
   allowPublicSignup: true,
   accessType: true,
   createdAt: true,
-  department: { select: { id: true, name: true, slug: true } },
+  department: { select: { id: true, name: true, slug: true, organization: true } },
   _count: { select: { organizers: true } },
 } satisfies Prisma.EventSelect;
 
@@ -83,6 +83,7 @@ export async function toEventItems(prisma: PrismaClient, rows: EventRow[]): Prom
     departmentId: e.department.id,
     departmentName: e.department.name,
     departmentSlug: e.department.slug,
+    departmentOrganization: e.department.organization,
     startDate: e.startDate.toISOString(),
     endDate: e.endDate.toISOString(),
     isPublished: e.isPublished,

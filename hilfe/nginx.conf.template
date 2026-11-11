@@ -4,7 +4,7 @@
 # Nur die vier bekannten Verbandsdomains werden übernommen, jeder andere Host bleibt bei Cevi.
 map $host $org_root {
     default cevi-schichtplan.ch;
-    ~^hilfe\.(?<known>(?:__ORG_DOMAINS__))$ $known;
+    ~^hilfe\.(?<known>(?:dev\.)?(?:__ORG_DOMAINS__))$ $known;
 }
 
 # Statisches Hilfe-Center hinter Traefik (TLS endet dort)

@@ -49,6 +49,26 @@ describe('checkinUrl', () => {
     );
   });
 
+  it('berücksichtigt die Organisation für Pfadi, Jubla und Vereine', () => {
+    const env = { NODE_ENV: 'production', DOMAIN: 'cevi-schichtplan.ch' } as NodeJS.ProcessEnv;
+    expect(checkinUrl('schleife', 'lager', 'tok1', 'PFADI', env)).toBe(
+      'https://schleife.pfadi-schichtplan.ch/events/lager/checkin?code=tok1'
+    );
+    expect(checkinUrl('jungwacht', 'lager', 'tok2', 'JUBLA', env)).toBe(
+      'https://jungwacht.jubla-schichtplan.ch/events/lager/checkin?code=tok2'
+    );
+    expect(checkinUrl('tv-effi', 'turnfest', 'tok3', 'OTHER', env)).toBe(
+      'https://tv-effi.vereins-schichtplan.ch/events/turnfest/checkin?code=tok3'
+    );
+  });
+
+  it('unterstützt Staging-Domains mit dev.-Präfix', () => {
+    const stagingEnv = { NODE_ENV: 'production', DOMAIN: 'dev.cevi-schichtplan.ch' } as NodeJS.ProcessEnv;
+    expect(checkinUrl('schleife', 'lager', 'tok1', 'PFADI', stagingEnv)).toBe(
+      'https://schleife.dev.pfadi-schichtplan.ch/events/lager/checkin?code=tok1'
+    );
+  });
+
   it('zeigt lokal auf localhost', () => {
     const env = { NODE_ENV: 'development' } as NodeJS.ProcessEnv;
     expect(checkinUrl('demo', 'fest', 'x', env)).toBe('http://demo.localhost:3000/events/fest/checkin?code=x');

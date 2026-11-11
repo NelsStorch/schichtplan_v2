@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { CHECKIN_EARLY_MINUTES } from '@schichtplan/shared';
+import { CHECKIN_EARLY_MINUTES, type OrganizationType } from '@schichtplan/shared';
 import { eventUrl } from './shiftReminders.js';
 import { trackUsage } from './usageStats.js';
 import { generateCheckinPdf, generateQrSvg } from './qrGenerator.js';
@@ -30,9 +30,19 @@ export function checkinUrl(
   departmentSlug: string,
   eventSlug: string,
   token: string,
-  env: NodeJS.ProcessEnv = process.env
+  orgOrDomainOrEnv?: OrganizationType | string | NodeJS.ProcessEnv,
+  maybeEnv?: NodeJS.ProcessEnv
 ): string {
-  return `${eventUrl(departmentSlug, eventSlug, env)}/checkin?code=${encodeURIComponent(token)}`;
+  let orgOrDomain: OrganizationType | string | undefined;
+  let env: NodeJS.ProcessEnv;
+  if (typeof orgOrDomainOrEnv === 'object' && orgOrDomainOrEnv !== null) {
+    env = orgOrDomainOrEnv as NodeJS.ProcessEnv;
+    orgOrDomain = undefined;
+  } else {
+    orgOrDomain = orgOrDomainOrEnv;
+    env = maybeEnv || process.env;
+  }
+  return `${eventUrl(departmentSlug, eventSlug, orgOrDomain, env)}/checkin?code=${encodeURIComponent(token)}`;
 }
 
 /** Name wie im Protokoll: «Vorname / Cevi-Name», sonst «Vorname Nachname», sonst Gastname */

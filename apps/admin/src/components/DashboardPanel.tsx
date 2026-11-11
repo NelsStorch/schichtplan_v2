@@ -199,7 +199,7 @@ export function DashboardPanel({
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-line/50 pt-2">
                   <a
-                    href={departmentUrl(ce.departmentSlug, `/events/${ce.slug}/ok`)}
+                    href={departmentUrl(ce.departmentSlug, `/events/${ce.slug}/ok`, ce.departmentOrganization)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 text-xs font-semibold text-accent-ink hover:underline"
@@ -346,7 +346,7 @@ export function DashboardPanel({
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-2">
                           <a
-                            href={departmentUrl(e.departmentSlug, `/events/${e.slug}`)}
+                            href={departmentUrl(e.departmentSlug, `/events/${e.slug}`, e.departmentOrganization)}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 truncate text-sm font-semibold text-fg hover:text-accent hover:underline"

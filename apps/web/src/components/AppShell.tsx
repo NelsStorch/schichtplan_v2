@@ -150,7 +150,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
               Datenschutz
             </a>
             <a
-              href={getLandingUrl()}
+              href={getLandingUrl('/', org.domain)}
               className="transition hover:text-fg"
             >
               {typeof window !== 'undefined' && window.location.hostname.includes('.')

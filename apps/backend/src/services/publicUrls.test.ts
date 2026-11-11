@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { getOrganizationSlugFromHost, helpUrl, loginBaseUrl, privacyUrl, statusUrl } from '@schichtplan/shared';
+import { getDepartmentUrl, getLandingUrl, getOrganizationSlugFromHost, helpUrl, loginBaseUrl, privacyUrl, statusUrl } from '@schichtplan/shared';
 import { getCeviDbRedirectUri, getLoginPortalBaseUrl, loginErrorUrl, loginPageUrl, rootDomain } from './authSession.js';
+import { cateringBaseUrl } from '../routes/catering.js';
 
 describe('Adressen nur aus der Konfiguration', () => {
   it('Login-Portal in Produktion aus COOKIE_DOMAIN bzw. DOMAIN', () => {
@@ -125,5 +126,19 @@ describe('Verband aus dem Host', () => {
     expect(loginBaseUrl('dev.vereins-schichtplan.ch')).toBe('https://login.dev.vereins-schichtplan.ch');
     expect(loginBaseUrl('cevi-schichtplan.ch')).toBe('https://login.cevi-schichtplan.ch');
     expect(loginBaseUrl()).toBe('https://login.cevi-schichtplan.ch');
+  });
+
+  it('getDepartmentUrl respektiert die Organisation', () => {
+    expect(getDepartmentUrl('schleife', '/events/fest', 'PFADI')).toBe('https://schleife.pfadi-schichtplan.ch/events/fest');
+    expect(getDepartmentUrl('jungwacht', '/', 'JUBLA')).toBe('https://jungwacht.jubla-schichtplan.ch');
+    expect(getDepartmentUrl('tv-effi', '/', 'OTHER')).toBe('https://tv-effi.vereins-schichtplan.ch');
+    expect(getDepartmentUrl('illnau', '/events/fest', 'CEVI')).toBe('https://illnau.cevi-schichtplan.ch/events/fest');
+  });
+
+  it('cateringBaseUrl generiert für alle Verbände sichere URLs', () => {
+    expect(cateringBaseUrl('schleife.pfadi-schichtplan.ch', 'schleife')).toBe('https://schleife.pfadi-schichtplan.ch');
+    expect(cateringBaseUrl('evil.com', 'schleife', 'PFADI')).toBe('https://schleife.pfadi-schichtplan.ch');
+    expect(cateringBaseUrl('evil.com', 'jungwacht', 'JUBLA')).toBe('https://jungwacht.jubla-schichtplan.ch');
+    expect(cateringBaseUrl('evil.com', 'turnverein', 'OTHER')).toBe('https://turnverein.vereins-schichtplan.ch');
   });
 });

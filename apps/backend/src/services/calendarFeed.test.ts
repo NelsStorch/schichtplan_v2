@@ -109,6 +109,14 @@ describe('deriveCalendarUrls', () => {
     );
     expect(forwarded.httpsUrl).toBe('https://illnau.cevi-schichtplan.ch/api/calendar/tok123.ics');
 
+    // Pfadi- und Jubla-Domains werden ebenfalls akzeptiert
+    const pfadi = deriveCalendarUrls(
+      { headers: { host: 'schleife.pfadi-schichtplan.ch' }, protocol: 'https' },
+      'tok123'
+    );
+    expect(pfadi.httpsUrl).toBe('https://schleife.pfadi-schichtplan.ch/api/calendar/tok123.ics');
+    expect(pfadi.webcalUrl).toBe('webcal://schleife.pfadi-schichtplan.ch/api/calendar/tok123.ics');
+
     // Fremder Host fällt sicher auf die Root-Domain zurück
     const poisoned = deriveCalendarUrls({ headers: { host: 'evil.com' }, protocol: 'https' }, 'tok123');
     expect(poisoned.httpsUrl).toBe('https://cevi-schichtplan.ch/api/calendar/tok123.ics');

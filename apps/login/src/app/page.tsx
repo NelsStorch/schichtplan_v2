@@ -375,9 +375,10 @@ function LoginContent() {
     }
   };
 
-  const cevidbAuthUrl = returnTo
-    ? `/api/auth/cevidb/login?returnTo=${encodeURIComponent(returnTo)}`
-    : '/api/auth/cevidb/login';
+  const cevidbAuthParams = new URLSearchParams();
+  if (returnTo) cevidbAuthParams.set('returnTo', returnTo);
+  if (org.slug) cevidbAuthParams.set('org', org.slug);
+  const cevidbAuthUrl = `/api/auth/cevidb/login${cevidbAuthParams.toString() ? `?${cevidbAuthParams.toString()}` : ''}`;
 
   const feedback = (
     <>

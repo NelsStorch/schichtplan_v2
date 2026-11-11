@@ -729,6 +729,7 @@ export interface AdminUserMembershipDto {
   departmentId: string;
   departmentName: string;
   departmentSlug: string;
+  departmentOrganization?: OrganizationType;
   role: string;
   permissions: DepartmentPermission[];
 }
@@ -797,6 +798,7 @@ export interface AdminUserSignupDto {
   eventSlug: string;
   departmentName: string;
   departmentSlug: string;
+  departmentOrganization?: OrganizationType;
   isConfirmed: boolean;
   createdAt: string;
 }
@@ -914,6 +916,7 @@ export interface AdminEventListItemDto {
   departmentId: string;
   departmentName: string;
   departmentSlug: string;
+  departmentOrganization?: OrganizationType;
   startDate: string;
   endDate: string;
   isPublished: boolean;
@@ -972,6 +975,7 @@ export interface AdminDashboardCriticalEventDto {
   departmentId: string;
   departmentName: string;
   departmentSlug: string;
+  departmentOrganization?: OrganizationType;
   startDate: string;
   endDate: string;
   isPublished: boolean;

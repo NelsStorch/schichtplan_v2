@@ -226,7 +226,7 @@ function CreateDepartment() {
                   <a
                     href={`/api/auth/cevidb/login?returnTo=${encodeURIComponent(
                       typeof window === 'undefined' ? '' : window.location.href
-                    )}`}
+                    )}&org=${encodeURIComponent(org.slug)}`}
                     className={buttonClasses({ size: 'lg', className: 'w-full justify-between' })}
                   >
                     Mit {org.authProviderShort} anmelden <ArrowUpRight />

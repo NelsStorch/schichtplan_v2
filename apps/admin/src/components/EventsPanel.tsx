@@ -144,11 +144,11 @@ function EventActions({
             role="menu"
             className="absolute right-0 top-10 z-30 w-64 overflow-hidden rounded-card border border-line bg-surface py-1 shadow-lift"
           >
-            <a role="menuitem" className={item} href={departmentUrl(event.departmentSlug, `/events/${event.slug}`)} target="_blank" rel="noreferrer">
+            <a role="menuitem" className={item} href={departmentUrl(event.departmentSlug, `/events/${event.slug}`, event.departmentOrganization)} target="_blank" rel="noreferrer">
               <ArrowUpRight aria-hidden />
               Anlass öffnen
             </a>
-            <a role="menuitem" className={item} href={departmentUrl(event.departmentSlug, `/events/${event.slug}/ok`)} target="_blank" rel="noreferrer">
+            <a role="menuitem" className={item} href={departmentUrl(event.departmentSlug, `/events/${event.slug}/ok`, event.departmentOrganization)} target="_blank" rel="noreferrer">
               <Settings2 aria-hidden />
               OK-Bereich öffnen
             </a>
@@ -225,7 +225,7 @@ export function EventRows({
               <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] sm:items-center lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
                 <span className="min-w-0">
                   <a
-                    href={departmentUrl(event.departmentSlug, `/events/${event.slug}`)}
+                    href={departmentUrl(event.departmentSlug, `/events/${event.slug}`, event.departmentOrganization)}
                     target="_blank"
                     rel="noreferrer"
                     className="block truncate text-sm font-semibold text-fg hover:text-accent hover:underline"

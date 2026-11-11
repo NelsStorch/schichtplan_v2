@@ -136,7 +136,7 @@ function UserMembershipRow({
           </Button>
         )}
         <a
-          href={departmentUrl(m.departmentSlug)}
+          href={departmentUrl(m.departmentSlug, '/', m.departmentOrganization)}
           target="_blank"
           rel="noreferrer"
           aria-label={`${m.departmentName} in neuem Tab öffnen`}

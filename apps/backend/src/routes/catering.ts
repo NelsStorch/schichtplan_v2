@@ -25,6 +25,10 @@ import {
 import {
   CreateCateringBatchSchema,
   RedeemPhysicalTokenSchema,
+  ORGANIZATION_DOMAINS,
+  getOrganization,
+  getOrganizationByDbType,
+  type OrganizationType,
 } from '@schichtplan/shared';
 import { timingSafeEqual } from 'node:crypto';
 import { eventUrl } from '../services/shiftReminders.js';
@@ -43,16 +47,44 @@ const staffPinLimiter = createRateLimiter(15 * 60 * 1000, 10);
  * Basis-URL für die QR-Codes auf Papier-Bons. Der Host muss zur eigenen Domain gehören (lokal auch
  * localhost); sonst die Abteilungs-Subdomain. In Produktion immer https.
  */
-export function cateringBaseUrl(hostHeader: string | undefined, tenantSlug: string | null): string {
-  const root = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '').toLowerCase();
+export function cateringBaseUrl(
+  hostHeader: string | undefined,
+  tenantSlug: string | null,
+  organization?: OrganizationType | string
+): string {
+  const defaultDomain = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '').toLowerCase();
   const production = process.env.NODE_ENV === 'production';
+  const isStaging = defaultDomain.startsWith('dev.') || defaultDomain.includes('.dev.');
   const host = (hostHeader ?? '').trim().toLowerCase();
   const hostname = host.replace(/:\d+$/, '');
   const isLocal = !production && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost'));
-  const isOwn = /^[a-z0-9.-]+(:\d+)?$/.test(host) && (hostname === root || hostname.endsWith(`.${root}`));
   if (isLocal) return `http://${host}`;
-  if (isOwn) return `https://${hostname}`;
-  return tenantSlug ? `https://${tenantSlug}.${root}` : `https://${root}`;
+
+  const isPlatformHost =
+    /^[a-z0-9.-]+(:\d+)?$/.test(host) &&
+    (hostname === defaultDomain ||
+      hostname.endsWith(`.${defaultDomain}`) ||
+      ORGANIZATION_DOMAINS.some(
+        (d) => hostname === d || hostname.endsWith(`.${d}`) || hostname === `dev.${d}` || hostname.endsWith(`.dev.${d}`)
+      ));
+
+  if (isPlatformHost) return `https://${hostname}`;
+
+  let rootDomain: string;
+  if (organization) {
+    const upper = organization.toUpperCase();
+    if (upper === 'CEVI' || upper === 'PFADI' || upper === 'JUBLA' || upper === 'OTHER' || upper === 'VEREIN') {
+      rootDomain = getOrganizationByDbType(upper).domain;
+    } else {
+      rootDomain = getOrganization(organization).domain;
+    }
+  } else {
+    rootDomain = getOrganization(defaultDomain).domain;
+  }
+
+  const cleanRoot = rootDomain.replace(/^dev\./, '');
+  const effectiveDomain = isStaging ? `dev.${cleanRoot}` : cleanRoot;
+  return tenantSlug ? `https://${tenantSlug}.${effectiveDomain}` : `https://${effectiveDomain}`;
 }
 
 function samePin(given: string, expected: string): boolean {
@@ -556,7 +588,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
       const input = request.body as z.output<typeof CreateCateringBatchSchema>;
 
       // Die Adresse landet gedruckt auf den Bons: nur die eigene Domain, nie ungeprüfte Header übernehmen
-      const baseUrl = cateringBaseUrl(request.headers.host, request.tenant?.slug ?? null);
+      const baseUrl = cateringBaseUrl(request.headers.host, request.tenant?.slug ?? null, request.tenant?.organization);
 
       const created = await createCateringBatch(fastify.prisma, {
         eventId: event.id,
@@ -600,7 +632,7 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         pdfBuffer = await generateBatchPdf(fastify.prisma, {
           eventId: event.id,
           batchId: request.params.batchId,
-          eventUrl: eventUrl(tenant.slug, event.slug),
+          eventUrl: eventUrl(tenant.slug, event.slug, tenant.organization),
           // Gleiche Farben, gleicher Stil und gleiches Logo wie der Check-in-QR-Code
           branding: {
             color: tenant.qrCustomColors && tenant.qrColorPrimary ? tenant.qrColorPrimary : tenant.primaryColor,

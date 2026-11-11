@@ -72,8 +72,9 @@ import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
       document.querySelectorAll<HTMLAnchorElement>('[data-app-link]').forEach((a) => {
         a.href = url.href;
       });
+      const reserved = new Set(['www', 'login', 'dev', 'staging', 'admin', 'api', 'hilfe', 'status', 'app']);
       document.querySelectorAll('[data-app-label]').forEach((span) => {
-        if (sub && sub !== 'www' && sub !== 'login') {
+        if (sub && !reserved.has(sub.toLowerCase())) {
           span.textContent = `Zurück zu ${sub}`;
         } else {
           span.textContent = 'Zurück zum Schichtplan';

@@ -545,7 +545,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           event: {
             include: {
               organizers: true,
-              department: { select: { slug: true, name: true, primaryColor: true } },
+              department: { select: { slug: true, name: true, primaryColor: true, organization: true } },
             },
           },
           signups: {
@@ -571,7 +571,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
       // Helfende benachrichtigen, wenn notify aktiv ist
       if (notify && shift.signups.length > 0) {
         const timeFormatted = formatShiftTime(shift.startTime, shift.endTime);
-        const targetUrl = eventUrl(shift.event.department.slug, shift.event.slug);
+        const targetUrl = eventUrl(shift.event.department.slug, shift.event.slug, shift.event.department.organization);
 
         for (const s of shift.signups) {
           const shiftTitle = shift.title?.trim()
@@ -588,6 +588,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               eventUrl: targetUrl,
               departmentName: shift.event.department.name,
               accentColor: shift.event.department.primaryColor,
+              organization: shift.event.department.organization,
             }).catch((err) => request.log.error(err, 'Absage-Mail fehlgeschlagen'));
           } else if (!s.userId && s.guestEmail?.trim() && s.guestEmail.includes('@')) {
             void sendShiftCancelledEmail({
@@ -599,6 +600,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               eventUrl: targetUrl,
               departmentName: shift.event.department.name,
               accentColor: shift.event.department.primaryColor,
+              organization: shift.event.department.organization,
             }).catch((err) => request.log.error(err, 'Gast-Absage-Mail fehlgeschlagen'));
           }
         }
@@ -739,7 +741,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
         include: {
           organizers: true,
-          department: { select: { slug: true, name: true, primaryColor: true } },
+          department: { select: { slug: true, name: true, primaryColor: true, organization: true } },
         },
       });
       if (!event) {
@@ -777,7 +779,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               },
             });
             if (signupsToNotify.length > 0) {
-              const targetUrl = eventUrl(event.department.slug, event.slug);
+              const targetUrl = eventUrl(event.department.slug, event.slug, event.department.organization);
               for (const s of signupsToNotify) {
                 const shiftTitle = s.shift.title?.trim()
                   ? (s.task?.title && s.task.title !== s.shift.title ? `${s.shift.title} · ${s.task.title}` : s.shift.title)
@@ -794,6 +796,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                     eventUrl: targetUrl,
                     departmentName: event.department.name,
                     accentColor: event.department.primaryColor,
+                    organization: event.department.organization,
                   }).catch((err) => request.log.error(err, 'Bulk-Absage-Mail fehlgeschlagen'));
                 } else if (!s.userId && s.guestEmail?.trim() && s.guestEmail.includes('@')) {
                   void sendShiftCancelledEmail({
@@ -805,6 +808,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                     eventUrl: targetUrl,
                     departmentName: event.department.name,
                     accentColor: event.department.primaryColor,
+                    organization: event.department.organization,
                   }).catch((err) => request.log.error(err, 'Bulk-Gast-Absage-Mail fehlgeschlagen'));
                 }
               }

@@ -16,6 +16,9 @@ import {
   DEFAULT_PUSH_REMINDER_MINUTES,
   PLACEHOLDER_EMAIL_REGEX,
   formatReminderLeadTime,
+  getOrganization,
+  getOrganizationByDbType,
+  type OrganizationType,
 } from '@schichtplan/shared';
 import type { PrismaClient } from '../db.js';
 import { sendShiftReminderEmail } from './email.js';
@@ -46,10 +49,42 @@ export function formatShiftTime(start: Date, end: Date): string {
 }
 
 /** Link auf den Anlass in der Abteilung (https://<abteilung>.<domain>/events/<slug>) */
-export function eventUrl(departmentSlug: string, eventSlug: string, env: NodeJS.ProcessEnv = process.env): string {
+export function eventUrl(
+  departmentSlug: string,
+  eventSlug: string,
+  orgOrDomainOrEnv?: OrganizationType | string | NodeJS.ProcessEnv,
+  maybeEnv?: NodeJS.ProcessEnv
+): string {
+  let orgOrDomain: OrganizationType | string | undefined;
+  let env: NodeJS.ProcessEnv;
+  if (typeof orgOrDomainOrEnv === 'object' && orgOrDomainOrEnv !== null) {
+    env = orgOrDomainOrEnv as NodeJS.ProcessEnv;
+    orgOrDomain = undefined;
+  } else {
+    orgOrDomain = orgOrDomainOrEnv;
+    env = maybeEnv || process.env;
+  }
+
   if (env.NODE_ENV !== 'production') return `http://${departmentSlug}.localhost:3000/events/${eventSlug}`;
-  const domain = (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
-  return `https://${departmentSlug}.${domain}/events/${eventSlug}`;
+
+  const defaultDomain = (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+  const isStaging = defaultDomain.startsWith('dev.') || defaultDomain.includes('.dev.');
+
+  let rootDomain: string;
+  if (orgOrDomain) {
+    const upper = orgOrDomain.toUpperCase();
+    if (upper === 'CEVI' || upper === 'PFADI' || upper === 'JUBLA' || upper === 'OTHER' || upper === 'VEREIN') {
+      rootDomain = getOrganizationByDbType(upper).domain;
+    } else {
+      rootDomain = getOrganization(orgOrDomain).domain;
+    }
+  } else {
+    rootDomain = getOrganization(defaultDomain).domain;
+  }
+
+  const cleanRoot = rootDomain.replace(/^dev\./, '');
+  const effectiveDomain = isStaging ? `dev.${cleanRoot}` : cleanRoot;
+  return `https://${departmentSlug}.${effectiveDomain}/events/${eventSlug}`;
 }
 
 interface CandidateEntry {
@@ -84,7 +119,7 @@ interface CandidateEntry {
       title: string;
       slug: string;
       reminderNote: string | null;
-      department: { slug: string; name: string; primaryColor: string | null };
+      department: { slug: string; name: string; primaryColor: string | null; organization?: OrganizationType };
     };
   };
 }
@@ -215,7 +250,7 @@ export async function sendDueShiftReminders(
                 title: true,
                 slug: true,
                 reminderNote: true,
-                department: { select: { slug: true, name: true, primaryColor: true } },
+                department: { select: { slug: true, name: true, primaryColor: true, organization: true } },
               },
             },
           },
@@ -259,7 +294,7 @@ export async function sendDueShiftReminders(
                 title: true,
                 slug: true,
                 reminderNote: true,
-                department: { select: { slug: true, name: true, primaryColor: true } },
+                department: { select: { slug: true, name: true, primaryColor: true, organization: true } },
               },
             },
           },
@@ -399,7 +434,7 @@ export async function sendDueShiftReminders(
     const shiftTitle = shift.title?.trim()
       ? (entry.taskTitle && entry.taskTitle !== shift.title ? `${shift.title} · ${entry.taskTitle}` : shift.title)
       : (entry.taskTitle || 'Schicht');
-    const targetUrl = eventUrl(shift.event.department.slug, shift.event.slug);
+    const targetUrl = eventUrl(shift.event.department.slug, shift.event.slug, shift.event.department.organization);
     const timeFormatted = formatShiftTime(shift.startTime, shift.endTime);
 
     // 1. E-Mail-Erinnerung prüfen
@@ -445,6 +480,7 @@ export async function sendDueShiftReminders(
                 reminderNote: shift.event.reminderNote,
                 isResponsible: entry.isResponsible,
                 isGuest: entry.userId === null,
+                organization: shift.event.department.organization,
               });
             } catch {
               ok = false;

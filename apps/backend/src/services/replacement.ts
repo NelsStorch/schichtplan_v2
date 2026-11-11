@@ -57,10 +57,10 @@ export async function notifyReplacementTaken(
   if (!replaced.user) return false;
   const department = await prisma.department.findUnique({
     where: { id: event.departmentId },
-    select: { slug: true, name: true, primaryColor: true },
+    select: { slug: true, name: true, primaryColor: true, organization: true },
   });
   const timeRangeFormatted = `${formatZurichDate(shift.startTime)}, ${formatZurichTimeRange(shift.startTime, shift.endTime)}`;
-  const targetUrl = department ? eventUrl(department.slug, event.slug) : undefined;
+  const targetUrl = department ? eventUrl(department.slug, event.slug, department.organization) : undefined;
 
   // Web Push an alle registrierten Geräte (auch für Cevi-Name-Profile ohne E-Mail)
   if (replaced.user.id && replaced.user.pushNotifyReplacement !== false && prisma.pushSubscription) {
@@ -85,5 +85,6 @@ export async function notifyReplacementTaken(
     eventUrl: targetUrl,
     departmentName: department?.name,
     accentColor: department?.primaryColor,
+    organization: department?.organization,
   });
 }

@@ -22,7 +22,7 @@ export async function sendDueCateringReminders(
       id: true,
       title: true,
       slug: true,
-      department: { select: { slug: true, name: true } },
+      department: { select: { slug: true, name: true, organization: true } },
       shifts: {
         select: {
           id: true,
@@ -134,7 +134,7 @@ export async function sendDueCateringReminders(
       const recipientName = group.user?.nickname || group.user?.firstName || group.guestName || 'Helfende Person';
       const count = group.tokens.length;
       const tokenNames = group.tokens.map((x) => x.title).join(', ');
-      const targetUrl = `${eventUrl(event.department.slug, event.slug)}/meine-schichten`;
+      const targetUrl = `${eventUrl(event.department.slug, event.slug, event.department.organization)}/meine-schichten`;
 
       let sent = false;
 
@@ -161,6 +161,7 @@ export async function sendDueCateringReminders(
         try {
           await sendEmail({
             to: email,
+            organization: event.department.organization,
             subject: `🎁 Verpflegungs-Gutschein nicht vergessen – ${event.title}`,
             text: `Hallo ${recipientName}!\n\nDanke für deinen grossartigen Helfereinsatz bei «${event.title}»!\n\nDu hast noch ${count} un-eingelöste Verpflegungs- oder Getränkegutscheine (${tokenNames}).\n\nVergiss nicht, dein Helferessen und dein Getränk vor Festende am Stand abzuholen!\n\nDeine Bons aufrufen: ${targetUrl}\n\nLiebe Grüsse\nDein OK von ${event.title}`,
             html: `

@@ -153,6 +153,12 @@ export function getOrganizationSlugFromHost(hostnameOrSlug?: string | null): Org
     if (clean === org.domain || clean.endsWith(`.${org.domain}`)) return org.slug;
   }
 
+  // Lokale Entwicklung oder Test-Hosts ohne Verbandsdomain (z. B. pfadi.localhost oder illnau.pfadi.localhost):
+  // erst die Verbände mit eigener Kennung, dann Cevi
+  for (const org of Object.values(ORGANIZATIONS)) {
+    if (org.slug !== 'cevi' && clean.includes(org.slug)) return org.slug;
+  }
+
   return 'cevi';
 }
 

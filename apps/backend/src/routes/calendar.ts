@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { ORGANIZATION_DOMAINS, getOrganization } from '@schichtplan/shared';
 import {
   buildIcsFeed,
   getOrCreateCalendarToken,
@@ -21,7 +22,10 @@ export function deriveCalendarUrls(request: { headers: Record<string, any>; prot
 
   const allowLocalhost = process.env.NODE_ENV !== 'production';
   const isLocalHost = allowLocalhost && (rawHost === 'localhost' || rawHost === '127.0.0.1' || rawHost.endsWith('.localhost'));
-  const isValidHost = /^[a-z0-9.-]+$/.test(rawHost) && (rawHost === root || rawHost.endsWith(`.${root}`) || isLocalHost);
+  const isOrgHost = ORGANIZATION_DOMAINS.some(
+    (d) => rawHost === d || rawHost.endsWith(`.${d}`) || rawHost === `dev.${d}` || rawHost.endsWith(`.dev.${d}`)
+  );
+  const isValidHost = /^[a-z0-9.-]+$/.test(rawHost) && (rawHost === root || rawHost.endsWith(`.${root}`) || isOrgHost || isLocalHost);
   const host = isValidHost ? rawHost : root;
 
   const isHttps = process.env.NODE_ENV === 'production' ? true : !isLocalHost;
@@ -57,7 +61,10 @@ const calendarRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const shifts = await getUserCalendarShifts(fastify.prisma, user.id);
-    const domain = (process.env.COOKIE_DOMAIN || process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
+    const rawHost = String(request.headers.host || '').split(':')[0].trim().toLowerCase();
+    const isLocalHost = rawHost === 'localhost' || rawHost === '127.0.0.1' || rawHost.endsWith('.localhost');
+    const org = getOrganization(rawHost);
+    const domain = isLocalHost ? rawHost : (rawHost.startsWith('dev.') ? `dev.${org.domain}` : org.domain);
     const userDisplayName = user.nickname || user.firstName;
 
     const ics = buildIcsFeed({

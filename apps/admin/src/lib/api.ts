@@ -1,4 +1,4 @@
-import { getDepartmentUrl, getLoginUrl } from '@schichtplan/shared';
+import { getDepartmentUrl, getLoginUrl, type OrganizationType } from '@schichtplan/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -36,9 +36,9 @@ export function loginUrl(returnTo?: string) {
   return getLoginUrl(returnTo);
 }
 
-/** Link auf eine Abteilungs-Subdomain (z. B. illnau.cevi-schichtplan.ch). */
-export function departmentUrl(slug: string, path = '/') {
-  return getDepartmentUrl(slug, path);
+/** Link auf eine Abteilungs-Subdomain (z. B. illnau.cevi-schichtplan.ch oder wald.pfadi-schichtplan.ch). */
+export function departmentUrl(slug: string, path = '/', organization?: OrganizationType | string) {
+  return getDepartmentUrl(slug, path, organization);
 }
 
 /** JSON an das Backend schicken (POST/PUT/PATCH/DELETE) */

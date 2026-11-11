@@ -724,7 +724,7 @@ export function DepartmentDialog({
         <>
           {loaded && (
             <a
-              href={departmentUrl(loaded.slug)}
+              href={departmentUrl(loaded.slug, '/', loaded.organization)}
               target="_blank"
               rel="noreferrer"
               className={cn(buttonClasses({ variant: 'secondary' }), 'sm:mr-auto')}
