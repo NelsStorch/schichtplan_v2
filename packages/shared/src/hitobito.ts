@@ -102,7 +102,7 @@ export const HITOBITO_PFADI_CONFIG: HitobitoConfig = {
   name: 'PBS MiData',
   oauthScopes: DEFAULT_HITOBITO_SCOPES,
   ortsgruppeField: 'abteilung_id',
-  defaultBaseUrl: 'https://midata.scouts.ch',
+  defaultBaseUrl: 'https://db.scout.ch',
   departmentGroupTypes: [
     'Group::Abteilung',
     'Group::Pfadi::Abteilung',

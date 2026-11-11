@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { ORGANIZATIONS, type OrganizationConfig, type OrganizationSlug } from '@schichtplan/shared';
+import { applyAccent } from '../theme/accent';
 
 /**
  * Verband der aktuellen Domain (cevi, pfadi, jubla, verein). Das Server-Layout ermittelt ihn aus dem Host
@@ -11,6 +12,11 @@ import { ORGANIZATIONS, type OrganizationConfig, type OrganizationSlug } from '@
 const OrganizationContext = createContext<OrganizationSlug | null>(null);
 
 export function OrganizationProvider({ slug, children }: { slug: OrganizationSlug; children: ReactNode }) {
+  const org = ORGANIZATIONS[slug ?? 'cevi'];
+  useEffect(() => {
+    applyAccent(org.primaryColor);
+  }, [org.primaryColor]);
+
   return <OrganizationContext.Provider value={slug}>{children}</OrganizationContext.Provider>;
 }
 

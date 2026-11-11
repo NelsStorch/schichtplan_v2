@@ -50,7 +50,7 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     nicknameTerm: 'Pfadiname',
     authProviderName: 'PBS MiData (Hitobito)',
     authProviderShort: 'PBS MiData',
-    primaryColor: '#c51319',
+    primaryColor: '#632949',
     logoUrl: '/images/pfadi-logo.svg',
     metaDescription:
       'Kostenlose Helferliste online für Pfingstlager, SoLa und Anlässe von Pfadi-Abteilungen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.',
@@ -68,7 +68,7 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     nicknameTerm: 'Leitername',
     authProviderName: 'Jubla-Datenbank (Hitobito)',
     authProviderShort: 'Jubla-DB',
-    primaryColor: '#f59e0b',
+    primaryColor: '#283583',
     logoUrl: '/images/jubla-logo.svg',
     metaDescription:
       'Kostenlose Helferliste online für Lager, Scharanlässe und Feste von Jubla-Scharen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.',

@@ -57,7 +57,7 @@ function getHitobitoConfigFor(orgSlugOrHost?: string | null): HitobitoProviderCo
   if (orgSlug === 'pfadi') {
     return {
       type: 'PFADI',
-      baseUrl: process.env.MIDATA_BASE_URL || 'https://midata.scouts.ch',
+      baseUrl: process.env.MIDATA_BASE_URL || 'https://db.scout.ch',
       // Kein Rückfall auf die Cevi.DB-Zugangsdaten: sonst ginge das Cevi-Secret an eine fremde Hitobito-Instanz
       clientId: process.env.MIDATA_CLIENT_ID || '',
       clientSecret: process.env.MIDATA_CLIENT_SECRET || '',

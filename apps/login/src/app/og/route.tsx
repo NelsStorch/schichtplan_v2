@@ -13,6 +13,7 @@ export async function GET() {
         <OgCard
           logo={logo}
           eyebrow={org.name}
+          accent={org.primaryColor}
           title="Anmelden"
           subtitle={`Ein Login für alle ${org.unitTermPlural}.`}
           host={host}

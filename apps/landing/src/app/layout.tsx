@@ -1,6 +1,6 @@
 import './globals.css';
 import { fontVariables } from '@schichtplan/ui/fonts';
-import { FeedbackProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
+import { FeedbackProvider, ThemeScript, UsageTracker, accentVars } from '@schichtplan/ui';
 import type { Metadata, Viewport } from 'next';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { JsonLd } from '@/components/JsonLd';
@@ -68,12 +68,16 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  viewportFit: 'cover',
-  themeColor: '#e11d48',
-};
+export async function generateViewport(): Promise<Viewport> {
+  const { host } = await getRequestOrigin();
+  const org = getOrganization(host);
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+    themeColor: org.primaryColor,
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -84,7 +88,13 @@ export default async function RootLayout({
   const org = getOrganization(host);
 
   return (
-    <html lang="de-CH" className={`${fontVariables} scroll-smooth`} data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html
+      lang="de-CH"
+      className={`${fontVariables} scroll-smooth`}
+      data-scroll-behavior="smooth"
+      style={accentVars(org.primaryColor) as React.CSSProperties}
+      suppressHydrationWarning
+    >
       <head>
         <ThemeScript />
         <JsonLd origin={origin} org={org} />

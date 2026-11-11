@@ -100,7 +100,7 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
         ortsgruppeField: 'ortsgruppe_id',
       });
       expect(getHitobitoConfig('PFADI')).toMatchObject({
-        defaultBaseUrl: 'https://midata.scouts.ch',
+        defaultBaseUrl: 'https://db.scout.ch',
         ortsgruppeField: 'abteilung_id',
       });
       expect(getHitobitoConfig('JUBLA')).toMatchObject({

@@ -6,6 +6,7 @@ import {
   UpdateDepartmentSchema,
   type DepartmentDirectoryItemDto,
   type DepartmentPermission,
+  getOrganizationByDbType,
 } from '@schichtplan/shared';
 import { autoCreateCeviDbDepartmentStufen, ceviDbGroupPeople, NO_HOME_CONFIRMATION } from '../../services/homeDepartment.js';
 import { isDepartmentInsider, } from '../../services/departmentVisibility.js';
@@ -232,6 +233,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
               name: departmentName,
               slug,
               organization: provider,
+              primaryColor: getOrganizationByDbType(provider).primaryColor,
               contactUserId: request.user.id,
               hitobitoGroupId: isOther ? null : ceviDbGroupId,
             },

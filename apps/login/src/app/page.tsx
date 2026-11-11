@@ -581,7 +581,7 @@ function LoginContent() {
                       <div className="mt-1.5 flex items-center justify-between px-1 text-[12px] text-fg-subtle">
                         <span>Offizieller Verbands-Login</span>
                         <span className="font-mono text-[11px] text-fg-muted">
-                          {org.slug === 'pfadi' ? 'midata.scouts.ch' : org.slug === 'jubla' ? 'db.jubla.ch' : 'db.cevi.ch'}
+                          {org.slug === 'pfadi' ? 'db.scout.ch' : org.slug === 'jubla' ? 'db.jubla.ch' : 'db.cevi.ch'}
                         </span>
                       </div>
                     </div>

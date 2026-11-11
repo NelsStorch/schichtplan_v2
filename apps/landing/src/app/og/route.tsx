@@ -13,6 +13,8 @@ export async function GET() {
       (
         <OgCard
           logo={logo}
+          eyebrow={org.name}
+          accent={org.primaryColor}
           title={`Schichtplanung für ${org.targetGroup}`}
           subtitle="Helfereinsätze an Lagern und Festen ohne Excel-Chaos."
           host={host}
