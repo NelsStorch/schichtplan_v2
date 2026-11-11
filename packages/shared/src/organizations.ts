@@ -15,6 +15,8 @@ export interface OrganizationConfig {
   authProviderShort: string;
   primaryColor: string;
   logoUrl: string;
+  /** Optionaler Hinweis, dass das Projekt unabhängig vom Verband ist (Footer, Login) */
+  independentNotice?: string;
   metaDescription: string;
   heroHeadlineHighlight: string;
 }
@@ -50,8 +52,12 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     nicknameTerm: 'Pfadiname',
     authProviderName: 'PBS MiData (Hitobito)',
     authProviderShort: 'PBS MiData',
-    primaryColor: '#64284b',
-    logoUrl: '/images/pfadi-logo.svg',
+    // Bewusst eigenes Erscheinungsbild (Tannengrün/Orange/Marineblau, eigenes Zeichen aus Kalender, Uhr und
+    // Zahnrad): kein PBS-Logo, keine PBS-Farbe und kein PBS-Favicon, damit die Seite nicht als offizielle
+    // PBS-Anwendung wirkt.
+    primaryColor: '#20553e',
+    logoUrl: '/images/pfadi-schichtplan-logo.svg',
+    independentNotice: 'Unabhängiges Projekt, nicht von der Pfadibewegung Schweiz (PBS) betrieben oder herausgegeben.',
     metaDescription:
       'Kostenlose Helferliste online für Pfingstlager, SoLa und Anlässe von Pfadi-Abteilungen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.',
     heroHeadlineHighlight: 'für Pfadi-Abteilungen',

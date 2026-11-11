@@ -62,7 +62,7 @@ export async function loadCeviLogo(): Promise<string | null> {
 export async function loadBrandLogo(host?: string): Promise<string | null> {
   const org = getOrganization(host);
   try {
-    const filename = org.slug === 'pfadi' ? 'pfadi-logo.svg' : org.slug === 'jubla' ? 'jubla-logo.svg' : org.slug === 'verein' ? 'verein-logo.svg' : 'cevi-logo.png';
+    const filename = org.slug === 'pfadi' ? 'pfadi-schichtplan-logo.svg' : org.slug === 'jubla' ? 'jubla-logo.svg' : org.slug === 'verein' ? 'verein-logo.svg' : 'cevi-logo.png';
     const filePath = path.join(process.cwd(), 'public', 'images', filename);
     const file = await readFile(filePath);
     const mime = filename.endsWith('.svg') ? 'image/svg+xml' : 'image/png';

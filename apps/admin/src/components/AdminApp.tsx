@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   Building2,
@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 import { Button, Callout, CeviLogo, Spinner, ThemeToggle, buttonClasses, cn } from '@schichtplan/ui';
 import {
-  PRIVACY_URL,
-  STATUS_URL,
+  getOrganization,
+  privacyUrl,
+  statusUrl,
   type AdminDepartmentListItemDto,
   type AdminOverviewDto,
   type AdminSessionDto,
@@ -57,6 +58,8 @@ function Shell({
   onOpenCommandPalette?: () => void;
   nav?: React.ReactNode;
 }) {
+  // Verband der aufgerufenen Domain (admin.<verband>-schichtplan.ch), sonst Cevi
+  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
   return (
     <div className="grain flex min-h-[100dvh] flex-col">
       <div aria-hidden className="bg-campfire pointer-events-none fixed inset-x-0 top-0 h-[40vh] opacity-60" />
@@ -66,7 +69,7 @@ function Shell({
           <span className="flex min-w-0 items-center gap-2.5">
             <CeviLogo className="size-8" alt="" />
             <span className="truncate font-display text-[15px] font-semibold tracking-tight text-fg">
-              Cevi Schichtplan
+              {org.name}
             </span>
             <span className="rounded-full bg-surface-3 px-2.5 py-0.5 text-xs font-semibold text-fg-muted">Admin</span>
           </span>
@@ -91,12 +94,15 @@ function Shell({
 
       <footer className="border-t border-line/70">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-6 text-xs text-fg-subtle sm:px-6">
-          <span>&copy; {new Date().getFullYear()} Cevi Schichtplan</span>
+          <span>
+            &copy; {new Date().getFullYear()} {org.name}
+            {org.independentNotice && <> · {org.independentNotice}</>}
+          </span>
           <div className="flex items-center gap-5">
-            <a href={STATUS_URL} className="transition hover:text-fg">
+            <a href={statusUrl('/', org.domain)} className="transition hover:text-fg">
               Status
             </a>
-            <a href={PRIVACY_URL} className="transition hover:text-fg">
+            <a href={privacyUrl(org.domain)} className="transition hover:text-fg">
               Datenschutz
             </a>
           </div>

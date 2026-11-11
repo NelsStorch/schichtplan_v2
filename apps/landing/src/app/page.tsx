@@ -422,6 +422,7 @@ export default async function LandingPage() {
               <BrandLogo logoUrl={org.logoUrl} alt={org.name} className="size-7 shrink-0" />
               <span>
                 © {new Date().getFullYear()} {org.name} · Unabhängiges, ehrenamtliches Projekt für {org.targetGroup}
+                {org.independentNotice && <> · {org.independentNotice}</>}
               </span>
             </div>
 

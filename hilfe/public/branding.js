@@ -28,10 +28,11 @@
       leadTerm: 'Abteilungsleitung',
       nicknameTerm: 'Pfadiname',
       authProvider: 'PBS MiData (Hitobito)',
-      logo: '/pfadi-logo.svg',
-      accent: '100 40 75',        // #64284b
-      accentInkLight: '100 40 75',
-      accentInkDark: '209 133 177',
+      logo: '/pfadi-schichtplan-logo.svg',
+      notice: 'Unabhängiges Projekt, nicht von der Pfadibewegung Schweiz (PBS) betrieben.',
+      accent: '32 85 62',         // #20553e (eigenes Tannengrün, nicht die Verbandsfarbe)
+      accentInkLight: '32 85 62',
+      accentInkDark: '93 187 138',
       accentFg: '255 255 255',
     },
     jubla: {
@@ -150,7 +151,7 @@
     // Footer-Elemente
     document.querySelectorAll('[data-footer-copyright]').forEach((el) => {
       const year = new Date().getFullYear();
-      el.innerHTML = `&copy; ${year} ${org.name} &middot; ehrenamtlich &amp; Open Source`;
+      el.innerHTML = `&copy; ${year} ${org.name} &middot; ehrenamtlich &amp; Open Source${org.notice ? ' &middot; ' + org.notice : ''}`;
     });
 
     document.querySelectorAll('[data-footer-app-domain]').forEach((a) => {
