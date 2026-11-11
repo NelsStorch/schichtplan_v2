@@ -17,7 +17,7 @@ export interface ProfileFieldsSource {
   birthDate: Date | null;
 }
 
-const hasText = (value: string | null | undefined) => Boolean(value && value.trim());
+const hasText = (value: string | null | undefined) => Boolean(value?.trim());
 
 export function hasProfileField(user: ProfileFieldsSource, field: RequiredProfileField): boolean {
   switch (field) {

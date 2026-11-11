@@ -506,7 +506,7 @@ export async function sendDueShiftReminders(
     const { sendDueCateringReminders } = await import('./cateringReminders.js');
     const cateringSent = await sendDueCateringReminders(prisma, now);
     sentCount += cateringSent;
-  } catch (err) {
+  } catch {
     // Fehler bei Bon-Erinnerung bricht den Job nicht ab
   }
 

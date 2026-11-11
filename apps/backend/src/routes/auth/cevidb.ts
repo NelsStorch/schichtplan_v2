@@ -175,7 +175,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
           tenantSlug = typeof parsedState.tenantSlug === 'string' ? parsedState.tenantSlug : null;
           if (HITOBITO_PROVIDERS.includes(parsedState.provider)) providerType = parsedState.provider;
         }
-      } catch (err) {
+      } catch {
         // Fallback default
       }
 
@@ -375,7 +375,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
         fastify.log.warn({ userId: byEmail.id, ceviDbId }, `${provider}-Login: E-Mail gehört zu anderem Provider-Konto`);
         return loginErrorUrl('cevidb_email_taken', returnTo, reply.request?.hostname);
       }
-      if (byEmail && byEmail.passwordHash && byEmail.id !== linkConfirmedUserId) {
+      if (byEmail?.passwordHash && byEmail.id !== linkConfirmedUserId) {
         // Passwort-Konto mit gleicher E-Mail: erst nach Passwort verknüpfen (login.<domain>/konto-verknuepfen)
         const token = createPendingLink({ profile, returnTo, tenantSlug, userId: byEmail.id, provider });
         reply.setCookie(PENDING_LINK_COOKIE, token, {
@@ -556,7 +556,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     const password = typeof (request.body as any)?.password === 'string' ? (request.body as any).password : '';
     const user = await fastify.prisma.user.findUnique({ where: { id: link.userId } });
-    if (!user || !user.passwordHash || !password || !(await bcrypt.compare(password, user.passwordHash))) {
+    if (!user?.passwordHash || !password || !(await bcrypt.compare(password, user.passwordHash))) {
       link.failedAttempts++;
       if (link.failedAttempts >= MAX_LINK_ATTEMPTS) {
         pendingLinks.delete(token!);

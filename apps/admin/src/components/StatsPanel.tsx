@@ -388,7 +388,6 @@ type RouteSort = 'count' | 'p95Ms' | 'errors5xx';
 function SystemView({
   system,
   usage,
-  onOpenAudit,
 }: {
   system: AdminStatsSystemDto;
   usage: AdminStatsUsageDto | null;

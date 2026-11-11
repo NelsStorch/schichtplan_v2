@@ -78,7 +78,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
 
     await autoCreateAllCeviDbDepartmentStufen(fastify.prisma, departmentId);
 
-    const [[item], members, homeUsers, stufen, eventRows, auditRows, templates] = await Promise.all([
+    const [[item], members, homeUsers, stufen, eventRows, auditRows] = await Promise.all([
       toDepartmentItems(fastify.prisma, [row]),
       fastify.prisma.departmentMember.findMany({
         where: { departmentId },
@@ -99,11 +99,6 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         where: { departmentId },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         take: 100,
-      }),
-      fastify.prisma.eventTemplate.findMany({
-        where: { departmentId },
-        orderBy: { title: 'asc' },
-        select: { id: true, title: true, description: true, data: true },
       }),
     ]);
 

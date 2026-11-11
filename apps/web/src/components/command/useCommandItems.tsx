@@ -1045,7 +1045,7 @@ export function useCommandItems(query: string) {
                     openWhatsAppDirect(helperPhone, su.userFirstName || su.displayName);
                   } else {
                     const input = window.prompt(`Handynummer für ${su.displayName} eingeben (z. B. 079 123 45 67):`);
-                    if (input && input.trim()) {
+                    if (input?.trim()) {
                       openWhatsAppDirect(input.trim(), su.userFirstName || su.displayName);
                     }
                   }
@@ -1366,7 +1366,7 @@ export function useCommandItems(query: string) {
       onSelect: () => {
         recordRecentCommand('action-direct-whatsapp');
         const input = window.prompt('Handynummer für WhatsApp-Direktchat eingeben (z. B. 079 123 45 67):');
-        if (input && input.trim()) {
+        if (input?.trim()) {
           openWhatsAppDirect(input.trim());
         }
       },
@@ -1807,7 +1807,7 @@ export function useCommandItems(query: string) {
               const input = window.prompt(
                 `Handynummer für ${person.firstName || person.name} eingeben (z. B. 079 123 45 67):`
               );
-              if (input && input.trim()) {
+              if (input?.trim()) {
                 openWhatsAppDirect(input.trim(), person.firstName);
               }
             },
@@ -1877,7 +1877,7 @@ export function useCommandItems(query: string) {
                 const input = window.prompt(
                   `Handynummer für ${person.firstName || person.name} eingeben (z. B. 079 123 45 67):`
                 );
-                if (input && input.trim()) {
+                if (input?.trim()) {
                   openWhatsAppDirect(input.trim(), person.firstName);
                 }
               }

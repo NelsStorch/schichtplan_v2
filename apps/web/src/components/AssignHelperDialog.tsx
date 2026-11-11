@@ -467,7 +467,7 @@ function AssignHelperForm({
         </div>
       )}
 
-      {collisionWarning && collisionWarning.hasCollision && (
+      {collisionWarning?.hasCollision && (
         <div className="space-y-2.5 rounded-field border border-warning/40 bg-warning/10 p-3.5 text-xs text-warning-ink">
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />

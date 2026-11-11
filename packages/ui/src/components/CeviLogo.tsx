@@ -43,7 +43,7 @@ export function BrandLogo({
   // Ein Ladefehler vor der Hydration löst onError nie aus: deshalb nach dem Mount nachprüfen.
   useEffect(() => {
     const img = ref.current;
-    if (img && img.complete && img.naturalWidth === 0 && src !== fallback) setSrc(fallback);
+    if (img?.complete && img.naturalWidth === 0 && src !== fallback) setSrc(fallback);
   }, [src, fallback]);
 
   return (

@@ -41,7 +41,6 @@ type Tab = 'personen' | 'anlaesse' | 'stufen' | 'vorlagen' | 'einstellungen' | '
 type PeopleFilter = 'all' | 'ADMIN' | 'RIGHTS' | 'HELPER' | 'home';
 
 export function DepartmentLogo({
-  name,
   logoUrl,
   color,
   className,

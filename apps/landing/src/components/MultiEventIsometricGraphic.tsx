@@ -36,6 +36,7 @@ export function MultiEventIsometricGraphic({
   return (
     <div className={`relative flex items-center justify-center select-none ${className}`}>
       <svg
+        aria-hidden="true"
         viewBox="0 0 400 240"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"

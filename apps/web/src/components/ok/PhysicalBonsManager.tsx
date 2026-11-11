@@ -22,7 +22,6 @@ interface PhysicalBonsManagerProps {
 
 export function PhysicalBonsManager({
   eventSlug,
-  eventTitle,
   items,
 }: PhysicalBonsManagerProps) {
   const toast = useToast();
@@ -206,7 +205,7 @@ export function PhysicalBonsManager({
                 min={1}
                 max={1000}
                 value={cardCount}
-                onChange={(e) => setCardCount(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => setCardCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
               />
               {helperCount !== null && helperCount > 0 && helperCount !== cardCount && (
                 <button

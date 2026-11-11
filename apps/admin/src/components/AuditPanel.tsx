@@ -152,7 +152,7 @@ export function AuditPanel({
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [timeFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {

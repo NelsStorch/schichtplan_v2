@@ -72,7 +72,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Auch ohne Konto ein Passwort prüfen: sonst verriete die Antwortzeit, ob es die Adresse gibt
     const passwordOk = await bcrypt.compare(password, user?.passwordHash || DUMMY_PASSWORD_HASH);
-    if (!user || !user.passwordHash || !passwordOk) {
+    if (!user?.passwordHash || !passwordOk) {
       trackUsage('LOGIN_FAILED', { dim: 'PASSWORD_WRONG', departmentId: request.tenant?.id });
       return reply.status(401).send({ error: 'E-Mail oder Passwort falsch' });
     }

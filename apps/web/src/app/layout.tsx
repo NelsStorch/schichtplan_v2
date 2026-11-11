@@ -9,8 +9,6 @@ import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { getDepartmentPreview } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
 
-const DESCRIPTION = 'Schichten für Chilbi, Lager und Cevi-Anlässe: anschauen, eintragen, fertig.';
-
 /**
  * Pro Abteilung (Subdomain) eigener Titel für Link-Vorschauen. Bewusst nur Abteilungsname und -logo:
  * Anlässe können intern oder «nur für Mitglieder» sein, ihre Titel gehören nicht in eine öffentliche Vorschau.

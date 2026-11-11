@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { DEPARTMENT_PERMISSION_KEYS } from '@schichtplan/shared';
 import {
   addMember,
   authCookie,
@@ -11,8 +10,6 @@ import {
   inject,
   resetDb,
 } from './helpers.js';
-
-const ALL = [...DEPARTMENT_PERMISSION_KEYS];
 
 describe.skipIf(!hasTestDb)('Vereins-Schichtplan: Erstellung und Verwaltung von Vereinsleitungen', () => {
   let app: FastifyInstance;

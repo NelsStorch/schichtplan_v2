@@ -38,13 +38,8 @@ export function ShiftTicket({
   index = 0,
   isMine,
   canManage,
-  needsLogin,
-  busy,
   contactUser,
   responsibles,
-  onSignup,
-  onCancel,
-  onRemoveHelper,
   onEdit,
   onSelect,
 }: ShiftTicketProps) {

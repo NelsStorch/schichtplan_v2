@@ -67,7 +67,7 @@ export function HelperHoursDialog({
     return helpers.filter((h) => {
       if (h.displayName.toLowerCase().includes(q)) return true;
       if ((h.nickname || h.ceviName) && (h.nickname || h.ceviName)!.toLowerCase().includes(q)) return true;
-      if (h.departmentName && h.departmentName.toLowerCase().includes(q)) return true;
+      if (h.departmentName?.toLowerCase().includes(q)) return true;
       if (h.stufen.some((s) => s.toLowerCase().includes(q))) return true;
       return false;
     });

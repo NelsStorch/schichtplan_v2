@@ -29,7 +29,7 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
         querystring: EventListQuerySchema,
       },
     },
-    async (request, reply) => {
+    async (request, _reply) => {
     const queryInput = request.query as z.output<typeof EventListQuerySchema>;
     const { q, departmentId, when, page, pageSize } = queryInput;
     const now = new Date();

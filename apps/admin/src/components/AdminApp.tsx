@@ -49,7 +49,6 @@ function Shell({
   children,
   user,
   onLogout,
-  onOpenCommandPalette,
   nav,
 }: {
   children: React.ReactNode;

@@ -253,6 +253,7 @@ export function NotFoundView({
             )}
           >
             <svg
+              aria-hidden="true"
               viewBox="0 0 420 220"
               className="h-44 w-auto sm:h-56 drop-shadow-soft"
               fill="none"

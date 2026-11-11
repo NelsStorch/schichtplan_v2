@@ -219,7 +219,7 @@ function BonScanContent() {
   };
 
   const availableItems = card?.items.filter((i) => i.status === 'AVAILABLE') ?? [];
-  const allRedeemed = Boolean(card && card.items.every((i) => i.status === 'REDEEMED'));
+  const allRedeemed = Boolean(card?.items.every((i) => i.status === 'REDEEMED'));
 
   return (
     <div className="min-h-screen bg-bg-muted/30 text-fg flex flex-col justify-between p-4 sm:p-6">

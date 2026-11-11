@@ -34,11 +34,6 @@ export function hashResetToken(token: string): string {
 const GENERIC_MESSAGE =
   'Falls es zu dieser E-Mail ein Konto mit Passwort gibt, haben wir dir einen Link geschickt. Prüfe auch den Spam-Ordner.';
 
-const GenericResetResponseSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-});
-
 const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/api/auth/password-reset/request',

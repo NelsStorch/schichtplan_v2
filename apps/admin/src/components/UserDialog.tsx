@@ -194,7 +194,7 @@ export function UserDialog({
   const [detail, setDetail] = useState<AdminUserDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [resetModalUrl, setResetModalUrl] = useState<string | null>(null);
+  const [, setResetModalUrl] = useState<string | null>(null);
   const [generatingReset, setGeneratingReset] = useState(false);
 
   const handleGenerateReset = async () => {
@@ -714,7 +714,7 @@ export function UserDialog({
                   ))}
                 </ul>
               )}
-              {departments && departments.some((d) => !user.memberships.some((m) => m.departmentId === d.id)) && (
+              {departments?.some((d) => !user.memberships.some((m) => m.departmentId === d.id)) && (
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <div className="flex-1">
                     <Select

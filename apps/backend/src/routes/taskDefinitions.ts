@@ -3,17 +3,6 @@ import { z } from 'zod';
 import { CreateTaskDefinitionSchema, UpdateTaskDefinitionSchema } from '@schichtplan/shared';
 import { canPlanInDepartment, isDepartmentInsider } from '../services/departmentVisibility.js';
 
-const TaskDefinitionResponseSchema = z.object({
-  id: z.string().uuid(),
-  departmentId: z.string().uuid(),
-  title: z.string(),
-  description: z.string().nullable(),
-  minAge: z.number().int().nullable(),
-  ageRequirementType: z.enum(['ALL', 'AT_LEAST_ONE']),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-});
-
 const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
   // Liste aller Arbeiten (Task-Definitionen) der aktuellen Abteilung
   fastify.get(

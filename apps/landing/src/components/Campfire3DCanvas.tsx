@@ -38,7 +38,7 @@ export function Campfire3DCanvas() {
     canvas.height = height;
 
     const handleResize = () => {
-      if (!canvas || !canvas.parentElement) return;
+      if (!canvas?.parentElement) return;
       width = canvas.width = canvas.parentElement.clientWidth;
       height = canvas.height = canvas.parentElement.clientHeight;
     };

@@ -99,7 +99,7 @@ function ShiftsPage() {
         if (onlyWarning && !warningShiftIds.has(s.id)) return false;
         if (
           q &&
-          !(s.title && s.title.toLowerCase().includes(q)) &&
+          !(s.title?.toLowerCase().includes(q)) &&
           !(s.category?.toLowerCase().includes(q) ?? false) &&
           !s.tasks?.some((t) => t.title.toLowerCase().includes(q)) &&
           !s.signups?.some((su) => su.displayName.toLowerCase().includes(q))

@@ -109,7 +109,7 @@ const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       const body = request.body || {};
       let rawBase64 = body.base64 || body.dataUrl || '';
       let mimeType = (body.mimeType || '').toLowerCase().trim();
-      let filename = (body.filename || 'upload.png').trim();
+      const filename = (body.filename || 'upload.png').trim();
 
       // Data-URL Präfix parsen (z.B. "data:image/png;base64,iVBOR...")
       if (rawBase64.startsWith('data:')) {

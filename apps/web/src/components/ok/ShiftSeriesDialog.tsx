@@ -91,7 +91,7 @@ export function ShiftSeriesDialog({
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [isSetupTeardown, setIsSetupTeardown] = useState(false);
-  const [description, setDescription] = useState('');
+  const [description] = useState('');
   const [minAge, setMinAge] = useState<number | ''>('');
 
   const [tasks, setTasks] = useState<SeriesTaskItem[]>([

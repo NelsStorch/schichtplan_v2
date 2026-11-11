@@ -24,7 +24,6 @@ import type {
   AdminUserListItemDto,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
-import { downloadCsv } from '../lib/csv';
 import { formatDate, formatLastSeen, fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
@@ -203,27 +202,6 @@ export function UsersPanel({
         tone: 'error',
       });
     }
-  };
-
-  const handleExport = () => {
-    if (!items.length) return;
-    const rows = items.map((u) => ({
-      ID: u.id,
-      Vorname: u.firstName,
-      Nachname: u.lastName,
-      'Cevi-Name': u.ceviName ?? '',
-      'E-Mail': u.email ?? '',
-      Telefon: u.phone ?? '',
-      'Cevi.DB-ID': u.ceviDbId ?? '',
-      Anmeldearten: u.loginMethods.join(', '),
-      'Globale Admin': u.isGlobalAdmin ? 'Ja' : 'Nein',
-      Heimabteilung: u.homeDepartmentName ?? '',
-      Eintragungen: u.signupCount,
-      'Zuletzt aktiv': u.lastSeenOn ? formatDate(u.lastSeenOn) : '',
-      Registriert: formatDate(u.createdAt),
-      'Mögliche Dublette': u.potentialDuplicateOf ? `Ja (${u.potentialDuplicateOf.name}, ID: ${u.potentialDuplicateOf.id})` : 'Nein',
-    }));
-    downloadCsv(rows, `personen_${filter}_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
   const handleDeleteUser = async (target: AdminUserListItemDto) => {

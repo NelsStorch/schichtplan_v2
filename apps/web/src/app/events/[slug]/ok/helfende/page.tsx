@@ -716,7 +716,7 @@ function AssignPersonToShiftDialog({
           if (onlyOpen && filled >= s.requiredSlots) return false;
           if (
             q &&
-            !(s.title && s.title.toLowerCase().includes(q)) &&
+            !(s.title?.toLowerCase().includes(q)) &&
             !(s.category?.toLowerCase().includes(q) ?? false) &&
             !s.tasks?.some((t) => t.title.toLowerCase().includes(q))
           )

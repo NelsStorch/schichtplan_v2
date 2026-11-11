@@ -63,7 +63,6 @@ export function getSmtpConfig(orgType: OrganizationType): SmtpAccountConfig {
         pass: process.env.SMTP_PASSWORD_VEREIN || '',
         from: process.env.SMTP_FROM_VEREIN || 'Vereins Schichtplan <admin@vereins-schichtplan.ch>',
       };
-    case 'CEVI':
     default:
       return {
         host: process.env.SMTP_HOST_CEVI || defaultHost,
@@ -239,7 +238,6 @@ function getDefaultGreeting(orgSlug: string): string {
       return 'Jublaner*in';
     case 'verein':
       return 'Helfer*in';
-    case 'cevi':
     default:
       return 'Cevianer*in';
   }

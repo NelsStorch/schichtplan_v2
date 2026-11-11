@@ -137,7 +137,7 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
           querystring: RangeQuerySchema,
         },
       },
-      async (request, reply) => {
+      async (request, _reply) => {
       await flushUsageStats(fastify.prisma);
       const queryInput = request.query as z.output<typeof RangeQuerySchema>;
       const { days, departmentId } = queryInput;
@@ -240,7 +240,7 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
           querystring: RangeQuerySchema,
         },
       },
-      async (request, reply) => {
+      async (request, _reply) => {
       const queryInput = request.query as z.output<typeof RangeQuerySchema>;
       const { days, departmentId } = queryInput;
       const dayList = rangeDays(days);
@@ -474,7 +474,7 @@ const statsRoutes: FastifyPluginAsync = async (fastify) => {
           querystring: RangeQuerySchema,
         },
       },
-      async (request, reply) => {
+      async (request, _reply) => {
       const queryInput = request.query as z.output<typeof RangeQuerySchema>;
       const dayList = rangeDays(queryInput.days);
       const from = zurichDayStart(dayList[0]);

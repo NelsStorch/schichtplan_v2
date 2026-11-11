@@ -306,7 +306,7 @@ export function DashboardPanel({
       )}
 
       {/* Inaktive Abteilungen */}
-      {data && data.inactiveDepartments && data.inactiveDepartments.length > 0 && (
+      {data?.inactiveDepartments && data.inactiveDepartments.length > 0 && (
         <Callout tone="info" title="Inaktive Abteilungen">
           <p className="mt-1 text-xs text-fg-muted">
             Keine Anlässe in den letzten 6 Monaten oder vor über 30 Tagen angelegt ohne Anlass:

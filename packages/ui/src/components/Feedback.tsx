@@ -48,7 +48,7 @@ function ToastProvider({ children }: { children: ReactNode }) {
           const el = containerRef.current;
           if (el && typeof el.showPopover === 'function') {
             try {
-              if (el.matches && el.matches(':popover-open')) {
+              if (el.matches?.(':popover-open')) {
                 el.hidePopover();
               }
               el.showPopover();
@@ -67,7 +67,7 @@ function ToastProvider({ children }: { children: ReactNode }) {
     if (!el || typeof el.showPopover !== 'function') return;
     if (toasts.length === 0) {
       try {
-        if (el.matches && el.matches(':popover-open')) {
+        if (el.matches?.(':popover-open')) {
           el.hidePopover();
         }
       } catch {

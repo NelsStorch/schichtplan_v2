@@ -410,7 +410,7 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // 2) Mindestalter der spezifischen Arbeit
-      if (chosenTask && chosenTask.minAge) {
+      if (chosenTask?.minAge) {
         if (chosenTask.ageRequirementType === 'ALL') {
           // Alle müssen das Mindestalter haben
           if (userAge !== null && userAge < chosenTask.minAge) {

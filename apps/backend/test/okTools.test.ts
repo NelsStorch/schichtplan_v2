@@ -164,7 +164,7 @@ describe.skipIf(!hasTestDb)('OK-Werkzeuge: Nachrichten und Massenbearbeitung', (
       const shift1 = await createShift(app, event.id, { title: 'Schicht 1' });
       const shift2 = await createShift(app, event.id, { title: 'Schicht 2' });
 
-      const userZero = await createUser(app, { firstName: 'Zero', lastName: 'Schicht', homeDepartmentId: department.id });
+      await createUser(app, { firstName: 'Zero', lastName: 'Schicht', homeDepartmentId: department.id });
       const userOne = await createUser(app, { firstName: 'Eins', lastName: 'Schicht', homeDepartmentId: department.id });
       const userTwo = await createUser(app, { firstName: 'Zwei', lastName: 'Schicht', homeDepartmentId: department.id });
       const userDereg = await createUser(app, { firstName: 'Ab', lastName: 'Gemeldet', homeDepartmentId: department.id });

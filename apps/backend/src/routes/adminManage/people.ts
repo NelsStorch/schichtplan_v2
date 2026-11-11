@@ -246,7 +246,7 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         querystring: AuditQuerySchema,
       },
     },
-    async (request, reply) => {
+    async (request, _reply) => {
     const queryInput = request.query as z.output<typeof AuditQuerySchema>;
     const { q, targetType, targetId, since, until, page, pageSize } = queryInput;
     const terms = (q ?? '').split(/\s+/).filter(Boolean).slice(0, 5);

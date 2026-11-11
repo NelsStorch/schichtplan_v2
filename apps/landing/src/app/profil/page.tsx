@@ -202,31 +202,6 @@ export default function ProfilePage() {
     }
   };
 
-  /** Erinnerungen sofort speichern (ohne «Speichern»-Knopf) */
-  const toggleReminders = async (enabled: boolean) => {
-    if (!user) return;
-    const previous = user;
-    setUser({ ...user, shiftReminders: enabled });
-    try {
-      const res = await fetch('/api/auth/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shiftReminders: enabled }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Speichern hat nicht geklappt.');
-      setUser(data as UserDto);
-      toast({ title: enabled ? 'Erinnerungen eingeschaltet' : 'Erinnerungen ausgeschaltet' });
-    } catch (err) {
-      setUser(previous);
-      toast({
-        title: 'Speichern hat nicht geklappt',
-        description: err instanceof Error ? err.message : undefined,
-        tone: 'error',
-      });
-    }
-  };
-
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/';

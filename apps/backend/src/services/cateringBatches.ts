@@ -29,7 +29,7 @@ export async function createCateringBatch(
   prisma: PrismaClient,
   params: CreateBatchParams
 ): Promise<CateringBatchDto> {
-  const { eventId, title, mode, cardCount, baseUrl } = params;
+  const { eventId, title, mode, cardCount } = params;
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },

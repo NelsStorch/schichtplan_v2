@@ -276,7 +276,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       },
       preHandler: [fastify.requireGlobalAdmin],
     },
-    async (request, reply) => {
+    async (request, _reply) => {
     const queryInput = request.query as z.output<typeof ListQuerySchema>;
     const { q, method, role, departmentId, sort, page, pageSize } = queryInput;
     const duplicateMap = await findDuplicateUsers(fastify.prisma);

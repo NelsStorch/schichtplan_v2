@@ -19,7 +19,7 @@ export function formatDisplayDate(digits: string): string {
 }
 
 export function isoToDisplay(iso: string): string {
-  if (!iso || !iso.includes('-')) return '';
+  if (!iso?.includes('-')) return '';
   const parts = iso.split('-');
   if (parts.length !== 3) return '';
   return `${parts[2]}.${parts[1]}.${parts[0]}`;
