@@ -80,6 +80,7 @@ export function parseCeviDbGroup(
     jungscharCount: hasType(expectedId, labels.ortsgruppe)
       ? idList(group.links.children).filter((id) => hasType(id, labels.jungschar)).length
       : null,
+    groupType: typeof group.group_type === 'string' ? group.group_type.slice(0, 80) : null,
   };
 }
 

@@ -80,6 +80,7 @@ describe('parseCeviDbGroup', () => {
       jungscharId: 295,
       ortsgruppeId: 161,
       jungscharCount: null,
+      groupType: 'Stufe',
     });
   });
 
@@ -140,6 +141,7 @@ describe('parseCeviDbGroup für Pfadi (MiData)', () => {
       jungscharId: null,
       ortsgruppeId: 1045,
       jungscharCount: null,
+      groupType: 'Wölfe',
     });
   });
 

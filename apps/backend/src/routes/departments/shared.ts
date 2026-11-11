@@ -3,7 +3,9 @@ import { FastifyReply, FastifyRequest, FastifyInstance } from 'fastify';
 import { Prisma, PrismaClient, OrganizationType } from '../../db.js';
 import {
   DEPARTMENT_PERMISSIONS,
+  getHitobitoConfig,
   type DepartmentCreationEligibilityDto,
+  type DepartmentCreationOptionDto,
   type DepartmentDto,
   type DepartmentPermission,
   type DepartmentStufeDto,
@@ -159,7 +161,9 @@ export async function departmentCreationEligibility(
     return denied('UNVERIFIED', { leaderGroupName });
   }
 
-  let firstExisting: DepartmentCreationEligibilityDto | null = null;
+  // Alle Ebenen, die die Person leitet: Leitet sie Abteilung und Region, wählt sie beim Anlegen
+  const levels = getHitobitoConfig(provider).departmentGroupLabels;
+  const options: DepartmentCreationOptionDto[] = [];
   for (const group of leaderGroups) {
     if (group.ortsgruppeId === null) continue;
     const ortsgruppe = await prisma.hitobitoGroup.findUnique({
@@ -169,20 +173,44 @@ export async function departmentCreationEligibility(
 
     const perJungschar = ortsgruppe.jungscharCount > 1 && group.jungscharId !== null;
     const groupId = perJungschar ? group.jungscharId! : ortsgruppe.id;
+    if (options.some((o) => o.hitobitoGroupId === groupId)) continue;
     // Vorschlag für den Namen: «JS Effretikon» wird zu «Effretikon» (dazu kommt «Cevi»)
     const name = perJungschar ? group.name.replace(/^JS\s+/i, '') : ortsgruppe.name;
+    const groupType = perJungschar ? 'Jungschar' : (ortsgruppe.groupType ?? null);
+    // Unbekannter Typ (Eintrag von vor dem Gruppentyp): wie die unterste Ebene, das war bisher die einzige
+    const level = perJungschar || groupType === null ? 0 : Math.max(0, levels.indexOf(groupType));
 
     const existing = await prisma.department.findUnique({
       where: { organization_hitobitoGroupId: { organization: provider, hitobitoGroupId: groupId } },
       select: { name: true, slug: true },
     });
-    if (!existing) {
-      return { eligible: true, reason: null, provider, ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: null };
-    }
-    firstExisting ??= denied('EXISTS', { provider, ortsgruppeId: groupId, ortsgruppeName: name, leaderGroupName, existingDepartment: existing });
+    options.push({ hitobitoGroupId: groupId, name, groupType, level, existingDepartment: existing ?? null });
   }
 
-  return firstExisting ?? denied('NO_ORTSGRUPPE', { leaderGroupName });
+  const list = options.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, 'de'));
+  const open = list.find((o) => o.existingDepartment === null);
+  if (open) {
+    return {
+      eligible: true,
+      reason: null,
+      provider,
+      ortsgruppeId: open.hitobitoGroupId,
+      ortsgruppeName: open.name,
+      leaderGroupName,
+      existingDepartment: null,
+      options: list,
+    };
+  }
+  const first = list[0];
+  if (!first) return denied('NO_ORTSGRUPPE', { leaderGroupName });
+  return denied('EXISTS', {
+    provider,
+    ortsgruppeId: first.hitobitoGroupId,
+    ortsgruppeName: first.name,
+    leaderGroupName,
+    existingDepartment: first.existingDepartment,
+    options: list,
+  });
 }
 
 /** Recht in der Abteilung der Subdomain prüfen (Abteilungsleitung und globale Admins haben alle) */

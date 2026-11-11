@@ -97,11 +97,11 @@ describe('departmentCreationEligibility für Vereine und Verbände', () => {
   describe('Pfadi und Jubla: Abteilung, Region, Kantonalverband', () => {
     const groupRows = [
       // Pfadi: Region 906 und Abteilung 1045 bilden selbst eine Ebene (keine Jungscharen)
-      { provider: 'PFADI', id: 906, name: 'RG-coachland', jungscharId: null, ortsgruppeId: 906, jungscharCount: 0 },
-      { provider: 'PFADI', id: 1045, name: 'Benoît de Pontverre', jungscharId: null, ortsgruppeId: 1045, jungscharCount: 0 },
+      { provider: 'PFADI', id: 906, name: 'RG-coachland', jungscharId: null, ortsgruppeId: 906, jungscharCount: 0, groupType: 'Region' },
+      { provider: 'PFADI', id: 1045, name: 'Benoît de Pontverre', jungscharId: null, ortsgruppeId: 1045, jungscharCount: 0, groupType: 'Abteilung' },
       // Jubla: Regionalleitung 21 ist eine Untergruppe der Region 20
       { provider: 'JUBLA', id: 21, name: 'Regionalleitung', jungscharId: null, ortsgruppeId: 20, jungscharCount: null },
-      { provider: 'JUBLA', id: 20, name: 'Region Oberland', jungscharId: null, ortsgruppeId: 20, jungscharCount: 0 },
+      { provider: 'JUBLA', id: 20, name: 'Region Oberland', jungscharId: null, ortsgruppeId: 20, jungscharCount: 0, groupType: 'Region' },
     ];
     const hitobitoPrisma = (user: object, existing: number[] = []) =>
       ({
@@ -144,6 +144,20 @@ describe('departmentCreationEligibility für Vereine und Verbände', () => {
     it('ordnet die Jubla-Regionalleitung der Region darüber zu', async () => {
       const result = await departmentCreationEligibility(hitobitoPrisma(leader('JUBLA', [21])), 'user-1', 'JUBLA');
       expect(result).toMatchObject({ eligible: true, ortsgruppeId: 20, ortsgruppeName: 'Region Oberland' });
+    });
+    it('bietet bei Abteilungs- und Regionsleitung beide Ebenen an, die Abteilung zuerst', async () => {
+      const result = await departmentCreationEligibility(hitobitoPrisma(leader('PFADI', [906, 1045])), 'user-1', 'PFADI');
+      expect(result).toMatchObject({ eligible: true, ortsgruppeId: 1045 });
+      expect(result.options?.map((o) => [o.hitobitoGroupId, o.groupType, o.level])).toEqual([
+        [1045, 'Abteilung', 0],
+        [906, 'Region', 1],
+      ]);
+    });
+
+    it('schlägt die Region vor, wenn die Abteilung schon einen Schichtplan hat', async () => {
+      const result = await departmentCreationEligibility(hitobitoPrisma(leader('PFADI', [906, 1045]), [1045]), 'user-1', 'PFADI');
+      expect(result).toMatchObject({ eligible: true, ortsgruppeId: 906 });
+      expect(result.options?.[0].existingDepartment).toEqual({ name: 'Bestehend', slug: 'bestehend' });
     });
   });
 });

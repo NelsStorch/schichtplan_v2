@@ -85,6 +85,8 @@ model HitobitoGroup {
   ortsgruppeId   Int?     @map("ortsgruppe_id")
   // Nur bei Ortsgruppen: Anzahl Jungscharen. Mehr als eine heisst: eine Abteilung pro Jungschar
   jungscharCount Int?     @map("jungschar_count")
+  // Gruppentyp laut Gruppen-API (übersetzt, z. B. «Abteilung», «Region», «Ortsgruppe»)
+  groupType      String?  @map("group_type")
   fetchedAt      DateTime @map("fetched_at")
 
   @@id([provider, id])

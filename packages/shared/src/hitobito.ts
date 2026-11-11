@@ -26,6 +26,7 @@ export interface HitobitoConfig {
    * Dieselben Gruppentypen, wie sie die Gruppen-API (`/groups/{id}.json`, Feld `group_type`) liefert: übersetzt, auf
    * Deutsch. Eine Rolle gehört zur nächsten Gruppe dieser Typen über ihr. Auch Regionen und Kantonalverbände können
    * so einen eigenen Schichtplan haben, geleitet von der Regions- bzw. Kantonsleitung.
+   * Reihenfolge von unten nach oben: Leitet jemand mehrere Ebenen, wird die unterste zuerst vorgeschlagen.
    */
   departmentGroupLabels: string[];
   /** Nur Cevi: Zwischenebene unter der Ortsgruppe (Jungschar), sonst leer */
@@ -75,7 +76,7 @@ export const HITOBITO_CEVI_CONFIG: HitobitoConfig = {
   ],
   // Struktur laut hitobito_cevi: Dachverband → Mitgliederorganisation (z. B. Cevi Region Zürich) → Sektion (optional)
   // → Ortsgruppe → Jungschar → Stufe. Mitgliederorganisation und Sektion können einen eigenen Schichtplan haben.
-  departmentGroupLabels: ['Ortsgruppe', 'Mitgliederorganisation', 'Sektion'],
+  departmentGroupLabels: ['Ortsgruppe', 'Sektion', 'Mitgliederorganisation'],
   jungscharGroupLabels: ['Jungschar'],
   departmentLeaderRoleClasses: [
     'Group::Jungschar::Abteilungsleiter',

@@ -84,6 +84,8 @@ export const DepartmentSlugSchema = z
 export const CreateDepartmentFromCeviDbSchema = z.object({
   departmentName: z.string().trim().min(2, 'Name muss mindestens 2 Zeichen lang sein').max(80),
   slug: DepartmentSlugSchema,
+  /** Gewählte Ebene, wenn die Person mehrere leitet (sonst die unterste ohne Schichtplan) */
+  hitobitoGroupId: z.number().int().positive().max(2_147_483_647).optional(),
 });
 
 export type CreateDepartmentFromCeviDbInput = z.infer<typeof CreateDepartmentFromCeviDbSchema>;

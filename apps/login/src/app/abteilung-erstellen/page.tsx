@@ -20,11 +20,18 @@ const slugify = (value: string) =>
     .replace(/^-|-$/g, '')
     .slice(0, 30);
 
+/** Verbandsname davor, ausser die Gruppe heisst schon so (z. B. «Cevi Region Zürich») */
+const withOrgName = (groupName: string, org: OrganizationConfig) =>
+  groupName.toLowerCase().startsWith(org.orgName.toLowerCase()) ? groupName : `${org.orgName} ${groupName}`;
+
 /** Name der Ortsgruppe ohne Zusatz, z. B. «Illnau-Effretikon» -> Subdomain «illnau-effretikon» */
 const suggestedName = (e: DepartmentCreationEligibilityDto, org: OrganizationConfig) => {
   if (org.slug === 'verein') return '';
-  return e.ortsgruppeName ? `${org.orgName} ${e.ortsgruppeName}` : e.leaderGroupName ? `${org.orgName} ${e.leaderGroupName}` : '';
+  return e.ortsgruppeName ? withOrgName(e.ortsgruppeName, org) : e.leaderGroupName ? withOrgName(e.leaderGroupName, org) : '';
 };
+
+const slugFromName = (name: string, org: OrganizationConfig) =>
+  slugify(name.replace(new RegExp(`^${org.orgName}\\s+`, 'i'), ''));
 
 /**
  * Abteilung anlegen: erscheint nach dem Cevi.DB-Login einer Abteilungsleitung, deren Ortsgruppe
@@ -42,6 +49,9 @@ function CreateDepartment() {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
+  // Leitet die Person mehrere Ebenen (z. B. Abteilung und Region): die gewählte Hitobito-Gruppe
+  const [groupId, setGroupId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,11 +66,25 @@ function CreateDepartment() {
       const res = await fetch('/api/departments/creation-eligibility', { cache: 'no-store' });
       const data = (await res.json()) as DepartmentCreationEligibilityDto;
       setEligibility(data);
+      setGroupId(data.ortsgruppeId);
       const proposal = suggestedName(data, org);
       setName(proposal);
-      setSlug(slugify(data.ortsgruppeName ?? proposal.replace(new RegExp(`^${org.orgName}\\s+`, 'i'), '')));
+      setSlug(data.ortsgruppeName ? slugify(data.ortsgruppeName) : slugFromName(proposal, org));
     })().catch(() => setError('Die Angaben konnten nicht geladen werden. Bitte lade die Seite neu.'));
   }, [org]);
+
+  // Ebenen ohne Schichtplan, unter denen die Person wählen kann (die unterste zuerst)
+  const choices = (eligibility?.options ?? []).filter((o) => o.existingDepartment === null);
+  const chosen = choices.find((o) => o.hitobitoGroupId === groupId) ?? null;
+  const chosenName = chosen?.name ?? eligibility?.ortsgruppeName ?? null;
+
+  const choose = (id: number) => {
+    const option = choices.find((o) => o.hitobitoGroupId === id);
+    if (!option) return;
+    setGroupId(id);
+    if (!nameTouched) setName(withOrgName(option.name, org));
+    if (!slugTouched) setSlug(slugFromName(option.name, org));
+  };
 
   /** «Später»: weiter wie nach einem normalen Login */
   const later = () => {
@@ -77,7 +101,11 @@ function CreateDepartment() {
       const res = await fetch('/api/departments/cevidb', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ departmentName: name.trim(), slug }),
+        body: JSON.stringify({
+          departmentName: name.trim(),
+          slug,
+          ...(org.slug !== 'verein' && groupId !== null ? { hitobitoGroupId: groupId } : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Anlegen hat nicht geklappt.');
@@ -120,7 +148,9 @@ function CreateDepartment() {
             <h1 className="font-display text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-fg text-balance">
               {org.slug === 'verein'
                 ? 'Neuen Verein anlegen'
-                : (eligibility.ortsgruppeName ?? `Deine ${org.unitTerm}`) + ' hat noch keinen Schichtplan'}
+                : choices.length > 1
+                  ? 'Für welche Ebene willst du einen Schichtplan anlegen?'
+                  : (chosenName ?? `Deine ${org.unitTerm}`) + ' hat noch keinen Schichtplan'}
             </h1>
             <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
               {org.slug === 'verein'
@@ -134,10 +164,36 @@ function CreateDepartment() {
 
             <div className="mt-8 space-y-5">
               {error && <Callout tone="danger">{error}</Callout>}
+              {choices.length > 1 && (
+                <fieldset className="space-y-2">
+                  <legend className="mb-2 text-[13px] font-semibold text-fg">Du leitest mehrere Ebenen</legend>
+                  {choices.map((option) => (
+                    <label
+                      key={option.hitobitoGroupId}
+                      className={`flex cursor-pointer items-center gap-3 rounded-field border px-4 py-3 transition-colors ${
+                        option.hitobitoGroupId === groupId ? 'border-accent bg-accent/10' : 'border-line bg-surface hover:bg-surface-2'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ebene"
+                        className="accent-[rgb(var(--accent))]"
+                        checked={option.hitobitoGroupId === groupId}
+                        onChange={() => choose(option.hitobitoGroupId)}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[15px] font-medium text-fg">{option.name}</span>
+                        {option.groupType && <span className="block text-[13px] text-fg-muted">{option.groupType}</span>}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
               <Field label={org.slug === 'verein' ? 'Name des Vereins' : `Name der ${org.unitTerm}`} required>
                 <Input
                   value={name}
                   onChange={(e) => {
+                    setNameTouched(true);
                     setName(e.target.value);
                     if (!slugTouched) setSlug(slugify(e.target.value.replace(new RegExp(`^${org.orgName}\\s+`, 'i'), '')));
                   }}

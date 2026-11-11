@@ -1022,6 +1022,21 @@ export interface DepartmentCreationEligibilityDto {
   /** Name der Cevi.DB-Gruppe, in der die Person Abteilungsleitung ist (z. B. "JS Illnau") */
   leaderGroupName: string | null;
   existingDepartment: { name: string; slug: string } | null;
+  /**
+   * Alle Ebenen, die die Person leitet (Abteilung, Region, Kantonalverband …), die unterste zuerst. Ohne
+   * `existingDepartment` lässt sich dort ein Schichtplan anlegen. Bei mehreren wählt die Person beim Anlegen.
+   */
+  options?: DepartmentCreationOptionDto[];
+}
+
+export interface DepartmentCreationOptionDto {
+  hitobitoGroupId: number;
+  name: string;
+  /** Gruppentyp aus der Verbands-DB, z. B. «Abteilung», «Region», «Kantonalverband»; null, wenn noch unbekannt */
+  groupType: string | null;
+  /** 0: Abteilung / Ortsgruppe / Schar, höher: Region, Kantonalverband usw. */
+  level: number;
+  existingDepartment: { name: string; slug: string } | null;
 }
 
 /** Eintrag im Protokoll von Schicht-Eintragungen und -Austragungen */

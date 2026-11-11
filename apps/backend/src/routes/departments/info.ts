@@ -221,12 +221,29 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
           .status(reason === 'EXISTS' ? 409 : 403)
           .send({ error: NOT_ELIGIBLE_MESSAGES[reason], reason, existingDepartment: eligibility.existingDepartment });
       }
-      const ceviDbGroupId = eligibility.ortsgruppeId;
+      // Leitet die Person mehrere Ebenen (z. B. Abteilung und Region), zählt ihre Wahl, aber nur unter ihren eigenen
+      const options = eligibility.options ?? [];
+      const chosen =
+        !isOther && input.hitobitoGroupId !== undefined
+          ? options.find((o) => o.hitobitoGroupId === input.hitobitoGroupId)
+          : options.find((o) => o.hitobitoGroupId === eligibility.ortsgruppeId);
+      if (!isOther && input.hitobitoGroupId !== undefined && !chosen) {
+        return reply.status(403).send({ error: NOT_ELIGIBLE_MESSAGES.NOT_LEADER, reason: 'NOT_LEADER', existingDepartment: null });
+      }
+      if (chosen?.existingDepartment) {
+        return reply
+          .status(409)
+          .send({ error: NOT_ELIGIBLE_MESSAGES.EXISTS, reason: 'EXISTS', existingDepartment: chosen.existingDepartment });
+      }
+      const ceviDbGroupId = chosen?.hitobitoGroupId ?? eligibility.ortsgruppeId;
+      // Eine höhere Ebene (Region, Kantonalverband) wird nicht zur Heimabteilung, wenn die Person schon eine hat
+      const isUpperLevel = (chosen?.level ?? 0) > 0;
       const founderUser = await fastify.prisma.user.findUnique({
         where: { id: request.user.id },
-        select: { provider: true },
+        select: { provider: true, homeDepartmentId: true },
       });
       const provider = isOther ? 'OTHER' : (founderUser?.provider ?? 'CEVI');
+      const becomesHome = !isUpperLevel || !founderUser?.homeDepartmentId;
 
       try {
         const departmentResult = await fastify.prisma.$transaction(async (tx) => {
@@ -248,15 +265,17 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
               leaderSource: isOther ? 'MANUAL' : 'CEVIDB',
             },
           });
-          await tx.user.update({
-            where: { id: request.user.id },
-            data: {
-              homeDepartmentId: created.id,
-              homeDepartmentSource: isOther ? 'SELF' : 'CEVIDB',
-              ...NO_HOME_CONFIRMATION,
-              departmentSetupAt: new Date(),
-            },
-          });
+          if (becomesHome) {
+            await tx.user.update({
+              where: { id: request.user.id },
+              data: {
+                homeDepartmentId: created.id,
+                homeDepartmentSource: isOther ? 'SELF' : 'CEVIDB',
+                ...NO_HOME_CONFIRMATION,
+                departmentSetupAt: new Date(),
+              },
+            });
+          }
 
           // Alle bereits angemeldeten Cevi.DB-Personen dieser Gruppe werden Helfer*innen bzw. Abteilungsleitung
           // (nur bei Hitobito-Gruppen, nicht bei Vereinen)

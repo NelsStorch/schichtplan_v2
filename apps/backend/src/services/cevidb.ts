@@ -221,6 +221,8 @@ export interface CeviDbGroupInfo {
   ortsgruppeId: number | null;
   /** Nur bei Ortsgruppen: Anzahl Jungscharen */
   jungscharCount: number | null;
+  /** Gruppentyp laut Gruppen-API (z. B. «Abteilung», «Region») */
+  groupType?: string | null;
 }
 
 export interface CeviDbPlacement {
