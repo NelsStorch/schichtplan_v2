@@ -134,6 +134,14 @@ describe('Verband aus dem Host', () => {
     expect(loginBaseUrl()).toBe('https://login.cevi-schichtplan.ch');
   });
 
+  it('getLandingUrl generiert domain-spezifische Landing-Links', () => {
+    expect(getLandingUrl('/', 'dev.vereins-schichtplan.ch')).toBe('https://dev.vereins-schichtplan.ch');
+    expect(getLandingUrl('/kontakt', 'pfadi-schichtplan.ch')).toBe('https://pfadi-schichtplan.ch/kontakt');
+    expect(getLandingUrl('/', 'cevi-schichtplan.ch')).toBe('https://cevi-schichtplan.ch');
+    expect(getLandingUrl('/profil', 'localhost:3000')).toBe('http://localhost:3001/profil');
+    expect(getLandingUrl()).toBe('/');
+  });
+
   it('getDepartmentUrl respektiert die Organisation', () => {
     expect(getDepartmentUrl('schleife', '/events/fest', 'PFADI')).toBe('https://schleife.pfadi-schichtplan.ch/events/fest');
     expect(getDepartmentUrl('jungwacht', '/', 'JUBLA')).toBe('https://jungwacht.jubla-schichtplan.ch');
