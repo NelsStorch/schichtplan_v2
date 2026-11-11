@@ -3,13 +3,13 @@
 const { siteTitleHref } = Astro.locals.starlightRoute;
 ---
 
-<a href={siteTitleHref} class="st" aria-label="Cevi Schichtplan Hilfe, Startseite">
+<a href={siteTitleHref} class="st" aria-label="Cevi Schichtplan Hilfe, Startseite" data-org-title-link>
   <span class="st-logo" aria-hidden="true">
-    <img src="/cevi-logo.svg" alt="" width="30" height="30" />
+    <img src="/cevi-logo.svg" alt="" width="30" height="30" data-org-logo />
   </span>
   <span class="st-text" translate="no">
     <span class="st-name">Hilfe</span>
-    <span class="st-sub">Cevi Schichtplan</span>
+    <span class="st-sub" data-org-sub>Cevi Schichtplan</span>
   </span>
 </a>
 

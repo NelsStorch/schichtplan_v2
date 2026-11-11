@@ -1,44 +1,46 @@
 ---
-title: Abteilung und Stufen angeben
-description: Manche Anlässe sind nur für eine Abteilung oder einzelne Stufen. Damit der Schichtplan das prüfen kann, sagst du einmal, wo du dabei bist.
+title: Organisation, Abteilung & Gruppen angeben
+description: Manche Anlässe sind nur für eine bestimmte Organisation oder einzelne Gruppen. Damit der Schichtplan das prüfen kann, sagst du einmal, wo du dabei bist.
 audience: [helfer]
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import Btn from '../../../components/Btn.astro';
 import Path from '../../../components/Path.astro';
 
-Nach dem ersten Login erscheint oben ein gelber Hinweis: **«Zu welcher Abteilung gehörst du?»**. Er bleibt, bis du eine Antwort gegeben hast. Auch «keine Abteilung» ist eine Antwort.
+Nach dem ersten Login erscheint oben ein gelber Hinweis: **«Zu welcher Organisation gehörst du?»**. Er bleibt, bis du eine Auswahl getroffen hast. Auch «keine Organisation» ist eine gültige Antwort.
 
-## Abteilung wählen
+## Organisation & Gruppen wählen
 
 <Steps>
-1. Tippe auf <Btn>Abteilung angeben</Btn>. Du landest auf `login.cevi-schichtplan.ch/abteilung`.
-2. Wähle deine Abteilung aus der Liste. Bei vielen Abteilungen hilft das Suchfeld.
-3. Gehörst du zu keiner Abteilung, zum Beispiel als Elternteil, Ehemalige\*r oder Gast, wähle **Ich gehöre zu keiner Abteilung**.
-4. Hat die Abteilung Stufen erfasst, wähle für jede Stufe **Nein**, **Teilnehmer\*in** oder **Leitung**. Keine Stufe ist auch in Ordnung.
+1. Tippe auf <Btn>Organisation angeben</Btn>. Du landest auf der Auswahlseite.
+2. Wähle deine Abteilung, deine Schar oder deinen Verein aus der Liste. Bei vielen Einträgen hilft das Suchfeld.
+3. Gehörst du zu keiner festen Einheit, zum Beispiel als Gast oder einmalige Helfer\*in, wähle **Ich gehöre zu keiner Organisation**.
+4. Sind Gruppen oder Stufen erfasst (z. B. Leiterteam, Aktivriege, Junioren), wähle für jede Gruppe deine Funktion (**Nein**, **Teilnehmer\*in / Mitglied** oder **Leitung**).
 5. Tippe auf <Btn variant="primary">Speichern und weiter</Btn>. Die Angabe gilt sofort.
 </Steps>
 
-:::tip[Mit Cevi-Name gibt es diesen Schritt nicht]
-Wer sich mit Cevi-Name anmeldet, macht das immer an einer Abteilung. Das Profil gehört dann zu dieser Abteilung, die Stufen wählst du gleich beim Anlegen.
-:::
-
-:::note[Mit Cevi.DB ist alles schon da]
-Hast du dich mit Cevi.DB angemeldet, kommt die Abteilung aus deinen Rollen und lässt sich hier nicht ändern. Führen deine Rollen zu keiner Abteilung, zum Beispiel wenn du nur im Vorstand bist, wählst du sie selbst. Die Abteilungsleitung kann dich dann [bestätigen](/abteilung/personen/). Stufen aus der Cevi.DB sind mit «aus Cevi.DB» markiert und ebenfalls fest. Stimmt etwas nicht, korrigiert es die Cevi.DB-Verwaltung deiner Abteilung. Beim nächsten Login übernimmt der Schichtplan die neuen Angaben.
-:::
+<Tabs>
+  <TabItem label="Für Cevi / Pfadi / Jubla (Verband)">
+    Hast du dich mit der Verbandsdatenbank (Cevi.DB, MiData oder Jubla-DB) angemeldet, ist deine Abteilung bzw. Schar anhand deiner aktiven Leitungsrollen meist schon **automatisch hinterlegt** und muss nicht manuell gewählt werden. Auch offizielle Verbandsstufen werden direkt synchronisiert.
+  </TabItem>
+  <TabItem label="Für Vereine">
+    Bei Vereinen wählst du deinen Verein beim ersten Login aus der Liste oder landest automatisch darauf, wenn du über den Einladungs-Link deines Vereins kommst.
+  </TabItem>
+  <TabItem label="Passwortloser Login">
+    Wer sich ohne Passwort mit Vorname/Spitzname und Geburtsdatum anmeldet, ist automatisch der jeweiligen Abteilung oder dem Verein zugeordnet, über dessen Link der Aufruf erfolgte.
+  </TabItem>
+</Tabs>
 
 ## Später ändern
 
-<Path steps={['Konto', 'Abteilung & Stufen']} />
+<Path steps={['Konto', 'Organisation & Stufen']} />
 
-Oder auf `cevi-schichtplan.ch/profil` bei «Abteilung & Stufen» auf <Btn>Ändern</Btn>.
+Oder im Profil unter «Organisation & Gruppen» auf <Btn>Ändern</Btn>.
 
 ## Wofür das gut ist
 
-- Anlässe mit dem Zugang **Abteilungs-intern** lassen nur Personen der Abteilung zu.
-- Anlässe mit **Stufen-Filter** lassen nur bestimmte Stufen zu, zum Beispiel nur das Leiterteam.
-- Anlässe **nur für Leitende** brauchen bei dir in mindestens einer Stufe die Rolle **Leitung**.
-- Ist die Startseite einer Abteilung [nur für Mitglieder](/abteilung/einstellungen/), siehst du die Anlässe nur mit dieser Abteilung als Heimabteilung.
-
-Die Abteilungsleitung sieht, wer sich ihrer Abteilung zugeordnet hat, und kann Stufen anpassen oder falsche Zuordnungen entfernen.
+- Anlässe mit dem Zugang **Intern** lassen nur Personen der jeweiligen Organisation zu.
+- Anlässe mit **Gruppen-Filter** lassen nur bestimmte Teams zu (z. B. nur das Leitungsteam oder die 1. Mannschaft).
+- Anlässe **nur für Leitende** setzen in mindestens einer Gruppe die Funktion **Leitung** voraus.
+- Ist die Portalseite einer Organisation [nur für Mitglieder](/abteilung/einstellungen/) sichtbar, sehen Helfende die Anlässe nur dann, wenn sie dieser Organisation zugeordnet sind.

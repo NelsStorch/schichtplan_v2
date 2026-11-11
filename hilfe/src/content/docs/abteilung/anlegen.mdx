@@ -1,68 +1,84 @@
 ---
-title: Die Abteilung anlegen
-description: Den Schichtplan für eure Abteilung legt die Abteilungsleitung an, mit Cevi.DB. Das dauert eine Minute.
+title: Organisation oder Verein anlegen
+description: Den Schichtplan für eure Abteilung, eure Schar oder euren Verein anlegen. Das dauert nur eine Minute.
 audience: [abteilung]
 numbered: true
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import Btn from '../../../components/Btn.astro';
 import FaqItem from '../../../components/FaqItem.astro';
 
-## Wer darf das?
+Egal ob Jugendverband oder lokaler Sportverein: Jede Organisation erhält auf dem Schichtplan ihre eigene feste Webadresse (Subdomain), zum Beispiel `illnau.cevi-schichtplan.ch` oder `turnier.vereins-schichtplan.ch`.
 
-Eine neue Abteilung legt nur die **Abteilungsleitung laut Cevi.DB** an, also wer in der Cevi.DB die Rolle «Abteilungsleiter\*in» hat. So gibt es pro Ortsgruppe genau einen Schichtplan, und niemand legt aus Versehen einen zweiten an. Hat eine Ortsgruppe mehrere Jungscharen, bekommt jede Jungschar ihren eigenen.
+<Tabs>
+  <TabItem label="Für Cevi / Pfadi / Jubla (Verband)">
+    ## Wer darf den Schichtplan anlegen?
 
-Bist du nicht Abteilungsleitung, frag eure AL, ob sie den Schichtplan anlegt. Sie kann dir danach Rechte geben, zum Beispiel «Administration» oder «Anlässe erstellen». Abteilungsleitung im Schichtplan wird, wer es auch in der Cevi.DB ist.
+    In den Jugendverbänden wird der Schichtplan von der **offiziellen Abteilungs- bzw. Scharleitung laut Verbands-Datenbank** angelegt:
+    - **Cevi:** Rolle «Abteilungsleiter\*in» in der Cevi.DB
+    - **Pfadi:** Rolle «Abteilungsleiter\*in» in der PBS MiData
+    - **Jubla:** Rolle «Scharleiter\*in» in der Jubla-Datenbank
 
-## So geht es
+    Dadurch ist sichergestellt, dass pro Ortsgruppe genau ein offizieller Schichtplan existiert.
 
-<Steps>
-1. Öffne `cevi-schichtplan.ch` und tippe auf <Btn variant="primary">Abteilung anlegen</Btn>.
-2. Melde dich mit <Btn variant="primary">Mit Cevi.DB anmelden</Btn> an.
-3. Hat eure Abteilung noch keinen Schichtplan, erscheint **«… hat noch keinen Schichtplan»**. Das passiert auch automatisch nach deinem ersten Cevi.DB-Login.
-4. **Name der Abteilung**: vorgeschlagen aus der Cevi.DB, zum Beispiel «Cevi Weiningen-Geroldswil». Lässt sich später ändern.
-5. **Subdomain**: die Adresse, zum Beispiel `illnau` für `illnau.cevi-schichtplan.ch`. 3 bis 30 Zeichen, Kleinbuchstaben, Zahlen und Bindestriche. **Lässt sich später nicht ändern.**
-6. Tippe auf <Btn variant="primary">Abteilung anlegen</Btn>. Du landest direkt auf eurer neuen Adresse.
-</Steps>
+    ## So geht es für Verbandsabteilungen
 
-Mit <Btn variant="ghost">Später</Btn> überspringst du den Schritt und kommst beim nächsten Cevi.DB-Login wieder hierher.
+    <Steps>
+    1. Öffne die Hauptseite deines Verbands (z. B. `cevi-schichtplan.ch` oder `pfadi-schichtplan.ch`) und tippe auf <Btn variant="primary">Abteilung anlegen</Btn>.
+    2. Melde dich mit deinem Verbands-Account (Cevi.DB, MiData oder Jubla-DB) an.
+    3. Hat deine Abteilung noch keinen Schichtplan, erkennt das System deine Leitungsrolle und schlägt dir die Erstellung vor.
+    4. **Name**: Wird automatisch aus der Verbandsdatenbank vorgeschlagen (z. B. «Cevi Weiningen» oder «Pfadi St. Georg»).
+    5. **Subdomain**: Die kurze Webadresse (z. B. `weiningen` für `weiningen.cevi-schichtplan.ch`). 3 bis 30 Zeichen. **Lässt sich später nicht mehr ändern.**
+    6. Klicke auf <Btn variant="primary">Abteilung anlegen</Btn>. Du wirst sofort zu eurem neuen Schichtplan weitergeleitet.
+    </Steps>
 
-:::tip[Kurze Subdomain wählen]
-Die Adresse landet auf Flyern und im Gruppenchat. `illnau` ist besser als `cevi-illnau-effretikon`. Einige Namen sind reserviert, zum Beispiel `www`, `admin`, `login` oder `hilfe`.
-:::
+    ### Was dabei passiert
+    - Du wirst automatisch **Hauptverantwortliche Leitung** im Schichtplan.
+    - Die Abteilung wird direkt mit eurer offiziellen Verbandsgruppe verknüpft.
+    - Andere Leitende eurer Gruppe erhalten beim Login automatisch ebenfalls Leitungsrechte.
+  </TabItem>
 
-## Was dabei passiert
+  <TabItem label="Für Vereine (E-Mail & Passwort)">
+    ## Wer darf einen Verein anlegen?
 
-- Du wirst **Abteilungsleitung** im Schichtplan (Hauptverantwortliche\*r). Weitere Abteilungsleiter\*innen aus der Cevi.DB kommen beim Login automatisch dazu. Du wirst auch Kontaktperson der Abteilung.
-- Die Abteilung wird mit eurer **Cevi.DB-Gruppe** verknüpft: mit der Ortsgruppe oder, wenn sie mehrere Jungscharen hat, mit eurer Jungschar.
-- Alle, die sich schon mit Cevi.DB angemeldet haben und dort Rollen haben, bekommen die Abteilung als Heimabteilung. Wer Rollen in mehreren Jungscharen hat, wird Mitglied und behält die bisherige Heimabteilung. Wer später dazukommt, wird beim Cevi.DB-Login automatisch zugeordnet.
+    Bei unabhängigen Vereinen, Clubs und Festkomitees kann **jedes Vorstands- oder OK-Mitglied** einen neuen Verein im Schichtplan eröffnen. Die erstellende Person wird automatisch Hauptadministrator\*in und kann anschliessend weiteren Personen Rechte im Verein erteilen.
+
+    ## So geht es für Vereine
+
+    <Steps>
+    1. Öffne `vereins-schichtplan.ch` und tippe auf <Btn variant="primary">Verein anlegen</Btn>.
+    2. Melde dich mit deinem E-Mail-Konto an oder erstelle kostenlos ein neues Vereinskonto.
+    3. **Name des Vereins**: Gib den offiziellen Namen deines Vereins ein (z. B. «FC Musterstadt» oder «Turnverein Wald»).
+    4. **Subdomain**: Wähle eure persönliche Webadresse (z. B. `fcmusterstadt` für `fcmusterstadt.vereins-schichtplan.ch`).
+    5. Klicke auf <Btn variant="primary">Verein anlegen</Btn>. Euer Vereinsportal ist sofort einsatzbereit.
+    </Steps>
+
+    ### Was danach zu tun ist
+    - Im Bereich [Einstellungen](/abteilung/einstellungen/) Vereinslogo hochladen und Vereinsfarben festlegen.
+    - [Gruppen oder Teams](/abteilung/stufen/) anlegen (z. B. Aktivmannschaft, Vorstand, Junioren).
+    - Weitere Vorstandsmitglieder unter [Personen & Rechte](/abteilung/rechte/) mit Leitungsrechten ausstatten.
+    - Den ersten [Anlass erstellen](/ok/anlass-erstellen/).
+  </TabItem>
+</Tabs>
 
 ## Die nächsten Schritte
 
-1. [Name, Logo und Farbe](/abteilung/einstellungen/) setzen.
-2. [Stufen](/abteilung/stufen/) erfassen, am einfachsten über die Vorschläge aus der Cevi.DB.
-3. [Rechte](/abteilung/rechte/) vergeben: Wer plant Anlässe mit?
+1. [Name, Logo und Primärfarbe](/abteilung/einstellungen/) anpassen.
+2. [Stufen oder Gruppen](/abteilung/stufen/) erfassen.
+3. [Rechte vergeben](/abteilung/rechte/): Wer im Leitungsteam plant welche Anlässe?
 4. Den ersten [Anlass erstellen](/ok/anlass-erstellen/).
 
-## Wenn es nicht klappt
+## Häufige Fragen
 
-<FaqItem q="«Für deine Abteilung gibt es schon einen Schichtplan»">
-Jemand aus eurer Abteilung war schneller. Tippe auf den Knopf mit dem Namen der Abteilung. Brauchst du dort mehr Rechte, frag die Person, die angelegt hat, oder die [Kontaktadresse](/wissen/kontakt/).
+<FaqItem q="«Für deine Organisation gibt es schon einen Schichtplan»">
+Jemand aus eurem Team hat die Organisation bereits angelegt. Wende dich an eure Hauptleitung, um Administrator- oder Planungsrechte für euer Portal zu erhalten.
 </FaqItem>
 
-<FaqItem q="«Melde dich dazu mit Cevi.DB an»">
-Du bist mit Cevi-Name oder E-Mail angemeldet. Nur über Cevi.DB sieht der Schichtplan deine Rolle und eure Ortsgruppe.
+<FaqItem q="«Eine neue Abteilung kann nur die Abteilungsleitung anlegen» (Verband)">
+In der Verbandsdatenbank ist für dich noch keine offizielle Abteilungs- bzw. Scharleitungsrolle eingetragen. Bitte wende dich an die Datenbank-Verwaltung deines Verbands, um deine Rolle zu aktualisieren.
 </FaqItem>
 
-<FaqItem q="«Wir konnten deine Gruppe in Cevi.DB gerade nicht prüfen»">
-Der Schichtplan konnte deine Gruppe in der Cevi.DB nicht lesen. Melde dich nochmals mit Cevi.DB an.
-</FaqItem>
-
-<FaqItem q="«In Cevi.DB ist für dich keine Ortsgruppe hinterlegt»">
-Deine Leitungsrolle liegt in keiner Ortsgruppe. Melde dich bei der Cevi.DB-Verwaltung eurer Abteilung.
-</FaqItem>
-
-<FaqItem q="«Eine neue Abteilung kann nur die Abteilungsleitung anlegen»">
-Du hast in der Cevi.DB keine Abteilungsleitungs-Rolle. Frag eure Abteilungsleitung.
+<FaqItem q="Kann die Subdomain später geändert werden?">
+Die Subdomain (z. B. <code>muster.vereins-schichtplan.ch</code>) lässt sich aus technischen Gründen nach der Erstellung nicht mehr umbenennen, da sie auf Flyern und Links fest verankert ist. Wähle daher eine prägnante, kurze Bezeichnung.
 </FaqItem>

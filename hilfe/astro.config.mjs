@@ -30,6 +30,7 @@ export default defineConfig({
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
       customCss: ['./src/styles/fonts.css', './src/styles/theme.css', './src/styles/content.css'],
       head: [
+        { tag: 'script', attrs: { src: '/branding.js' } },
         { tag: 'link', attrs: { rel: 'icon', href: '/favicon.ico', sizes: '48x48' } },
         { tag: 'link', attrs: { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' } },
         { tag: 'link', attrs: { rel: 'icon', href: '/favicon-48x48.png', type: 'image/png', sizes: '48x48' } },
@@ -109,7 +110,7 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Abteilungsleitung',
+          label: 'Organisation & Leitung',
           items: [
             'abteilung/anlegen',
             'abteilung/einstellungen',

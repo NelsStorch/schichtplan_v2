@@ -38,17 +38,17 @@ const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
     <div class="ft-copy">
       <p class="ft-title">Nicht gefunden, was du suchst?</p>
       <p class="ft-text">
-        Frag zuerst das OK deines Anlasses oder deine Abteilungsleitung. Fehler im Schichtplan selbst meldest du
+        Frag zuerst das OK deines Anlasses oder die Leitung deiner Abteilung, Schar bzw. deines Vereins. Fehler im Schichtplan selbst meldest du
         über <a href="/wissen/kontakt/">Kontakt</a>.
       </p>
     </div>
   </div>
 
   <div class="ft-bottom">
-    <span>© {new Date().getFullYear()} Cevi Schichtplan · ehrenamtlich &amp; Open Source</span>
+    <span data-footer-copyright>© {new Date().getFullYear()} Cevi Schichtplan · ehrenamtlich &amp; Open Source</span>
     <nav aria-label="Weitere Seiten des Schichtplans">
-      <a href="https://cevi-schichtplan.ch" data-app-link>cevi-schichtplan.ch</a>
-      <a href="https://login.cevi-schichtplan.ch">Login</a>
+      <a href="https://cevi-schichtplan.ch" data-app-link data-footer-app-domain>cevi-schichtplan.ch</a>
+      <a href="https://login.cevi-schichtplan.ch" data-footer-login-domain>Login</a>
       <a href="https://github.com/NelsStorch/schichtplan_v2" rel="noopener">GitHub</a>
     </nav>
   </div>

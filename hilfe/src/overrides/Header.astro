@@ -23,16 +23,24 @@ import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
 </div>
 
 <script>
-  // Intelligenter Rücksprung: Merkt sich, von welcher Abteilung der Besucher kam
+  // Intelligenter Rücksprung: Merkt sich, von welcher Abteilung / Schar / welchem Verein der Besucher kam
   try {
     const params = new URLSearchParams(window.location.search);
     let fromUrl = params.get('from');
+    const validDomains = [
+      'cevi-schichtplan.ch',
+      'pfadi-schichtplan.ch',
+      'jubla-schichtplan.ch',
+      'vereins-schichtplan.ch',
+    ];
 
     if (!fromUrl && document.referrer) {
-      const ref = new URL(document.referrer);
-      if (ref.hostname.endsWith('cevi-schichtplan.ch') && !ref.hostname.startsWith('hilfe.')) {
-        fromUrl = ref.origin;
-      }
+      try {
+        const ref = new URL(document.referrer);
+        if (validDomains.some((d) => ref.hostname.endsWith(d)) && !ref.hostname.startsWith('hilfe.')) {
+          fromUrl = ref.origin;
+        }
+      } catch (_) {}
     }
 
     if (fromUrl) {

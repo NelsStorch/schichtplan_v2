@@ -1,44 +1,78 @@
 ---
 title: So funktioniert der Schichtplan
-description: Ein Konto für alle Abteilungen, jede Abteilung auf ihrer eigenen Adresse. Hier siehst du, was wo liegt.
+description: Ein Konto für alle Einheiten, jede Organisation auf ihrer eigenen Adresse. Hier siehst du, was wo liegt.
 audience: [helfer, ok, abteilung]
 sidebar:
   label: Überblick
 ---
 
-import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
 
-Der Cevi Schichtplan ersetzt die Excel-Liste und den Doodle für Chilbi, Lager und Feste. Helfer\*innen sehen auf einen Blick, wo noch jemand fehlt, und tragen sich selbst ein. Das OK sieht in Echtzeit, welche Schichten voll sind.
+Der Schichtplan ersetzt unübersichtliche Excel-Listen, Chat-Nachrichten und Doodle für Lager, Feste, Chilbis und Turniere. Helfende sehen auf einen Blick, wo noch jemand fehlt, und tragen sich selbst ein. Das OK sieht in Echtzeit, welche Schichten besetzt sind.
 
-## Die vier Adressen
+## Die vier Adressen deines Verbands
 
-| Adresse | Wofür |
-| --- | --- |
-| `cevi-schichtplan.ch` | Startseite, Abteilung suchen, dein [Profil](/helfen/konto/) |
-| `login.cevi-schichtplan.ch` | Anmelden. Gilt für alle Abteilungen auf einmal |
-| `deine-abteilung.cevi-schichtplan.ch` | Der Schichtplan deiner Abteilung mit allen Anlässen |
-| `hilfe.cevi-schichtplan.ch` | Diese Hilfe |
+Der Schichtplan ist für Cevi, Pfadi, Jubla und unabhängige Vereine auf eigenen Domains verfügbar:
 
-Jede Abteilung hat ihre eigene Adresse, zum Beispiel `illnau.cevi-schichtplan.ch`. Diese Adresse bleibt fest und passt auf jeden Flyer.
+<Tabs>
+  <TabItem label="Für Cevi">
+    | Adresse | Wofür |
+    | --- | --- |
+    | `cevi-schichtplan.ch` | Startseite, Abteilung suchen, dein [Profil](/helfen/konto/) |
+    | `login.cevi-schichtplan.ch` | Zentrales Login für alle Cevi-Abteilungen |
+    | `deine-abteilung.cevi-schichtplan.ch` | Der Schichtplan deiner Abteilung mit allen Anlässen |
+    | `hilfe.cevi-schichtplan.ch` | Dieses Hilfe-Center |
+  </TabItem>
+  <TabItem label="Für Pfadi">
+    | Adresse | Wofür |
+    | --- | --- |
+    | `pfadi-schichtplan.ch` | Startseite, Abteilung suchen, dein [Profil](/helfen/konto/) |
+    | `login.pfadi-schichtplan.ch` | Zentrales Login für alle Pfadi-Abteilungen |
+    | `deine-abteilung.pfadi-schichtplan.ch` | Der Schichtplan deiner Abteilung mit allen Anlässen |
+    | `hilfe.pfadi-schichtplan.ch` | Dieses Hilfe-Center |
+  </TabItem>
+  <TabItem label="Für Jubla">
+    | Adresse | Wofür |
+    | --- | --- |
+    | `jubla-schichtplan.ch` | Startseite, Schar suchen, dein [Profil](/helfen/konto/) |
+    | `login.jubla-schichtplan.ch` | Zentrales Login für alle Jubla-Scharen |
+    | `deine-schar.jubla-schichtplan.ch` | Der Schichtplan deiner Schar mit allen Anlässen |
+    | `hilfe.jubla-schichtplan.ch` | Dieses Hilfe-Center |
+  </TabItem>
+  <TabItem label="Für Vereine">
+    | Adresse | Wofür |
+    | --- | --- |
+    | `vereins-schichtplan.ch` | Startseite, Verein suchen, dein [Profil](/helfen/konto/) |
+    | `login.vereins-schichtplan.ch` | Zentrales Login mit E-Mail & Passwort |
+    | `dein-verein.vereins-schichtplan.ch` | Der Schichtplan deines Vereins mit allen Anlässen |
+    | `hilfe.vereins-schichtplan.ch` | Dieses Hilfe-Center |
+  </TabItem>
+</Tabs>
+
+Jede Einheit hat ihre eigene feste Webadresse, zum Beispiel `illnau.cevi-schichtplan.ch` oder `turnier.vereins-schichtplan.ch`. Diese Adresse bleibt dauerhaft bestehen und passt perfekt auf jeden Flyer oder in die Helfer-Einladung.
 
 :::tip[Einmal anmelden reicht]
-Du meldest dich einmal an und bist danach auf allen Abteilungen angemeldet. Hilfst du bei einer anderen Abteilung aus, brauchst du kein zweites Konto.
+Du meldest dich einmal an und bist danach auf allen Einheiten deiner Organisation angemeldet. Hilfst du bei einer befreundeten Abteilung oder einem anderen Verein aus, brauchst du kein zweites Konto.
 :::
 
 ## Wie alles zusammenhängt
 
-- Eine **Abteilung** hat beliebig viele **Anlässe**, zum Beispiel «Chilbi 2026» oder «Sommerlager».
+- **Die Organisation:**
+  - Im **Cevi** und in der **Pfadi** hat jede **Abteilung** ihren eigenen Schichtplan, verwaltet von der **Abteilungsleitung (AL)**.
+  - In der **Jubla** hat jede **Schar** ihren Schichtplan, verwaltet von der **Scharleitung (SL)**.
+  - Bei **Vereinen** hat jeder **Verein** (oder jedes Organisationskomitee) seinen Schichtplan, verwaltet von der **Vereinsleitung bzw. dem Vorstand**.
+- Eine Organisation hat beliebig viele **Anlässe**, zum Beispiel «Chilbi 2026», «Sommerlager» oder «Vereinsturnier».
 - Ein Anlass hat **Schichten**, zum Beispiel «Samstag 17:00 bis 20:00».
 - Eine Schicht hat eine oder mehrere **Arbeiten** mit eigenen Plätzen, zum Beispiel Grill 2, Bar 2, Kasse 1.
-- Das **OK** (Organisationskomitee) plant die Schichten eines Anlasses. Die **Abteilungsleitung** verwaltet die ganze Abteilung.
+- Das **OK** (Organisationskomitee) plant die Schichten eines Anlasses. Die Leitung verwaltet die gesamte Organisation.
 
 Mehr Begriffe stehen im [Glossar](/wissen/glossar/).
 
-## Auf dem Handy
+## Auf dem Smartphone
 
-Der Schichtplan ist fürs Handy gebaut. Unten gibt es eine Leiste mit **Anlässe**, **Meine Schichten** und **Konto**. Auf dem Computer stehen dieselben Punkte oben.
+Der Schichtplan ist von Grund auf fürs Smartphone optimiert. Unten gibt es eine feste Navigationsleiste mit **Anlässe**, **Meine Schichten** und **Konto**. Auf dem Computer stehen dieselben Punkte oben in der Kopfzeile.
 
-Du kannst die Seite deiner Abteilung auf den Home-Bildschirm legen (im Browser «Zum Home-Bildschirm»). Dann öffnet sie sich wie eine App, ohne App Store.
+Du kannst die Seite deiner Organisation auf den Home-Bildschirm legen (im Smartphone-Browser «Zum Home-Bildschirm hinzufügen»). Dann öffnet sie sich wie eine native App, ganz ohne Installation über den App Store.
 
 ## Auf dem Computer & Tastatur
 
@@ -47,8 +81,8 @@ Auf dem Laptop oder PC steht oben in der Navigationsleiste ein Schnellsuche-Feld
 ## Wo anfangen?
 
 <CardGrid>
-  <LinkCard title="Anmelden" description="Cevi.DB, Cevi-Name oder E-Mail: was passt zu dir?" href="/start/anmelden/" />
-  <LinkCard title="In eine Schicht eintragen" description="Schicht finden, Arbeit wählen, fertig." href="/helfen/eintragen/" />
-  <LinkCard title="Einen Anlass planen" description="Für das OK: vom leeren Anlass zum vollen Plan." href="/ok/anlass-erstellen/" />
-  <LinkCard title="Abteilung einrichten" description="Für die Abteilungsleitung mit Cevi.DB." href="/abteilung/anlegen/" />
+  <LinkCard title="Anmelden" description="Verbands-Login (Cevi.DB / MiData / Jubla-DB), Spitzname oder E-Mail: was passt zu dir?" href="/start/anmelden/" />
+  <LinkCard title="In eine Schicht eintragen" description="Schicht finden, Arbeit wählen, fertig eingetragen." href="/helfen/eintragen/" />
+  <LinkCard title="Einen Anlass planen" description="Für das OK: vom leeren Anlass zum vollständigen Helferplan." href="/ok/anlass-erstellen/" />
+  <LinkCard title="Organisation einrichten" description="Abteilung, Schar oder Verein neu anlegen und starten." href="/abteilung/anlegen/" />
 </CardGrid>

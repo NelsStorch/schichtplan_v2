@@ -1,112 +1,107 @@
 ---
 title: Anmelden
-description: Es gibt drei Wege. Mit Cevi.DB geht es am schnellsten, mit dem Cevi-Namen auch ganz ohne Passwort.
+description: Es gibt passende Wege für jede Organisation. Mit Verbands-Login geht es am schnellsten, für Vereine mit E-Mail und für Helfende sogar ganz ohne Passwort.
 audience: [helfer, ok, abteilung]
 ---
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
 import Btn from '../../../components/Btn.astro';
 
-Zum Ansehen eines Plans brauchst du meistens kein Konto. Zum **Eintragen** schon, aber ein Cevi-Name ohne Passwort reicht. Angemeldet wird immer auf `login.cevi-schichtplan.ch`, egal von welcher Abteilung du kommst.
+Zum Ansehen eines öffentlichen Schichtplans brauchst du meistens kein Konto. Zum **Eintragen** meldest du dich einmal an. Für Helfende reicht dazu oft schon der Vorname oder Spitzname mit Geburtsdatum – ganz ohne Passwort.
+
+Angemeldet wird immer auf der zentralen Login-Domain deiner Organisation (`login.cevi-schichtplan.ch`, `login.pfadi-schichtplan.ch`, `login.jubla-schichtplan.ch` oder `login.vereins-schichtplan.ch`), egal von welcher Abteilung, Schar oder welchem Verein du kommst.
 
 ## Welcher Weg passt zu mir?
 
 | Du bist … | Nimm |
 | --- | --- |
-| Leiter\*in oder Teilnehmer\*in mit Konto in der Cevi.DB | **Mit Cevi.DB anmelden** |
-| Elternteil, Ehemalige\*r, Freund\*in, kurz einmal Helfer\*in | **Mit Cevi-Name** (nur über die Seite einer Abteilung) |
-| Ohne Cevi.DB, möchtest aber ein festes Konto mit Passwort | **Mit E-Mail und Passwort** |
-| im OK oder in der Leitung, aber ohne Cevi.DB | **Mit E-Mail und Passwort** |
+| Leitende\*r oder Mitglied im **Cevi**, der **Pfadi** oder **Jubla** | **Verbands-Login** (Cevi.DB, PBS MiData oder Jubla-DB) |
+| Mitglied, Vorstand oder OK in einem **Verein** | **Mit E-Mail und Passwort** |
+| Elternteil, Ehemalige\*r, Freund\*in, kurz einmal Helfer\*in | **Mit Spitzname / Vorname** (nur über die Seite der Organisation) |
+| Im OK oder in der Leitung eines Vereins | **Mit E-Mail und Passwort** |
 
 ## So meldest du dich an
 
 <Tabs>
-  <TabItem label="Mit Cevi.DB">
+  <TabItem label="Für Cevi / Pfadi / Jubla (Verbands-Login)">
+    Leitende und Mitglieder der Jugendverbände nutzen ihren gewohnten Verbands-Account (Hitobito). Damit werden Name, Rollen und Gruppen automatisch erkannt:
+
+    - **Cevi:** Login via `db.cevi.ch`
+    - **Pfadi:** Login via `db.scout.ch` (PBS MiData)
+    - **Jubla:** Login via `db.jubla.ch` (Jubla-Datenbank)
+
     <Steps>
-    1. Tippe auf <Btn variant="primary">Mit Cevi.DB anmelden</Btn>.
-    2. Du landest auf `db.cevi.ch`. Melde dich dort an wie immer.
-    3. Cevi.DB fragt, ob der Schichtplan deine Angaben lesen darf. Bestätige.
-    4. Du kommst automatisch zurück zu der Seite, von der du gekommen bist.
+    1. Tippe auf der Login-Seite auf den Knopf deines Verbands (z. B. <Btn variant="primary">Mit Cevi.DB anmelden</Btn> oder <Btn variant="primary">Mit PBS MiData anmelden</Btn>).
+    2. Du wirst zur offiziellen Datenbank deines Verbands weitergeleitet. Melde dich dort mit deinen gewohnten Zugangsdaten an.
+    3. Die Datenbank fragt, ob der Schichtplan deine Basisdaten (Name, E-Mail, Rollen) lesen darf. Bestätige dies.
+    4. Du wirst automatisch zurück zum Schichtplan geleitet und bist sofort angemeldet.
     </Steps>
 
     :::note[Schon ein Konto mit E-Mail und Passwort?]
-    Hat dein Cevi.DB-Profil dieselbe E-Mail wie dein bestehendes Konto, fragt der Schichtplan beim ersten Cevi.DB-Login nach deinem **Passwort**. Danach ist es ein einziges Konto: Schichten und Rollen bleiben, und du meldest dich auf beide Arten an. Ohne Passwort geht der Cevi.DB-Login nicht weiter, denn zwei Konten mit derselben E-Mail gibt es nicht.
+    Hat dein Verbandsprofil dieselbe E-Mail wie ein zuvor erstelltes E-Mail-Konto, fragt der Schichtplan beim ersten Verbands-Login nach deinem **Passwort**. Danach sind beide Anmeldearten miteinander verknüpft: Deine Schichten und Leitungsrechte bleiben nahtlos erhalten.
     :::
 
-    Der Schichtplan übernimmt aus der Cevi.DB deinen Cevi-Namen, Vor- und Nachnamen, das Geburtsdatum, deine Abteilung (aus deinen Rollen) und deine Stufen. Deine Adresse übernimmt er nicht. Die Handynummer gibst du im Schichtplan selbst an. Bei jedem neuen Login werden die Angaben aufgefrischt.
+    Der Schichtplan übernimmt aus der Verbandsdatenbank deinen Verbandsnamen (Cevi-Name, Pfadiname, Leitername), Vor- und Nachnamen, das Geburtsdatum sowie deine Abteilung/Schar und Stufen. Deine Wohnadresse wird aus Datenschutzgründen nicht übernommen.
   </TabItem>
-  <TabItem label="Mit Cevi-Name">
-    Den Login mit Cevi-Name gibt es nur, wenn du **von der Seite einer Abteilung** kommst, zum Beispiel über «Anmelden» auf `illnau.cevi-schichtplan.ch` oder über den Link zu einem Anlass. Dein Profil gehört dann zu dieser Abteilung.
+
+  <TabItem label="Für Vereine (E-Mail & Passwort)">
+    Für unabhängige Vereine, Sportclubs, Dorffeste und Festkomitees erfolgt die Anmeldung und Kontoverwaltung direkt mit E-Mail-Adresse und Passwort:
 
     <Steps>
-    1. Tippe auf <Btn>Mit Cevi-Name</Btn>. Darunter steht, für welche Abteilung.
-    2. Gib deinen **Cevi-Namen** ein. Hast du keinen, nimm deinen Vornamen.
-    3. Gib dein **Geburtsdatum** ein. Zusammen mit dem Namen ist es dein Schlüssel, ganz ohne Passwort.
-    4. Tippe auf <Btn variant="primary">Weiter</Btn>. Kennt dich der Schichtplan schon, bist du angemeldet.
-    5. Bist du zum ersten Mal da, steht **Neu bei …?**. Prüf Name und Datum auf Tippfehler. Optional gibst du Vor- und Nachname, Handynummer und deine Stufen an. Dann <Btn variant="primary">Profil anlegen und weiter</Btn>.
+    1. Öffne die Seite deines Vereins oder `login.vereins-schichtplan.ch`.
+    2. Tippe auf <Btn>Mit E-Mail und Passwort</Btn>.
+    3. Noch kein Konto? Klicke auf **Konto erstellen** und trage Vorname, Nachname, E-Mail-Adresse und dein gewünschtes Passwort (mindestens 8 Zeichen) ein.
+    4. Du erhältst eine Bestätigungs-E-Mail. Klicke auf den darin enthaltenen Link, um dein Konto zu aktivieren.
+    5. Danach meldest du dich mit E-Mail und Passwort an und kannst Schichten belegen oder deinen Verein verwalten.
+    </Steps>
+
+    ### Passwort vergessen oder zurücksetzen
+
+    Hast du dein Passwort vergessen, kannst du es jederzeit zurücksetzen:
+
+    <Steps>
+    1. Klicke unter dem Passwort-Eingabefeld auf **Passwort vergessen?**.
+    2. Gib deine E-Mail-Adresse ein und tippe auf <Btn>Link schicken</Btn>.
+    3. Klicke auf den Link in der E-Mail (2 Stunden gültig) und vergib ein neues Passwort.
+    4. Melde dich mit dem neuen Passwort an.
+    </Steps>
+  </TabItem>
+
+  <TabItem label="Ohne Passwort (Mit Spitzname / Vorname)">
+    Für Gelegenheitshelfende, Kuchenbäcker\*innen, Eltern oder Gäste gibt es den besonders einfachen Login **ohne Passwort**. Dieser Login steht zur Verfügung, wenn du **über den Link deiner Organisation** kommst (z. B. `turnier.vereins-schichtplan.ch` oder `illnau.cevi-schichtplan.ch`):
+
+    <Steps>
+    1. Tippe auf der Anmeldeseite auf <Btn>Mit Spitzname</Btn> (bzw. Cevi-Name / Pfadiname / Leitername).
+    2. Gib deinen **Spitznamen** oder deinen **Vornamen** ein.
+    3. Gib dein **Geburtsdatum** ein. Zusammen mit deinem Namen bildet es deinen persönlichen Schlüssel – ganz ohne Passwort.
+    4. Tippe auf <Btn variant="primary">Weiter</Btn>. Kennt dich das System bereits, bist du sofort eingeloggt.
+    5. Wenn du zum ersten Mal da bist, überprüfe deine Angaben und tippe auf <Btn variant="primary">Profil anlegen und weiter</Btn>.
     </Steps>
 
     :::caution[Kein Passwort-Schutz]
-    Ein Cevi-Name-Profil hat **kein Passwort**: Jede Person, die deinen Cevi-Namen und dein Geburtsdatum kennt, kann sich in dein Profil einloggen. Für ein geschütztes Konto oder Aufgaben im OK melde dich stattdessen mit Cevi.DB oder mit E-Mail und Passwort an.
+    Ein Profil ohne Passwort ist für spontane Helfende gedacht: Wer deinen Namen und dein Geburtsdatum kennt, kann deine Schichten einsehen. Für Aufgaben im OK oder Vorstand erstelle stattdessen ein geschütztes Konto mit Passwort bzw. Verbandsdatenbank.
     :::
 
-    Beim nächsten Mal meldest du dich an derselben Abteilung wieder mit Cevi-Name und Geburtsdatum an. Gross- und Kleinschreibung spielen keine Rolle.
-
-    :::note[Gleicher Cevi-Name in der Abteilung?]
-    Kein Problem: Das Geburtsdatum unterscheidet euch. Zwei Profile mit gleichem Namen **und** gleichem Geburtsdatum gibt es in einer Abteilung nicht.
+    :::tip[Gleicher Name in der Organisation?]
+    Das Geburtsdatum unterscheidet Personen mit gleichem Vornamen eindeutig voneinander.
     :::
-
-    :::caution[«Melde dich bitte mit Cevi.DB an»]
-    Gehören Cevi-Name und Geburtsdatum zu einem Konto mit Cevi.DB oder mit Passwort, geht der Cevi-Name-Login nicht. Das schützt diese Konten. Nimm dann den Knopf in der Meldung und melde dich auf diesem Weg an.
-    :::
-
-    Profile nur mit Cevi-Name sind für Helfer\*innen gedacht. Für Aufgaben im OK oder in der Abteilungsleitung brauchst du ein Konto mit Cevi.DB oder mit E-Mail und Passwort.
-
-    :::tip[Später auf Cevi.DB wechseln]
-    Meldest du dich irgendwann mit Cevi.DB an, übernimmt der Schichtplan dein Cevi-Name-Profil automatisch, wenn Cevi-Name, Geburtsdatum und Abteilung übereinstimmen. Deine Schichten gehen nicht verloren.
-    :::
-  </TabItem>
-  <TabItem label="Mit E-Mail">
-    <Steps>
-    1. Tippe auf <Btn>Mit E-Mail und Passwort</Btn>.
-    2. Noch kein Konto? Tippe auf **Konto erstellen** und gib Vorname, Nachname, E-Mail und ein Passwort mit mindestens 8 Zeichen ein. Cevi-Name und Handynummer sind freiwillig.
-    3. Du bekommst eine E-Mail mit einem Bestätigungslink. Öffne ihn.
-    4. Danach meldest du dich mit E-Mail und Passwort an.
-    </Steps>
-
-    Keine E-Mail bekommen? Schau im Spam-Ordner nach oder tippe auf **Bestätigungs-E-Mail erneut senden**. Einen neuen Link gibt es höchstens einmal pro Minute.
-
-    ### Passwort vergessen oder zurücksetzen (PW)
-
-    Hast du dein Passwort (PW) vergessen, kannst du es in wenigen Sekunden zurücksetzen:
-
-    <Steps>
-    1. Tippe unter dem Passwort-Feld auf **Passwort vergessen?**.
-    2. Gib die E-Mail deines Kontos ein und tippe auf <Btn>Link schicken</Btn>.
-    3. Öffne den Link in der E-Mail (2 Stunden gültig) und wähle ein neues Passwort.
-    4. Melde dich mit dem neuen Passwort an. Auf anderen Geräten bist du danach abgemeldet.
-    </Steps>
-
-    Mit Cevi.DB oder Cevi-Name brauchst du kein Passwort, dort gibt es auch nichts zurückzusetzen.
   </TabItem>
 </Tabs>
 
 ## Wohin geht es nach dem Login?
 
-Kommst du von einer Abteilung oder einem Anlass, steht auf der Login-Seite «Danach geht es weiter zu …». Genau dorthin kommst du zurück. Öffnest du die Login-Seite direkt, landest du auf deiner Abteilung oder, wenn du keine hast, auf `cevi-schichtplan.ch`.
+Kommst du von einer Organisation oder einem konkreten Anlass, leitet dich der Schichtplan nach erfolgreichem Login direkt wieder dorthin zurück. Öffnest du die Login-Seite direkt, landest du auf der Startseite deiner Organisation.
 
-Beim ersten Login fragt der Schichtplan, [zu welcher Abteilung du gehörst](/start/abteilung-und-stufen/). Mit Cevi.DB ist das schon ausgefüllt, mit Cevi-Name ist es die Abteilung, bei der du dich angemeldet hast.
+Beim ersten Login fragt dich das System, [zu welcher Organisation du gehörst](/start/abteilung-und-stufen/). Mit Verbands-Login ist diese Angabe meist schon automatisch hinterlegt.
 
 ## Abmelden
 
-Tippe unten rechts auf **Konto** (auf dem Computer oben rechts auf deinen Namen) und dann auf <Btn variant="ghost">Abmelden</Btn>. Du bist danach auf allen Abteilungen abgemeldet.
+Tippe auf dem Smartphone unten rechts auf **Konto** (auf dem Computer oben rechts auf deinen Namen) und wähle <Btn variant="ghost">Abmelden</Btn>. Du bist danach überall sicher abgemeldet.
 
-## Probleme beim Anmelden
+## Häufige Fragen & Probleme
 
-- **«Die Anmeldung mit Cevi.DB ist im Moment nicht verfügbar»**: Versuch es etwas später nochmals.
-- **«E-Mail oder Passwort falsch»**: Prüfe die Schreibweise oder setz ein neues Passwort mit **Passwort vergessen?** (siehe oben, Reiter «Mit E-Mail»).
-- **«Zu viele Versuche»**: Nach vielen falschen Passwörtern wartet der Login eine Viertelstunde. Setz in der Zwischenzeit am besten ein neues Passwort.
-- **«Bitte bestätige zuerst deine E-Mail-Adresse»**: Öffne den Link in der Bestätigungs-E-Mail. Er ist nur eine gewisse Zeit gültig, danach forderst du einen neuen an.
-- **«Mit Cevi-Name» fehlt**: Du bist direkt auf der Login-Seite gelandet. Öffne zuerst die Seite deiner Abteilung und tippe dort auf «Anmelden».
-- **«Neu bei …?», obwohl du schon da warst**: Prüf das Geburtsdatum und ob du bei derselben Abteilung bist. Profile von früher ohne Geburtsdatum lassen sich nicht mehr so anmelden. Leg dann ein neues an, deine alten Eintragungen sieht das OK weiterhin.
-- **«Zu viele Versuche»**: Nach mehreren falschen Versuchen ist der Cevi-Name-Login für ein paar Minuten gesperrt. Warte kurz und versuch es nochmals.
+- **«Die Verbands-Anmeldung ist im Moment nicht verfügbar»**: Es liegt meist eine kurze Störung der externen Verbands-Datenbank vor. Bitte versuche es etwas später nochmals.
+- **«E-Mail oder Passwort falsch»**: Prüfe die Gross- und Kleinschreibung oder setze dein Passwort über **Passwort vergessen?** zurück.
+- **«Bitte bestätige zuerst deine E-Mail-Adresse»**: Prüfe deinen Posteingang und Spam-Ordner nach dem Bestätigungslink.
+- **«Mit Spitzname» fehlt**: Der passwortlose Login existiert nur über die spezifische Subdomain deiner Organisation (z. B. `illnau.cevi-schichtplan.ch`), nicht auf der globalen Login-Hauptseite.
+- **«Zu viele Versuche»**: Nach mehreren Fehleingaben wird der Login zum Schutz deines Kontos für wenige Minuten gesperrt.
