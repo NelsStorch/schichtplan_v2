@@ -6,18 +6,30 @@
   // Auch fuer andere Skripte der Seite (z. B. den Ruecksprung in der Kopfzeile)
   window.SCHICHTPLAN_ORGS = ORGS;
 
-  // Verband aus einem Text (Hostname, Rücksprung-URL): erst die Verbände mit eigener Kennung, dann Cevi
+  // Verband aus einem Hostnamen oder einer Rücksprung-URL. Massgebend ist das Domain-Ende: Eine Cevi-Abteilung
+  // «pfadi-wald.cevi-schichtplan.ch» bleibt Cevi. Nur ohne Verbandsdomain (lokal, z. B. pfadi.localhost) zählt
+  // die Kennung im Namen: erst die Verbände mit eigener Kennung, dann Cevi.
   function orgFromText(text) {
-    const own = Object.values(ORGS).find((o) => o.slug !== 'cevi' && text.includes(o.slug));
+    let host = String(text || '').toLowerCase();
+    try {
+      if (host.includes('://')) host = new URL(host).hostname;
+    } catch (_) {
+      return null;
+    }
+    host = host.replace(/\.$/, '');
+    const byDomain = Object.values(ORGS).find((o) => host === o.domain || host.endsWith('.' + o.domain));
+    if (byDomain) return byDomain;
+    const own = Object.values(ORGS).find((o) => o.slug !== 'cevi' && host.includes(o.slug));
     if (own) return own;
-    return text.includes('cevi') ? ORGS.cevi : null;
+    return host.includes('cevi') ? ORGS.cevi : null;
   }
 
   function detectOrg() {
     const host = window.location.hostname.toLowerCase();
     const params = new URLSearchParams(window.location.search);
     const orgParam = params.get('org');
-    if (orgParam && ORGS[orgParam]) return ORGS[orgParam];
+    // Nur eigene Schlüssel: «?org=__proto__» oder «?org=constructor» würde sonst ein Objekt ohne Verbandsdaten liefern
+    if (orgParam && Object.prototype.hasOwnProperty.call(ORGS, orgParam)) return ORGS[orgParam];
 
     // Der Host der Hilfe-Seite hat Vorrang vor einem gemerkten Rücksprung
     const byHost = orgFromText(host);
