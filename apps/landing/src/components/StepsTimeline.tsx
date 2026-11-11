@@ -3,28 +3,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, Share2, UserCheck } from 'lucide-react';
 import { Reveal } from '@/components/Reveal';
-
-const steps = [
-  {
-    icon: CalendarPlus,
-    title: 'Anlass erfassen',
-    text: 'Das OK legt Schichten an: wann, was zu tun ist und wie viele Leute es braucht. Mit einer Vorlage vom Vorjahr geht das in Minuten.',
-  },
-  {
-    icon: Share2,
-    title: 'Link teilen',
-    text: 'Den Link per WhatsApp, Mail oder Flyer verschicken. Ihr bestimmt, wer sich eintragen darf: alle, nur eure Abteilung oder einzelne Stufen.',
-  },
-  {
-    icon: UserCheck,
-    title: 'Alle tragen sich ein',
-    text: 'Helfer*innen wählen ihre Schicht selbst, auch Eltern und Ehemalige ohne Cevi.DB. Das OK sieht sofort, wo noch Lücken sind.',
-  },
-];
+import type { OrganizationConfig } from '@schichtplan/shared';
 
 /** Die drei Schritte mit einer Linie, die sich beim Scrollen zeichnet (am Handy senkrecht) */
-export function StepsTimeline() {
+export function StepsTimeline({ org }: { org?: OrganizationConfig } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const unitTerm = org?.unitTerm ?? 'Abteilung';
+  const authProvider = org?.slug === 'verein' ? 'Konto' : (org?.authProviderShort ?? 'Cevi.DB');
+
+  const steps = [
+    {
+      icon: CalendarPlus,
+      title: 'Anlass erfassen',
+      text: 'Das OK legt Schichten an: wann, was zu tun ist und wie viele Leute es braucht. Mit einer Vorlage vom Vorjahr geht das in Minuten.',
+    },
+    {
+      icon: Share2,
+      title: 'Link teilen',
+      text: `Den Link per WhatsApp, Mail oder Flyer verschicken. Ihr bestimmt, wer sich eintragen darf: alle, nur eure ${unitTerm} oder einzelne Stufen.`,
+    },
+    {
+      icon: UserCheck,
+      title: 'Alle tragen sich ein',
+      text: `Helfer*innen wählen ihre Schicht selbst, auch Eltern und Ehemalige ohne ${authProvider}. Das OK sieht sofort, wo noch Lücken sind.`,
+    },
+  ];
+
   const [reached, setReached] = useState(steps.length);
 
   useEffect(() => {

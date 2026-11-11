@@ -11,7 +11,8 @@ import {
   Moon,
   Flame,
 } from 'lucide-react';
-import { CeviLogo } from './CeviLogo';
+import type { OrganizationConfig } from '@schichtplan/shared';
+import { BrandLogo } from './CeviLogo';
 
 interface ConfettiPiece {
   id: number;
@@ -22,8 +23,44 @@ interface ConfettiPiece {
   angle: number;
 }
 
-export function Hero3DStage() {
+export function Hero3DStage({ org }: { org?: OrganizationConfig } = {}) {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const isPfadi = org?.slug === 'pfadi';
+  const isJubla = org?.slug === 'jubla';
+  const isVerein = org?.slug === 'verein';
+
+  const badgeAuthText = isVerein
+    ? 'Einfach mit E-Mail'
+    : `Mit ${org?.authProviderShort ?? 'Cevi.DB'}`;
+
+  const badgeUnitText = isPfadi
+    ? 'St. Georg 2026'
+    : isJubla
+    ? 'Wohlen 2026'
+    : isVerein
+    ? 'Oberglatt 2026'
+    : 'Illnau 2026';
+
+  const initials = isPfadi ? 'SG' : isJubla ? 'JW' : isVerein ? 'TV' : 'IL';
+
+  const eventTitle = isPfadi
+    ? 'Pfadi Sommerlager 2026'
+    : isJubla
+    ? 'Jubla-Tag & Pfarreifest'
+    : isVerein
+    ? 'Dorfturnier 2026'
+    : 'Chilbi Illnau 2026';
+
+  const eventSubtitle = isPfadi
+    ? 'Lagerküche & Posten • Pfadi St. Georg'
+    : isJubla
+    ? 'Festzelt & Spiele • Jubla Wohlen'
+    : isVerein
+    ? 'Festwirtschaft & Bar • TV Oberglatt'
+    : 'Festzelt & Barbetrieb • Cevi Illnau';
+
+  const logoUrl = org?.logoUrl ?? '/images/cevi-logo.svg';
 
   // Interactive state
   const [barEnrolled, setBarEnrolled] = useState(false);
@@ -82,14 +119,14 @@ export function Hero3DStage() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
           </span>
-          <span className="font-mono text-2xs font-bold text-fg">Mit Cevi.DB</span>
+          <span className="font-mono text-2xs font-bold text-fg">{badgeAuthText}</span>
           <ShieldCheck className="size-3.5 text-emerald-400" />
         </div>
 
         {/* Floating Satellite Badge 2 (Top-Right) */}
         <div className="absolute -top-3.5 right-2 sm:-top-4 sm:-right-4 z-20 flex items-center gap-1.5 sm:gap-2 rounded-full border border-line/80 bg-surface-2/95 px-2.5 sm:px-3 py-1 shadow-lift backdrop-blur-md">
-          <CeviLogo className="size-4 shrink-0" />
-          <span className="text-2xs font-bold text-fg-subtle">Illnau 2026</span>
+          <BrandLogo logoUrl={logoUrl} className="size-4 shrink-0" alt="" />
+          <span className="text-2xs font-bold text-fg-subtle">{badgeUnitText}</span>
         </div>
 
         {/* Inner Card Core */}
@@ -101,12 +138,12 @@ export function Hero3DStage() {
           <div className="flex items-center justify-between pb-4 border-b border-line gap-3">
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
               <div className="flex size-10 sm:size-11 shrink-0 items-center justify-center rounded-tile bg-accent/15 text-accent-ink font-bold text-sm sm:text-base shadow-sm">
-                IL
+                {initials}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <h3 className="font-display text-sm sm:text-base font-bold text-fg truncate">
-                    Chilbi Illnau 2026
+                    {eventTitle}
                   </h3>
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold text-emerald-400">
                     <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -114,7 +151,7 @@ export function Hero3DStage() {
                   </span>
                 </div>
                 <p className="text-2xs sm:text-xs text-fg-subtle truncate">
-                  Festzelt &amp; Barbetrieb • Cevi Illnau
+                  {eventSubtitle}
                 </p>
               </div>
             </div>

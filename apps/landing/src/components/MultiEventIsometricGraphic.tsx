@@ -1,6 +1,38 @@
 
 
-export function MultiEventIsometricGraphic({ className = '' }: { className?: string }) {
+import type { OrganizationConfig } from '@schichtplan/shared';
+
+export function MultiEventIsometricGraphic({
+  className = '',
+  org,
+}: {
+  className?: string;
+  org?: OrganizationConfig;
+}) {
+  const isPfadi = org?.slug === 'pfadi';
+  const isJubla = org?.slug === 'jubla';
+  const isVerein = org?.slug === 'verein';
+
+  const event1 = isPfadi
+    ? 'SoLa 2026'
+    : isJubla
+    ? 'Jubla-Tag 2026'
+    : isVerein
+    ? 'Dorfturnier 2026'
+    : 'Chilbi 2026';
+
+  const event2 = isPfadi
+    ? 'PfiLa 2026'
+    : isJubla
+    ? 'Pfarreifest'
+    : isVerein
+    ? 'Vereinsfest'
+    : 'PfiLa 2026';
+
+  const event3 = isVerein
+    ? '🏆 Grümpelturnier Aktiv'
+    : '🏕️ Sommerlager Aktiv';
+
   return (
     <div className={`relative flex items-center justify-center select-none ${className}`}>
       <svg
@@ -85,38 +117,38 @@ export function MultiEventIsometricGraphic({ className = '' }: { className?: str
         </g>
 
         {/* Floating Event Cards in 3D Space (Clear of 3D objects) */}
-        {/* Card 1: Chilbi 2026 */}
+        {/* Card 1: Main Event */}
         <g transform="translate(22, 22)">
           <rect x="0" y="3" width="128" height="36" rx="10" fill="rgba(0,0,0,0.4)" filter="blur(5px)" />
           <rect x="0" y="0" width="128" height="36" rx="10" fill="rgba(24, 24, 27, 0.94)" stroke="#e11d48" strokeWidth="1.2" />
           <circle cx="16" cy="18" r="6" fill="#e11d48" />
           <text x="28" y="17" fill="#ffffff" fontSize="10.5" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
-            Chilbi 2026
+            {event1}
           </text>
           <text x="28" y="27" fill="#fb7185" fontSize="8.5" fontFamily="monospace">
             28 Schichten · 86%
           </text>
         </g>
 
-        {/* Card 2: PfiLa Lager */}
+        {/* Card 2: Secondary Event */}
         <g transform="translate(250, 22)">
           <rect x="0" y="3" width="128" height="36" rx="10" fill="rgba(0,0,0,0.4)" filter="blur(5px)" />
           <rect x="0" y="0" width="128" height="36" rx="10" fill="rgba(24, 24, 27, 0.94)" stroke="#10b981" strokeWidth="1.2" />
           <circle cx="16" cy="18" r="6" fill="#10b981" />
           <text x="28" y="17" fill="#ffffff" fontSize="10.5" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
-            PfiLa 2026
+            {event2}
           </text>
           <text x="28" y="27" fill="#34d399" fontSize="8.5" fontFamily="monospace">
             Küche, Aufbau, Posten
           </text>
         </g>
 
-        {/* Card 3: Sommerlager (Floating Bottom Center) */}
+        {/* Card 3: Seasonal Event (Floating Bottom Center) */}
         <g transform="translate(138, 196)">
           <rect x="0" y="3" width="124" height="28" rx="8" fill="rgba(0,0,0,0.4)" filter="blur(4px)" />
           <rect x="0" y="0" width="124" height="28" rx="8" fill="rgba(24, 24, 27, 0.95)" stroke="#38bdf8" strokeWidth="1" />
           <text x="14" y="18" fill="#e0f2fe" fontSize="10" fontWeight="600" fontFamily="system-ui, -apple-system, sans-serif">
-            🏕️ Sommerlager Aktiv
+            {event3}
           </text>
         </g>
       </svg>

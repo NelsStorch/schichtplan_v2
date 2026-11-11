@@ -73,14 +73,29 @@ export function HeaderAccount() {
 }
 
 /** Hauptknopf: zur eigenen Abteilung, zu den eigenen Schichten oder zum Login */
-export function PrimaryCta({ loginLabel, className }: { loginLabel: string; className: string }) {
+export function PrimaryCta({
+  loginLabel,
+  className,
+  unitTerm = 'Abteilung',
+}: {
+  loginLabel: string;
+  className: string;
+  unitTerm?: string;
+}) {
   const me = useContext(MeContext);
   const classes = buttonClasses({ variant: 'primary', size: 'md', className });
 
   if (me?.homeDepartment) {
+    const toUnitText =
+      unitTerm === 'Schar'
+        ? `Zu deiner Schar (${me.homeDepartment.name})`
+        : unitTerm === 'Verein'
+        ? `Zu deinem Verein (${me.homeDepartment.name})`
+        : `Zu deiner Abteilung (${me.homeDepartment.name})`;
+
     return (
       <a href={getDepartmentUrl(me.homeDepartment.slug)} className={classes}>
-        <span>Zu deiner Abteilung ({me.homeDepartment.name})</span>
+        <span>{toUnitText}</span>
         <ArrowRight className="size-4" />
       </a>
     );

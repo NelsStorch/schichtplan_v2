@@ -1,6 +1,26 @@
 
 
-export function MobilePwaIsometricGraphic({ className = '' }: { className?: string }) {
+import type { OrganizationConfig } from '@schichtplan/shared';
+
+export function MobilePwaIsometricGraphic({
+  className = '',
+  org,
+}: {
+  className?: string;
+  org?: OrganizationConfig;
+}) {
+  const isPfadi = org?.slug === 'pfadi';
+  const isJubla = org?.slug === 'jubla';
+  const isVerein = org?.slug === 'verein';
+
+  const eventName = isPfadi
+    ? 'SoLa 2026'
+    : isJubla
+    ? 'Jubla-Tag'
+    : isVerein
+    ? 'Dorfturnier'
+    : 'Chilbi Illnau';
+
   return (
     <div className={`relative flex items-center justify-center select-none ${className}`}>
       <svg
@@ -83,7 +103,7 @@ export function MobilePwaIsometricGraphic({ className = '' }: { className?: stri
             {/* Header Status */}
             <circle cx="20" cy="34" r="3.5" fill="#e11d48" />
             <text x="28" y="37" fill="#f4f4f5" fontSize="8" fontWeight="bold" fontFamily="system-ui, -apple-system, sans-serif">
-              Chilbi Illnau
+              {eventName}
             </text>
             <text x="96" y="37" fill="#71717a" fontSize="6.5" fontFamily="monospace">
               LIVE

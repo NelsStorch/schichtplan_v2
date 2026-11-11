@@ -109,7 +109,11 @@ export default async function LandingPage() {
 
                   {/* CTAs */}
                   <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                    <PrimaryCta loginLabel="Schichtplan öffnen / Anmelden" className={PRIMARY_CTA_CLASS} />
+                    <PrimaryCta
+                      loginLabel="Schichtplan öffnen / Anmelden"
+                      unitTerm={org.unitTerm}
+                      className={PRIMARY_CTA_CLASS}
+                    />
 
                     <a
                       href="#so-funktionierts"
@@ -171,7 +175,7 @@ export default async function LandingPage() {
 
                 {/* Right Column: Live Interactive Shift Stage */}
                 <div className="lg:col-span-5">
-                  <Hero3DStage />
+                  <Hero3DStage org={org} />
                 </div>
               </div>
             </div>
@@ -185,7 +189,7 @@ export default async function LandingPage() {
                   In drei Schritten zur vollen Helferliste.
                 </h2>
               </Reveal>
-              <StepsTimeline />
+              <StepsTimeline org={org} />
             </div>
           </section>
 
@@ -322,7 +326,7 @@ export default async function LandingPage() {
 
                     {/* Bespoke Architecture Graphic (Festzelt, Campfire, Jurte) */}
                     <div className="my-5">
-                      <MultiEventIsometricGraphic className="max-h-[190px] sm:max-h-[200px]" />
+                      <MultiEventIsometricGraphic org={org} className="max-h-[190px] sm:max-h-[200px]" />
                     </div>
 
                     <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
@@ -347,7 +351,7 @@ export default async function LandingPage() {
 
                     {/* Smartphone Graphic */}
                     <div className="my-5">
-                      <MobilePwaIsometricGraphic className="max-h-[200px] sm:max-h-[220px]" />
+                      <MobilePwaIsometricGraphic org={org} className="max-h-[200px] sm:max-h-[220px]" />
                     </div>
 
                     <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
@@ -382,7 +386,11 @@ export default async function LandingPage() {
 
                   {/* Dynamic Bottom Button */}
                   <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <PrimaryCta loginLabel="Jetzt anmelden" className={PRIMARY_CTA_CLASS} />
+                    <PrimaryCta
+                      loginLabel="Jetzt anmelden"
+                      unitTerm={org.unitTerm}
+                      className={PRIMARY_CTA_CLASS}
+                    />
 
                     <a
                       href={helpUrl()}
