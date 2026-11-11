@@ -248,7 +248,7 @@ function LoginContent() {
     if (res.ok) {
       setSuccess(`Hallo ${data.user.nickname || data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
       setTimeout(() => {
-        window.location.href = afterLogin(data.user, returnTo);
+        window.location.href = afterLogin(data.user, returnTo, org.dbType);
       }, 700);
       return;
     }
@@ -366,7 +366,7 @@ function LoginContent() {
           : 'Konto erstellt. Du wirst weitergeleitet …'
       );
       setTimeout(() => {
-        window.location.href = afterLogin(data.user, returnTo);
+        window.location.href = afterLogin(data.user, returnTo, org.dbType);
       }, 700);
     } catch (err: any) {
       setError(err.message || 'Ein Fehler ist aufgetreten');
@@ -493,7 +493,7 @@ function LoginContent() {
 
             <div className="mt-6 space-y-3">
               <a
-                href={afterLogin(existingUser, returnTo)}
+                href={afterLogin(existingUser, returnTo, org.dbType)}
                 className={buttonClasses({
                   size: 'lg',
                   className: 'w-full justify-between shadow-soft',

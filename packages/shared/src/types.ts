@@ -371,6 +371,7 @@ export interface HomeDepartmentDto {
   id: string;
   name: string;
   slug: string;
+  organization?: OrganizationType;
 }
 
 export interface DepartmentStufeDto {

@@ -48,6 +48,10 @@ services:
       CEVIDB_STUFE_LEADER_ROLES: ${CEVIDB_STUFE_LEADER_ROLES:-}
       CEVIDB_STUFE_PARTICIPANT_ROLES: ${CEVIDB_STUFE_PARTICIPANT_ROLES:-}
       CEVIDB_REDIRECT_URI: ${CEVIDB_REDIRECT_URI:-https://login.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}/api/auth/cevidb/callback}
+      # Pfadi (PBS MiData): auf Dev die Integrationsumgebung pbs.puzzle.ch
+      MIDATA_BASE_URL: ${MIDATA_BASE_URL:-https://pbs.puzzle.ch}
+      MIDATA_CLIENT_ID: ${MIDATA_CLIENT_ID:-}
+      MIDATA_CLIENT_SECRET: ${MIDATA_CLIENT_SECRET:-}
       SMTP_HOST: ${SMTP_HOST:-mail.infomaniak.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-admin@cevi-schichtplan.ch}

@@ -49,7 +49,7 @@ export function HeaderAccount() {
     <div className="flex items-center gap-1.5 sm:gap-2">
       {me.homeDepartment && (
         <a
-          href={getDepartmentUrl(me.homeDepartment.slug)}
+          href={getDepartmentUrl(me.homeDepartment.slug, '/', me.homeDepartment.organization)}
           className={buttonClasses({
             variant: 'secondary',
             size: 'sm',
@@ -94,7 +94,7 @@ export function PrimaryCta({
         : `Zu deiner Abteilung (${me.homeDepartment.name})`;
 
     return (
-      <a href={getDepartmentUrl(me.homeDepartment.slug)} className={classes}>
+      <a href={getDepartmentUrl(me.homeDepartment.slug, '/', me.homeDepartment.organization)} className={classes}>
         <span>{toUnitText}</span>
         <ArrowRight className="size-4" />
       </a>

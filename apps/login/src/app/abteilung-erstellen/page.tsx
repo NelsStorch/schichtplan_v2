@@ -66,7 +66,7 @@ function CreateDepartment() {
   const later = () => {
     window.location.href = user?.needsDepartmentSetup
       ? withReturnTo('/abteilung', returnTo)
-      : finalDestination(returnTo, user);
+      : finalDestination(returnTo, user, org.dbType);
   };
 
   const submit = async (e: FormEvent) => {
@@ -81,7 +81,7 @@ function CreateDepartment() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Anlegen hat nicht geklappt.');
-      window.location.href = getDepartmentUrl(data.department.slug);
+      window.location.href = getDepartmentUrl(data.department.slug, '/', data.department?.organization ?? org.dbType);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Anlegen hat nicht geklappt.');
       setSaving(false);

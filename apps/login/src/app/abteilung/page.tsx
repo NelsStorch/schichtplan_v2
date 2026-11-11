@@ -88,7 +88,7 @@ function DepartmentSetup() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Speichern hat nicht geklappt.');
-      window.location.href = finalDestination(returnTo, data as UserDto);
+      window.location.href = finalDestination(returnTo, data as UserDto, org.dbType);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speichern hat nicht geklappt.');
       setSaving(false);

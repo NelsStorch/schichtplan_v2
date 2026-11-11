@@ -109,7 +109,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
       const returnTo = request.query.returnTo
         ? cleanReturnTo(request.query.returnTo, '/', reqHost)
         : request.tenant
-          ? defaultDestination(request.tenant.slug, reqHost)
+          ? defaultDestination(request.tenant.slug, reqHost, request.tenant.organization)
           : null;
 
       if (!providerConfig.clientId) {
@@ -497,7 +497,7 @@ const ceviDbAuthRoutes: FastifyPluginAsync = async (fastify) => {
     trackUsage('LOGIN', { dim: 'cevidb', departmentId: homeDepartment?.id ?? tenantDepartmentId });
 
     // Ohne Ziel: Abteilungsseite, sonst Landingpage (nicht zurück auf die Login-Seite)
-    const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null, reply.request?.hostname);
+    const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null, reply.request?.hostname, homeDepartment?.organization ?? provider);
 
     // Abteilungsleitung, deren Ortsgruppe noch keinen Schichtplan hat: Abteilung anlegen anbieten
     if (!homeDepartment && derived.isDepartmentLeader && derived.ortsgruppeId !== null) {

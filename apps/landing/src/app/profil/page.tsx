@@ -10,6 +10,7 @@ import {
   getDepartmentSetupUrl,
   getDepartmentUrl,
   getLoginUrl,
+  type OrganizationType,
   type UserDto,
 } from '@schichtplan/shared';
 import {
@@ -44,6 +45,7 @@ interface MyShift {
   eventSlug: string;
   departmentName: string;
   departmentSlug: string;
+  departmentOrganization?: OrganizationType;
   isSignup?: boolean;
   isResponsible?: boolean;
   responsibleRole?: string | null;
@@ -269,7 +271,7 @@ export default function ProfilePage() {
                 <div className="flex flex-wrap gap-2">
                   {user.homeDepartment && (
                     <a
-                      href={getDepartmentUrl(user.homeDepartment.slug)}
+                      href={getDepartmentUrl(user.homeDepartment.slug, '/', user.homeDepartment.organization)}
                       className={buttonClasses({ size: 'sm' })}
                     >
                       Zum Schichtplan <ArrowUpRight />
@@ -412,7 +414,7 @@ export default function ProfilePage() {
                   {upcoming.map((s) => (
                     <li key={s.signupId}>
                       <a
-                        href={getDepartmentUrl(s.departmentSlug, `/events/${s.eventSlug}`)}
+                        href={getDepartmentUrl(s.departmentSlug, `/events/${s.eventSlug}`, s.departmentOrganization)}
                         className="flex items-center justify-between gap-3 py-2.5 transition hover:text-accent-ink"
                       >
                         <span className="min-w-0">

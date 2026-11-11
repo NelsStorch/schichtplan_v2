@@ -24,9 +24,9 @@ export async function GET() {
         <OgCard
           logo={logo}
           accent={safeAccent(department?.primaryColor ?? org.primaryColor)}
-          title={department?.name ?? `${org.name} Schichtplan`}
+          title={department?.name ?? org.name}
           subtitle="Schichten anschauen, eintragen, fertig."
-          eyebrow={`${org.name} Schichtplan`}
+          eyebrow={org.name}
           host={host}
         />
       ),

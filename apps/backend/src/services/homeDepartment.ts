@@ -298,8 +298,8 @@ export async function syncCeviDbHomeDepartment(
   user: { id: string; homeDepartmentSource: string | null; departmentSetupAt: Date | null },
   placement: CeviDbPlacement,
   provider: OrganizationType = 'CEVI'
-): Promise<{ id: string; slug: string } | null> {
-  const select = { id: true, slug: true } as const;
+): Promise<{ id: string; slug: string; organization: OrganizationType } | null> {
+  const select = { id: true, slug: true, organization: true } as const;
   let department = placement.homeDepartmentId
     ? await prisma.department.findUnique({ where: { id: placement.homeDepartmentId }, select })
     : null;

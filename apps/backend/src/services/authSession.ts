@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import {
   safeReturnTo,
   getRootDomain,
+  getOrganization,
   ORGANIZATIONS,
   type UserDto,
   type OrganizationType,
@@ -121,11 +122,18 @@ export function loginErrorUrl(
  * Ziel nach dem Login, wenn keines angegeben ist: die eigene Abteilung, sonst die Landingpage.
  * (Früher ging es auf "/" der Login-Seite zurück, die dann wieder das Login zeigte.)
  */
-export function defaultDestination(homeDepartmentSlug: string | null, reqHost?: string): string {
+export function defaultDestination(
+  homeDepartmentSlug: string | null,
+  reqHost?: string,
+  domainOrOrg?: OrganizationType | string
+): string {
   if (process.env.NODE_ENV !== 'production' && (!reqHost || rootDomain(reqHost) === 'localhost')) {
     return homeDepartmentSlug ? `http://${homeDepartmentSlug}.localhost:3000/` : 'http://localhost:3001/';
   }
-  const root = rootDomain(reqHost);
+  let root = domainOrOrg ? getOrganization(domainOrOrg).domain : rootDomain(reqHost);
+  if (reqHost && (reqHost.startsWith('dev.') || reqHost.includes('.dev.')) && !root.startsWith('dev.')) {
+    root = `dev.${root}`;
+  }
   return homeDepartmentSlug ? `https://${homeDepartmentSlug}.${root}/` : `https://${root}/`;
 }
 
@@ -253,7 +261,7 @@ export async function loadUserDto(
     where: { id: userId },
     include: {
       memberships: tenantId ? { where: { departmentId: tenantId } } : { take: 0 },
-      homeDepartment: { select: { id: true, name: true, slug: true } },
+      homeDepartment: { select: { id: true, name: true, slug: true, organization: true } },
       stufen: { include: { stufe: { select: { name: true, departmentId: true, sortOrder: true } } } },
       _count: { select: { pushSubscriptions: true } },
     },

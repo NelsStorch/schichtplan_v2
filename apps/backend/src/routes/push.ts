@@ -1,6 +1,6 @@
 import { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { PushSubscribeSchema, PushUnsubscribeSchema } from '@schichtplan/shared';
+import { PushSubscribeSchema, PushUnsubscribeSchema, getDepartmentUrl, getLandingUrl } from '@schichtplan/shared';
 import {
   getVapidPublicKey,
   isAllowedPushEndpoint,
@@ -199,16 +199,17 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
       });
       if (user) {
         const displayName = user.nickname || user.firstName;
-        const domain = (process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
         const slug = request.tenant?.slug || user.homeDepartment?.slug;
-        const targetUrl = slug ? `https://${slug}.${domain}/` : `https://${domain}/profil`;
+        const targetUrl = slug
+          ? getDepartmentUrl(slug, '/', request.tenant?.organization || request.organization)
+          : getLandingUrl('/profil', request.headers.host);
         void sendPushNotification(
           { endpoint, p256dh: keys.p256dh, auth: keys.auth },
           {
             title: `Hallo ${displayName}! Browser-Benachrichtigungen sind aktiv`,
             body: 'Dieses Gerät empfängt jetzt Erinnerungen vor deinen Schichten und Infos vom OK.',
             url: targetUrl,
-            tag: `cevi-schichtplan-welcome-${Date.now()}`,
+            tag: `schichtplan-welcome-${Date.now()}`,
           },
         ).catch((err) => {
           request.log.warn({ err, userId }, 'Willkommens-Push konnte nicht gesendet werden');
@@ -296,9 +297,10 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const displayName = user.nickname || user.firstName;
-      const domain = (process.env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
       const slug = request.tenant?.slug || user.homeDepartment?.slug;
-      const targetUrl = slug ? `https://${slug}.${domain}/` : `https://${domain}/profil`;
+      const targetUrl = slug
+        ? getDepartmentUrl(slug, '/', request.tenant?.organization || request.organization)
+        : getLandingUrl('/profil', request.headers.host);
 
       const result = await sendPushToUser(
         fastify.prisma,
@@ -307,7 +309,7 @@ const pushRoutes: FastifyPluginAsync = async (fastify) => {
           title: `Hallo ${displayName}! Browser-Benachrichtigungen sind aktiv`,
           body: 'Du erhältst hier künftig Erinnerungen an deine Schichten und wichtige Infos vom OK.',
           url: targetUrl,
-          tag: `cevi-schichtplan-test-${Date.now()}`,
+          tag: `schichtplan-test-${Date.now()}`,
         },
         request.log,
       );

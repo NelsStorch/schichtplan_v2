@@ -1,5 +1,6 @@
 import { getDefaultDestination, safeReturnTo } from '@schichtplan/shared/redirect';
 import { RESERVED_SUBDOMAINS } from '@schichtplan/shared/constants';
+import type { OrganizationType } from '@schichtplan/shared';
 
 /**
  * Abteilung, von der die Person kommt (illnau.cevi-schichtplan.ch → «illnau»), sonst null.
@@ -37,20 +38,23 @@ export function cleanReturnTo(raw: string | null): string | null {
 /** Ziel ohne return_to: eigene Abteilung, sonst Landingpage. Nie zurück auf die Login-Seite. */
 export function finalDestination(
   returnTo: string | null,
-  user: { homeDepartment?: { slug: string } | null } | null | undefined
+  user?: { homeDepartment?: { slug: string; organization?: OrganizationType } | null } | null,
+  org?: OrganizationType | string
 ): string {
-  return returnTo ?? getDefaultDestination(user?.homeDepartment?.slug);
+  const targetOrg = user?.homeDepartment?.organization ?? org;
+  return returnTo ?? getDefaultDestination(user?.homeDepartment?.slug, targetOrg);
 }
 
 /** Wer seine Abteilung noch nicht angegeben hat, kommt zuerst auf /abteilung (mit dem gleichen Ziel). */
 export function afterLogin(
-  user: { needsDepartmentSetup?: boolean; homeDepartment?: { slug: string } | null } | null | undefined,
-  returnTo: string | null
+  user?: { needsDepartmentSetup?: boolean; homeDepartment?: { slug: string; organization?: OrganizationType } | null } | null,
+  returnTo?: string | null,
+  org?: OrganizationType | string
 ): string {
   if (user?.needsDepartmentSetup) {
     return returnTo ? `/abteilung?return_to=${encodeURIComponent(returnTo)}` : '/abteilung';
   }
-  return finalDestination(returnTo, user);
+  return finalDestination(returnTo ?? null, user, org);
 }
 
 /** Pfad im Login-Portal mit unverändertem Ziel */

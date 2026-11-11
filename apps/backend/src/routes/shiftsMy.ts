@@ -4,6 +4,7 @@ import {
   businessDayKey,
   toZurichInput,
   type MyHoursSummaryDto,
+  type OrganizationType,
   type ResponsiblePersonDto,
 } from '@schichtplan/shared';
 import { toResponsiblePersonDto } from '../services/shiftDto.js';
@@ -171,7 +172,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                     allowReplacement: true,
                     replacementCutoffHours: true,
                     cateringTokensEnabled: true,
-                    department: { select: { name: true, slug: true } },
+                    department: { select: { name: true, slug: true, organization: true } },
                   },
                 },
               },
@@ -191,7 +192,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                     startDate: true,
                     cancelDeadlineDays: true,
                     cateringTokensEnabled: true,
-                    department: { select: { name: true, slug: true } },
+                    department: { select: { name: true, slug: true, organization: true } },
                   },
                 },
               },
@@ -209,7 +210,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                 startDate: true,
                 cancelDeadlineDays: true,
                 cateringTokensEnabled: true,
-                department: { select: { name: true, slug: true } },
+                department: { select: { name: true, slug: true, organization: true } },
                 shifts: true,
               },
             },
@@ -240,6 +241,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
         replacementNote?: string | null;
         departmentName: string;
         departmentSlug: string;
+        departmentOrganization?: OrganizationType;
         createdAt: string;
         isSignup: boolean;
         isResponsible: boolean;
@@ -277,6 +279,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
           replacementNote: su.replacementNote,
           departmentName: su.shift.event.department.name,
           departmentSlug: su.shift.event.department.slug,
+          departmentOrganization: su.shift.event.department.organization,
           createdAt: su.createdAt.toISOString(),
           isSignup: true,
           isResponsible: false,
@@ -308,6 +311,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
             cateringTokensEnabled: sr.shift.event.cateringTokensEnabled,
             departmentName: sr.shift.event.department.name,
             departmentSlug: sr.shift.event.department.slug,
+            departmentOrganization: sr.shift.event.department.organization,
             createdAt: sr.createdAt.toISOString(),
             isSignup: false,
             isResponsible: true,
@@ -345,6 +349,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                 cateringTokensEnabled: dr.event.cateringTokensEnabled,
                 departmentName: dr.event.department.name,
                 departmentSlug: dr.event.department.slug,
+                departmentOrganization: dr.event.department.organization,
                 createdAt: dr.createdAt.toISOString(),
                 isSignup: false,
                 isResponsible: true,

@@ -29,6 +29,7 @@ import {
 import {
   cancelDeadlineAt,
   cancelDeadlineText,
+  getDepartmentUrl,
   replacementDeadline,
   type ResponsiblePersonDto,
 } from '@schichtplan/shared';
@@ -92,7 +93,7 @@ function hasBriefingDetails(s: MyShift): boolean {
 }
 
 export default function MyShiftsPage() {
-  const { user, loading: sessionLoading } = usePortal();
+  const { user, department, loading: sessionLoading } = usePortal();
   const toast = useToast();
   const confirm = useConfirm();
   const [shifts, setShifts] = useState<MyShift[] | null>(null);
@@ -104,6 +105,8 @@ export default function MyShiftsPage() {
   const [resettingToken, setResettingToken] = useState(false);
   const [calDialogOpen, setCalDialogOpen] = useState(false);
   const [clientDevice, setClientDevice] = useState<ClientDevice>('other');
+
+  const isOtherDept = (s: MyShift) => Boolean(department && s.departmentSlug && s.departmentSlug !== department.slug);
 
   useEffect(() => {
     setClientDevice(detectClientDevice());
@@ -352,9 +355,18 @@ export default function MyShiftsPage() {
                         <span className="ml-2 text-base font-normal text-fg-muted">({next.taskTitle})</span>
                       )}
                     </p>
-                    <Link href={`/events/${next.eventSlug}`} className="block w-fit text-sm font-medium text-fg-muted hover:text-fg">
-                      {next.eventTitle}
-                    </Link>
+                    {isOtherDept(next) ? (
+                      <a
+                        href={getDepartmentUrl(next.departmentSlug, `/events/${next.eventSlug}`, next.departmentOrganization)}
+                        className="block w-fit text-sm font-medium text-fg-muted hover:text-fg"
+                      >
+                        {next.eventTitle} <span className="text-xs text-fg-subtle">({next.departmentName})</span>
+                      </a>
+                    ) : (
+                      <Link href={`/events/${next.eventSlug}`} className="block w-fit text-sm font-medium text-fg-muted hover:text-fg">
+                        {next.eventTitle}
+                      </Link>
+                    )}
                     <p className="tabular mt-3 inline-flex items-center gap-2 font-mono text-[13px] text-fg-muted">
                       <Clock className="size-4" />
                       {fmtWeekday(next.startTime)}, {fmtDayMonth(next.startTime)} · {fmtTimeRange(next.startTime, next.endTime)}
@@ -659,7 +671,10 @@ function Timeline({
   onWithdrawReplacement?: (shift: MyShift) => void;
   onOpenCatering?: (slug: string, title: string) => void;
 }) {
+  const { department } = usePortal();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
+  const isOtherDept = (s: MyShift) => Boolean(department && s.departmentSlug && s.departmentSlug !== department.slug);
 
   const toggleBriefing = (id: string) => {
     if (!expandedIds[id]) trackUi('UI_BRIEFING');
@@ -744,9 +759,18 @@ function Timeline({
                             <p className="font-bold text-base sm:text-lg text-fg">
                               {s.title?.trim() || s.taskTitle || 'Schicht'}
                             </p>
-                            <Link href={`/events/${s.eventSlug}`} className="text-sm font-medium text-fg-muted hover:text-fg transition-colors">
-                              {s.eventTitle}
-                            </Link>
+                            {isOtherDept(s) ? (
+                              <a
+                                href={getDepartmentUrl(s.departmentSlug, `/events/${s.eventSlug}`, s.departmentOrganization)}
+                                className="text-sm font-medium text-fg-muted hover:text-fg transition-colors"
+                              >
+                                {s.eventTitle} <span className="text-xs text-fg-subtle">({s.departmentName})</span>
+                              </a>
+                            ) : (
+                              <Link href={`/events/${s.eventSlug}`} className="text-sm font-medium text-fg-muted hover:text-fg transition-colors">
+                                {s.eventTitle}
+                              </Link>
+                            )}
                           </div>
 
                           {/* Kompakte Kurz-Zusammenfassung (Leitung & Team) direkt sichtbar */}
@@ -863,6 +887,13 @@ function Timeline({
                             >
                               <UserMinus /> Austragen
                             </Button>
+                          ) : isOtherDept(s) ? (
+                            <a
+                              href={getDepartmentUrl(s.departmentSlug, `/events/${s.eventSlug}`, s.departmentOrganization)}
+                              className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+                            >
+                              Zum Anlass <ExternalLink className="size-3" />
+                            </a>
                           ) : (
                             <Link
                               href={`/events/${s.eventSlug}`}

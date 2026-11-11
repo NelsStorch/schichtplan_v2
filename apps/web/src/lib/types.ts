@@ -8,6 +8,7 @@ import type {
   EventResponsibleMode,
   EventContactVisibility,
   AttendanceMode,
+  OrganizationType,
 } from '@schichtplan/shared';
 
 /** Antwort von GET /api/shifts/my */
@@ -34,6 +35,7 @@ export interface MyShift {
   replacementNote?: string | null;
   departmentName: string;
   departmentSlug: string;
+  departmentOrganization?: OrganizationType;
   createdAt: string;
   isSignup?: boolean;
   isResponsible?: boolean;
