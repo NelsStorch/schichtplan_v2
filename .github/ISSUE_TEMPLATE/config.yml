@@ -6,3 +6,6 @@ contact_links:
   - name: 📚 Hilfe-Center
     url: https://hilfe.cevi-schichtplan.ch/
     about: Anleitungen und FAQ für Helfer:innen, OK und Abteilungsleitungen.
+  - name: 💬 Fragen & Community-Austausch
+    url: https://github.com/NelsStorch/schichtplan_v2/discussions
+    about: Für allgemeine Fragen, Ideen oder verbandsübergreifenden Austausch (Pfadi, Jubla etc.).

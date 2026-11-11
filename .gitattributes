@@ -1,0 +1,51 @@
+# Auto-detect text files and normalize line endings to LF on commit
+* text=auto eol=lf
+
+# Explicit text files with LF
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.astro text eol=lf
+*.sql text eol=lf
+*.zone text eol=lf
+*.env* text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.dockerignore text eol=lf
+Dockerfile* text eol=lf
+nginx.conf text eol=lf
+
+# Linux / Unix shell scripts must always have LF (fails in Docker/Linux if CRLF)
+*.sh text eol=lf
+
+# Windows PowerShell and batch scripts
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files (prevent corruption by Git)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg text eol=lf
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.tar.gz binary
+*.zip binary
+*.dump binary
+*.pfx binary
+*.p12 binary

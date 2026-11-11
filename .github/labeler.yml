@@ -1,0 +1,47 @@
+bereich/web:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/web/**'
+
+bereich/login:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/login/**'
+
+bereich/admin:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/admin/**'
+
+bereich/landing:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/landing/**'
+
+bereich/backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/backend/**'
+          - 'packages/shared/**'
+
+bereich/hilfe:
+  - changed-files:
+      - any-glob-to-any-file: 'hilfe/**'
+
+bereich/ui:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/ui/**'
+
+bereich/devops:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'docker-compose*.yml'
+          - '**/Dockerfile*'
+          - 'deploy*'
+          - 'restore*'
+          - 'rollback*'
+          - 'nginx.conf'
+          - '.dockerignore'
+
+typ/doku:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'

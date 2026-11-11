@@ -83,6 +83,19 @@ jobs:
       - name: Shared-Paket bauen
         run: npm run build --workspace=packages/shared
 
+      - name: Next.js Cache wiederherstellen
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/web/.next/cache
+            apps/login/.next/cache
+            apps/landing/.next/cache
+            apps/admin/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('apps/**', 'packages/**') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
+
       - name: Frontends bauen
         run: |
           npm run build --workspace=apps/web
