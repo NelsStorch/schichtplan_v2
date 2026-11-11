@@ -1,4 +1,4 @@
-import { evaluateContrast, type ContrastEvaluation } from '@schichtplan/shared';
+import { evaluateContrast, getOrganization, type ContrastEvaluation } from '@schichtplan/shared';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import type { PrismaClient } from '../db.js';
@@ -298,6 +298,7 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
   const { primary: primaryColor, secondary: secondaryColor, isTwoTone } = palette;
 
   const logo = await resolveLogo(options.logoUrl, options.prisma);
+  const footerOrg = getOrganization(options.text);
 
   return new Promise((resolve, reject) => {
     // A4: 595.28 x 841.89 pt
@@ -475,7 +476,8 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
       .fontSize(8.5)
       .fillColor('#9ca3af')
       .text(
-        'Cevi Schichtplan · cevi-schichtplan.ch',
+        // Verband aus der Adresse im QR-Code (illnau.pfadi-schichtplan.ch -> Pfadi Schichtplan)
+        `${footerOrg.name} · ${footerOrg.domain}`,
         40,
         742,
         { align: 'center', width: 515.28 }

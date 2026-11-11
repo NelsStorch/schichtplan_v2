@@ -112,8 +112,6 @@ export function getLandingUrl(path = '/'): string {
  * Link ins Hilfe-Center, z. B. helpUrl('/ok/zugang/').
  * Unterstützt dynamisch die Verbands-Domain (z. B. hilfe.pfadi-schichtplan.ch).
  */
-export const HELP_URL = 'https://hilfe.cevi-schichtplan.ch';
-
 export function helpUrl(path = '/', host?: string): string {
   const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
   const root = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
@@ -124,8 +122,6 @@ export function helpUrl(path = '/', host?: string): string {
 /**
  * Link zum Status-Portal (Uptime Kuma). Unterstützt dynamisch die Verbands-Domain (z. B. status.vereins-schichtplan.ch).
  */
-export const STATUS_URL = 'https://status.cevi-schichtplan.ch';
-
 export function statusUrl(path = '/', host?: string): string {
   const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
   const root = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
@@ -133,13 +129,19 @@ export function statusUrl(path = '/', host?: string): string {
   return `https://status.${root}${cleanPath}`;
 }
 
-/** Datenschutzerklärung auf der Landingpage, standardmässig auf cevi-schichtplan.ch */
-export const PRIVACY_URL = 'https://cevi-schichtplan.ch/datenschutz';
-
+/** Datenschutzerklärung auf der Landingpage der jeweiligen Verbandsdomain (ohne Host: cevi-schichtplan.ch) */
 export function privacyUrl(host?: string): string {
   const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
   const root = currentHost ? getRootDomain(currentHost) : 'cevi-schichtplan.ch';
   return `https://${root}/datenschutz`;
+}
+
+/** Startseite des zentralen Logins der Verbandsdomain (z. B. https://login.pfadi-schichtplan.ch), ohne Rücksprung-Parameter */
+export function loginBaseUrl(host?: string): string {
+  const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
+  const root = currentHost ? getRootDomain(currentHost) : 'cevi-schichtplan.ch';
+  if (root === 'localhost') return 'http://localhost:3002';
+  return `https://login.${root}`;
 }
 
 /** Ziel nach dem Login ohne return_to: eigene Abteilung, sonst Landingpage (nie zurück aufs Login). */

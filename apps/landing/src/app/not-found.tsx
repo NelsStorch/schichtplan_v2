@@ -1,7 +1,7 @@
 'use client';
 
 import { LifeBuoy, LogIn } from 'lucide-react';
-import { helpUrl } from '@schichtplan/shared';
+import { helpUrl, loginBaseUrl } from '@schichtplan/shared';
 import { NotFoundView } from '@schichtplan/ui';
 
 export default function NotFound() {
@@ -18,7 +18,7 @@ export default function NotFound() {
         },
         {
           label: 'Zentrales Login',
-          href: 'https://login.cevi-schichtplan.ch',
+          href: loginBaseUrl(),
           external: true,
           icon: <LogIn className="size-3.5" />,
         },

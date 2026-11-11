@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { HELP_URL, type STATS_APPS } from '@schichtplan/shared';
+import type { STATS_APPS } from '@schichtplan/shared';
 import { trackUi } from './usage';
 
 /** Höchstens so viele Browser-Fehler pro Seitenaufruf melden (eine Fehlerschleife soll nicht fluten) */
@@ -24,8 +24,8 @@ function isDark(): boolean {
 function helpPath(href: string): string | null {
   try {
     const url = new URL(href, window.location.href);
-    const help = new URL(HELP_URL);
-    return url.host === help.host ? url.pathname : null;
+    // hilfe.<verband>-schichtplan.ch: alle Verbandsdomains zählen (nicht nur Cevi)
+    return /^hilfe\./.test(url.hostname) ? url.pathname : null;
   } catch {
     return null;
   }

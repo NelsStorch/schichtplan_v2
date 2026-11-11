@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getOrganizationSlugFromHost, helpUrl, privacyUrl, statusUrl } from '@schichtplan/shared';
+import { getOrganizationSlugFromHost, helpUrl, loginBaseUrl, privacyUrl, statusUrl } from '@schichtplan/shared';
 import { getCeviDbRedirectUri, getLoginPortalBaseUrl, loginErrorUrl, loginPageUrl, rootDomain } from './authSession.js';
 
 describe('Adressen nur aus der Konfiguration', () => {
@@ -116,5 +116,14 @@ describe('Verband aus dem Host', () => {
     expect(privacyUrl('vereins-schichtplan.ch')).toBe('https://vereins-schichtplan.ch/datenschutz');
     expect(privacyUrl('cevi-schichtplan.ch')).toBe('https://cevi-schichtplan.ch/datenschutz');
     expect(privacyUrl()).toBe('https://cevi-schichtplan.ch/datenschutz');
+  });
+
+  it('loginBaseUrl führt auf das Login der jeweiligen Verbandsdomain', () => {
+    expect(loginBaseUrl('pfadi-schichtplan.ch')).toBe('https://login.pfadi-schichtplan.ch');
+    expect(loginBaseUrl('illnau.pfadi-schichtplan.ch')).toBe('https://login.pfadi-schichtplan.ch');
+    expect(loginBaseUrl('hilfe.jubla-schichtplan.ch')).toBe('https://login.jubla-schichtplan.ch');
+    expect(loginBaseUrl('dev.vereins-schichtplan.ch')).toBe('https://login.dev.vereins-schichtplan.ch');
+    expect(loginBaseUrl('cevi-schichtplan.ch')).toBe('https://login.cevi-schichtplan.ch');
+    expect(loginBaseUrl()).toBe('https://login.cevi-schichtplan.ch');
   });
 });

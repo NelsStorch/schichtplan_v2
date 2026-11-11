@@ -23,38 +23,57 @@ import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
 </div>
 
 <script>
-  // Intelligenter Rücksprung: Merkt sich, von welcher Abteilung / Schar / welchem Verein der Besucher kam
+  // Intelligenter Rücksprung: Merkt sich, von welcher Abteilung / Schar / welchem Verein der Besucher kam.
+  // Gemerkt wird nur ein Ziel der eigenen Verbandsdomain. Sonst würde ein alter Rücksprung (z. B. von
+  // einer Cevi-Seite) auf hilfe.pfadi-schichtplan.ch alle Links zurück auf Cevi umleiten.
   try {
-    const params = new URLSearchParams(window.location.search);
-    let fromUrl = params.get('from');
     const validDomains = [
       'cevi-schichtplan.ch',
       'pfadi-schichtplan.ch',
       'jubla-schichtplan.ch',
       'vereins-schichtplan.ch',
     ];
+    const inDomain = (host: string, domain: string) => host === domain || host.endsWith(`.${domain}`);
+    const currentHost = window.location.hostname.toLowerCase();
+    const currentDomain = validDomains.find((d) => inDomain(currentHost, d)) ?? null;
 
-    if (!fromUrl && document.referrer) {
+    const accepted = (value: string | null): URL | null => {
+      if (!value) return null;
       try {
-        const ref = new URL(document.referrer);
-        if (validDomains.some((d) => ref.hostname.endsWith(d)) && !ref.hostname.startsWith('hilfe.')) {
-          fromUrl = ref.origin;
-        }
-      } catch (_) {}
+        const url = new URL(value, window.location.origin);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+        const host = url.hostname.toLowerCase();
+        if (host.startsWith('hilfe.')) return null;
+        if (currentDomain) return inDomain(host, currentDomain) ? url : null;
+        return validDomains.some((d) => inDomain(host, d)) || host === 'localhost' || host.endsWith('.localhost')
+          ? url
+          : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const params = new URLSearchParams(window.location.search);
+    let fromUrl = accepted(params.get('from'));
+    if (!fromUrl && document.referrer) {
+      const ref = accepted(document.referrer);
+      if (ref) fromUrl = new URL(ref.origin);
     }
 
     if (fromUrl) {
-      sessionStorage.setItem('schichtplan_return_url', fromUrl);
+      sessionStorage.setItem('schichtplan_return_url', fromUrl.href);
     }
 
-    const returnUrl = sessionStorage.getItem('schichtplan_return_url');
-    if (returnUrl) {
-      const url = new URL(returnUrl, window.location.origin);
+    const stored = sessionStorage.getItem('schichtplan_return_url');
+    const url = accepted(stored);
+    if (stored && !url) sessionStorage.removeItem('schichtplan_return_url');
+
+    if (url) {
       const hostParts = url.hostname.split('.');
       const sub = hostParts.length >= 3 ? hostParts[0] : null;
 
       document.querySelectorAll<HTMLAnchorElement>('[data-app-link]').forEach((a) => {
-        a.href = returnUrl;
+        a.href = url.href;
       });
       document.querySelectorAll('[data-app-label]').forEach((span) => {
         if (sub && sub !== 'www' && sub !== 'login') {

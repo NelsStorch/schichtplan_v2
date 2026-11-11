@@ -1,4 +1,4 @@
-// Client-seitiges dynamisches Branding fuer alle 4 Verbaende / Organisationen:
+// Client-seitiges dynamisches Branding & Favicon fuer alle 4 Verbaende / Organisationen:
 // Cevi, Pfadi, Jubla und Verein.
 (function () {
   const ORGS = {
@@ -78,6 +78,8 @@
     if (host.includes('pfadi')) return ORGS.pfadi;
     if (host.includes('jubla')) return ORGS.jubla;
     if (host.includes('verein')) return ORGS.verein;
+    // Auch Cevi-Domains haben Vorrang vor einem gemerkten Rücksprung (sonst kippt hilfe.cevi-schichtplan.ch auf Pfadi)
+    if (host.includes('cevi')) return ORGS.cevi;
 
     // Check referrer or sessionStorage for return_url
     try {
@@ -113,7 +115,28 @@
     );
   }
 
+  // 2. Favicon & Apple-Touch-Icon dynamisch setzen
+  function applyFavicon() {
+    if (!document.head) return;
+    const iconUrl = org.logo;
+
+    // Bestehende Icon-Tags entfernen/bereinigen, damit der Browser nicht das alte Icon cached
+    document.querySelectorAll("link[rel*='icon']").forEach((el) => el.remove());
+
+    const iconLink = document.createElement('link');
+    iconLink.rel = 'icon';
+    iconLink.type = 'image/svg+xml';
+    iconLink.href = iconUrl;
+    document.head.appendChild(iconLink);
+
+    const appleLink = document.createElement('link');
+    appleLink.rel = 'apple-touch-icon';
+    appleLink.href = iconUrl;
+    document.head.appendChild(appleLink);
+  }
+
   applyThemeVariables();
+  applyFavicon();
 
   // Theme-Umschaltung beobachten
   const observer = new MutationObserver(() => applyThemeVariables());
@@ -122,9 +145,10 @@
     attributeFilter: ['data-theme'],
   });
 
-  // 2. DOM-Elemente aktualisieren, sobald verfuegbar
+  // 3. DOM-Elemente aktualisieren, sobald verfuegbar
   function updateDom() {
     applyThemeVariables();
+    applyFavicon();
 
     // Logo & Titel im Header
     document.querySelectorAll('[data-org-logo]').forEach((img) => {
@@ -161,6 +185,14 @@
 
     document.querySelectorAll('[data-footer-login-domain]').forEach((a) => {
       a.setAttribute('href', `https://login.${org.domain}`);
+    });
+
+    document.querySelectorAll('[data-footer-status-domain]').forEach((a) => {
+      a.setAttribute('href', `https://status.${org.domain}`);
+    });
+
+    document.querySelectorAll('[data-footer-privacy-domain]').forEach((a) => {
+      a.setAttribute('href', `https://${org.domain}/datenschutz`);
     });
 
     // Seitentitel im Tab aktualisieren (falls noetig)
