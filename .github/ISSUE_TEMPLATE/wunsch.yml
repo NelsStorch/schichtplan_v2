@@ -1,6 +1,6 @@
 name: 💡 Wunsch oder Idee
 description: Eine neue Funktion oder Verbesserung vorschlagen.
-labels: ["enhancement"]
+labels: ["typ/feature"]
 body:
   - type: textarea
     id: problem
