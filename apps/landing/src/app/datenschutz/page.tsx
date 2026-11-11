@@ -2,29 +2,93 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { helpUrl } from "@schichtplan/shared";
+import {
+  ORGANIZATIONS,
+  getOrganization,
+  getVocabulary,
+  helpUrl,
+  type OrganizationConfig,
+  type OrganizationSlug,
+} from "@schichtplan/shared";
 import { ThemeToggle } from "@schichtplan/ui";
-import { CeviLogo } from "@/components/CeviLogo";
+import { getRequestOrigin } from "@schichtplan/ui/og";
+import { BrandLogo } from "@/components/CeviLogo";
 import { ContactReveal } from "./ContactReveal";
 
-export const metadata: Metadata = {
-  title: "Datenschutzerklärung",
-  description:
-    "Welche Personendaten der Cevi Schichtplan bearbeitet, wozu und welche Rechte du hast (nDSG).",
-  // Eigener Canonical statt dem der Startseite (aus dem Layout), sonst widersprechen sich die Signale
-  alternates: { canonical: "/datenschutz" },
-  // Nicht in Suchmaschinen, keine Kopie im Cache (zusätzlich zu robots.txt)
-  robots: {
-    index: false,
-    follow: false,
-    nocache: true,
-    noarchive: true,
-    "max-snippet": 0,
+export async function generateMetadata(): Promise<Metadata> {
+  const { host } = await getRequestOrigin();
+  const org = getOrganization(host);
+  return {
+    title: "Datenschutzerklärung",
+    description: `Welche Personendaten der ${org.name} bearbeitet, wozu und welche Rechte du hast (nDSG).`,
+    // Eigener Canonical statt dem der Startseite (aus dem Layout), sonst widersprechen sich die Signale
+    alternates: { canonical: "/datenschutz" },
+    // Nicht in Suchmaschinen, keine Kopie im Cache (zusätzlich zu robots.txt)
+    robots: {
+      index: false,
+      follow: false,
+      nocache: true,
+      noarchive: true,
+      "max-snippet": 0,
+    },
+  };
+}
+
+const STAND = "11. November 2026";
+
+/**
+ * Betreiber der Verbandsdatenbank (Hitobito), über die man sich anmelden kann, samt deren Datenschutz-Seite.
+ * Vereine haben keine Verbandsdatenbank (Anmeldung mit E-Mail und Passwort).
+ */
+const FEDERATION_DB: Record<
+  OrganizationSlug,
+  { operator: string; where: string; policyLabel: string; policyUrl: string } | null
+> = {
+  cevi: {
+    operator: "vom Dachverband Cevi Schweiz",
+    where: ", Server in der Schweiz",
+    policyLabel: "Datenschutzerklärung des Cevi Schweiz",
+    policyUrl: "https://www.cevi.ch/datenschutz/",
   },
+  pfadi: {
+    operator: "von der Pfadibewegung Schweiz (PBS)",
+    where: "",
+    policyLabel: "Datenschutz der Pfadibewegung Schweiz",
+    policyUrl: "https://pfadi.swiss/de/verband/datenschutz/",
+  },
+  jubla: {
+    operator: "von Jungwacht Blauring Schweiz",
+    where: "",
+    policyLabel: "Datenschutzerklärung von Jungwacht Blauring Schweiz",
+    policyUrl: "https://www.jubla.ch/datenschutz",
+  },
+  verein: null,
 };
 
-// Rechtliche Stammdaten: Platzhalter in eckigen Klammern vor dem Livegang ausfüllen
-const STAND = "9. November 2026";
+/** Begriffe der Verbandsdomain: Abteilung, Schar oder Verein samt passendem Artikel */
+function wording(org: OrganizationConfig) {
+  const vocab = getVocabulary(org.dbType);
+  const isVerein = org.slug === "verein";
+  const unit = org.unitTerm;
+  return {
+    vocab,
+    unit,
+    units: org.unitTermPlural,
+    leadership: vocab.departmentLeader,
+    nickname: org.nicknameTerm,
+    /** «die Abteilung», «die Schar», «der Verein» */
+    the: isVerein ? "der Verein" : `die ${unit}`,
+    /** «der Abteilung», «der Schar», «des Vereins» */
+    ofThe: isVerein ? "des Vereins" : `der ${unit}`,
+    /** «die jeweilige Abteilung», «der jeweilige Verein» */
+    respective: isVerein ? "der jeweilige Verein" : `die jeweilige ${unit}`,
+    /** «in der betreffenden Abteilung», «im betreffenden Verein» */
+    inConcerned: isVerein ? "im betreffenden Verein" : `in der betreffenden ${unit}`,
+    /** «Im Cevi», «In der Pfadi», «In der Jubla», «In Vereinen» */
+    inOrg: { cevi: "Im Cevi", pfadi: "In der Pfadi", jubla: "In der Jubla", verein: "In Vereinen" }[org.slug],
+    federation: FEDERATION_DB[org.slug],
+  };
+}
 
 function Section({
   id,
@@ -87,7 +151,12 @@ function StorageTable({
   );
 }
 
-export default function DatenschutzPage() {
+export default async function DatenschutzPage() {
+  const { host } = await getRequestOrigin();
+  const org = getOrganization(host);
+  const w = wording(org);
+  const fed = w.federation;
+  const dbShort = org.authProviderShort;
   return (
     <div className="min-h-[100dvh] bg-canvas text-fg">
       <div
@@ -99,8 +168,9 @@ export default function DatenschutzPage() {
           href="/"
           className="inline-flex items-center gap-2 text-sm font-semibold text-fg-muted transition hover:text-fg"
         >
-          <ArrowLeft className="size-4" /> <CeviLogo className="size-7" /> Cevi
-          Schichtplan
+          <ArrowLeft className="size-4" />{" "}
+          <BrandLogo logoUrl={org.logoUrl} alt={org.name} className="size-7" />{" "}
+          {org.name}
         </Link>
         <ThemeToggle />
       </header>
@@ -115,7 +185,7 @@ export default function DatenschutzPage() {
           </h1>
           <p>
             Diese Erklärung beschreibt, welche Personendaten wir beim Betrieb
-            des Cevi Schichtplans bearbeiten, wozu wir das tun und welche Rechte
+            des {org.name}s bearbeiten, wozu wir das tun und welche Rechte
             du hast. Sie richtet sich nach dem Schweizer Bundesgesetz über den
             Datenschutz (DSG) und der Datenschutzverordnung (DSV).
           </p>
@@ -134,33 +204,47 @@ export default function DatenschutzPage() {
         </Section>
 
         <Section id="geltung" title="2. Geltungsbereich">
-          <p>Diese Erklärung gilt für alle Teile des Cevi Schichtplans:</p>
+          <p>Diese Erklärung gilt für alle Teile des {org.name}s:</p>
           <List>
             <li>
-              die Landingpage <strong>cevi-schichtplan.ch</strong> mit
-              Profilseite,
+              die Landingpage <strong>{org.domain}</strong> mit Profilseite,
             </li>
             <li>
-              das zentrale Login <strong>login.cevi-schichtplan.ch</strong>,
+              das zentrale Login <strong>login.{org.domain}</strong>,
             </li>
             <li>
-              die Schichtpläne der Abteilungen{" "}
-              <strong>&lt;abteilung&gt;.cevi-schichtplan.ch</strong>,
+              die Schichtpläne der {w.units}{" "}
+              <strong>
+                &lt;{w.unit.toLowerCase()}&gt;.{org.domain}
+              </strong>
+              ,
             </li>
             <li>
-              das Admin-Portal <strong>admin.cevi-schichtplan.ch</strong>,
+              das Hilfe-Center <strong>hilfe.{org.domain}</strong>,
             </li>
             <li>
-              das Hilfe-Center <strong>hilfe.cevi-schichtplan.ch</strong>.
+              das Admin-Portal <strong>admin.cevi-schichtplan.ch</strong>, das
+              für alle vier Angebote gemeinsam genutzt wird und nur globalen
+              Administrator*innen offensteht.
             </li>
           </List>
           <p>
-            Die Abteilungen und die Organisationskomitees (OK) ihrer Anlässe
+            Dieselbe Plattform läuft unter vier Domains:{" "}
+            {Object.values(ORGANIZATIONS).map((o, i, all) => (
+              <span key={o.slug}>
+                <strong>{o.domain}</strong>
+                {i < all.length - 2 ? ", " : i === all.length - 2 ? " und " : ""}
+              </span>
+            ))}
+            . Diese Erklärung gilt für alle vier.
+          </p>
+          <p>
+            Die {w.units} und die Organisationskomitees (OK) ihrer Anlässe
             entscheiden selbst, welche Anlässe sie anlegen, welche Angaben sie
             von Helfenden verlangen und wen sie einteilen. Für diese Entscheide
             und für die Verwendung der Daten ausserhalb der Plattform
-            (z.&nbsp;B. eine exportierte Helferliste) ist die jeweilige
-            Abteilung verantwortlich.
+            (z.&nbsp;B. eine exportierte Helferliste) ist {w.respective}{" "}
+            verantwortlich.
           </p>
         </Section>
 
@@ -173,25 +257,33 @@ export default function DatenschutzPage() {
               (nur als bcrypt-Hash, nie im Klartext), Vor- und Nachname, ob die
               E-Mail bestätigt ist.
             </li>
+            {fed && (
+              <li>
+                <strong>{dbShort}:</strong> {dbShort}-Personen-ID, Vor- und
+                Nachname, {w.nickname}, E-Mail, Geburtsdatum,{" "}
+                {org.slug === "cevi" ? "Ortsgruppe" : `Angabe deiner ${w.unit}`}{" "}
+                sowie deine Rollen
+                in der {dbShort}, soweit wir daraus {w.unit},{" "}
+                {w.vocab.groupPlural} und eine allfällige {w.leadership}{" "}
+                ableiten. Dafür lesen wir beim Login auch die Gruppenstruktur zu
+                deinen Rollen (
+                {org.slug === "cevi"
+                  ? "welche Gruppe zu welcher Jungschar und Ortsgruppe gehört"
+                  : "welche Gruppe zu welcher übergeordneten Gruppe gehört"}
+                ). Deine Postadresse aus der {dbShort} übernehmen und
+                speichern wir nicht.
+              </li>
+            )}
             <li>
-              <strong>Cevi.DB:</strong> Cevi.DB-Personen-ID, Vor- und Nachname,
-              Cevi-Name, E-Mail, Geburtsdatum, Ortsgruppe sowie deine Rollen in
-              der Cevi.DB, soweit wir daraus Abteilung, Stufen und eine
-              allfällige Abteilungsleitung ableiten. Dafür lesen wir beim Login
-              auch die Gruppenstruktur zu deinen Rollen (welche Gruppe zu welcher
-              Jungschar und Ortsgruppe gehört). Deine Postadresse aus der Cevi.DB
-              übernehmen und speichern wir nicht.
-            </li>
-            <li>
-              <strong>Cevi-Name (ohne Passwort):</strong> Cevi-Name und
-              Geburtsdatum, dazu freiwillig Vor- und Nachname, Handynummer und
-              Stufen.
+              <strong>{w.nickname} (ohne Passwort):</strong> {w.nickname} und
+              Geburtsdatum, dazu freiwillig Vor- und Nachname, Handynummer und{" "}
+              {w.vocab.groupPlural}.
             </li>
           </List>
           <p>
             Freiwillig oder auf Verlangen eines Anlasses kommen dazu:
-            Handynummer, Geburtsdatum, Heimabteilung und Stufen (mit Rolle
-            Leitung oder Teilnehmer*in) sowie die Einstellung, ob du
+            Handynummer, Geburtsdatum, Heim{w.unit.toLowerCase()} und{" "}
+            {w.vocab.groupPlural} (mit Rolle Leitung oder Teilnehmer*in) sowie die Einstellung, ob du
             Schicht-Erinnerungen erhalten möchtest.
           </p>
           <p>
@@ -220,7 +312,7 @@ export default function DatenschutzPage() {
               «verhindert» reicht,
             </li>
             <li>
-              Rollen und Rechte in Abteilung und OK (Abteilungsleitung,
+              Rollen und Rechte in {w.unit} und OK ({w.leadership},
               einzelne Rechte wie «Anlässe erstellen», OK-Leitung,
               OK-Mitglied) sowie ein Protokoll, wer wem welche Rechte gegeben
               hat,
@@ -235,7 +327,8 @@ export default function DatenschutzPage() {
           <h3 className="pt-2 font-semibold text-fg">Inhalte von Planenden</h3>
           <p>
             Logos, Banner und Bilder, die Planende hochladen, sowie Texte zu
-            Abteilungen, Anlässen, Schichten und Vorlagen. Lade bitte keine
+            {w.unit === "Verein" ? "Vereinen" : w.units}, Anlässen, Schichten
+            und Vorlagen. Lade bitte keine
             Bilder hoch, auf denen Personen ohne deren Einverständnis erkennbar
             sind.
           </p>
@@ -252,7 +345,7 @@ export default function DatenschutzPage() {
             Anwendung sind in der Grösse begrenzt und werden spätestens bei der
             nächsten Aktualisierung der Software gelöscht. Zum Schutz vor
             Passwort-Erraten zählen wir Fehlversuche pro IP-Adresse und pro
-            E-Mail bzw. Cevi-Name nur im Arbeitsspeicher; diese Einträge gelten
+            E-Mail bzw. {w.nickname} nur im Arbeitsspeicher; diese Einträge gelten
             höchstens eine Stunde und gehen bei jedem Neustart verloren.
           </p>
 
@@ -260,10 +353,10 @@ export default function DatenschutzPage() {
           <p>
             Um zu sehen, ob der Schichtplan gut läuft und welche Funktionen
             gebraucht werden, zählen wir Nutzungen als{" "}
-            <strong>Summen pro Tag</strong>, z.&nbsp;B. «12 Anmeldungen mit
-            Cevi.DB», «3 PDF-Schichtpläne gedruckt» oder «40 Aufrufe der Hilfe
+            <strong>Summen pro Tag</strong>, z.&nbsp;B. «12 Anmeldungen mit{" "}
+            {dbShort}», «3 PDF-Schichtpläne gedruckt» oder «40 Aufrufe der Hilfe
             zum Eintragen». Gespeichert werden nur die Art der Nutzung, eine
-            feste Unterteilung (z.&nbsp;B. die Anmeldeart), die Abteilung und
+            feste Unterteilung (z.&nbsp;B. die Anmeldeart), {w.the} und
             der Tag. Für den Betrieb zählen wir zusätzlich pro Stunde, wie viele
             Anfragen eine Funktion des Servers bekam, wie lange die Antwort
             dauerte und ob Fehler auftraten; dabei speichern wir nur das Muster
@@ -298,8 +391,8 @@ export default function DatenschutzPage() {
               Schichten planen, Helfende einteilen und Anlässe durchführen,
             </li>
             <li>
-              Zugang zu Anlässen prüfen (z.&nbsp;B. nur Mitglieder der
-              Abteilung, nur Leitende, bestimmte Stufen),
+              Zugang zu Anlässen prüfen (z.&nbsp;B. nur Mitglieder{" "}
+              {w.ofThe}, nur Leitende, bestimmte {w.vocab.groupPlural}),
             </li>
             <li>
               Mindestalter prüfen: Bei Schichten mit Altersgrenze (z.&nbsp;B.
@@ -330,20 +423,21 @@ export default function DatenschutzPage() {
           <List>
             <li>
               <strong>Andere Helfende</strong> eines Anlasses sehen im
-              Schichtplan, wer in welcher Schicht eingetragen ist (Cevi-Name
+              Schichtplan, wer in welcher Schicht eingetragen ist ({w.nickname}
               bzw. Name). Wer für einen Anlass nicht berechtigt ist, sieht den
               Plan ohne Namen.
             </li>
             <li>
-              <strong>OK, Abteilungsleitung und wer das Recht «Alle Anlässe
-              sehen» hat</strong> in der betreffenden Abteilung sehen zusätzlich
+              <strong>OK, {w.leadership} und wer das Recht «Alle Anlässe
+              sehen» hat</strong> {w.inConcerned} sehen zusätzlich
               Kontaktdaten (E-Mail und Telefon, soweit vorhanden), das Alter sowie Antworten und
               Abmeldungen zu ihren Anlässen.
             </li>
             <li>
               <strong>Globale Administrator*innen</strong> des Betreibers sehen
-              im Admin-Portal alle Konten über alle Abteilungen (Profil,
-              Anmeldeart, Abteilungen, Rollen, Eintragungen und den Tag der
+              im Admin-Portal alle Konten über alle vier Angebote und alle
+              Abteilungen, Scharen und Vereine (Profil, Anmeldeart,
+              Zugehörigkeit, Rollen, Eintragungen und den Tag der
               letzten Nutzung) sowie die anonyme Nutzungsstatistik und können
               Konten löschen. Dieser Zugriff ist auf wenige Personen beschränkt
               und dient Support und Missbrauchsbekämpfung.
@@ -364,19 +458,23 @@ export default function DatenschutzPage() {
             rows={[
               [
                 "token",
-                "Anmeldung (signiertes Sitzungs-Token, für Skripte nicht lesbar), gilt für alle Subdomains von cevi-schichtplan.ch",
+                `Anmeldung (signiertes Sitzungs-Token, für Skripte nicht lesbar),gilt für alle Subdomains von ${org.domain}`,
                 "30 Tage oder bis zur Abmeldung",
               ],
-              [
-                "cevidb_oauth_state",
-                "Schutz der Anmeldung über die Cevi.DB vor Fälschung",
-                "10 Minuten",
-              ],
-              [
-                "cevidb_link",
-                "Bestätigung, wenn ein bestehendes Konto mit der Cevi.DB verknüpft wird",
-                "15 Minuten",
-              ],
+              ...(fed
+                ? ([
+                    [
+                      "cevidb_oauth_state",
+                      `Schutz der Anmeldung über die ${dbShort} vor Fälschung`,
+                      "10 Minuten",
+                    ],
+                    [
+                      "cevidb_link",
+                      `Bestätigung, wenn ein bestehendes Konto mit der ${dbShort} verknüpft wird`,
+                      "15 Minuten",
+                    ],
+                  ] as [string, string, string][])
+                : []),
             ]}
           />
           <p>
@@ -424,26 +522,30 @@ export default function DatenschutzPage() {
             </li>
             <li>
               <strong>Infomaniak Network AG</strong>, Genf, Schweiz: Versand der
-              E-Mails (SMTP), Verwaltung der Domain (DNS) und Speicherort einer
+              E-Mails (SMTP), Verwaltung der Domains (DNS) und Speicherort einer
               verschlüsselten Sicherungskopie der Datenbank in der Schweiz. Wie
               bei Google Drive verschlüsseln wir die Sicherung vor dem Hochladen;
               Infomaniak kann sie nicht lesen.
             </li>
-            <li>
-              <strong>Cevi.DB</strong> (Hitobito), betrieben vom Dachverband
-              Cevi Schweiz, Server in der Schweiz: Wenn du dich über die Cevi.DB
-              anmeldest, erhalten wir nach deiner Zustimmung dort dein Profil
-              mit E-Mail, Namen und Rollen. Wir schreiben nichts in die Cevi.DB
-              zurück. Für die Daten in der Cevi.DB gilt die{" "}
-              <a
-                href="https://www.cevi.ch/datenschutz/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Datenschutzerklärung des Cevi Schweiz
-              </a>
-              .
-            </li>
+            {fed && (
+              <li>
+                <strong>{org.authProviderName}</strong>, betrieben{" "}
+                {fed.operator}
+                {fed.where}: Wenn du dich über die {dbShort} anmeldest, erhalten
+                wir nach deiner Zustimmung dort dein Profil mit E-Mail, Namen
+                und Rollen. Wir schreiben nichts in die {dbShort} zurück. Für
+                die Daten in der {dbShort} gilt die Datenschutzerklärung des
+                Verbands (
+                <a
+                  href={fed.policyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {fed.policyLabel}
+                </a>
+                ).
+              </li>
+            )}
             <li>
               <strong>Let&apos;s Encrypt</strong> (ISRG, USA): stellt die
               TLS-Zertifikate aus. Dabei werden nur Domainnamen übermittelt,
@@ -469,20 +571,20 @@ export default function DatenschutzPage() {
         <Section id="dauer" title="8. Wie lange wir Daten aufbewahren">
           <List>
             <li>
-              Kontodaten bewahren wir auf, solange dein Konto besteht. Mit
-              Cevi.DB oder Passwort kannst du dein Konto jederzeit selbst
-              löschen (Profil auf cevi-schichtplan.ch oder Konto-Menü im
-              Schichtplan). Dabei werden auch deine Eintragungen, Rollen und
+              Kontodaten bewahren wir auf, solange dein Konto besteht. Mit{" "}
+              {fed ? `${dbShort} oder Passwort` : "Passwort"} kannst du dein
+              Konto jederzeit selbst löschen (Profil auf {org.domain} oder
+              Konto-Menü im Schichtplan). Dabei werden auch deine Eintragungen, Rollen und
               Antworten gelöscht.
             </li>
             <li>
-              Profile, die nur über den Cevi-Namen angemeldet sind, bleiben
+              Profile, die nur über den {w.nickname}n angemeldet sind, bleiben
               bestehen, bis sie gelöscht werden. Schreib uns, wenn wir dein
               Profil löschen sollen.
             </li>
             <li>
-              Anlässe mit ihren Eintragungen bleiben bestehen, bis die Abteilung
-              sie löscht.
+              Anlässe mit ihren Eintragungen bleiben bestehen, bis {w.the} sie
+              löscht.
             </li>
             <li>
               Antworten auf die Fragen eines Anlasses löschen wir automatisch
@@ -549,7 +651,7 @@ export default function DatenschutzPage() {
 
         <Section id="kinder" title="10. Kinder und Jugendliche">
           <p>
-            Im Cevi helfen auch Jugendliche mit. Wir bearbeiten ihre Daten nur
+            {w.inOrg} helfen auch Jugendliche mit. Wir bearbeiten ihre Daten nur
             im oben beschriebenen Umfang. Jugendliche unter 14 Jahren sollten
             ein Konto nur mit Einverständnis ihrer Eltern anlegen.
           </p>
@@ -599,7 +701,7 @@ export default function DatenschutzPage() {
             Wir passen diese Erklärung an, wenn sich die Plattform oder die
             Rechtslage ändert. Es gilt die jeweils hier veröffentlichte Fassung.
             Fragen zur Bedienung beantwortet das{" "}
-            <a href={helpUrl()}>Hilfe-Center</a>.
+            <a href={helpUrl("/", host)}>Hilfe-Center</a>.
           </p>
         </Section>
       </main>
