@@ -50,7 +50,7 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     nicknameTerm: 'Pfadiname',
     authProviderName: 'PBS MiData (Hitobito)',
     authProviderShort: 'PBS MiData',
-    primaryColor: '#632949',
+    primaryColor: '#64284b',
     logoUrl: '/images/pfadi-logo.svg',
     metaDescription:
       'Kostenlose Helferliste online für Pfingstlager, SoLa und Anlässe von Pfadi-Abteilungen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.',

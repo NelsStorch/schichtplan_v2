@@ -14,7 +14,7 @@ import { ImageUpload } from './ImageUpload';
 import { DepartmentBrandingPreview } from './DepartmentBrandingPreview';
 
 // Kuratierte Akzentfarben mit optimalem Kontrast
-const SWATCHES_PRIMARY = ['#e11d48', '#632949', '#283583', '#dc2626', '#ea580c', '#d97706', '#16a34a', '#0d9488', '#2563eb', '#7c3aed'];
+const SWATCHES_PRIMARY = ['#e11d48', '#64284b', '#283583', '#dc2626', '#ea580c', '#d97706', '#16a34a', '#0d9488', '#2563eb', '#7c3aed'];
 const SWATCHES_SECONDARY = ['#003d8f', '#1e293b', '#e11d48', '#16a34a', '#d97706', '#4f46e5', '#0f766e', '#be123c'];
 
 // Jeder Reiter braucht sein Recht (die Abteilungsleitung hat alle)
