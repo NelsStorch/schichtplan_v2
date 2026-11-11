@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Avatar, Badge, Dialog, cn, useToast } from '@schichtplan/ui';
 import {
+  getOrganizationByDbType,
   statusUrl,
   type AdminDepartmentListItemDto,
   type AdminEventListItemDto,
@@ -140,15 +141,7 @@ export function CommandPalette({
       action: () => {
         const text = departments
           .map((d) => {
-            const domain =
-              d.organization === 'PFADI'
-                ? 'pfadi-schichtplan.ch'
-                : d.organization === 'JUBLA'
-                ? 'jubla-schichtplan.ch'
-                : d.organization === 'OTHER'
-                ? 'vereins-schichtplan.ch'
-                : 'cevi-schichtplan.ch';
-            return `${d.slug}.${domain}`;
+            return `${d.slug}.${getOrganizationByDbType(d.organization).domain}`;
           })
           .join('\n');
         copyToClipboard(text, `${departments.length} Subdomains`);

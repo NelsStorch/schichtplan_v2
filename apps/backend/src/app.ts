@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { ORGANIZATION_DOMAINS } from '@schichtplan/shared';
 import { z } from 'zod';
 import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
@@ -45,12 +46,7 @@ function hasPinoPretty(): boolean {
   }
 }
 
-export const ALLOWED_PLATFORM_DOMAINS = [
-  'cevi-schichtplan.ch',
-  'pfadi-schichtplan.ch',
-  'jubla-schichtplan.ch',
-  'vereins-schichtplan.ch',
-];
+export const ALLOWED_PLATFORM_DOMAINS: readonly string[] = ORGANIZATION_DOMAINS;
 
 /** Darf diese Herkunft (Origin-Header) mit Cookies auf die API zugreifen? */
 export function isAllowedOrigin(origin: string, rootDomain: string, allowLocalhost: boolean): boolean {

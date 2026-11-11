@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button, Callout, CeviLogo, Spinner, ThemeToggle, buttonClasses, cn } from '@schichtplan/ui';
 import {
-  getOrganization,
+  getBrowserOrganization,
   privacyUrl,
   statusUrl,
   type AdminDepartmentListItemDto,
@@ -58,7 +58,7 @@ function Shell({
   nav?: React.ReactNode;
 }) {
   // Verband der aufgerufenen Domain (admin.<verband>-schichtplan.ch), sonst Cevi
-  const org = useMemo(() => getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch'), []);
+  const org = useMemo(() => getBrowserOrganization(), []);
   return (
     <div className="grain flex min-h-[100dvh] flex-col">
       <div aria-hidden className="bg-campfire pointer-events-none fixed inset-x-0 top-0 h-[40vh] opacity-60" />

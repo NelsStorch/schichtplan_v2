@@ -1,12 +1,11 @@
 'use client';
 
 import { ExternalLink } from 'lucide-react';
-import { NotFoundView } from '@schichtplan/ui';
-import { getLandingUrl, getOrganization } from '@schichtplan/shared';
+import { NotFoundView, useOrganization } from '@schichtplan/ui';
+import { getLandingUrl } from '@schichtplan/shared';
 
 export default function NotFound() {
-  const org = typeof window !== 'undefined' ? getOrganization(window.location.host) : undefined;
-  const orgDomain = org?.domain ?? 'cevi-schichtplan.ch';
+  const orgDomain = useOrganization().domain;
 
   return (
     <NotFoundView

@@ -8,11 +8,13 @@ COPY hilfe/package.json hilfe/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 # Zugangsarten kommen direkt aus den gemeinsamen Konstanten der App
 COPY packages/shared/src/constants.ts /app/packages/shared/src/constants.ts
+# Verbandsliste: daraus entstehen branding.js und nginx.conf (npm run generate)
+COPY packages/shared/src/organizations.ts /app/packages/shared/src/organizations.ts
 COPY hilfe ./
 RUN npm run build
 
 FROM nginx:1.29-alpine AS runner
-COPY hilfe/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/hilfe/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/hilfe/dist /usr/share/nginx/html
 EXPOSE 3004
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \

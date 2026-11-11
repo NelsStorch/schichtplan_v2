@@ -1,0 +1,66 @@
+# Ein Build bedient alle Verbandsdomains (hilfe.cevi-/pfadi-/jubla-/vereins-schichtplan.ch). Gebaut wird mit den
+# Cevi-Adressen; hier werden sie pro aufgerufenem Host ersetzt, damit Canonical, Sitemap, robots.txt, og:image und
+# die festen Links nicht auf Cevi zeigen (sonst gilt das Hilfe-Center von Pfadi/Jubla/Vereinen als Duplikat von Cevi).
+# Nur die vier bekannten Verbandsdomains werden übernommen, jeder andere Host bleibt bei Cevi.
+map $host $org_root {
+    default cevi-schichtplan.ch;
+    ~^hilfe\.(?<known>(?:__ORG_DOMAINS__))$ $known;
+}
+
+# Statisches Hilfe-Center hinter Traefik (TLS endet dort)
+server {
+    listen 3004;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    server_tokens off;
+    # Hinter Traefik: Weiterleitungen relativ, sonst zeigt z. B. /ok -> http://host:3004/ok/
+    absolute_redirect off;
+
+    sub_filter_once off;
+    sub_filter_types text/html text/plain application/xml text/xml;
+    sub_filter 'https://hilfe.cevi-schichtplan.ch' 'https://hilfe.$org_root';
+    sub_filter 'https://login.cevi-schichtplan.ch' 'https://login.$org_root';
+    sub_filter 'https://status.cevi-schichtplan.ch' 'https://status.$org_root';
+    sub_filter 'https://cevi-schichtplan.ch' 'https://$org_root';
+
+    gzip on;
+    gzip_min_length 1024;
+    gzip_types text/css application/javascript application/json image/svg+xml text/plain application/xml;
+
+    # Hashte Build-Dateien ändern nie ihren Namen
+    location /_astro/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    location /pagefind/ {
+        add_header Cache-Control "public, max-age=3600" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    # Healthchecks (Traefik und Uptime Kuma)
+    location ~ ^/(api/)?health$ {
+        access_log off;
+        default_type text/plain;
+        return 200 "OK\n";
+    }
+
+    # Manche Crawler und Tools suchen standardmässig nach /sitemap.xml
+    location = /sitemap.xml {
+        return 301 /sitemap-index.xml;
+    }
+
+    location / {
+        try_files $uri $uri/ $uri.html =404;
+        add_header Cache-Control "public, max-age=300" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        # Starlight hat Inline-Skripte (Theme), die Suche (Pagefind) braucht WebAssembly
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" always;
+    }
+
+    error_page 404 /404.html;
+}

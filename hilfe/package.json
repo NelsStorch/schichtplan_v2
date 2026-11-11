@@ -6,7 +6,10 @@
   "description": "Hilfe-Center hilfe.cevi-schichtplan.ch (statisch, Astro Starlight)",
   "type": "module",
   "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "predev": "npm run generate",
     "dev": "astro dev --port 3004",
+    "prebuild": "npm run generate",
     "build": "astro build",
     "preview": "astro preview --port 3004"
   },

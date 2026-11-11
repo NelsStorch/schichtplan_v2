@@ -27,12 +27,9 @@ import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
   // Gemerkt wird nur ein Ziel der eigenen Verbandsdomain. Sonst würde ein alter Rücksprung (z. B. von
   // einer Cevi-Seite) auf hilfe.pfadi-schichtplan.ch alle Links zurück auf Cevi umleiten.
   try {
-    const validDomains = [
-      'cevi-schichtplan.ch',
-      'pfadi-schichtplan.ch',
-      'jubla-schichtplan.ch',
-      'vereins-schichtplan.ch',
-    ];
+    // Verbandsdomains aus branding.js (dort aus packages/shared/src/organizations.ts erzeugt)
+    const orgs = (window as unknown as { SCHICHTPLAN_ORGS?: Record<string, { domain: string }> }).SCHICHTPLAN_ORGS ?? {};
+    const validDomains = Object.values(orgs).map((o) => o.domain);
     const inDomain = (host: string, domain: string) => host === domain || host.endsWith(`.${domain}`);
     const currentHost = window.location.hostname.toLowerCase();
     const currentDomain = validDomains.find((d) => inDomain(currentHost, d)) ?? null;

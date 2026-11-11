@@ -11,9 +11,16 @@ export interface OrganizationConfig {
   unitTerm: string;
   unitTermPlural: string;
   nicknameTerm: string;
+  /** Leitung der Einheit in der Anrede des Hilfe-Centers (z. B. «Abteilungsleitung») */
+  leadTerm: string;
+  /** Endung der Umgebungsvariablen für den Mailversand (SMTP_USER_<ENV_SUFFIX>) */
+  envSuffix: string;
   authProviderName: string;
   authProviderShort: string;
   primaryColor: string;
+  /** Akzentfarbe für Text auf hellem bzw. dunklem Grund (Hilfe-Center), je mit ausreichendem Kontrast */
+  accentInkLight: string;
+  accentInkDark: string;
   logoUrl: string;
   /** Optionaler Hinweis, dass das Projekt unabhängig vom Verband ist (Footer, Login) */
   independentNotice?: string;
@@ -32,9 +39,13 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     unitTerm: 'Abteilung',
     unitTermPlural: 'Abteilungen',
     nicknameTerm: 'Cevi-Name',
+    leadTerm: 'Abteilungsleitung',
+    envSuffix: 'CEVI',
     authProviderName: 'Cevi.DB (Hitobito)',
     authProviderShort: 'Cevi.DB',
     primaryColor: '#e11d48',
+    accentInkLight: '#be123c',
+    accentInkDark: '#fb7185',
     logoUrl: '/images/cevi-logo.svg',
     metaDescription:
       'Kostenlose Helferliste online für Chilbi, Lager und Anlässe von Cevi-Abteilungen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.',
@@ -50,12 +61,16 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     unitTerm: 'Abteilung',
     unitTermPlural: 'Abteilungen',
     nicknameTerm: 'Pfadiname',
+    leadTerm: 'Abteilungsleitung',
+    envSuffix: 'PFADI',
     authProviderName: 'PBS MiData (Hitobito)',
     authProviderShort: 'PBS MiData',
     // Bewusst eigenes Erscheinungsbild (Tannengrün/Orange/Marineblau, eigenes Zeichen aus Kalender, Uhr und
     // Zahnrad): kein PBS-Logo, keine PBS-Farbe und kein PBS-Favicon, damit die Seite nicht als offizielle
     // PBS-Anwendung wirkt.
     primaryColor: '#20553e',
+    accentInkLight: '#20553e',
+    accentInkDark: '#5dbb8a',
     logoUrl: '/images/pfadi-schichtplan-logo.svg',
     independentNotice: 'Unabhängiges Projekt, nicht von der Pfadibewegung Schweiz (PBS) betrieben oder herausgegeben.',
     metaDescription:
@@ -72,9 +87,13 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     unitTerm: 'Schar',
     unitTermPlural: 'Scharen',
     nicknameTerm: 'Leitername',
+    leadTerm: 'Scharleitung',
+    envSuffix: 'JUBLA',
     authProviderName: 'Jubla-Datenbank (Hitobito)',
     authProviderShort: 'Jubla-DB',
     primaryColor: '#283583',
+    accentInkLight: '#283583',
+    accentInkDark: '#66b1e2',
     logoUrl: '/images/jubla-logo.svg',
     metaDescription:
       'Kostenlose Helferliste online für Lager, Scharanlässe und Feste von Jubla-Scharen. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.',
@@ -90,15 +109,22 @@ export const ORGANIZATIONS: Record<OrganizationSlug, OrganizationConfig> = {
     unitTerm: 'Verein',
     unitTermPlural: 'Vereine',
     nicknameTerm: 'Spitzname',
+    leadTerm: 'Vereinsleitung / Vorstand',
+    envSuffix: 'VEREIN',
     authProviderName: 'E-Mail & Passwort',
     authProviderShort: 'E-Mail',
     primaryColor: '#2563eb',
+    accentInkLight: '#1d4ed8',
+    accentInkDark: '#93c5fd',
     logoUrl: '/images/verein-logo.svg',
     metaDescription:
       'Kostenlose Helferliste online für Vereinsfeste, Turniere und Anlässe aller Art. Helfer*innen tragen sich per Link ein, ohne App und ohne Passwort.',
     heroHeadlineHighlight: 'für Vereine & Feste',
   },
 };
+
+/** Alle Verbandsdomains (cevi-, pfadi-, jubla-, vereins-schichtplan.ch): einzige Quelle für Listen im Code */
+export const ORGANIZATION_DOMAINS: readonly string[] = Object.values(ORGANIZATIONS).map((o) => o.domain);
 
 /**
  * Ermittelt den Verbands-Slug aus einem Hostnamen oder Slug.
@@ -128,6 +154,16 @@ export function getOrganizationSlugFromHost(hostnameOrSlug?: string | null): Org
   }
 
   return 'cevi';
+}
+
+/**
+ * Verband der Domain, auf der der Browser gerade ist (ohne Fenster: Cevi).
+ * Nur in Ereignis-Handlern und Effekten verwenden. Beim Rendern fehlt auf dem Server der Host, dann ergäbe
+ * das Cevi und React korrigiert Link-Attribute bei der Hydration nicht: dort `useOrganization()` aus
+ * `@schichtplan/ui` bzw. `getOrganization(host)` mit dem Host der Anfrage nehmen.
+ */
+export function getBrowserOrganization(): OrganizationConfig {
+  return getOrganization(typeof window !== 'undefined' ? window.location.host : undefined);
 }
 
 /**

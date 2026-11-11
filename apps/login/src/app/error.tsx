@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { ErrorView } from '@schichtplan/ui';
-import { getLandingUrl, getOrganization } from '@schichtplan/shared';
+import { ErrorView, useOrganization } from '@schichtplan/ui';
+import { getLandingUrl } from '@schichtplan/shared';
 
 export default function ErrorPage({
   error,
@@ -16,8 +16,7 @@ export default function ErrorPage({
     console.error('Unhandled login error:', error);
   }, [error]);
 
-  const org = typeof window !== 'undefined' ? getOrganization(window.location.host) : undefined;
-  const orgDomain = org?.domain ?? 'cevi-schichtplan.ch';
+  const orgDomain = useOrganization().domain;
 
   return (
     <ErrorView

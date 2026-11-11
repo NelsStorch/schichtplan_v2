@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { getOrganization } from '@schichtplan/shared';
+import { getBrowserOrganization } from '@schichtplan/shared';
 
 /**
  * Aktualisiert das Browser-Tab-Favicon dynamisch im DOM.
@@ -10,7 +10,7 @@ import { getOrganization } from '@schichtplan/shared';
 export function updateFavicon(iconUrl?: string | null) {
   if (typeof document === 'undefined') return;
 
-  const defaultUrl = getOrganization(typeof window !== 'undefined' ? window.location.host : '').logoUrl;
+  const defaultUrl = getBrowserOrganization().logoUrl;
   const url = iconUrl && iconUrl.trim().length > 0 ? iconUrl.trim() : defaultUrl;
 
   // Standard Favicon

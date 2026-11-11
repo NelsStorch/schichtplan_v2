@@ -1,6 +1,6 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { MailKind, OrganizationType } from '@schichtplan/shared';
-import { getOrganization } from '@schichtplan/shared';
+import { getOrganization, getOrganizationByDbType } from '@schichtplan/shared';
 import { escapeIcsText, foldIcsLine, formatIcsUtc } from './calendarFeed.js';
 import { trackUsage } from './usageStats.js';
 
@@ -35,44 +35,20 @@ export function normalizeOrganizationType(org?: string | null): OrganizationType
  * Passwörter kommen ausschliesslich aus der Umgebung (Server-.env), nie aus dem Code.
  */
 export function getSmtpConfig(orgType: OrganizationType): SmtpAccountConfig {
-  switch (orgType) {
-    case 'PFADI':
-      return {
-        host: process.env.SMTP_HOST_PFADI || defaultHost,
-        port: Number(process.env.SMTP_PORT_PFADI || defaultPort),
-        secure: process.env.SMTP_PORT_PFADI ? Number(process.env.SMTP_PORT_PFADI) === 465 : defaultSecure,
-        user: process.env.SMTP_USER_PFADI || 'admin@pfadi-schichtplan.ch',
-        pass: process.env.SMTP_PASSWORD_PFADI || '',
-        from: process.env.SMTP_FROM_PFADI || 'Pfadi Schichtplan <admin@pfadi-schichtplan.ch>',
-      };
-    case 'JUBLA':
-      return {
-        host: process.env.SMTP_HOST_JUBLA || defaultHost,
-        port: Number(process.env.SMTP_PORT_JUBLA || defaultPort),
-        secure: process.env.SMTP_PORT_JUBLA ? Number(process.env.SMTP_PORT_JUBLA) === 465 : defaultSecure,
-        user: process.env.SMTP_USER_JUBLA || 'admin@jubla-schichtplan.ch',
-        pass: process.env.SMTP_PASSWORD_JUBLA || '',
-        from: process.env.SMTP_FROM_JUBLA || 'Jubla Schichtplan <admin@jubla-schichtplan.ch>',
-      };
-    case 'OTHER':
-      return {
-        host: process.env.SMTP_HOST_VEREIN || defaultHost,
-        port: Number(process.env.SMTP_PORT_VEREIN || defaultPort),
-        secure: process.env.SMTP_PORT_VEREIN ? Number(process.env.SMTP_PORT_VEREIN) === 465 : defaultSecure,
-        user: process.env.SMTP_USER_VEREIN || 'admin@vereins-schichtplan.ch',
-        pass: process.env.SMTP_PASSWORD_VEREIN || '',
-        from: process.env.SMTP_FROM_VEREIN || 'Vereins Schichtplan <admin@vereins-schichtplan.ch>',
-      };
-    default:
-      return {
-        host: process.env.SMTP_HOST_CEVI || defaultHost,
-        port: Number(process.env.SMTP_PORT_CEVI || defaultPort),
-        secure: process.env.SMTP_PORT_CEVI ? Number(process.env.SMTP_PORT_CEVI) === 465 : defaultSecure,
-        user: process.env.SMTP_USER_CEVI || process.env.SMTP_USER || 'admin@cevi-schichtplan.ch',
-        pass: process.env.SMTP_PASSWORD_CEVI || process.env.SMTP_PASSWORD || '',
-        from: process.env.SMTP_FROM_CEVI || process.env.SMTP_FROM || 'Cevi Schichtplan <admin@cevi-schichtplan.ch>',
-      };
-  }
+  const org = getOrganizationByDbType(orgType);
+  const suffix = org.envSuffix;
+  const env = process.env;
+  // Cevi nutzt zusätzlich die älteren Variablen ohne Endung (SMTP_USER, SMTP_PASSWORD, SMTP_FROM)
+  const legacy = org.slug === 'cevi';
+  const portVar = env[`SMTP_PORT_${suffix}`];
+  return {
+    host: env[`SMTP_HOST_${suffix}`] || defaultHost,
+    port: Number(portVar || defaultPort),
+    secure: portVar ? Number(portVar) === 465 : defaultSecure,
+    user: env[`SMTP_USER_${suffix}`] || (legacy ? env.SMTP_USER : undefined) || `admin@${org.domain}`,
+    pass: env[`SMTP_PASSWORD_${suffix}`] || (legacy ? env.SMTP_PASSWORD : undefined) || '',
+    from: env[`SMTP_FROM_${suffix}`] || (legacy ? env.SMTP_FROM : undefined) || `${org.name} <admin@${org.domain}>`,
+  };
 }
 
 /**

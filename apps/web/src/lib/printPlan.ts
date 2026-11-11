@@ -1,4 +1,4 @@
-import { getOrganization, type DepartmentDto, type ShiftDto, type ShiftSignupDto } from '@schichtplan/shared';
+import { getBrowserOrganization, type DepartmentDto, type ShiftDto, type ShiftSignupDto } from '@schichtplan/shared';
 import { dayKeyToIso, fmtDateRange, fmtDayMonth, fmtShortDate, fmtShortWeekday, fmtWeekday, groupByBusinessDay, fmtTimeRange } from './format';
 import type { EventDetails } from './types';
 
@@ -202,7 +202,7 @@ export async function buildPlanDocument(
   options: PrintPlanOptions,
   loadImage: (url: string) => Promise<string | null> = rasterize
 ): Promise<PlanDocument> {
-  const org = getOrganization(typeof window !== 'undefined' ? window.location.host : 'cevi-schichtplan.ch');
+  const org = getBrowserOrganization();
   const brandLogo = await loadImage(org.logoUrl);
   let logo: string | null = null;
   for (const url of [event.logoUrl, department?.logoUrl]) {

@@ -1,73 +1,83 @@
-// Client-seitiges dynamisches Branding & Favicon fuer alle 4 Verbaende / Organisationen:
-// Cevi, Pfadi, Jubla und Verein.
+// GENERIERT aus hilfe/branding.template.js und packages/shared/src/organizations.ts (npm run generate).
+// Nicht von Hand aendern: Verbandsdaten (Domain, Name, Farbe, Logo) kommen aus organizations.ts.
+// Client-seitiges dynamisches Branding & Favicon fuer alle Verbaende / Organisationen.
 (function () {
   const ORGS = {
-    cevi: {
-      slug: 'cevi',
-      name: 'Cevi Schichtplan',
-      shortName: 'Cevi',
-      domain: 'cevi-schichtplan.ch',
-      unitTerm: 'Abteilung',
-      unitTermPlural: 'Abteilungen',
-      leadTerm: 'Abteilungsleitung',
-      nicknameTerm: 'Cevi-Name',
-      authProvider: 'Cevi.DB (Hitobito)',
-      logo: '/cevi-logo.svg',
-      accent: '225 29 72',        // #e11d48
-      accentInkLight: '190 18 60',
-      accentInkDark: '251 113 133',
-      accentFg: '255 255 255',
+    "cevi": {
+      "slug": "cevi",
+      "name": "Cevi Schichtplan",
+      "shortName": "Cevi",
+      "domain": "cevi-schichtplan.ch",
+      "unitTerm": "Abteilung",
+      "unitTermPlural": "Abteilungen",
+      "leadTerm": "Abteilungsleitung",
+      "nicknameTerm": "Cevi-Name",
+      "authProvider": "Cevi.DB (Hitobito)",
+      "logo": "/cevi-logo.svg",
+      "accent": "225 29 72",
+      "accentInkLight": "190 18 60",
+      "accentInkDark": "251 113 133",
+      "accentFg": "255 255 255"
     },
-    pfadi: {
-      slug: 'pfadi',
-      name: 'Pfadi Schichtplan',
-      shortName: 'Pfadi',
-      domain: 'pfadi-schichtplan.ch',
-      unitTerm: 'Abteilung',
-      unitTermPlural: 'Abteilungen',
-      leadTerm: 'Abteilungsleitung',
-      nicknameTerm: 'Pfadiname',
-      authProvider: 'PBS MiData (Hitobito)',
-      logo: '/pfadi-schichtplan-logo.svg',
-      notice: 'Unabhängiges Projekt, nicht von der Pfadibewegung Schweiz (PBS) betrieben.',
-      accent: '32 85 62',         // #20553e (eigenes Tannengrün, nicht die Verbandsfarbe)
-      accentInkLight: '32 85 62',
-      accentInkDark: '93 187 138',
-      accentFg: '255 255 255',
+    "pfadi": {
+      "slug": "pfadi",
+      "name": "Pfadi Schichtplan",
+      "shortName": "Pfadi",
+      "domain": "pfadi-schichtplan.ch",
+      "unitTerm": "Abteilung",
+      "unitTermPlural": "Abteilungen",
+      "leadTerm": "Abteilungsleitung",
+      "nicknameTerm": "Pfadiname",
+      "authProvider": "PBS MiData (Hitobito)",
+      "logo": "/pfadi-schichtplan-logo.svg",
+      "notice": "Unabhängiges Projekt, nicht von der Pfadibewegung Schweiz (PBS) betrieben oder herausgegeben.",
+      "accent": "32 85 62",
+      "accentInkLight": "32 85 62",
+      "accentInkDark": "93 187 138",
+      "accentFg": "255 255 255"
     },
-    jubla: {
-      slug: 'jubla',
-      name: 'Jubla Schichtplan',
-      shortName: 'Jubla',
-      domain: 'jubla-schichtplan.ch',
-      unitTerm: 'Schar',
-      unitTermPlural: 'Scharen',
-      leadTerm: 'Scharleitung',
-      nicknameTerm: 'Leitername',
-      authProvider: 'Jubla-DB (Hitobito)',
-      logo: '/jubla-logo.svg',
-      accent: '40 53 131',        // #283583
-      accentInkLight: '40 53 131',
-      accentInkDark: '102 177 226',
-      accentFg: '255 255 255',
+    "jubla": {
+      "slug": "jubla",
+      "name": "Jubla Schichtplan",
+      "shortName": "Jubla",
+      "domain": "jubla-schichtplan.ch",
+      "unitTerm": "Schar",
+      "unitTermPlural": "Scharen",
+      "leadTerm": "Scharleitung",
+      "nicknameTerm": "Leitername",
+      "authProvider": "Jubla-Datenbank (Hitobito)",
+      "logo": "/jubla-logo.svg",
+      "accent": "40 53 131",
+      "accentInkLight": "40 53 131",
+      "accentInkDark": "102 177 226",
+      "accentFg": "255 255 255"
     },
-    verein: {
-      slug: 'verein',
-      name: 'Vereins Schichtplan',
-      shortName: 'Verein',
-      domain: 'vereins-schichtplan.ch',
-      unitTerm: 'Verein',
-      unitTermPlural: 'Vereine',
-      leadTerm: 'Vereinsleitung / Vorstand',
-      nicknameTerm: 'Spitzname',
-      authProvider: 'E-Mail & Passwort',
-      logo: '/verein-logo.svg',
-      accent: '37 99 235',        // #2563eb
-      accentInkLight: '29 78 216',
-      accentInkDark: '147 197 253',
-      accentFg: '255 255 255',
-    },
+    "verein": {
+      "slug": "verein",
+      "name": "Vereins Schichtplan",
+      "shortName": "Verein",
+      "domain": "vereins-schichtplan.ch",
+      "unitTerm": "Verein",
+      "unitTermPlural": "Vereine",
+      "leadTerm": "Vereinsleitung / Vorstand",
+      "nicknameTerm": "Spitzname",
+      "authProvider": "E-Mail & Passwort",
+      "logo": "/verein-logo.svg",
+      "accent": "37 99 235",
+      "accentInkLight": "29 78 216",
+      "accentInkDark": "147 197 253",
+      "accentFg": "255 255 255"
+    }
   };
+  // Auch fuer andere Skripte der Seite (z. B. den Ruecksprung in der Kopfzeile)
+  window.SCHICHTPLAN_ORGS = ORGS;
+
+  // Verband aus einem Text (Hostname, Rücksprung-URL): erst die Verbände mit eigener Kennung, dann Cevi
+  function orgFromText(text) {
+    const own = Object.values(ORGS).find((o) => o.slug !== 'cevi' && text.includes(o.slug));
+    if (own) return own;
+    return text.includes('cevi') ? ORGS.cevi : null;
+  }
 
   function detectOrg() {
     const host = window.location.hostname.toLowerCase();
@@ -75,19 +85,16 @@
     const orgParam = params.get('org');
     if (orgParam && ORGS[orgParam]) return ORGS[orgParam];
 
-    if (host.includes('pfadi')) return ORGS.pfadi;
-    if (host.includes('jubla')) return ORGS.jubla;
-    if (host.includes('verein')) return ORGS.verein;
-    // Auch Cevi-Domains haben Vorrang vor einem gemerkten Rücksprung (sonst kippt hilfe.cevi-schichtplan.ch auf Pfadi)
-    if (host.includes('cevi')) return ORGS.cevi;
+    // Der Host der Hilfe-Seite hat Vorrang vor einem gemerkten Rücksprung
+    const byHost = orgFromText(host);
+    if (byHost) return byHost;
 
     // Check referrer or sessionStorage for return_url
     try {
       const returnUrl = sessionStorage.getItem('schichtplan_return_url');
       if (returnUrl) {
-        if (returnUrl.includes('pfadi')) return ORGS.pfadi;
-        if (returnUrl.includes('jubla')) return ORGS.jubla;
-        if (returnUrl.includes('verein')) return ORGS.verein;
+        const byReturn = orgFromText(returnUrl);
+        if (byReturn) return byReturn;
       }
     } catch (_) {}
 

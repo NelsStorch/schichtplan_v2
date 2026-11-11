@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { headers } from 'next/headers';
-import { getOrganization } from '@schichtplan/shared';
+import { ORGANIZATION_DOMAINS, getOrganization } from '@schichtplan/shared';
 
 /**
  * Bausteine für Link-Vorschau-Bilder (Open Graph, 1200×630) mit `next/og`.
@@ -25,12 +25,7 @@ export async function getRequestOrigin(): Promise<{ origin: string; host: string
   return { origin: `${proto}://${host}`, host };
 }
 
-const SUPPORTED_ROOT_DOMAINS = [
-  'cevi-schichtplan.ch',
-  'pfadi-schichtplan.ch',
-  'jubla-schichtplan.ch',
-  'vereins-schichtplan.ch',
-];
+const SUPPORTED_ROOT_DOMAINS = ORGANIZATION_DOMAINS;
 
 /**
  * Host aus der Anfrage, aber nur die eigene Domain (DOMAIN, Standard cevi-schichtplan.ch, samt Subdomains
