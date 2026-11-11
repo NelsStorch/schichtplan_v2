@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { ErrorView } from '@schichtplan/ui';
+import { getLandingUrl } from '@schichtplan/shared';
 
 export default function ErrorPage({
   error,
@@ -27,7 +28,7 @@ export default function ErrorPage({
       secondaryActions={[
         {
           label: 'Hauptportal',
-          href: 'https://cevi-schichtplan.ch',
+          href: getLandingUrl(),
           external: true,
           icon: <ExternalLink className="size-3.5" />,
         },

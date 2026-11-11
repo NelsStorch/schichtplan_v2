@@ -671,7 +671,7 @@ export function renderEmailTemplate({
                             &copy; ${new Date().getFullYear()} <strong>${escapeHtml(brandName)}</strong> &bull;
                             <a href="https://${org.domain}" style="color: #716b66; text-decoration: underline;">${org.domain}</a>
                             &bull;
-                            <a href="https://hilfe.cevi-schichtplan.ch" style="color: #716b66; text-decoration: underline;">Hilfe</a>
+                            <a href="https://hilfe.${org.domain}" style="color: #716b66; text-decoration: underline;">Hilfe</a>
                             ${
                               unsubscribeUrl
                                 ? ` &bull; <a href="${escapeHtml(unsubscribeUrl)}" style="color: #716b66; text-decoration: underline;">${escapeHtml(

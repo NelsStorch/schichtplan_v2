@@ -18,10 +18,11 @@ import {
   X,
 } from 'lucide-react';
 import { Avatar, Badge, Dialog, cn, useToast } from '@schichtplan/ui';
-import type {
-  AdminDepartmentListItemDto,
-  AdminEventListItemDto,
-  AdminUserListItemDto,
+import {
+  statusUrl,
+  type AdminDepartmentListItemDto,
+  type AdminEventListItemDto,
+  type AdminUserListItemDto,
 } from '@schichtplan/shared';
 import { api } from '../lib/api';
 import { fullName } from '../lib/format';
@@ -130,14 +131,26 @@ export function CommandPalette({
       id: 'action-system-status',
       label: 'System-Status prüfen',
       icon: <ExternalLink />,
-      action: () => window.open('https://status.cevi-schichtplan.ch', '_blank'),
+      action: () => window.open(statusUrl(), '_blank'),
     },
     {
       id: 'action-copy-slugs',
       label: 'Alle Abteilungs-Subdomains kopieren',
       icon: <Copy />,
       action: () => {
-        const text = departments.map((d) => `${d.slug}.cevi-schichtplan.ch`).join('\n');
+        const text = departments
+          .map((d) => {
+            const domain =
+              d.organization === 'PFADI'
+                ? 'pfadi-schichtplan.ch'
+                : d.organization === 'JUBLA'
+                ? 'jubla-schichtplan.ch'
+                : d.organization === 'OTHER'
+                ? 'vereins-schichtplan.ch'
+                : 'cevi-schichtplan.ch';
+            return `${d.slug}.${domain}`;
+          })
+          .join('\n');
         copyToClipboard(text, `${departments.length} Subdomains`);
       },
     },

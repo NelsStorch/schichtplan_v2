@@ -109,13 +109,16 @@ export function getLandingUrl(path = '/'): string {
 }
 
 /**
- * Link ins Hilfe-Center, z. B. helpUrl('/ok/zugang/'). Bewusst immer die Produktiv-Hilfe:
- * Die Inhalte sind für alle Umgebungen gleich, und eine feste URL vermeidet Hydration-Unterschiede.
+ * Link ins Hilfe-Center, z. B. helpUrl('/ok/zugang/').
+ * Unterstützt dynamisch die Verbands-Domain (z. B. hilfe.pfadi-schichtplan.ch).
  */
 export const HELP_URL = 'https://hilfe.cevi-schichtplan.ch';
 
-export function helpUrl(path = '/'): string {
-  return `${HELP_URL}${path}`;
+export function helpUrl(path = '/', host?: string): string {
+  const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
+  const root = currentHost ? getRootDomain(currentHost).replace(/^dev\./, '') : 'cevi-schichtplan.ch';
+  const cleanPath = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
+  return `https://hilfe.${root}${cleanPath}`;
 }
 
 /**
@@ -130,8 +133,14 @@ export function statusUrl(path = '/', host?: string): string {
   return `https://status.${root}${cleanPath}`;
 }
 
-/** Datenschutzerklärung auf der Landingpage, wie die Hilfe fest auf Produktion (gilt für alle Subdomains) */
+/** Datenschutzerklärung auf der Landingpage, standardmässig auf cevi-schichtplan.ch */
 export const PRIVACY_URL = 'https://cevi-schichtplan.ch/datenschutz';
+
+export function privacyUrl(host?: string): string {
+  const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
+  const root = currentHost ? getRootDomain(currentHost) : 'cevi-schichtplan.ch';
+  return `https://${root}/datenschutz`;
+}
 
 /** Ziel nach dem Login ohne return_to: eigene Abteilung, sonst Landingpage (nie zurück aufs Login). */
 export function getDefaultDestination(homeDepartmentSlug?: string | null): string {

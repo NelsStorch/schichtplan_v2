@@ -19,6 +19,7 @@ import { Button, buttonClasses } from './Button';
 import { Badge } from './Badge';
 import { CeviLogo } from './CeviLogo';
 import { ThemeToggle } from '../theme/ThemeToggle';
+import { getLandingUrl, getOrganization } from '@schichtplan/shared';
 
 export interface ErrorAction {
   label: string;
@@ -108,6 +109,12 @@ export function ErrorView({
   const [copied, setCopied] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
 
+  const org = typeof window !== 'undefined' ? getOrganization(window.location.host) : undefined;
+  const orgName = org?.name ?? 'Schichtplan';
+  const orgDomain = org?.domain ?? 'cevi-schichtplan.ch';
+  const landingUrl = typeof window !== 'undefined' ? getLandingUrl() : 'https://cevi-schichtplan.ch';
+  const displayLogoUrl = departmentLogoUrl || org?.logoUrl || '/images/cevi-logo.svg';
+
   useEffect(() => {
     setWisdomIndex(Math.floor(Math.random() * KITCHEN_WISDOMS.length));
     setCanGoBack(typeof window !== 'undefined' && window.history.length > 1);
@@ -190,10 +197,10 @@ export function ErrorView({
           href={homeHref}
           className="group inline-flex items-center gap-3 transition hover:opacity-90 focus-visible:outline-none"
         >
-          <CeviLogo logoUrl={departmentLogoUrl} size="sm" alt="Cevi Schichtplan Logo" />
+          <CeviLogo logoUrl={displayLogoUrl} size="sm" alt={orgName} />
           <div className="flex flex-col">
             <span className="font-display text-sm font-bold tracking-tight text-fg group-hover:text-accent-ink transition-colors">
-              {departmentName || 'Cevi Schichtplan'}
+              {departmentName || orgName}
             </span>
             <span className="text-2xs font-medium text-fg-subtle">Lagerküche & Technik</span>
           </div>
@@ -560,12 +567,12 @@ export function ErrorView({
       {/* Fusszeile */}
       <footer className="relative z-10 py-5 text-center text-xs text-fg-subtle">
         <p>
-          Cevi Schichtplan ·{' '}
+          {orgName} ·{' '}
           <a
-            href="https://cevi-schichtplan.ch"
+            href={landingUrl}
             className="underline hover:text-fg transition-colors"
           >
-            cevi-schichtplan.ch
+            {orgDomain}
           </a>
         </p>
       </footer>

@@ -2,6 +2,7 @@
 
 import { ExternalLink } from 'lucide-react';
 import { NotFoundView } from '@schichtplan/ui';
+import { getLandingUrl } from '@schichtplan/shared';
 
 export default function NotFound() {
   return (
@@ -14,7 +15,7 @@ export default function NotFound() {
       secondaryActions={[
         {
           label: 'Hauptportal',
-          href: 'https://cevi-schichtplan.ch',
+          href: getLandingUrl(),
           external: true,
           icon: <ExternalLink className="size-3.5" />,
         },

@@ -173,6 +173,7 @@ describe('email service', () => {
       });
       expect(htmlPfadi).toContain('Pfadi Schichtplan');
       expect(htmlPfadi).toContain('pfadi-schichtplan.ch');
+      expect(htmlPfadi).toContain('https://hilfe.pfadi-schichtplan.ch');
 
       const htmlVerein = renderEmailTemplate({
         title: 'Vereins Event',
@@ -181,6 +182,7 @@ describe('email service', () => {
       });
       expect(htmlVerein).toContain('Vereins Schichtplan');
       expect(htmlVerein).toContain('vereins-schichtplan.ch');
+      expect(htmlVerein).toContain('https://hilfe.vereins-schichtplan.ch');
     });
   });
 

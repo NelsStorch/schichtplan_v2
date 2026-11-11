@@ -30,7 +30,15 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { PRIVACY_URL, departmentRoleLabel, helpUrl, statusUrl, type MyHoursSummaryDto } from '@schichtplan/shared';
+import {
+  departmentRoleLabel,
+  getLandingUrl,
+  getRootDomain,
+  helpUrl,
+  privacyUrl,
+  statusUrl,
+  type MyHoursSummaryDto,
+} from '@schichtplan/shared';
 import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { clearOfflineData, useInstallPrompt } from '@/lib/offline';
@@ -136,11 +144,22 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
             <a href={statusUrl()} className="transition hover:text-fg">
               Status
             </a>
-            <a href={PRIVACY_URL} className="transition hover:text-fg">
+            <a href={privacyUrl()} className="transition hover:text-fg">
               Datenschutz
             </a>
-            <a href="https://cevi-schichtplan.ch" className="transition hover:text-fg">
-              cevi-schichtplan.ch
+            <a
+              href={getLandingUrl()}
+              className="transition hover:text-fg"
+            >
+              {typeof window !== 'undefined' && window.location.hostname.includes('.')
+                ? getRootDomain(window.location.hostname)
+                : department?.organization === 'PFADI'
+                ? 'pfadi-schichtplan.ch'
+                : department?.organization === 'JUBLA'
+                ? 'jubla-schichtplan.ch'
+                : department?.organization === 'OTHER'
+                ? 'vereins-schichtplan.ch'
+                : 'cevi-schichtplan.ch'}
             </a>
           </div>
         </div>
