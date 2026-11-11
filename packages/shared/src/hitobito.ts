@@ -52,6 +52,16 @@ export interface HitobitoConfig {
   stufeParticipantRoles?: string[];
 }
 
+/**
+ * Leitung der Cevi-Ebenen über der Ortsgruppe (Mitgliederorganisation, Sektion): Sie darf dort einen Schichtplan
+ * anlegen. Reine Datenpflege-Rollen (Administrator der Mitgliederorganisation, AdminOrtsgruppen) zählen nicht.
+ */
+export const CEVI_REGIONAL_LEADER_ROLE_CLASSES = [
+  'Group::MitgliederorganisationGeschaeftsstelle::Geschaeftsleiter',
+  'Group::MitgliederorganisationVorstand::Praesidium',
+  'Group::Sektion::Administrator',
+];
+
 export const HITOBITO_CEVI_CONFIG: HitobitoConfig = {
   orgType: 'CEVI',
   name: 'Cevi.DB',
@@ -63,7 +73,9 @@ export const HITOBITO_CEVI_CONFIG: HitobitoConfig = {
     'Group::Abteilung',
     'Group::Ortsgruppe',
   ],
-  departmentGroupLabels: ['Ortsgruppe'],
+  // Struktur laut hitobito_cevi: Dachverband → Mitgliederorganisation (z. B. Cevi Region Zürich) → Sektion (optional)
+  // → Ortsgruppe → Jungschar → Stufe. Mitgliederorganisation und Sektion können einen eigenen Schichtplan haben.
+  departmentGroupLabels: ['Ortsgruppe', 'Mitgliederorganisation', 'Sektion'],
   jungscharGroupLabels: ['Jungschar'],
   departmentLeaderRoleClasses: [
     'Group::Jungschar::Abteilungsleiter',
@@ -72,6 +84,7 @@ export const HITOBITO_CEVI_CONFIG: HitobitoConfig = {
     'Group::Abteilung::Abteilungsleiterin',
     'Group::Ortsgruppe::Abteilungsleiter',
     'Group::Ortsgruppe::Abteilungsleiterin',
+    ...CEVI_REGIONAL_LEADER_ROLE_CLASSES,
   ],
   departmentLeaderSuffixes: [
     '::abteilungsleiter',

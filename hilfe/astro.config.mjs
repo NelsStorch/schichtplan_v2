@@ -118,6 +118,7 @@ export default defineConfig({
             'abteilung/personen',
             'abteilung/rechte',
             'abteilung/cevidb',
+            'abteilung/gruppen-und-rollen',
           ],
         },
         {

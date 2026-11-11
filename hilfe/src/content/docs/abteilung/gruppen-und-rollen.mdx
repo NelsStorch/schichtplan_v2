@@ -1,0 +1,83 @@
+---
+title: Gruppen und Rollen aus der Verbands-DB
+description: Welche Gruppen der Schichtplan als Abteilung erkennt und welche Rollen als Leitung, Stufenleitung oder Teilnehmende zählen – für Cevi, Pfadi und Jubla.
+audience: [abteilung]
+sidebar:
+  label: Gruppen & Rollen
+---
+
+import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+
+Beim Login mit der Verbands-Datenbank (Cevi.DB, PBS MiData, Jubla-DB) liest der Schichtplan deine Rollen und die Gruppen, in denen sie liegen. Daraus ergibt sich:
+
+- zu welcher **Abteilung** du gehörst (bzw. Schar, Region, Kantonalverband),
+- ob du dort **Leitung** bist und den Schichtplan anlegen und verwalten darfst,
+- in welchen **Stufen** du Leitung oder Teilnehmer\*in bist.
+
+Eine Rolle gehört immer zur **nächsten Abteilungs-Ebene über ihr**. Wer in den Wölfen einer Pfadi-Abteilung ist, gehört zu dieser Abteilung, nicht zur Region darüber.
+
+:::note[Auch Regionen und Kantonalverbände]
+Nicht nur Abteilungen und Scharen, auch **Regionen und Kantonalverbände** können einen eigenen Schichtplan anlegen, zum Beispiel für einen Regionsanlass. Angelegt wird er von deren Leitung, gleich wie bei einer Abteilung (siehe [Organisation anlegen](/abteilung/anlegen/)).
+:::
+
+<Tabs syncKey="verband">
+  <TabItem label="Cevi">
+    **Struktur:** Dachverband → Mitgliederorganisation (z. B. Cevi Region Zürich) → Sektion → Ortsgruppe → Jungschar → Stufe
+
+    | Ebene mit eigenem Schichtplan | Wer gilt als Leitung? |
+    | --- | --- |
+    | Ortsgruppe bzw. Jungschar | Abteilungsleiter\*in |
+    | Sektion | Administrator\*in der Sektion |
+    | Mitgliederorganisation | Geschäftsleiter\*in (Geschäftsstelle), Präsidium (Vorstand) |
+
+    Hat eine Ortsgruppe mehrere Jungscharen, bekommt jede Jungschar ihren eigenen Schichtplan.
+
+    **Stufen:** Gruppen vom Typ «Stufe». Stufenleiter\*innen und Gruppenleiter\*innen sind Leitung, Teilnehmer\*innen sind Teilnehmende.
+
+    Nicht als Leitung zählen reine Verwaltungsrollen wie «Administrator Cevi.DB».
+  </TabItem>
+
+  <TabItem label="Pfadi">
+    **Struktur:** Bund → Kantonalverband → Region → Abteilung → Biber, Wölfe, Pfadi, Pio, Rover, PTA
+
+    | Ebene mit eigenem Schichtplan | Wer gilt als Leitung? |
+    | --- | --- |
+    | Abteilung | Abteilungsleiter\*in, Abteilungsleiter\*in Stv, Sekretariat |
+    | Region | Regionsleiter\*in |
+    | Kantonalverband | Kantonsleiter\*in |
+
+    **Einheiten:** Biber, Wölfe, Pfadi, Pio, Rover und PTA. Einheitsleiter\*innen und Mitleiter\*innen sind Leitung. Biber, Wölfe, Pfadis, Pios, Rover und PTA-Mitglieder sind Teilnehmende, auch Leitwölfe und Leitpfadis.
+
+    Präsidium und Vizepräsidium dürfen in MiData nur lesen und sind darum im Schichtplan keine Leitung.
+  </TabItem>
+
+  <TabItem label="Jubla">
+    **Struktur:** Bund → Kanton → Region → Schar → Kindergruppen
+
+    | Ebene mit eigenem Schichtplan | Wer gilt als Leitung? |
+    | --- | --- |
+    | Schar | Scharleitung, Lagerleitung |
+    | Region | Leitung in der Gruppe «Regionalleitung» |
+    | Kanton | Leitung in der Gruppe «Kantonsleitung» |
+
+    **Gruppen:** Kindergruppen der Schar. Leitende sind Leitung, Kinder sind Teilnehmende.
+
+    Präses darf in der Jubla-DB nur lesen und ist darum im Schichtplan keine Leitung.
+  </TabItem>
+</Tabs>
+
+## Wann Änderungen wirken
+
+Die Zuordnung wird bei **jedem Login** neu berechnet. Wurde in der Verbands-DB eine Rolle neu vergeben oder entfernt, meldet sich die Person einmal ab und wieder an.
+
+Wer als Leitung keine Rolle mehr hat, verliert die Leitung im Schichtplan wieder, solange die Abteilung noch eine andere Leitung hat. Rechte, die ihr im Schichtplan selbst vergeben habt (siehe [Personen & Rechte](/abteilung/rechte/)), bleiben davon unberührt.
+
+## Fehlt eure Rolle oder Gruppe?
+
+Jeder Verband organisiert sich etwas anders. Zählt bei euch eine Rolle als Leitung, die hier fehlt, oder wird eine Gruppe falsch zugeordnet, meldet es uns bitte auf GitHub. Gebt dabei den Verband, die Ebene und die genaue Bezeichnung der Rolle aus der Verbands-DB an.
+
+<LinkCard
+  title="Anpassung bei Gruppen oder Rollen melden"
+  description="Vorlage auf GitHub: Verband, Gruppe und Rolle angeben."
+  href="https://github.com/NelsStorch/schichtplan_v2/issues/new?template=rollen.yml"
+/>

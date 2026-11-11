@@ -7,6 +7,7 @@
  *
  * Wird bei jedem Aufruf neu gelesen (nicht beim Import), damit `.env`-Werte von dotenv sicher gelten.
  */
+import { CEVI_REGIONAL_LEADER_ROLE_CLASSES } from '@schichtplan/shared';
 
 function list(value: string | undefined, fallback: readonly string[]): string[] {
   const items = (value ?? '')
@@ -64,6 +65,8 @@ export function cevidbConfig(): CeviDbConfig {
       'Group::Abteilung::Abteilungsleiterin',
       'Group::Ortsgruppe::Abteilungsleiter',
       'Group::Ortsgruppe::Abteilungsleiterin',
+      // Mitgliederorganisation und Sektion (Regionen): eigener Schichtplan für ihre Ebene
+      ...CEVI_REGIONAL_LEADER_ROLE_CLASSES,
     ]),
     stufeRoleClassPrefix: process.env.CEVIDB_STUFE_ROLE_PREFIX?.trim() || 'Group::Stufe::',
     stufeLeaderRoles: list(process.env.CEVIDB_STUFE_LEADER_ROLES, [

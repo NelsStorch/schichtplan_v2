@@ -1,0 +1,57 @@
+name: 🧩 Gruppe oder Rolle anpassen
+description: Eine Rolle oder Gruppe aus Cevi.DB, MiData oder Jubla-DB wird im Schichtplan falsch oder gar nicht erkannt.
+labels: ["typ/verbesserung", "bereich/login"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Welche Gruppen und Rollen der Schichtplan heute erkennt, steht im Hilfe-Center unter
+        [Gruppen & Rollen](https://hilfe.cevi-schichtplan.ch/abteilung/gruppen-und-rollen/).
+        Bitte keine Namen von Personen angeben.
+  - type: dropdown
+    id: verband
+    attributes:
+      label: Verband
+      options:
+        - Cevi (Cevi.DB)
+        - Pfadi (PBS MiData)
+        - Jubla (Jubla-DB)
+    validations:
+      required: true
+  - type: dropdown
+    id: ebene
+    attributes:
+      label: Ebene
+      options:
+        - Abteilung / Ortsgruppe / Jungschar / Schar
+        - Stufe / Einheit / Kindergruppe
+        - Region / Sektion / Mitgliederorganisation
+        - Kantonalverband / Kanton
+        - Andere
+    validations:
+      required: true
+  - type: input
+    id: rolle
+    attributes:
+      label: Bezeichnung der Rolle oder Gruppe in der Verbands-DB
+      description: So, wie sie dort angezeigt wird, z. B. «Regionsleiter*in» in der Gruppe «Region».
+    validations:
+      required: true
+  - type: dropdown
+    id: soll
+    attributes:
+      label: Wie soll sie im Schichtplan zählen?
+      options:
+        - Als Leitung der Abteilung / Region (darf den Schichtplan anlegen und verwalten)
+        - Nicht als Leitung
+        - Als Stufenleitung
+        - Als Teilnehmer*in einer Stufe
+        - Gruppe soll einen eigenen Schichtplan haben können
+        - Anderes
+    validations:
+      required: true
+  - type: textarea
+    id: begruendung
+    attributes:
+      label: Warum?
+      description: Wofür braucht ihr das, z. B. «Unsere Regionsanlässe organisiert das Präsidium».

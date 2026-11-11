@@ -91,6 +91,19 @@ describe('parseCeviDbGroup', () => {
     expect(parseCeviDbGroup(ortsgruppe, 161)).toMatchObject({ jungscharId: null, ortsgruppeId: 161, jungscharCount: 2 });
   });
 
+  it('lässt Mitgliederorganisation und Sektion selbst eine Abteilung bilden', () => {
+    const sektion = {
+      groups: [{ id: '72', name: 'Sektion Oberland', group_type: 'Sektion', links: { hierarchies: ['1', '2', '72'], children: ['161'] } }],
+      linked: { groups: ortsgruppe.linked.groups },
+    };
+    expect(parseCeviDbGroup(sektion, 72)).toMatchObject({ ortsgruppeId: 72, jungscharId: null, jungscharCount: 0 });
+    const vorstand = {
+      groups: [{ id: '3', name: 'Vorstand', group_type: 'Vorstand', links: { hierarchies: ['1', '2', '3'] } }],
+      linked: { groups: [{ id: '2', name: 'Cevi Region Zürich', group_type: 'Mitgliederorganisation' }] },
+    };
+    expect(parseCeviDbGroup(vorstand, 3)).toMatchObject({ ortsgruppeId: 2, jungscharCount: null });
+  });
+
   it('nimmt keine Personendaten mit', () => {
     expect(JSON.stringify(parseCeviDbGroup(joschija, 806))).not.toMatch(/Musterweg|Vorname|6396/);
   });

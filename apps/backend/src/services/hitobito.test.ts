@@ -128,6 +128,12 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
       expect(isDepartmentLeaderRole('Group::Jungschar::Abteilungsleiterin', 'CEVI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Abteilung::Abteilungsleiter', 'CEVI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Ortsgruppe::AdministratorCeviDB', 'CEVI')).toBe(false);
+      // Regionen: Mitgliederorganisation und Sektion, ohne reine Datenpflege-Rollen
+      expect(isDepartmentLeaderRole('Group::MitgliederorganisationGeschaeftsstelle::Geschaeftsleiter', 'CEVI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::MitgliederorganisationVorstand::Praesidium', 'CEVI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::Sektion::Administrator', 'CEVI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::Mitgliederorganisation::Administrator', 'CEVI')).toBe(false);
+      expect(isDepartmentLeaderRole('Group::MitgliederorganisationGeschaeftsstelle::AdminOrtsgruppen', 'CEVI')).toBe(false);
       expect(isDepartmentLeaderRole('Group::Stufe::Stufenleiter', 'CEVI')).toBe(false);
     });
 
