@@ -279,6 +279,13 @@ export async function ceviDbGroupPeople(
       : [];
   const leaderGroupIds = new Set<number | null>(jungscharen.map((g) => g.jungscharId));
   if (isJungschar) leaderGroupIds.add(groupId);
+  // Ohne Jungscharen (Pfadi-Abteilung, Jubla-Schar, Region, Kantonalverband): Die Leitungsrolle liegt in der Gruppe
+  // selbst oder in einer Gruppe darunter (Jubla: Regional- bzw. Kantonsleitung als eigene Untergruppe)
+  if (group?.jungscharCount === 0) {
+    leaderGroupIds.add(groupId);
+    const below = await prisma.hitobitoGroup.findMany({ where: { provider, ortsgruppeId: groupId }, select: { id: true } });
+    for (const g of below) leaderGroupIds.add(g.id);
+  }
   return people.map((p) => ({
     id: p.id,
     isLeader: p.leaderGroupIds.some((id) => leaderGroupIds.has(id)),

@@ -131,23 +131,26 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
       expect(isDepartmentLeaderRole('Group::Stufe::Stufenleiter', 'CEVI')).toBe(false);
     });
 
-    it('erkennt Pfadi-Leitungsrollen (PBS MiData & DPSG/BdP)', () => {
+    it('erkennt Pfadi-Leitungsrollen (hitobito_pbs), auch Regions- und Kantonsleitung', () => {
       expect(isDepartmentLeaderRole('Group::Abteilung::Abteilungsleitung', 'PFADI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Abteilung::AbteilungsleitungStv', 'PFADI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Abteilung::Sekretariat', 'PFADI')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Abteilung::Praesidium', 'PFADI')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Stamm::Stammesfuehrung', 'PFADI')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Stamm::StammesfuehrungStv', 'PFADI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::Region::Regionalleitung', 'PFADI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::Kantonalverband::Kantonsleitung', 'PFADI')).toBe(true);
+      // Präsidium darf in MiData nur lesen
+      expect(isDepartmentLeaderRole('Group::Abteilung::Praesidium', 'PFADI')).toBe(false);
+      expect(isDepartmentLeaderRole('Group::Abteilung::VizePraesidium', 'PFADI')).toBe(false);
       expect(isDepartmentLeaderRole('Group::Pfadi::Einheitsleitung', 'PFADI')).toBe(false);
     });
 
-    it('erkennt Jubla-Leitungsrollen (Scharleitung, Präses, CampLeader)', () => {
+    it('erkennt Jubla-Leitungsrollen (Scharleitung, Lagerleitung, Regional- und Kantonsleitung)', () => {
       expect(isDepartmentLeaderRole('Group::Flock::Leader', 'JUBLA')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Flock::CampLeader', 'JUBLA')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Flock::President', 'JUBLA')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Schar::Scharleitung', 'JUBLA')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Schar::Scharleiter', 'JUBLA')).toBe(true);
-      expect(isDepartmentLeaderRole('Group::Schar::Praeses', 'JUBLA')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::RegionalBoard::Leader', 'JUBLA')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::StateBoard::Leader', 'JUBLA')).toBe(true);
+      // Präses darf in der Jubla-DB nur lesen
+      expect(isDepartmentLeaderRole('Group::Flock::President', 'JUBLA')).toBe(false);
+      expect(isDepartmentLeaderRole('Group::RegionalBoard::Member', 'JUBLA')).toBe(false);
       expect(isDepartmentLeaderRole('Group::ChildGroup::Leader', 'JUBLA')).toBe(false);
     });
 
@@ -193,14 +196,16 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
       // Pfadi
       expect(classifyUnitRole('Group::Pfadi::Einheitsleitung', 'PFADI')).toBe('LEITUNG');
       expect(classifyUnitRole('Group::Woelfe::Mitleitung', 'PFADI')).toBe('LEITUNG');
-      expect(classifyUnitRole('Group::Pfadi::Leitpfadi', 'PFADI')).toBe('LEITUNG');
+      // Leitpfadi und Leitwolf sind Kinder mit einer Gruppenleitung innerhalb der Stufe
+      expect(classifyUnitRole('Group::Pfadi::Leitpfadi', 'PFADI')).toBe('TEILNEHMER');
+      expect(classifyUnitRole('Group::Woelfe::Leitwolf', 'PFADI')).toBe('TEILNEHMER');
       expect(classifyUnitRole('Group::Pfadi::Pfadi', 'PFADI')).toBe('TEILNEHMER');
       expect(classifyUnitRole('Group::Woelfe::Wolf', 'PFADI')).toBe('TEILNEHMER');
       expect(classifyUnitRole('Group::Biber::Biber', 'PFADI')).toBe('TEILNEHMER');
 
       // Jubla
       expect(classifyUnitRole('Group::ChildGroup::Leader', 'JUBLA')).toBe('LEITUNG');
-      expect(classifyUnitRole('Group::Flock::Guide', 'JUBLA')).toBe('LEITUNG');
+      expect(classifyUnitRole('Group::Flock::Guide', 'JUBLA')).toBe('ANDERE');
       expect(classifyUnitRole('Group::ChildGroup::Child', 'JUBLA')).toBe('TEILNEHMER');
       expect(classifyUnitRole('Group::Flock::Coach', 'JUBLA')).toBe('ANDERE');
     });
@@ -213,11 +218,10 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
         last_name: 'Muster',
         nickname: 'Chinchilla',
         email: 'chinchilla@pfadi-beispiel.ch',
-        abteilung_id: 501,
         primary_group_id: 502,
         roles: [
           { role_class: 'Group::Abteilung::Abteilungsleitung', group_id: 501, group_name: 'Pfadi Uster' },
-          { role_class: 'Group::Woelfe::Stufenleitung', group_id: 502, group_name: 'Meute Rikki-Tikki' },
+          { role_class: 'Group::Woelfe::Einheitsleitung', group_id: 502, group_name: 'Meute Rikki-Tikki' },
         ],
       };
 
@@ -240,11 +244,10 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
         last_name: 'Keller',
         nickname: 'Panda',
         email: 'panda@jubla-beispiel.ch',
-        schar_id: 601,
         primary_group_id: 602,
         roles: [
           { role_class: 'Group::Flock::Leader', group_id: 601, group_name: 'Jubla Sursee' },
-          { role_class: 'Group::ChildGroup::Guide', group_id: 602, group_name: 'Gruppe Tiger' },
+          { role_class: 'Group::ChildGroup::Leader', group_id: 602, group_name: 'Gruppe Tiger' },
         ],
       };
 

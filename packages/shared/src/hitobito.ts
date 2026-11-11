@@ -20,8 +20,16 @@ export interface HitobitoConfig {
   ortsgruppeField: string;
   /** Standard-BaseURL der Hitobito-Instanz */
   defaultBaseUrl: string;
-  /** Typen von Gruppen in Hitobito, die eine Abteilung / Schar darstellen */
+  /** Typen von Gruppen in Hitobito, die eine Abteilung / Schar darstellen (inkl. Region und Kantonalverband) */
   departmentGroupTypes: string[];
+  /**
+   * Dieselben Gruppentypen, wie sie die Gruppen-API (`/groups/{id}.json`, Feld `group_type`) liefert: übersetzt, auf
+   * Deutsch. Eine Rolle gehört zur nächsten Gruppe dieser Typen über ihr. Auch Regionen und Kantonalverbände können
+   * so einen eigenen Schichtplan haben, geleitet von der Regions- bzw. Kantonsleitung.
+   */
+  departmentGroupLabels: string[];
+  /** Nur Cevi: Zwischenebene unter der Ortsgruppe (Jungschar), sonst leer */
+  jungscharGroupLabels: string[];
   /** Voll qualifizierte Rollen-Klassen (`roles[].role_class`), die als Abteilungsleitung / Scharleitung gelten */
   departmentLeaderRoleClasses: string[];
   /** Namensendungen (Suffixe) von Rollen, die als Leitung gelten (Groß-/Kleinschreibung tolerant) */
@@ -55,6 +63,8 @@ export const HITOBITO_CEVI_CONFIG: HitobitoConfig = {
     'Group::Abteilung',
     'Group::Ortsgruppe',
   ],
+  departmentGroupLabels: ['Ortsgruppe'],
+  jungscharGroupLabels: ['Jungschar'],
   departmentLeaderRoleClasses: [
     'Group::Jungschar::Abteilungsleiter',
     'Group::Jungschar::Abteilungsleiterin',
@@ -103,87 +113,38 @@ export const HITOBITO_PFADI_CONFIG: HitobitoConfig = {
   oauthScopes: DEFAULT_HITOBITO_SCOPES,
   ortsgruppeField: 'abteilung_id',
   defaultBaseUrl: 'https://db.scout.ch',
-  departmentGroupTypes: [
-    'Group::Abteilung',
-    'Group::Pfadi::Abteilung',
-    'Group::Stamm',
-  ],
+  // Struktur laut hitobito_pbs: Bund → Kantonalverband → Region (verschachtelbar) → Abteilung → Biber, Wölfe, Pfadi,
+  // Pio, Rover, PTA. Abteilungen hängen unter einer Region oder direkt unter dem Kantonalverband.
+  departmentGroupTypes: ['Group::Abteilung', 'Group::Region', 'Group::Kantonalverband'],
+  departmentGroupLabels: ['Abteilung', 'Region', 'Kantonalverband'],
+  jungscharGroupLabels: [],
+  // Nur Rollen mit Schreibrechten auf die Ebene (layer_and_below_full). Präsidium und Vizepräsidium dürfen in
+  // MiData nur lesen und werden darum hier nicht Leitung.
   departmentLeaderRoleClasses: [
     'Group::Abteilung::Abteilungsleitung',
     'Group::Abteilung::AbteilungsleitungStv',
-    'Group::Abteilung::Abteilungsleiter',
-    'Group::Abteilung::Abteilungsleiterin',
     'Group::Abteilung::Sekretariat',
-    'Group::Abteilung::Praesidium',
-    'Group::Abteilung::VizePraesidium',
-    'Group::Pfadi::Abteilung::Abteilungsleitung',
-    'Group::Pfadi::Abteilung::Abteilungsleiter',
-    'Group::Pfadi::Abteilung::Abteilungsleiterin',
-    'Group::Stamm::Stammesfuehrung',
-    'Group::Stamm::StammesfuehrungStv',
+    'Group::Region::Regionalleitung',
+    'Group::Kantonalverband::Kantonsleitung',
   ],
   departmentLeaderSuffixes: [
     '::abteilungsleitung',
     '::abteilungsleitungstv',
-    '::abteilungsleiter',
-    '::abteilungsleiterin',
-    '::al',
-    '::al-stellvertretung',
-    '::stabsleitung',
-    '::stammesfuehrung',
-    '::stammesfuehrungstv',
+    '::regionalleitung',
+    '::kantonsleitung',
   ],
   unitRoleClassPrefixes: [
     'Group::Biber::',
     'Group::Woelfe::',
     'Group::Pfadi::',
     'Group::Pio::',
+    'Group::AbteilungsRover::',
     'Group::Rover::',
     'Group::Pta::',
-    'Group::AbteilungsRover::',
-    'Group::StammGruppePfadfinder::',
-    'Group::Stufe::',
-    'Group::Einheit::',
   ],
-  unitLeaderRoles: [
-    'Einheitsleitung',
-    'Einheitsleiter',
-    'Einheitsleiterin',
-    'Mitleitung',
-    'Mitleiter',
-    'Mitleiterin',
-    'Stufenleitung',
-    'Stufenleiter',
-    'Stufenleiterin',
-    'StufenleitungBiber',
-    'StufenleitungWoelfe',
-    'StufenleitungPfadi',
-    'StufenleitungPio',
-    'StufenleitungRover',
-    'StufenleitungPta',
-    'Gruppenleiter',
-    'Gruppenleiterin',
-    'Gruppenleitung',
-    'Leitung',
-    'Hilfsleitung',
-    'Leitwolf',
-    'Leitpfadi',
-  ],
-  unitParticipantRoles: [
-    'Biber',
-    'Wolf',
-    'Wölfe',
-    'Pfadi',
-    'Pfadis',
-    'Pio',
-    'Pios',
-    'Rover',
-    'Rovers',
-    'Pta',
-    'Mitglied',
-    'Teilnehmer',
-    'Teilnehmerin',
-  ],
+  unitLeaderRoles: ['Einheitsleitung', 'Mitleitung'],
+  // Leitwolf und Leitpfadi führen als Kinder eine Gruppe innerhalb der Stufe: Sie sind Teilnehmende
+  unitParticipantRoles: ['Biber', 'Wolf', 'Leitwolf', 'Pfadi', 'Leitpfadi', 'Pio', 'Rover', 'Mitglied'],
   get stufeRoleClassPrefix() {
     return this.unitRoleClassPrefixes[0];
   },
@@ -201,68 +162,28 @@ export const HITOBITO_JUBLA_CONFIG: HitobitoConfig = {
   oauthScopes: DEFAULT_HITOBITO_SCOPES,
   ortsgruppeField: 'schar_id',
   defaultBaseUrl: 'https://db.jubla.ch',
-  departmentGroupTypes: [
-    'Group::Flock',
-    'Group::Schar',
-    'Group::Jubla::Schar',
-  ],
+  // Struktur laut hitobito_jubla: Bund → Kanton → Region → Schar (Flock) → Kindergruppen. Scharen hängen unter einer
+  // Region oder direkt unter dem Kanton. Die Leitung von Region und Kanton sitzt in einer eigenen Untergruppe
+  // (Regionalleitung / Kantonsleitung), die Rolle zählt darum für die Region bzw. den Kanton darüber.
+  departmentGroupTypes: ['Group::Flock', 'Group::Region', 'Group::State'],
+  departmentGroupLabels: ['Schar', 'Region', 'Kanton'],
+  jungscharGroupLabels: [],
+  // Präses (President) darf in der Jubla-DB nur lesen und wird darum hier nicht Leitung
   departmentLeaderRoleClasses: [
     'Group::Flock::Leader',
     'Group::Flock::CampLeader',
-    'Group::Flock::President',
-    'Group::Flock::Scharleitung',
-    'Group::Flock::Scharleiter',
-    'Group::Flock::Scharleiterin',
-    'Group::Schar::Scharleitung',
-    'Group::Schar::Scharleiter',
-    'Group::Schar::Scharleiterin',
-    'Group::Schar::Praeses',
-    'Group::Jubla::Schar::Scharleitung',
+    'Group::RegionalBoard::Leader',
+    'Group::StateBoard::Leader',
   ],
   departmentLeaderSuffixes: [
     '::flock::leader',
     '::flock::campleader',
-    '::flock::president',
-    '::scharleitung',
-    '::scharleiter',
-    '::scharleiterin',
-    '::lagerleitung',
-    '::praeses',
-    '::president',
+    '::regionalboard::leader',
+    '::stateboard::leader',
   ],
-  unitRoleClassPrefixes: [
-    'Group::ChildGroup::',
-    'Group::Gruppe::',
-    'Group::Stufe::',
-    'Group::SimpleGroup::',
-  ],
-  unitLeaderRoles: [
-    'Leader',
-    'CampLeader',
-    'President',
-    'Guide',
-    'Scharleitung',
-    'Scharleiter',
-    'Scharleiterin',
-    'Lagerleitung',
-    'Praeses',
-    'Gruppenleiter',
-    'Gruppenleiterin',
-    'Gruppenleitung',
-    'Leiter',
-    'Leiterin',
-    'Hilfsleiter',
-    'Hilfsleiterin',
-    'Hilfsleitung',
-  ],
-  unitParticipantRoles: [
-    'Child',
-    'Kind',
-    'Kinder',
-    'Teilnehmer',
-    'Teilnehmerin',
-    'Mitglied',
-  ],
+  unitRoleClassPrefixes: ['Group::ChildGroup::'],
+  unitLeaderRoles: ['Leader'],
+  unitParticipantRoles: ['Child'],
   get stufeRoleClassPrefix() {
     return this.unitRoleClassPrefixes[0];
   },
@@ -281,6 +202,8 @@ export const HITOBITO_OTHER_CONFIG: HitobitoConfig = {
   ortsgruppeField: 'verein_id',
   defaultBaseUrl: '',
   departmentGroupTypes: ['Group::Verein'],
+  departmentGroupLabels: [],
+  jungscharGroupLabels: [],
   departmentLeaderRoleClasses: ['Vorstand', 'Praesident', 'Praesidentin'],
   departmentLeaderSuffixes: ['::vorstand', '::praesident', '::praesidentin'],
   unitRoleClassPrefixes: ['Group::Team::', 'Group::Gruppe::'],

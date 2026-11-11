@@ -103,6 +103,84 @@ describe('parseCeviDbGroup', () => {
   });
 });
 
+// Struktur wie auf pbs.puzzle.ch (November 2026): Bund → Kantonalverband → Region → Abteilung → Wölfe
+const pbsLinked = [
+  { id: '1', name: 'Pfadibewegung Schweiz', group_type: 'Bund' },
+  { id: '234', name: 'AS Genevois', group_type: 'Kantonalverband' },
+  { id: '906', name: 'RG-coachland', group_type: 'Region' },
+  { id: '906', name: 'RG-coachland', group_type: 'Gruppe' },
+  { id: '1045', name: 'Benoît de Pontverre', group_type: 'Abteilung' },
+  { id: '1047', name: 'Meute', group_type: 'Wölfe' },
+  { id: '1046', name: 'Troupe', group_type: 'Pfadi' },
+];
+const pbsGroup = (id: string, name: string, type: string, hierarchies: string[], children: string[] = []) => ({
+  groups: [{ id, name, group_type: type, layer: true, links: { hierarchies, children } }],
+  linked: { groups: pbsLinked },
+});
+
+describe('parseCeviDbGroup für Pfadi (MiData)', () => {
+  it('ordnet eine Einheit ihrer Abteilung zu', () => {
+    const meute = pbsGroup('1047', 'Meute', 'Wölfe', ['1113', '1', '234', '906', '1045', '1047']);
+    expect(parseCeviDbGroup(meute, 1047, 'PFADI')).toEqual({
+      id: 1047,
+      name: 'Meute',
+      jungscharId: null,
+      ortsgruppeId: 1045,
+      jungscharCount: null,
+    });
+  });
+
+  it('nimmt die Abteilung als eigene Ebene, ohne Jungscharen', () => {
+    const abteilung = pbsGroup('1045', 'Benoît de Pontverre', 'Abteilung', ['1113', '1', '234', '906', '1045'], ['1047', '1046']);
+    expect(parseCeviDbGroup(abteilung, 1045, 'PFADI')).toMatchObject({ jungscharId: null, ortsgruppeId: 1045, jungscharCount: 0 });
+  });
+
+  it('lässt Regionen und Kantonalverbände selbst eine Abteilung bilden', () => {
+    const region = pbsGroup('906', 'RG-coachland', 'Region', ['1113', '1', '234', '906'], ['1045']);
+    expect(parseCeviDbGroup(region, 906, 'PFADI')).toMatchObject({ ortsgruppeId: 906, jungscharCount: 0 });
+    const kantonalverband = pbsGroup('234', 'AS Genevois', 'Kantonalverband', ['1113', '1', '234'], ['906']);
+    expect(parseCeviDbGroup(kantonalverband, 234, 'PFADI')).toMatchObject({ ortsgruppeId: 234, jungscharCount: 0 });
+  });
+
+  it('wertet Pfadi-Gruppen nicht mit den Cevi-Typen aus', () => {
+    const abteilung = pbsGroup('1045', 'Benoît de Pontverre', 'Abteilung', ['1113', '1', '234', '906', '1045']);
+    expect(parseCeviDbGroup(abteilung, 1045, 'CEVI')).toMatchObject({ ortsgruppeId: null });
+  });
+});
+
+describe('parseCeviDbGroup für Jubla', () => {
+  const linked = [
+    { id: '1', name: 'Jubla Schweiz', group_type: 'Bund' },
+    { id: '10', name: 'Jubla Zürich', group_type: 'Kanton' },
+    { id: '20', name: 'Region Oberland', group_type: 'Region' },
+    { id: '21', name: 'Regionalleitung', group_type: 'Regionalleitung' },
+    { id: '30', name: 'Jubla Uster', group_type: 'Schar' },
+    { id: '31', name: 'Blauring 3. Klasse', group_type: 'Kindergruppe' },
+  ];
+  const jubla = (id: string, type: string, hierarchies: string[]) => ({
+    groups: [{ id, name: `Gruppe ${id}`, group_type: type, links: { hierarchies } }],
+    linked: { groups: linked },
+  });
+
+  it('ordnet eine Kindergruppe ihrer Schar zu', () => {
+    expect(parseCeviDbGroup(jubla('31', 'Kindergruppe', ['1', '10', '20', '30', '31']), 31, 'JUBLA')).toMatchObject({
+      ortsgruppeId: 30,
+      jungscharId: null,
+    });
+  });
+
+  it('ordnet die Regionalleitung ihrer Region zu', () => {
+    expect(parseCeviDbGroup(jubla('21', 'Regionalleitung', ['1', '10', '20', '21']), 21, 'JUBLA')).toMatchObject({
+      ortsgruppeId: 20,
+      jungscharCount: null,
+    });
+    expect(parseCeviDbGroup(jubla('20', 'Region', ['1', '10', '20']), 20, 'JUBLA')).toMatchObject({
+      ortsgruppeId: 20,
+      jungscharCount: 0,
+    });
+  });
+});
+
 describe('refreshCeviDbGroups', () => {
   const log = { warn: vi.fn() } as unknown as FastifyBaseLogger;
 

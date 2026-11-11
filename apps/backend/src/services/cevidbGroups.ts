@@ -7,6 +7,7 @@
  */
 import type { FastifyBaseLogger } from 'fastify';
 import type { OrganizationType, PrismaClient } from '../db.js';
+import { getHitobitoConfig } from '@schichtplan/shared';
 import { parseCeviDbGroupId, type CeviDbGroupInfo } from './cevidb.js';
 
 /** Solange gilt ein Eintrag als aktuell (die Gruppenstruktur ändert sich selten) */
@@ -16,9 +17,15 @@ const TIME_BUDGET_MS = 6_000;
 const CONCURRENCY = 4;
 const MAX_GROUPS = 40;
 
-// Gruppentypen laut Cevi.DB. Die Bezeichnungen sind übersetzt, die Cevi.DB läuft nur auf Deutsch.
-const JUNGSCHAR_TYPE = 'Jungschar';
-const ORTSGRUPPE_TYPE = 'Ortsgruppe';
+/**
+ * Gruppentypen pro Verband (packages/shared/src/hitobito.ts). Die Gruppen-API liefert sie übersetzt, auf Deutsch.
+ * «Ortsgruppe» steht hier für die Ebene einer Abteilung: Cevi-Ortsgruppe, Pfadi-Abteilung, Jubla-Schar, aber auch
+ * Region und Kantonalverband. Eine Jungschar als Zwischenebene gibt es nur bei der Cevi.
+ */
+function groupLabels(provider: OrganizationType) {
+  const config = getHitobitoConfig(provider);
+  return { ortsgruppe: config.departmentGroupLabels, jungschar: config.jungscharGroupLabels };
+}
 
 type Db = Pick<PrismaClient, 'hitobitoGroup'>;
 
@@ -35,7 +42,11 @@ function idList(value: unknown): number[] {
  * Antwort von `/groups/{id}.json` auslesen, ohne Personendaten. In `linked.groups` kommen Eltern-Gruppen doppelt
  * vor, einmal mit dem allgemeinen Typ «Gruppe»: Jede ID zählt darum mit allen ihren Typen.
  */
-export function parseCeviDbGroup(body: unknown, expectedId: number): CeviDbGroupInfo | null {
+export function parseCeviDbGroup(
+  body: unknown,
+  expectedId: number,
+  provider: OrganizationType = 'CEVI'
+): CeviDbGroupInfo | null {
   if (!isRecord(body) || !Array.isArray(body.groups) || !isRecord(body.groups[0])) return null;
   const group = body.groups[0];
   if (parseCeviDbGroupId(group.id) !== expectedId || typeof group.name !== 'string' || !isRecord(group.links)) {
@@ -55,17 +66,19 @@ export function parseCeviDbGroup(body: unknown, expectedId: number): CeviDbGroup
   for (const entry of linked) {
     if (isRecord(entry)) addType(parseCeviDbGroupId(entry.id), entry.group_type);
   }
-  const hasType = (id: number, type: string) => typesById.get(id)?.has(type) ?? false;
-  // Die Hierarchie geht von oben nach unten: Die letzte Treffer-Gruppe liegt der Gruppe am nächsten
-  const nearest = (type: string) => hierarchy.filter((id) => hasType(id, type)).at(-1) ?? null;
+  const labels = groupLabels(provider);
+  const hasType = (id: number, types: string[]) => types.some((type) => typesById.get(id)?.has(type) ?? false);
+  // Die Hierarchie geht von oben nach unten und enthält die Gruppe selbst: Der letzte Treffer liegt am nächsten
+  const nearest = (types: string[]) => hierarchy.filter((id) => hasType(id, types)).at(-1) ?? null;
 
   return {
     id: expectedId,
     name: group.name.slice(0, 200),
-    jungscharId: nearest(JUNGSCHAR_TYPE),
-    ortsgruppeId: nearest(ORTSGRUPPE_TYPE),
-    jungscharCount: hasType(expectedId, ORTSGRUPPE_TYPE)
-      ? idList(group.links.children).filter((id) => hasType(id, JUNGSCHAR_TYPE)).length
+    jungscharId: nearest(labels.jungschar),
+    ortsgruppeId: nearest(labels.ortsgruppe),
+    // Bei Pfadi und Jubla gibt es keine Jungscharen: 0, die Abteilung hängt dann immer an der Gruppe selbst
+    jungscharCount: hasType(expectedId, labels.ortsgruppe)
+      ? idList(group.links.children).filter((id) => hasType(id, labels.jungschar)).length
       : null,
   };
 }
@@ -75,7 +88,8 @@ async function fetchGroup(
   accessToken: string,
   id: number,
   signal: AbortSignal,
-  log: FastifyBaseLogger
+  log: FastifyBaseLogger,
+  provider: OrganizationType
 ): Promise<CeviDbGroupInfo | null> {
   const res = await fetch(`${baseUrl}/groups/${id}.json`, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
@@ -85,7 +99,7 @@ async function fetchGroup(
     log.warn({ groupId: id, status: res.status }, 'Cevi.DB: Gruppe nicht lesbar');
     return null;
   }
-  const info = parseCeviDbGroup(await res.json(), id);
+  const info = parseCeviDbGroup(await res.json(), id, provider);
   if (!info) log.warn({ groupId: id }, 'Cevi.DB: Gruppen-Antwort unbrauchbar');
   return info;
 }
@@ -110,7 +124,7 @@ async function refreshGroups(
     for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
       // Ein Fehler betrifft nur diese Gruppe: Was schon gelesen ist, wird trotzdem gespeichert
       try {
-        const info = await fetchGroup(baseUrl, accessToken, id, signal, log);
+        const info = await fetchGroup(baseUrl, accessToken, id, signal, log, provider);
         if (info) results.push(info);
       } catch (err) {
         log.warn({ groupId: id, reason: err instanceof Error ? err.message : 'unbekannt' }, 'Cevi.DB: Gruppe nicht erreichbar');
