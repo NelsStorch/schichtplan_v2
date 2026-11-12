@@ -3,9 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Share, Smartphone, X } from 'lucide-react';
 import { useOrganization } from '@schichtplan/ui';
-
-const STORAGE_KEY = 'schichtplan.pwa_install_dismissed';
-const DISMISS_DAYS = 14;
+import { isPwaPromptDismissed, dismissPwaPrompt } from '@/lib/pwaDismissal';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -21,25 +19,21 @@ export function PwaInstallBanner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Bereits als App installiert?
+    // Bereits als App (Standalone PWA) installiert?
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       Boolean((navigator as unknown as { standalone?: boolean }).standalone);
 
     if (isStandalone) return;
 
-    // Kürzlich weggedrückt?
-    const dismissedAt = window.localStorage.getItem(STORAGE_KEY);
-    if (dismissedAt) {
-      const ageMs = Date.now() - Number(dismissedAt);
-      if (ageMs < DISMISS_DAYS * 24 * 60 * 60 * 1000) {
-        return;
-      }
+    // Kürzlich (innert 14 Tagen) oder in dieser Session weggedrückt?
+    if (isPwaPromptDismissed()) {
+      return;
     }
 
-    // iOS Safari Erkennung
+    // iOS Safari Erkennung (inkl. iPad)
     const ua = window.navigator.userAgent.toLowerCase();
-    const isIos = /iphone|ipad|ipod/.test(ua);
+    const isIos = /iphone|ipad|ipod/.test(ua) || (ua.includes('macintosh') && window.navigator.maxTouchPoints > 1);
     const isSafari = isIos && /safari/.test(ua) && !/crios|fxios|opios/.test(ua);
 
     if (isSafari) {
@@ -50,6 +44,8 @@ export function PwaInstallBanner() {
 
     // Android / Chromium Browser: beforeinstallprompt abfangen
     const handler = (e: Event) => {
+      // Vor dem Anzeigen nochmals prüfen (z. B. falls zwischenzeitlich weggedrückt)
+      if (isPwaPromptDismissed()) return;
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setVisible(true);
@@ -62,18 +58,18 @@ export function PwaInstallBanner() {
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
     await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setVisible(false);
-    }
+    try {
+      await deferredPrompt.userChoice;
+    } catch {}
+    // Sowohl bei Akzeptieren als auch bei Ablehnen: 14 Tage Pause
+    dismissPwaPrompt();
+    setVisible(false);
     setDeferredPrompt(null);
   };
 
   const handleDismiss = () => {
     setVisible(false);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, String(Date.now()));
-    } catch {}
+    dismissPwaPrompt();
   };
 
   if (!visible) return null;
@@ -97,12 +93,30 @@ export function PwaInstallBanner() {
           </p>
 
           {showIosGuide ? (
-            <div className="mt-2.5 rounded-field bg-surface-muted/60 px-3 py-2 text-xs text-fg">
-              <span className="font-medium">Auf dem iPhone:</span> Tippe unten im Browser auf{' '}
-              <span className="inline-flex items-center gap-0.5 font-semibold text-accent-fg">
-                <Share className="inline size-3.5" aria-hidden="true" /> Teilen
-              </span>{' '}
-              und wähle <strong className="font-semibold">«Zum Home-Bildschirm»</strong>.
+            <div className="mt-2.5 space-y-2.5">
+              <div className="rounded-field bg-surface-muted/60 px-3 py-2 text-xs text-fg">
+                <span className="font-medium">Auf dem iPhone/iPad:</span> Unten im Browser auf{' '}
+                <span className="inline-flex items-center gap-0.5 font-semibold text-accent-fg">
+                  <Share className="inline size-3.5" aria-hidden="true" /> Teilen
+                </span>{' '}
+                tippen und <strong className="font-semibold">«Zum Home-Bildschirm»</strong> wählen.
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDismiss}
+                  className="inline-flex items-center gap-1.5 rounded-field bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-soft transition hover:bg-accent-hover active:scale-95"
+                >
+                  Verstanden
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismiss}
+                  className="rounded-field px-2.5 py-1.5 text-xs font-medium text-fg-muted hover:text-fg"
+                >
+                  Später
+                </button>
+              </div>
             </div>
           ) : (
             <div className="mt-3 flex items-center gap-2">
