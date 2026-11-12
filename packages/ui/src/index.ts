@@ -19,6 +19,7 @@ export { Badge, type BadgeProps, type BadgeTone } from './components/Badge';
 export { Chip, ChipRow, type ChipProps } from './components/Chip';
 export { Card, type CardProps } from './components/Card';
 export { Field, Input, Select, Switch, Textarea, type FieldProps, type SwitchProps } from './components/Field';
+export { PasswordInput, type PasswordInputProps } from './components/PasswordInput';
 export { Dialog, type DialogProps } from './components/Dialog';
 export {
   Callout,
@@ -57,3 +58,4 @@ export {
 export { trackUi, usageOptedOut } from './stats/usage';
 export { UsageTracker } from './stats/UsageTracker';
 export { NotificationSettings, type NotificationSettingsProps } from './components/NotificationSettings';
+export { PasswordSettings, type PasswordSettingsProps } from './components/PasswordSettings';

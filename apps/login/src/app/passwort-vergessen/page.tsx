@@ -73,7 +73,7 @@ function ForgotPassword() {
             Passwort vergessen?
           </h1>
           <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
-            Gib die E-Mail deines Kontos ein. Wir schicken dir einen Link, mit dem du ein neues Passwort setzt.
+            Gib die E-Mail deines Kontos ein. Wir schicken dir einen Link, mit dem du ein neues Passwort setzt. Funktioniert auch für Konten mit {org.name}-Login, um ein Notfall-Passwort einzurichten.
           </p>
 
           <div className="mt-8 space-y-5">

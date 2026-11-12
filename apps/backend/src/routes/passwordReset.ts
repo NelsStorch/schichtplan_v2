@@ -13,7 +13,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { RequestPasswordResetSchema, ResetPasswordSchema } from '@schichtplan/shared';
+import { RequestPasswordResetSchema, ResetPasswordSchema, isPlaceholderEmail } from '@schichtplan/shared';
 import { sendPasswordResetEmail } from '../services/email.js';
 import { createRateLimiter } from '../services/rateLimit.js';
 import { RATE_LIMIT_ERROR } from '../services/nicknameLogin.js';
@@ -56,10 +56,11 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { email },
-        select: { id: true, passwordHash: true, nickname: true, firstName: true },
+        select: { id: true, email: true, passwordHash: true, nickname: true, firstName: true },
       });
-      // Nur Passwort-Konten: Cevi.DB- und Cevi-Name-Konten melden sich anders an
-      if (!user?.passwordHash) return { success: true, message: GENERIC_MESSAGE };
+      // Funktioniert für alle Konten mit echter E-Mail (auch Hitobito-Konten als Notfall-Passwort).
+      // Nur Platzhalter-Adressen (z. B. cevi_123@cevi-schichtplan.ch) erhalten keine Mail.
+      if (!user?.email || isPlaceholderEmail(user.email)) return { success: true, message: GENERIC_MESSAGE };
 
       // Höchstens ein Link pro Minute und Konto
       const recent = await fastify.prisma.passwordResetToken.findFirst({

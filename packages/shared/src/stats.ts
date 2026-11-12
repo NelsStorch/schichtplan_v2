@@ -100,6 +100,12 @@ export const USAGE_METRICS = {
     source: 'server',
     dims: { REQUEST: 'angefordert', DONE: 'neu gesetzt' },
   },
+  PASSWORD_SET: {
+    label: 'Passwort im Profil gesetzt/geändert',
+    group: 'KONTEN',
+    source: 'server',
+    dims: { CREATE: 'Fallback-Passwort festgelegt', CHANGE: 'Passwort geändert' },
+  },
   EMAIL_VERIFIED: { label: 'E-Mail bestätigt', group: 'KONTEN', source: 'server' },
   ACCOUNT_DELETE: { label: 'Konto selbst gelöscht', group: 'KONTEN', source: 'server' },
 

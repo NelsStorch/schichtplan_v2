@@ -61,13 +61,64 @@ describe.skipIf(!hasTestDb)('Passwort vergessen', () => {
     expect((await confirm(token, 'nochmal-anders-123')).statusCode).toBe(400);
   });
 
-  it('antwortet gleich, ob es ein Konto gibt oder nicht', async () => {
-    await createUser(app, { email: 'nopw@example.com', ceviDbId: 99 });
+  it('antwortet gleich, ob es ein Konto gibt oder nicht, und ignoriert Platzhalter-Adressen', async () => {
+    await createUser(app, { email: 'cevi_99@cevi-schichtplan.ch', ceviDbId: 99 });
     const unknown = await request('niemand@example.com');
-    const ceviDb = await request('nopw@example.com');
+    const placeholder = await request('cevi_99@cevi-schichtplan.ch');
     expect(unknown.statusCode).toBe(200);
-    expect(ceviDb.json()).toEqual(unknown.json());
+    expect(placeholder.statusCode).toBe(200);
+    expect(placeholder.json()).toEqual(unknown.json());
     expect(sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+
+  it('erlaubt Passwort-Reset auch für Hitobito-Konten ohne bisheriges Passwort', async () => {
+    const user = await createUser(app, { email: 'hitobito@example.com', ceviDbId: 101, passwordHash: null });
+    const res = await request('hitobito@example.com');
+    expect(res.statusCode).toBe(200);
+    expect(sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+    expect(sendPasswordResetEmail.mock.calls[0][0].to).toBe('hitobito@example.com');
+
+    const token = tokenFromMail();
+    expect((await confirm(token, 'neues-passwort-123')).statusCode).toBe(200);
+    expect((await login('hitobito@example.com', 'neues-passwort-123')).statusCode).toBe(200);
+    const updated = await app.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(updated.passwordHash).not.toBeNull();
+  });
+
+  it('erlaubt das Setzen und Ändern des Passworts über /api/auth/me/password', async () => {
+    const user = await createUser(app, { email: 'profil@example.com', ceviDbId: 202, passwordHash: null });
+    const cookie = authCookie(app, user);
+
+    // 1. Fallback-Passwort ohne currentPassword setzen
+    const setRes = await inject(app, {
+      method: 'POST',
+      url: '/api/auth/me/password',
+      cookie,
+      payload: { newPassword: 'erstes-passwort-123' },
+    });
+    expect(setRes.statusCode).toBe(200);
+    expect(setRes.json().success).toBe(true);
+
+    // Login mit neuem Passwort möglich
+    expect((await login('profil@example.com', 'erstes-passwort-123')).statusCode).toBe(200);
+
+    // 2. Passwort ändern erfordert currentPassword
+    const failChange = await inject(app, {
+      method: 'POST',
+      url: '/api/auth/me/password',
+      cookie: setRes.headers['set-cookie'] as string,
+      payload: { currentPassword: 'falsches-passwort', newPassword: 'zweites-passwort-456' },
+    });
+    expect(failChange.statusCode).toBe(401);
+
+    const successChange = await inject(app, {
+      method: 'POST',
+      url: '/api/auth/me/password',
+      cookie: setRes.headers['set-cookie'] as string,
+      payload: { currentPassword: 'erstes-passwort-123', newPassword: 'zweites-passwort-456' },
+    });
+    expect(successChange.statusCode).toBe(200);
+    expect((await login('profil@example.com', 'zweites-passwort-456')).statusCode).toBe(200);
   });
 
   it('lehnt abgelaufene und erfundene Links ab', async () => {

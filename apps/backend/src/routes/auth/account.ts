@@ -1,8 +1,11 @@
-import { FastifyPluginAsync, } from 'fastify';
+import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 import {
   SetHomeDepartmentSchema,
+  SetProfilePasswordSchema,
   UpdateProfileSchema,
+  isPlaceholderEmail,
 } from '@schichtplan/shared';
 import {
   autoCreateCeviDbDepartmentStufen,
@@ -16,6 +19,7 @@ import {
   loadUserDto,
   ensureHelperMembership,
   clearAuthCookie,
+  setAuthCookie,
 } from '../../services/authSession.js';
 
 
@@ -61,6 +65,91 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       const result = await applyProfileUpdate(fastify.prisma, request.user.id, input);
       if ('error' in result) return reply.status(result.status).send({ error: result.error });
       return loadUserDto(fastify.prisma, request.user.id, request.tenant?.id ?? null);
+    }
+  );
+
+  // 6b. Eigenes Passwort im Profil festlegen oder ändern (Notfall-Passwort für Hitobito oder Änderung)
+  fastify.post(
+    '/api/auth/me/password',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: 'Eigenes Passwort im Profil setzen oder ändern',
+        description: 'Setzt ein neues Passwort für das eigene Konto. Hat das Konto bereits ein Passwort, muss das bisherige Passwort angegeben werden.',
+        security: [{ bearerAuth: [] }],
+        body: SetProfilePasswordSchema,
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      const input = request.body as z.output<typeof SetProfilePasswordSchema>;
+      const userId = request.user.id;
+
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          isGlobalAdmin: true,
+          emailVerifiedAt: true,
+        },
+      });
+
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+      if (!user.email || isPlaceholderEmail(user.email)) {
+        return reply.status(400).send({
+          error: 'Bitte trage zuerst eine gültige E-Mail-Adresse im Profil ein.',
+        });
+      }
+
+      // Wenn bereits ein Passwort existiert, muss das bisherige Passwort angegeben und korrekt sein
+      if (user.passwordHash) {
+        if (!input.currentPassword) {
+          return reply.status(400).send({
+            error: 'Bitte gib dein aktuelles Passwort ein.',
+            code: 'CURRENT_PASSWORD_REQUIRED',
+          });
+        }
+        const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
+        if (!matches) {
+          return reply.status(401).send({
+            error: 'Das aktuelle Passwort ist nicht korrekt.',
+            code: 'CURRENT_PASSWORD_WRONG',
+          });
+        }
+      }
+
+      const passwordHash = await bcrypt.hash(input.newPassword, 10);
+      const now = new Date();
+
+      await fastify.prisma.user.update({
+        where: { id: userId },
+        data: {
+          passwordHash,
+          passwordChangedAt: now,
+          emailVerified: true,
+          emailVerifiedAt: user.emailVerifiedAt ?? now,
+        },
+      });
+
+      // Frisches Token signieren und Cookie erneuern, damit die aktuelle Sitzung aktiv bleibt
+      const token = fastify.signAuthToken({
+        id: user.id,
+        email: user.email,
+        isGlobalAdmin: user.isGlobalAdmin,
+        amr: 'password',
+      });
+      setAuthCookie(reply, token);
+
+      trackUsage('PASSWORD_SET', { dim: user.passwordHash ? 'CHANGE' : 'CREATE' });
+      request.log.info({ userId }, user.passwordHash ? 'Passwort geändert' : 'Fallback-Passwort festgelegt');
+
+      return {
+        success: true,
+        message: user.passwordHash ? 'Passwort erfolgreich geändert.' : 'Fallback-Passwort erfolgreich festgelegt.',
+        user: await loadUserDto(fastify.prisma, userId, request.tenant?.id ?? null),
+      };
     }
   );
 

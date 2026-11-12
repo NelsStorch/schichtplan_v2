@@ -738,6 +738,17 @@ export const ResetPasswordSchema = z.object({
 
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 
+/** Eigenes Passwort im Profil setzen oder ändern */
+export const SetProfilePasswordSchema = z.object({
+  currentPassword: z.string().max(200).optional(),
+  newPassword: z
+    .string()
+    .min(8, 'Passwort muss mindestens 8 Zeichen lang sein')
+    .max(200, 'Passwort darf höchstens 200 Zeichen lang sein'),
+});
+
+export type SetProfilePasswordInput = z.infer<typeof SetProfilePasswordSchema>;
+
 // ---------------------------------------------------------------------------
 // Admin-Portal (nur globale Admins)
 // ---------------------------------------------------------------------------

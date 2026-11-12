@@ -19,6 +19,7 @@ import {
   Field,
   Input,
   NotificationSettings,
+  PasswordSettings,
   buttonClasses,
   useConfirm,
   useOrganization,
@@ -266,6 +267,8 @@ export default function DepartmentProfilePage() {
                 </Button>
               </div>
             </form>
+
+            <PasswordSettings user={user} onUserChange={setUser} />
 
             <section className="rounded-card border border-line bg-surface p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
