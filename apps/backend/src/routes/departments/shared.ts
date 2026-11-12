@@ -157,7 +157,7 @@ export async function departmentCreationEligibility(
   if (!user.departmentLeader) return denied('NOT_LEADER');
 
   const leaderGroups = await prisma.hitobitoGroup.findMany({ where: { provider, id: { in: user.leaderGroupIds } } });
-  if (leaderGroups.length === 0 || leaderGroups.length < user.leaderGroupIds.length) {
+  if (leaderGroups.length === 0) {
     return denied('UNVERIFIED', { leaderGroupName });
   }
 
@@ -169,7 +169,7 @@ export async function departmentCreationEligibility(
     const ortsgruppe = await prisma.hitobitoGroup.findUnique({
       where: { provider_id: { provider, id: group.ortsgruppeId } },
     });
-    if (!ortsgruppe || ortsgruppe.jungscharCount === null) return denied('UNVERIFIED', { leaderGroupName });
+    if (!ortsgruppe || ortsgruppe.jungscharCount === null) continue;
 
     const perJungschar = ortsgruppe.jungscharCount > 1 && group.jungscharId !== null;
     const groupId = perJungschar ? group.jungscharId! : ortsgruppe.id;

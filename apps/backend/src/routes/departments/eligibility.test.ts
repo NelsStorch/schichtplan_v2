@@ -159,5 +159,14 @@ describe('departmentCreationEligibility für Vereine und Verbände', () => {
       expect(result).toMatchObject({ eligible: true, ortsgruppeId: 906 });
       expect(result.options?.[0].existingDepartment).toEqual({ name: 'Bestehend', slug: 'bestehend' });
     });
+
+    it('lässt Abteilungsleitung anlegen, selbst wenn nur ein Teil der vielen Leitergruppen synchronisiert ist', async () => {
+      // Benutzer hat 32 Leitergruppen (z. B. auf PBS MiData Staging), aber im Cache sind nur wenige
+      const leaderWithManyGroups = leader('PFADI', [1045, 9991, 9992, 9993, 9994]);
+      const result = await departmentCreationEligibility(hitobitoPrisma(leaderWithManyGroups), 'user-1', 'PFADI');
+      expect(result.eligible).toBe(true);
+      expect(result.ortsgruppeId).toBe(1045);
+      expect(result.ortsgruppeName).toBe('Benoît de Pontverre');
+    });
   });
 });

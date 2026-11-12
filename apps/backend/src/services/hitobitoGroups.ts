@@ -13,9 +13,9 @@ import { parseCeviDbGroupId, type CeviDbGroupInfo } from './hitobito.js';
 /** Solange gilt ein Eintrag als aktuell (die Gruppenstruktur ändert sich selten) */
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** Obergrenze für alle Aufrufe eines Logins: Eine langsame Cevi.DB darf den Login nicht aufhalten */
-const TIME_BUDGET_MS = 6_000;
-const CONCURRENCY = 4;
-const MAX_GROUPS = 40;
+const TIME_BUDGET_MS = 10_000;
+const CONCURRENCY = 6;
+const MAX_GROUPS = 60;
 
 /**
  * Gruppentypen pro Verband (packages/shared/src/hitobito.ts). Die Gruppen-API liefert sie übersetzt, auf Deutsch.

@@ -276,12 +276,21 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
           expiresIn: tokenData.expires_in,
         };
 
-        // Gruppenstruktur zu den Rollen: hier, weil das Token nur jetzt da ist (wird nicht gespeichert)
+        // Gruppenstruktur zu den Rollen: hier, weil das Token nur jetzt da ist (wird nicht gespeichert).
+        // Wichtig: Leiter-Gruppen und Stamm-Gruppe zuerst auffrischen, damit die Abteilungserstellung verlässlich funktioniert.
+        const previewDerived = deriveCeviDbFields(profile, providerConfig.type);
+        const prioritizedGroupIds = [
+          ...previewDerived.leaderGroupIds,
+          ...(previewDerived.ortsgruppeId ? [previewDerived.ortsgruppeId] : []),
+          ...(previewDerived.primaryGroupId ? [previewDerived.primaryGroupId] : []),
+          ...ceviDbRoleGroupIds(profile),
+        ];
+
         await refreshCeviDbGroups(fastify.prisma, fastify.log, {
           baseUrl: providerConfig.baseUrl,
           accessToken,
           grantedScopes: profile._meta.grantedScopes,
-          groupIds: ceviDbRoleGroupIds(profile),
+          groupIds: prioritizedGroupIds,
           provider: providerConfig.type,
         });
       } catch (err) {
