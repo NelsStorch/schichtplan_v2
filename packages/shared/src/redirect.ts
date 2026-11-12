@@ -1,4 +1,4 @@
-import { getOrganization, type OrganizationType } from './organizations.js';
+import { ORGANIZATIONS, getOrganization, type OrganizationConfig, type OrganizationType } from './organizations.js';
 
 // Platzhalter-Basis, um relative Pfade so aufzulösen, wie es der Browser tut
 const RELATIVE_BASE = 'https://relative.invalid';
@@ -161,4 +161,22 @@ export function loginBaseUrl(host?: string): string {
 /** Ziel nach dem Login ohne return_to: eigene Abteilung, sonst Landingpage (nie zurück aufs Login). */
 export function getDefaultDestination(homeDepartmentSlug?: string | null, domainOrOrg?: OrganizationType | string): string {
   return homeDepartmentSlug ? getDepartmentUrl(homeDepartmentSlug, '/', domainOrOrg) : getLandingUrl('/', typeof domainOrOrg === 'string' ? domainOrOrg : undefined);
+}
+
+/** Verbände mit eigener Instanz und Verbands-Login (Hitobito), in der Reihenfolge für Querverweise */
+export const VERBAND_ORGANIZATIONS: readonly OrganizationConfig[] = [ORGANIZATIONS.cevi, ORGANIZATIONS.pfadi, ORGANIZATIONS.jubla];
+
+/**
+ * Adresse einer anderen Verbandsinstanz, z. B. für Querverweise von vereins-schichtplan.ch auf
+ * pfadi-schichtplan.ch. Auf dev.* bleibt der Link in der Dev-Umgebung; lokal gibt es keinen
+ * eigenen Host pro Verband, dann zeigt er auf die produktive Domain.
+ */
+export function organizationSiteUrl(
+  target: OrganizationConfig,
+  { subdomain, host }: { subdomain?: 'login'; host?: string } = {}
+): string {
+  const currentHost = host || (typeof window !== 'undefined' ? window.location.host : '');
+  const isDev = currentHost ? getRootDomain(currentHost).startsWith('dev.') : false;
+  const root = isDev ? `dev.${target.domain}` : target.domain;
+  return `https://${subdomain ? `${subdomain}.` : ''}${root}`;
 }

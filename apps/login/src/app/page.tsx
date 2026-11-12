@@ -23,7 +23,7 @@ import {
   cn,
   useOrganization,
 } from '@schichtplan/ui';
-import { getLandingUrl } from '@schichtplan/shared/redirect';
+import { VERBAND_ORGANIZATIONS, getLandingUrl, organizationSiteUrl } from '@schichtplan/shared/redirect';
 import {
   type CeviNameLoginErrorCode,
   type DepartmentDirectoryItemDto,
@@ -116,6 +116,16 @@ function LoginContent() {
   const destination = destinationHost(returnTo);
   const [landingHref, setLandingHref] = useState('/');
   useEffect(() => setLandingHref(getLandingUrl()), []);
+  // Neutrale Vereins-Domain ohne Ziel-Verein: Verweis auf die Verbands-Logins (Cevi.DB, MiData, Jubla-DB).
+  // Erst im Browser berechnen (Host und return_to), damit Server und Browser gleich rendern.
+  const [verbandLogins, setVerbandLogins] = useState<{ org: OrganizationConfig; href: string }[]>([]);
+  useEffect(() => {
+    if (org.slug !== 'verein' || departmentSlugFromReturnTo(returnTo)) {
+      setVerbandLogins([]);
+      return;
+    }
+    setVerbandLogins(VERBAND_ORGANIZATIONS.map((v) => ({ org: v, href: organizationSiteUrl(v, { subdomain: 'login' }) })));
+  }, [org.slug, returnTo]);
 
   // Bestehende Sitzung (One-Click Weiterleitung)
   const [existingUser, setExistingUser] = useState<UserDto | null>(null);
@@ -696,6 +706,20 @@ function LoginContent() {
                     </li>
                   )}
                 </ul>
+
+                {verbandLogins.length > 0 && (
+                  <p className="mt-5 text-xs leading-relaxed text-fg-subtle">
+                    Leitest du bei Cevi, Pfadi oder Jubla? Dann melde dich im Login deines Verbands an:{' '}
+                    {verbandLogins.map((v, i) => (
+                      <span key={v.org.slug}>
+                        {i > 0 && ' · '}
+                        <a href={v.href} className="font-semibold text-accent-ink hover:underline">
+                          {v.org.orgName} <span className="font-normal">({v.org.authProviderShort})</span>
+                        </a>
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
             )}
 

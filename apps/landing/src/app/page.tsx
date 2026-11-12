@@ -10,7 +10,13 @@ import {
   Heart,
   Users,
 } from 'lucide-react';
-import { helpUrl, statusUrl, getOrganization } from '@schichtplan/shared';
+import {
+  helpUrl,
+  statusUrl,
+  getOrganization,
+  organizationSiteUrl,
+  VERBAND_ORGANIZATIONS,
+} from '@schichtplan/shared';
 import { getRequestOrigin } from '@schichtplan/ui/og';
 import { BrandLogo } from '@/components/BrandLogo';
 import { ThemeToggle, buttonClasses } from '@schichtplan/ui';
@@ -31,6 +37,11 @@ const PRIMARY_CTA_CLASS = 'justify-center text-sm font-semibold h-12 px-6 gap-2 
 export default async function LandingPage() {
   const { host } = await getRequestOrigin();
   const org = getOrganization(host);
+  // Nur auf der neutralen Vereins-Seite: Verweis auf die Verbandsinstanzen mit eigenem Verbands-Login
+  const verbandLinks =
+    org.slug === 'verein'
+      ? VERBAND_ORGANIZATIONS.map((v) => ({ org: v, href: organizationSiteUrl(v, { host }) }))
+      : [];
 
   return (
     <MeProvider>
@@ -139,9 +150,22 @@ export default async function LandingPage() {
                       </span>
                     </div>
                     <div className="text-fg-subtle pt-1">
-                      Du leitest eine {org.orgName}-{org.unitTerm}?{' '}
+                      {org.slug === 'verein' ? 'Du leitest einen Verein?' : `Du leitest eine ${org.orgName}-${org.unitTerm}?`}{' '}
                       <CreateDepartmentButton unitTerm={org.unitTerm} />
                     </div>
+                    {verbandLinks.length > 0 && (
+                      <div className="text-fg-subtle leading-relaxed">
+                        Gehörst du zu Cevi, Pfadi oder Jubla? In der Version deines Verbands meldest du dich mit deinem Verbandskonto an:{' '}
+                        {verbandLinks.map((v, i) => (
+                          <span key={v.org.slug}>
+                            {i > 0 && ' · '}
+                            <a href={v.href} className="font-semibold text-accent-ink hover:underline">
+                              {v.org.orgName}
+                            </a>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Proof Points Strip */}
@@ -459,6 +483,16 @@ export default async function LandingPage() {
               </Link>
             </div>
           </div>
+          {verbandLinks.length > 0 && (
+            <div className="mx-auto mt-6 max-w-6xl px-4 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2">
+              <span>Auch für Verbände:</span>
+              {verbandLinks.map((v) => (
+                <a key={v.org.slug} href={v.href} className="hover:text-fg transition">
+                  {v.org.name}
+                </a>
+              ))}
+            </div>
+          )}
         </footer>
       </div>
     </MeProvider>

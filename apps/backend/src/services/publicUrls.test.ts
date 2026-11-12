@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { getDepartmentUrl, getLandingUrl, getOrganizationSlugFromHost, helpUrl, loginBaseUrl, privacyUrl, statusUrl } from '@schichtplan/shared';
+import {
+  ORGANIZATIONS,
+  getDepartmentUrl,
+  getLandingUrl,
+  getOrganizationSlugFromHost,
+  helpUrl,
+  loginBaseUrl,
+  organizationSiteUrl,
+  privacyUrl,
+  statusUrl,
+} from '@schichtplan/shared';
 import { getCeviDbRedirectUri, getLoginPortalBaseUrl, loginErrorUrl, loginPageUrl, rootDomain } from './authSession.js';
 import { cateringBaseUrl } from '../routes/catering.js';
 
@@ -157,5 +167,18 @@ describe('Verband aus dem Host', () => {
     expect(cateringBaseUrl('evil.com', 'schleife', 'PFADI')).toBe('https://schleife.pfadi-schichtplan.ch');
     expect(cateringBaseUrl('evil.com', 'jungwacht', 'JUBLA')).toBe('https://jungwacht.jubla-schichtplan.ch');
     expect(cateringBaseUrl('evil.com', 'turnverein', 'OTHER')).toBe('https://turnverein.vereins-schichtplan.ch');
+  });
+});
+
+describe('Querverweise auf andere Verbandsinstanzen', () => {
+  it('Produktion, Dev und lokal', () => {
+    expect(organizationSiteUrl(ORGANIZATIONS.pfadi, { host: 'vereins-schichtplan.ch' })).toBe('https://pfadi-schichtplan.ch');
+    expect(organizationSiteUrl(ORGANIZATIONS.jubla, { subdomain: 'login', host: 'login.vereins-schichtplan.ch' })).toBe(
+      'https://login.jubla-schichtplan.ch'
+    );
+    expect(organizationSiteUrl(ORGANIZATIONS.cevi, { subdomain: 'login', host: 'login.dev.vereins-schichtplan.ch' })).toBe(
+      'https://login.dev.cevi-schichtplan.ch'
+    );
+    expect(organizationSiteUrl(ORGANIZATIONS.cevi, { host: 'localhost:3001' })).toBe('https://cevi-schichtplan.ch');
   });
 });
