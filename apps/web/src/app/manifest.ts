@@ -3,16 +3,16 @@ import { getOrganization } from '@schichtplan/shared';
 import { getRequestOrigin } from '@schichtplan/ui/og';
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  let orgName = 'Cevi';
+  let org = getOrganization('cevi');
   try {
     const { host } = await getRequestOrigin();
-    orgName = getOrganization(host).name;
+    org = getOrganization(host);
   } catch {}
 
   return {
-    name: `${orgName} Schichtplan`,
+    name: org.name,
     short_name: 'Schichtplan',
-    description: `Schichten für Chilbi, Lager und ${orgName}-Anlässe: anschauen, eintragen, fertig.`,
+    description: `Schichten für Chilbi, Lager und ${org.orgName}-Anlässe: anschauen, eintragen, fertig.`,
     start_url: '/',
     scope: '/',
     display: 'standalone',

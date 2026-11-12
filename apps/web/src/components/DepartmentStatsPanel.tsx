@@ -102,7 +102,7 @@ export function DepartmentStatsPanel() {
     const rows: (string | number | null | undefined)[][] = [];
 
     // Titelzeilen
-    rows.push([`${org.name} Schichtplan - Jahresauswertung ${department?.name ?? ''}`]);
+    rows.push([`${org.name} - Jahresauswertung ${department?.name ?? ''}`]);
     rows.push([`Jahr: ${data.year === 'ALL' ? 'Alle erfassten Jahre' : data.year}`]);
     rows.push([`Stand: ${new Date().toLocaleDateString('de-CH')}`]);
     rows.push([

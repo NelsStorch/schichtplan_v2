@@ -18,12 +18,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const { origin, host } = await getRequestOrigin();
   const org = getOrganization(host);
   const department = await getDepartmentPreview();
-  const brandName = `${org.name} Schichtplan`;
+  const brandName = org.name;
   const title = department ? `${department.name} · ${brandName}` : brandName;
   const image = { url: `${origin}/og`, ...OG_SIZE, alt: title };
   const description = department
     ? `Schichten und Anlässe der ${department.name}: anschauen, eintragen, fertig.`
-    : `Schichten für Chilbi, Lager und ${org.name}-Anlässe: anschauen, eintragen, fertig.`;
+    : `Schichten für Chilbi, Lager und ${org.orgName}-Anlässe: anschauen, eintragen, fertig.`;
   return {
     metadataBase: new URL(origin),
     title: { default: title, template: `%s · ${brandName}` },

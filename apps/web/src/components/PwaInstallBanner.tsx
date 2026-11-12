@@ -90,7 +90,7 @@ export function PwaInstallBanner() {
 
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-fg">
-            {org.name} Schichtplan als App installieren
+            {org.name} als App installieren
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-fg-muted">
             Schneller Zugriff auf deine Schichten und Offline-Ansicht auf dem Festgelände ohne Empfang.

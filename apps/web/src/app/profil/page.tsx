@@ -292,7 +292,7 @@ export default function DepartmentProfilePage() {
                   <div>
                     <h2 className="text-sm font-semibold text-danger-ink">Konto löschen</h2>
                     <p className="mt-1 text-xs text-fg-muted">
-                      Löscht dein Konto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem {org.name} Schichtplan.
+                      Löscht dein Konto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem {org.name}.
                     </p>
                   </div>
                   <Button
