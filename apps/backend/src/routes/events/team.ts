@@ -337,6 +337,14 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
+      const signupIds = signupsToCancel.map((s) => s.id);
+      if (signupIds.length > 0) {
+        await fastify.prisma.cateringToken.updateMany({
+          where: { shiftSignupId: { in: signupIds }, status: 'REDEEMED' },
+          data: { shiftSignupId: null },
+        });
+      }
+
       const deleted = await fastify.prisma.shiftSignup.deleteMany({
         where: whereClause,
       });

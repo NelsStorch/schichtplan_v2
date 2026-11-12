@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../db.js';
 import {
+  getOrganizationByDbType,
   isPlaceholderEmail,
   normalizePermissions,
   UpdateDepartmentPersonSchema,
@@ -508,9 +509,10 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
       if (user.homeDepartmentSource === 'CEVIDB') {
+        const providerName = getOrganizationByDbType(tenant.organization).authProviderShort;
         return reply
           .status(400)
-          .send({ error: 'Diese Zuordnung kommt aus Cevi.DB und lässt sich hier nicht ändern.' });
+          .send({ error: `Diese Zuordnung kommt aus ${providerName} und lässt sich hier nicht ändern.` });
       }
       const removesLeader = membership?.role === 'ADMIN';
       try {

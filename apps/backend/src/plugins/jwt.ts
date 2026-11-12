@@ -209,7 +209,7 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
     const sessionProblem = adminSessionProblem(tokenClaims.get(request) ?? {}, adminConfig);
     if (sessionProblem === 'NOT_CEVIDB') {
       return reply.status(401).send({
-        error: 'Für den Admin-Bereich bitte mit Cevi.DB anmelden.',
+        error: 'Für den Admin-Bereich bitte mit Cevi.DB oder Hitobito anmelden.',
         code: 'REAUTH_CEVIDB',
       });
     }

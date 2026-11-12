@@ -208,6 +208,7 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
                 title: true,
                 slug: true,
                 startDate: true,
+                dayCutoffTime: true,
                 cancelDeadlineDays: true,
                 cateringTokensEnabled: true,
                 department: { select: { name: true, slug: true, organization: true } },
@@ -321,9 +322,11 @@ const shiftsMyRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       for (const dr of dayResp) {
+        const cutoff = dr.event.dayCutoffTime || '04:00';
         for (const s of dr.event.shifts) {
-          const shiftDate = toZurichInput(s.startTime).slice(0, 10);
-          if (shiftDate === dr.dayDate) {
+          const calendarDate = toZurichInput(s.startTime).slice(0, 10);
+          const businessDate = businessDayKey(s.startTime, cutoff);
+          if (calendarDate === dr.dayDate || businessDate === dr.dayDate) {
             const existing = map.get(s.id);
             if (existing) {
               existing.isResponsible = true;

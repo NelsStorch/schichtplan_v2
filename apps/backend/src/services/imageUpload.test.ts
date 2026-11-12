@@ -35,8 +35,11 @@ describe('unsafeSvgReason', () => {
   it.each([
     ['<svg><script>alert(1)</script></svg>'],
     ['<svg onload="alert(1)"></svg>'],
+    ['<svg/onload="alert(1)"></svg>'],
     ['<svg><a href="javascript:alert(1)"><text>x</text></a></svg>'],
+    ['<svg><a href="jav&#97;script:alert(1)"><text>x</text></a></svg>'],
     ['<svg><foreignObject><div>x</div></foreignObject></svg>'],
+    ['<svg><image href="data:image/svg+xml;base64,PHN2Zz4="/></svg>'],
     ['<svg><image href="https://evil.example/x.png"/></svg>'],
     ['<svg><image href=\'https://evil.example/x.png\'/></svg>'],
     ['<svg><image href=https://evil.example/x.png/></svg>'],

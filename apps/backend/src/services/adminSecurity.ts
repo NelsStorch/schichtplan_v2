@@ -1,3 +1,5 @@
+import { ORGANIZATION_DOMAINS } from '@schichtplan/shared';
+
 /**
  * Zusätzliche Hürden für die Schnittstelle der globalen Admins (Admin-Portal).
  *
@@ -48,7 +50,10 @@ export function adminRequestProblem(
   config: Pick<AdminSecurityConfig, 'rootDomain' | 'allowLocalhost'>
 ): AdminRequestProblem | null {
   const host = bareHost(headers.host);
-  const allowedHosts = [`admin.${config.rootDomain}`];
+  const allowedHosts = [
+    `admin.${config.rootDomain}`,
+    ...ORGANIZATION_DOMAINS.map((d) => `admin.${d}`),
+  ];
   if (!allowedHosts.includes(host) && !(config.allowLocalhost && isLocalHost(host))) return 'HOST';
 
   // Browser schicken Sec-Fetch-Site mit: alles ausser «same-origin» (oder «none» = direkt eingetippt) ablehnen

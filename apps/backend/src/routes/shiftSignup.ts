@@ -464,6 +464,10 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
             select: { id: true },
           });
           if (!stillOffered) return { error: 'Diese Schicht wurde schon übernommen oder wird nicht mehr angeboten.' } as const;
+          await tx.cateringToken.updateMany({
+            where: { shiftSignupId: replaced.id, status: 'REDEEMED' },
+            data: { shiftSignupId: null },
+          });
           await tx.shiftSignup.delete({ where: { id: replaced.id } });
         }
         if (!allowCollision) {
@@ -730,6 +734,18 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      // Wurde bereits ein Verpflegungs-Bon eingelöst, darf man sich nicht mehr selbst austragen
+      if (!isManager) {
+        const redeemedToken = await fastify.prisma.cateringToken.findFirst({
+          where: { shiftSignupId: existingSignup.id, status: 'REDEEMED' },
+        });
+        if (redeemedToken) {
+          return reply.status(403).send({
+            error: 'Du hast für diese Schicht bereits einen Verpflegungs-Bon eingelöst und kannst dich nicht mehr selbst austragen. Bitte melde dich beim OK.',
+          });
+        }
+      }
+
       // Austrag-Sperre prüfen: Helfer können sich ab X Tagen vor Event-Beginn nicht mehr selbst austragen
       if (!isManager && event.cancelDeadlineDays !== null && event.cancelDeadlineDays !== undefined) {
         const deadline = cancelDeadlineAt(event.startDate, event.cancelDeadlineDays);
@@ -781,6 +797,11 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
       } catch (logErr) {
         request.log.error(logErr, 'Fehler beim Erstellen des Signoff-Logs');
       }
+
+      await fastify.prisma.cateringToken.updateMany({
+        where: { shiftSignupId: existingSignup.id, status: 'REDEEMED' },
+        data: { shiftSignupId: null },
+      });
 
       await fastify.prisma.shiftSignup.delete({
         where: { id: existingSignup.id },

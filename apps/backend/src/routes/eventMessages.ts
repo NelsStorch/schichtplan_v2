@@ -381,7 +381,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
         let failed = 0;
         for (const r of withEmail) {
           const greetingName = r.label?.trim() || defaultGreeting;
-          const personalizedBody = body.replace(/\{name\}/gi, greetingName);
+          const personalizedBody = body.replace(/\{name\}/gi, () => greetingName);
           const html = renderEmailTemplate({
             preheader: `${subject} – Nachricht vom OK ${event.title}`,
             eyebrow: event.title,
@@ -417,7 +417,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
           if (r.pushNotifyMessages === false) continue;
           const greetingName = r.label?.trim() || defaultGreeting;
           const previewText = body
-            .replace(/\{name\}/gi, greetingName)
+            .replace(/\{name\}/gi, () => greetingName)
             .replace(/\s+/g, ' ')
             .trim()
             .slice(0, 140);

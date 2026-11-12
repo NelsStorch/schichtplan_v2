@@ -80,7 +80,13 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
   );
   const sourceSignups = await tx.shiftSignup.findMany({ where: { userId: sourceId }, select: { id: true, shiftId: true } });
   const duplicateSignups = sourceSignups.filter((s) => targetShiftIds.has(s.shiftId)).map((s) => s.id);
-  if (duplicateSignups.length) await tx.shiftSignup.deleteMany({ where: { id: { in: duplicateSignups } } });
+  if (duplicateSignups.length) {
+    await tx.cateringToken.updateMany({
+      where: { shiftSignupId: { in: duplicateSignups }, status: 'REDEEMED' },
+      data: { shiftSignupId: null },
+    });
+    await tx.shiftSignup.deleteMany({ where: { id: { in: duplicateSignups } } });
+  }
   await tx.shiftSignup.updateMany({ where: { userId: sourceId }, data: { userId: targetId } });
 
   // Tabellen mit Eindeutigkeit pro Person: nur übernehmen, was beim Ziel noch fehlt

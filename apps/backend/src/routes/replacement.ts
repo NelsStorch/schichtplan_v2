@@ -58,6 +58,21 @@ const replacementRoutes: FastifyPluginAsync = async (fastify) => {
       if (!replacementOpen(event, signup.shift.startTime)) {
         return reply.status(400).send({ error: 'Für diese Schicht kann kein Ersatz mehr gesucht werden. Melde dich beim OK.' });
       }
+      if (signup.attendance === 'PRESENT') {
+        return reply.status(400).send({
+          error: 'Du bist für diese Schicht bereits als anwesend erfasst. Ersatz kann nur über das OK geregelt werden.',
+        });
+      }
+      if (isSelf) {
+        const redeemedToken = await fastify.prisma.cateringToken.findFirst({
+          where: { shiftSignupId: signup.id, status: 'REDEEMED' },
+        });
+        if (redeemedToken) {
+          return reply.status(400).send({
+            error: 'Für diese Schicht wurde bereits ein Verpflegungs-Bon eingelöst. Ersatz kann nur über das OK geregelt werden.',
+          });
+        }
+      }
 
       let byName: string | null = null;
       if (!isSelf) {

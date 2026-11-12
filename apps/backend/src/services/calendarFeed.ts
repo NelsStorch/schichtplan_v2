@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { PrismaClient } from '../db.js';
 import {
+  businessDayKey,
   toZurichInput,
   getOrganization,
   getOrganizationByDbType,
@@ -177,6 +178,7 @@ export async function getUserCalendarShifts(
             id: true,
             title: true,
             slug: true,
+            dayCutoffTime: true,
             department: { select: { name: true, slug: true, organization: true } },
             shifts: {
               where: {
@@ -241,9 +243,11 @@ export async function getUserCalendarShifts(
   }
 
   for (const dr of dayResp) {
+    const cutoff = dr.event.dayCutoffTime || '04:00';
     for (const s of dr.event.shifts) {
-      const shiftDate = toZurichInput(s.startTime).slice(0, 10);
-      if (shiftDate === dr.dayDate) {
+      const calendarDate = toZurichInput(s.startTime).slice(0, 10);
+      const businessDate = businessDayKey(s.startTime, cutoff);
+      if (calendarDate === dr.dayDate || businessDate === dr.dayDate) {
         const existing = map.get(s.id);
         if (existing) {
           existing.isResponsible = true;
