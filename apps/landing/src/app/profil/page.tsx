@@ -24,6 +24,7 @@ import {
   ThemeToggle,
   buttonClasses,
   useConfirm,
+  useOrganization,
   useToast,
 } from '@schichtplan/ui';
 import { BrandLogo } from '@/components/BrandLogo';
@@ -64,6 +65,7 @@ const dateFmt = new Intl.DateTimeFormat('de-CH', {
 export default function ProfilePage() {
   const confirm = useConfirm();
   const toast = useToast();
+  const org = useOrganization();
   const [user, setUser] = useState<UserDto | null>(null);
   const [shifts, setShifts] = useState<MyShift[] | null>(null);
   const [calData, setCalData] = useState<CalendarTokenData | null>(null);
@@ -210,7 +212,7 @@ export default function ProfilePage() {
   };
 
   const upcoming = (shifts ?? []).filter((s) => new Date(s.endTime).getTime() > Date.now());
-  const name = user ? user.ceviName || user.firstName : '';
+  const name = user ? user.nickname || user.ceviName || user.firstName : '';
   const fullName = user
     ? [user.firstName, user.lastName === PLACEHOLDER_LAST_NAME ? '' : user.lastName].join(' ').trim()
     : '';
@@ -220,7 +222,7 @@ export default function ProfilePage() {
       <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[420px] bg-campfire opacity-80" />
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-5 sm:px-6">
         <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-fg-muted transition hover:text-fg">
-          <ArrowLeft className="size-4" /> <BrandLogo className="size-7" /> Cevi Schichtplan
+          <ArrowLeft className="size-4" /> <BrandLogo logoUrl={org.logoUrl} alt={org.name} className="size-7" /> {org.name}
         </Link>
         <ThemeToggle />
       </header>
@@ -243,7 +245,7 @@ export default function ProfilePage() {
                 </p>
                 {user.hasCeviDb && (
                   <Badge size="sm" className="mt-2">
-                    <Database className="size-3" /> Cevi.DB
+                    <Database className="size-3" /> {org.authProviderShort || 'Verband'}
                   </Badge>
                 )}
               </div>
@@ -255,9 +257,9 @@ export default function ProfilePage() {
             <section className="rounded-card border border-line bg-surface p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-fg-subtle">Abteilung &amp; Stufen</h2>
+                  <h2 className="text-sm font-semibold text-fg-subtle">{org.unitTerm} &amp; Stufen</h2>
                   <p className="mt-1 text-base font-semibold">
-                    {user.homeDepartment?.name ?? (user.needsDepartmentSetup ? 'Noch nicht angegeben' : 'Keine Abteilung')}
+                    {user.homeDepartment?.name ?? (user.needsDepartmentSetup ? 'Noch nicht angegeben' : `Keine ${org.unitTerm}`)}
                   </p>
                   {user.stufen && user.stufen.length > 0 && (
                     <p className="mt-0.5 text-sm text-fg-muted">
@@ -265,7 +267,7 @@ export default function ProfilePage() {
                     </p>
                   )}
                   {user.homeDepartmentFromCeviDb && (
-                    <p className="mt-1 text-xs text-fg-subtle">Abteilung aus Cevi.DB übernommen.</p>
+                    <p className="mt-1 text-xs text-fg-subtle">{org.unitTerm} aus {org.authProviderShort || 'Verband'} übernommen.</p>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -291,8 +293,8 @@ export default function ProfilePage() {
               <div>
                 <h2 className="text-sm font-semibold text-fg-subtle">Deine Angaben</h2>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Manche Anlässe brauchen sie für die Eintragung. Bei Cevi.DB-Konten werden Name, E-Mail und
-                  Geburtsdatum bei jedem Login aus Cevi.DB aktualisiert. Deine Adresse speichern wir nicht; braucht ein
+                  Manche Anlässe brauchen sie für die Eintragung. Bei {org.authProviderShort || 'Verbands'}-Konten werden Name, E-Mail und
+                  Geburtsdatum bei jedem Login aus {org.authProviderShort || 'der Verbands-DB'} aktualisiert. Deine Adresse speichern wir nicht; braucht ein
                   OK sie, fragt es beim Anlass danach und löscht sie nach der angegebenen Frist.
                 </p>
               </div>
@@ -307,7 +309,7 @@ export default function ProfilePage() {
                 <Field label="Handynummer">
                   <Input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} autoComplete="tel" placeholder="+41 79 000 00 00" />
                 </Field>
-                <Field label="Geburtsdatum" hint={birthDateFromCeviDb ? 'Aus Cevi.DB, nur dort änderbar' : undefined}>
+                <Field label="Geburtsdatum" hint={birthDateFromCeviDb ? `Aus ${org.authProviderShort || 'der Verbands-DB'}, nur dort änderbar` : undefined}>
                   <Input type="date" value={form.birthDate} disabled={birthDateFromCeviDb} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} autoComplete="bday" />
                 </Field>
                 {!emailEditable ? (
@@ -445,7 +447,7 @@ export default function ProfilePage() {
                   <div>
                     <h2 className="text-sm font-semibold text-danger-ink">Konto löschen</h2>
                     <p className="mt-1 text-xs text-fg-muted">
-                      Löscht dein Konto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem Cevi Schichtplan.
+                      Löscht dein Konto und alle deine Eintragungen und Verknüpfungen unwiderruflich aus dem {org.name}.
                     </p>
                   </div>
                   <Button
