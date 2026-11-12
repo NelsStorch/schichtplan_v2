@@ -143,7 +143,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     // Die Antwort ist dieselbe wie bei einem neuen Konto: sonst liesse sich durchprobieren, wer ein Konto
     // hat. Die Person mit dieser Adresse bekommt stattdessen einen Hinweis per Mail.
     if (existing && !releaseUnverified) {
-      const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host);
+      const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host, request.organization);
       if (!accountExistsMailsByEmail.hit(cleanEmail)) await sendAccountExistsEmail({
         to: cleanEmail,
         name: existing.nickname || existing.firstName,
@@ -203,7 +203,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // Bestätigungs-E-Mail versenden
-    const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host);
+    const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host, request.organization);
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,
@@ -268,7 +268,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host);
+    const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host, request.organization);
     const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
     await sendVerificationEmail({
       to: cleanEmail,

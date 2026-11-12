@@ -7,7 +7,7 @@
  */
 
 /** Wie man sich angemeldet hat (steht im Token als `amr`) */
-export type LoginMethodClaim = 'cevidb' | 'password' | 'ceviname';
+export type LoginMethodClaim = 'cevidb' | 'hitobito' | 'password' | 'ceviname' | 'nickname';
 
 export interface AdminSecurityConfig {
   rootDomain: string;
@@ -78,7 +78,7 @@ export function adminSessionProblem(
   config: Pick<AdminSecurityConfig, 'maxSessionAgeSeconds' | 'requireCeviDbLogin'>,
   nowSeconds = Math.floor(Date.now() / 1000)
 ): AdminSessionProblem | null {
-  if (config.requireCeviDbLogin && token.amr !== 'cevidb') return 'NOT_CEVIDB';
+  if (config.requireCeviDbLogin && token.amr !== 'cevidb' && token.amr !== 'hitobito') return 'NOT_CEVIDB';
   if (token.iat === undefined || nowSeconds - token.iat > config.maxSessionAgeSeconds) return 'STALE';
   return null;
 }

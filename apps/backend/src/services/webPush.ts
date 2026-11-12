@@ -8,6 +8,7 @@ import {
   sign,
 } from 'node:crypto';
 import type { PrismaClient } from '../generated/prisma/client.js';
+import { resolveJwtSecret } from '../plugins/jwt.js';
 
 export interface PushPayload {
   title: string;
@@ -88,7 +89,7 @@ export function getVapidKeys(): VapidKeys {
     }
   }
 
-  const secret = process.env.JWT_SECRET || 'schichtplan-default-vapid-seed-dev-only';
+  const secret = resolveJwtSecret(process.env);
   const rawSeed = Buffer.from(
     hkdfSync('sha256', Buffer.from(secret, 'utf8'), Buffer.from('cevi-schichtplan-vapid-salt', 'utf8'), Buffer.from('vapid-p256-priv', 'utf8'), 32),
   );

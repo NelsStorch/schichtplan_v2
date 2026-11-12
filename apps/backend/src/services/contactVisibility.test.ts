@@ -91,10 +91,18 @@ describe('Event contactVisibility', () => {
   });
 
   it('redacts Cevi.DB placeholder email even when contactVisibility is BOTH or EMAIL', () => {
-    const placeholderPerson = { ...samplePerson, email: 'cevidb_12345@cevi-schichtplan.ch' };
-    expect(redactResponsible(placeholderPerson, 'BOTH').email).toBeNull();
-    expect(redactResponsible(placeholderPerson, 'EMAIL').email).toBeNull();
-    expect(redactResponsible(placeholderPerson, 'BOTH').phone).toBe('079 123 45 67');
+    for (const email of [
+      'cevidb_12345@cevi-schichtplan.ch',
+      'pfadi_12345@pfadi-schichtplan.ch',
+      'jubla_12345@jubla-schichtplan.ch',
+      'other_12345@vereins-schichtplan.ch',
+      'helfer@guest.pfadi-schichtplan.ch',
+    ]) {
+      const placeholderPerson = { ...samplePerson, email };
+      expect(redactResponsible(placeholderPerson, 'BOTH').email).toBeNull();
+      expect(redactResponsible(placeholderPerson, 'EMAIL').email).toBeNull();
+      expect(redactResponsible(placeholderPerson, 'BOTH').phone).toBe('079 123 45 67');
+    }
   });
 
   it('validates SendEventMessageSchema targets including OPEN', () => {

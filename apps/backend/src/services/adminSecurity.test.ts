@@ -51,6 +51,7 @@ describe('adminSessionProblem', () => {
     expect(adminSessionProblem({ iat: now, amr: 'password' }, config, now)).toBe('NOT_CEVIDB');
     expect(adminSessionProblem({ iat: now }, config, now)).toBe('NOT_CEVIDB');
     expect(adminSessionProblem({ iat: now, amr: 'cevidb' }, config, now)).toBeNull();
+    expect(adminSessionProblem({ iat: now, amr: 'hitobito' }, config, now)).toBeNull();
   });
 
   it('verlangt eine frische Anmeldung', () => {

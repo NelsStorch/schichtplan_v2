@@ -473,9 +473,16 @@ export const STUFE_ROLES = {
 
 export type StufeRole = keyof typeof STUFE_ROLES;
 
-/** Platzhalter-Nachname des Cevi-Name-Logins und Platzhalter-E-Mail des Cevi.DB-Logins zählen nicht als Angabe. */
+/** Platzhalter-Nachname des Cevi-Name-Logins und Platzhalter-E-Mail des Cevi.DB-/Hitobito-Logins zählen nicht als Angabe. */
 export const PLACEHOLDER_LAST_NAME = '(Helfer)';
-export const PLACEHOLDER_EMAIL_REGEX = /^cevidb_\d+@cevi-schichtplan\.ch$/;
+export const PLACEHOLDER_EMAIL_REGEX =
+  /^(?:(?:cevidb|cevi|pfadi|jubla|other|verein)_\d+@(?:[a-z0-9-]+\.)?(?:cevi-|pfadi-|jubla-|vereins-)?schichtplan\.ch|.+@guest\.(?:[a-z0-9-]+\.)?(?:cevi-|pfadi-|jubla-|vereins-)?schichtplan\.ch)$/i;
+
+/** Prüft, ob eine E-Mail-Adresse ein automatisch generierter Platzhalter ist (Hitobito ohne Mail oder Gast-Profil). */
+export function isPlaceholderEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return PLACEHOLDER_EMAIL_REGEX.test(email.trim());
+}
 
 export const DEFAULT_SHIFT_CATEGORIES = [
   'Küche & Verpflegung',
