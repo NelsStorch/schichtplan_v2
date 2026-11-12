@@ -1,11 +1,19 @@
-# Lint, Typecheck und Tests bei jedem Push und Pull Request, dazu ein Build der vier Frontends.
+# Lint, Typecheck und Tests bei jedem Push und Pull Request, dazu ein Build der vier Frontends
+# und des Hilfe-Centers, eine Prüfung der Abhängigkeiten und ein Scan nach versehentlich
+# eingecheckten Geheimnissen.
 # Die API-Tests laufen gegen eine leere Postgres im Service-Container (nur für diesen Lauf).
+# Actions sind auf Commit-SHAs festgenagelt (Kommentar = Version); Dependabot aktualisiert sie.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+
+# Neuer Push auf denselben Branch/PR: den veralteten Lauf abbrechen
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -34,9 +42,11 @@ jobs:
       TEST_DATABASE_URL: postgresql://test:test@localhost:5432/schichtplan_test
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 26
           cache: npm
@@ -50,20 +60,15 @@ jobs:
         working-directory: apps/backend
         run: npx prisma generate
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint (Biome)
-        run: npm run lint
-
       - name: Migrationen auf die Test-DB
         working-directory: apps/backend
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
-      - name: Tests
-        run: npm test
+      # Dasselbe wie lokal: Lint (Biome), Typecheck aller Apps, Tests (Backend, Web, Login, Admin)
+      - name: Lint, Typecheck und Tests
+        run: npm run check
 
   # Die Frontends müssen sich bauen lassen (Typen allein reichen nicht: Next prüft auch Routen und Imports)
   build:
@@ -71,9 +76,11 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 26
           cache: npm
@@ -84,7 +91,7 @@ jobs:
         run: npm run build --workspace=packages/shared
 
       - name: Next.js Cache wiederherstellen
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             apps/web/.next/cache
@@ -104,3 +111,64 @@ jobs:
           npm run build --workspace=apps/admin
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+  # Das Hilfe-Center (Astro Starlight) hat eigene Abhängigkeiten: ein kaputtes MDX fällt sonst erst beim Deploy auf
+  hilfe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: hilfe/package-lock.json
+
+      - run: npm ci
+        working-directory: hilfe
+
+      - name: Hilfe-Center bauen
+        run: npm run build
+        working-directory: hilfe
+        env:
+          ASTRO_TELEMETRY_DISABLED: "1"
+
+  # Bekannte Schwachstellen in Abhängigkeiten, die im Betrieb laufen (ohne devDependencies)
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 26
+
+      - name: npm audit (Schichtplan)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: npm audit (Hilfe-Center)
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: hilfe
+
+  # Passwörter, Schlüssel und Tokens gehören nie ins Repository (auch nicht in alte Commits)
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

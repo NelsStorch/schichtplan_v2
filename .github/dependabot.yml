@@ -16,6 +16,21 @@ updates:
         update-types: [minor, patch]
     labels: [dependencies]
 
+  # Das Hilfe-Center ist kein Workspace und hat ein eigenes package-lock.json
+  - package-ecosystem: npm
+    directory: /hilfe
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: [dependencies]
+
+  # Auch die SHA-festgenagelten Actions (ci.yml, codeql.yml, labeler.yml)
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -29,6 +44,7 @@ updates:
       - /apps/login
       - /apps/landing
       - /apps/admin
+      - /hilfe
     schedule:
       interval: monthly
     labels: [dependencies]
