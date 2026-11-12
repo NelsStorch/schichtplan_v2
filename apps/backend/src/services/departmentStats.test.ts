@@ -184,6 +184,8 @@ describe('Abteilungs-Statistiken (computeDepartmentStats)', () => {
     // s1 (2h Aufbau) wird ignoriert. Nur s2 (3h Fuchs + 3h Anna = 6h)
     expect(stats.summary.totalHours).toBe(6);
     expect(stats.summary.setupHours).toBe(0);
+    expect(stats.summary.totalShifts).toBe(1);
+    expect(stats.events[0].totalShifts).toBe(1);
   });
 
   it('unterstützt ALL für alle Jahre inkl. Gästen', async () => {

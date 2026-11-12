@@ -25,7 +25,13 @@ export interface UsageMetricDef {
   openDim?: boolean;
 }
 
-const LOGIN_METHODS = { cevidb: 'Cevi.DB', password: 'E-Mail/Passwort', ceviname: 'Cevi-Name' } as const;
+const LOGIN_METHODS = {
+  cevidb: 'Cevi.DB',
+  hitobito: 'Hitobito',
+  password: 'E-Mail/Passwort',
+  ceviname: 'Cevi-Name',
+  nickname: 'Spitzname',
+} as const;
 const SIGNUP_BY = { SELF: 'selbst', OK: 'durch das OK', GUEST: 'Gast (durch das OK)' } as const;
 const MESSAGE_TARGETS = { ALL: 'Alle', SHIFTS: 'Schichten', PEOPLE: 'Personen', OK: 'OK', OPEN: 'Noch offen (Soll)' } as const;
 

@@ -392,7 +392,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Hitobito ist die Quelle: Was dort steht, ersetzt die lokalen Werte bei jedem Login.
     if (!user) {
-      trackUsage('REGISTER', { dim: 'cevidb' });
+      trackUsage('REGISTER', { dim: provider === 'CEVI' ? 'cevidb' : 'hitobito' });
       user = await fastify.prisma.user.create({
         data: {
           email,
@@ -486,15 +486,16 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.log.error({ err, userId: user.id }, 'Cevi-Name-Profile konnten nicht übernommen werden');
     }
 
+    const amr = provider === 'CEVI' ? 'cevidb' : 'hitobito';
     const token = fastify.signAuthToken({
       id: user.id,
       email: user.email || `${user.id}@${getOrganizationByDbType(provider).domain}`,
       isGlobalAdmin: user.isGlobalAdmin,
-      amr: 'cevidb',
+      amr,
     });
 
     setAuthCookie(reply, token);
-    trackUsage('LOGIN', { dim: 'cevidb', departmentId: homeDepartment?.id ?? tenantDepartmentId });
+    trackUsage('LOGIN', { dim: amr, departmentId: homeDepartment?.id ?? tenantDepartmentId });
 
     // Ohne Ziel: Abteilungsseite, sonst Landingpage (nicht zurück auf die Login-Seite)
     const target = returnTo ?? defaultDestination(homeDepartment?.slug ?? null, reply.request?.hostname, homeDepartment?.organization ?? provider);

@@ -33,7 +33,7 @@ export interface HitobitoConfig {
   jungscharGroupLabels: string[];
   /** Voll qualifizierte Rollen-Klassen (`roles[].role_class`), die als Abteilungsleitung / Scharleitung gelten */
   departmentLeaderRoleClasses: string[];
-  /** Namensendungen (Suffixe) von Rollen, die als Leitung gelten (Groß-/Kleinschreibung tolerant) */
+  /** Namensendungen (Suffixe) von Rollen, die als Leitung gelten (Gross-/Kleinschreibung tolerant) */
   departmentLeaderSuffixes: string[];
   /** Präfixe von Rollen, die zu einer Stufe / Einheit / Kindergruppe gehören */
   unitRoleClassPrefixes: string[];

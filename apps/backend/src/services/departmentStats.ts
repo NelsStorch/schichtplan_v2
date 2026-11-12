@@ -161,14 +161,16 @@ export async function computeDepartmentStats(
     let evSignupsCount = 0;
     let evAttendedSignupsCount = 0;
     const evHelperKeys = new Set<string>();
-
-    totalShiftsCount += ev.shifts.length;
+    let evShiftsCount = 0;
 
     for (const shift of ev.shifts) {
       const isSetup = Boolean(shift.isSetupTeardown);
       if (!includeSetupTeardown && isSetup) {
         continue;
       }
+
+      evShiftsCount += 1;
+      totalShiftsCount += 1;
 
       const durationMin = Math.max(0, Math.round((shift.endTime.getTime() - shift.startTime.getTime()) / 60000));
       evRequiredSlots += shift.requiredSlots;
@@ -277,7 +279,7 @@ export async function computeDepartmentStats(
       endDate: ev.endDate.toISOString(),
       isPublished: ev.isPublished,
       helpersCount: evHelperKeys.size,
-      totalShifts: ev.shifts.length,
+      totalShifts: evShiftsCount,
       totalSlots: evRequiredSlots,
       filledSlots: evFilledSlots,
       fillRatePct: evFillRate,

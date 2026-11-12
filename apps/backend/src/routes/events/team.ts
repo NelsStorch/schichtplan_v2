@@ -70,7 +70,9 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
 
       const input = request.body as z.output<typeof SetDayResponsiblesSchema>;
 
-      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, input.userIds))) {
+      const uniqueUserIds = [...new Set(input.userIds)];
+
+      if (!(await allUsersRelatedToEvent(fastify.prisma, event.id, uniqueUserIds))) {
         return reply.status(400).send({ error: UNRELATED_PERSON_ERROR });
       }
 
@@ -81,13 +83,14 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
             dayDate,
           },
         });
-        if (input.userIds.length > 0) {
+        if (uniqueUserIds.length > 0) {
           await tx.eventDayResponsible.createMany({
-            data: input.userIds.map((userId) => ({
+            data: uniqueUserIds.map((userId) => ({
               eventId: event.id,
               dayDate,
               userId,
             })),
+            skipDuplicates: true,
           });
         }
       });
@@ -248,14 +251,15 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zur OK-Verwaltung' });
       }
 
-      // Schutz: Die letzte OK-Leitung kann nicht entfernt werden
+      // Schutz: Die letzte OK-Leitung kann nicht entfernt werden, solange noch andere OK-Mitglieder existieren
       if (existing.role === 'OK_LEAD') {
         const otherLeads = existing.event.organizers.filter(
           (o) => o.role === 'OK_LEAD' && o.id !== existing.id
         );
-        if (otherLeads.length === 0) {
+        const otherMembers = existing.event.organizers.filter((o) => o.id !== existing.id);
+        if (otherLeads.length === 0 && otherMembers.length > 0) {
           return reply.status(400).send({
-            error: 'Mindestens eine Person mit Event-Leitung (OK-Leitung) muss im OK verbleiben.',
+            error: 'Mindestens eine Person mit Event-Leitung (OK-Leitung) muss im OK verbleiben, solange weitere OK-Mitglieder eingetragen sind.',
           });
         }
       }
@@ -338,15 +342,16 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       const signupIds = signupsToCancel.map((s) => s.id);
-      if (signupIds.length > 0) {
-        await fastify.prisma.cateringToken.updateMany({
-          where: { shiftSignupId: { in: signupIds }, status: 'REDEEMED' },
-          data: { shiftSignupId: null },
+      const deleted = await fastify.prisma.$transaction(async (tx) => {
+        if (signupIds.length > 0) {
+          await tx.cateringToken.updateMany({
+            where: { shiftSignupId: { in: signupIds }, status: 'REDEEMED' },
+            data: { shiftSignupId: null },
+          });
+        }
+        return tx.shiftSignup.deleteMany({
+          where: whereClause,
         });
-      }
-
-      const deleted = await fastify.prisma.shiftSignup.deleteMany({
-        where: whereClause,
       });
 
       // Im Aktivitäts-Protokoll festhalten

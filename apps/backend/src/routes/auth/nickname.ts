@@ -92,7 +92,8 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     await ensureHelperMembership(fastify.prisma, department.id, result.userId);
     const user = await fastify.prisma.user.findUniqueOrThrow({ where: { id: result.userId } });
-    trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
+    const method = request.organization === 'CEVI' ? 'ceviname' : 'nickname';
+    trackUsage('LOGIN', { dim: method, departmentId: department.id });
     return signInCeviNameProfile(reply, user, returnTo);
   };
 
@@ -186,8 +187,9 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     fastify.log.info({ userId: user.id, departmentId: department.id }, 'Cevi-Name-Profil angelegt');
-    trackUsage('REGISTER', { dim: 'ceviname', departmentId: department.id });
-    trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
+    const method = request.organization === 'CEVI' ? 'ceviname' : 'nickname';
+    trackUsage('REGISTER', { dim: method, departmentId: department.id });
+    trackUsage('LOGIN', { dim: method, departmentId: department.id });
     return signInCeviNameProfile(reply, user, returnTo);
   };
 
@@ -203,13 +205,14 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const nick = user.nickname ?? user.ceviName ?? 'helfer';
     const orgDomain = getOrganizationByDbType(reply.request?.organization).domain;
     const cleanNick = nick.toLowerCase().replace(/[^a-z0-9]/g, '') || 'helfer';
+    const amr = reply.request?.organization === 'CEVI' ? 'ceviname' : 'nickname';
     const token = fastify.signAuthToken({
       id: user.id,
       email:
         user.email ||
         `${cleanNick}@guest.${orgDomain}`,
       isGlobalAdmin: user.isGlobalAdmin,
-      amr: 'ceviname',
+      amr,
     });
     setAuthCookie(reply, token);
     return {

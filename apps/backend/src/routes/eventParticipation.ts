@@ -325,21 +325,25 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       const invalid = validateAnswers(questions, answers);
       if (invalid) return reply.status(400).send({ error: invalid });
 
-      await fastify.prisma.$transaction(
-        questions.map((question) => {
-          const value = answers[question.id].trim();
-          const where = { questionId_userId: { questionId: question.id, userId: request.user.id } };
-          return value
-            ? fastify.prisma.eventAnswer.upsert({
+      if (questions.length > 0) {
+        await fastify.prisma.$transaction(async (tx) => {
+          for (const question of questions) {
+            const value = (answers[question.id] ?? '').trim();
+            const where = { questionId_userId: { questionId: question.id, userId: request.user.id } };
+            if (value) {
+              await tx.eventAnswer.upsert({
                 where,
                 update: { value },
                 create: { eventId: event.id, questionId: question.id, userId: request.user.id, value },
-              })
-            : fastify.prisma.eventAnswer.deleteMany({
+              });
+            } else {
+              await tx.eventAnswer.deleteMany({
                 where: { questionId: question.id, userId: request.user.id },
               });
-        })
-      );
+            }
+          }
+        });
+      }
 
       return { message: 'Angaben gespeichert' };
     }

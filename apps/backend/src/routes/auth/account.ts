@@ -149,6 +149,15 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
           data: { createdById: null },
         });
 
+        // Eingelöste Verpflegungs-Bons für Event-Abrechnung und Inventar erhalten
+        await tx.cateringToken.updateMany({
+          where: {
+            status: 'REDEEMED',
+            OR: [{ userId }, { signup: { userId } }],
+          },
+          data: { userId: null, shiftSignupId: null },
+        });
+
         // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserHitobitoStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
         await tx.user.delete({
           where: { id: userId },

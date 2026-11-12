@@ -290,6 +290,10 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Du darfst nur deine eigenen Verpflegungs-Bons einlösen' });
       }
 
+      if (token.status === 'BLOCKED') {
+        return reply.status(403).send({ error: 'Dieser Verpflegungs-Bon ist gesperrt.' });
+      }
+
       if (token.status === 'REDEEMED') {
         return reply.status(409).send({
           error: 'Dieser Verpflegungs-Bon wurde bereits eingelöst',
@@ -319,9 +323,9 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
         ? personLabel(personUser)
         : token.signup?.guestName || 'Helfende Person';
 
-      // Nur entwerten, wenn noch nicht eingelöst: Zwei gleichzeitige Anfragen dürfen den Bon nicht beide einlösen
+      // Nur entwerten, wenn noch nicht eingelöst und verfügbar: Zwei gleichzeitige Anfragen dürfen den Bon nicht beide einlösen
       const { count } = await fastify.prisma.cateringToken.updateMany({
-        where: { id: token.id, status: { not: 'REDEEMED' } },
+        where: { id: token.id, status: 'AVAILABLE' },
         data: {
           status: 'REDEEMED',
           redeemedAt: now,
@@ -330,6 +334,9 @@ export const cateringRoutes: FastifyPluginAsync = async (fastify) => {
       });
       const updated = await fastify.prisma.cateringToken.findUniqueOrThrow({ where: { id: token.id } });
       if (count === 0) {
+        if (updated.status === 'BLOCKED') {
+          return reply.status(403).send({ error: 'Dieser Verpflegungs-Bon ist gesperrt.' });
+        }
         return reply.status(409).send({
           error: 'Dieser Verpflegungs-Bon wurde bereits eingelöst',
           redeemedAt: updated.redeemedAt ? updated.redeemedAt.toISOString() : null,

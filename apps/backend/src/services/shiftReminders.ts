@@ -350,7 +350,7 @@ export async function sendDueShiftReminders(
 
     // Gast-Anmeldung ohne Account (mit hinterlegter guestEmail)
     const trimmedGuestEmail = s.guestEmail?.trim();
-    if (!s.userId && trimmedGuestEmail && trimmedGuestEmail.includes('@')) {
+    if (!s.userId && trimmedGuestEmail && trimmedGuestEmail.includes('@') && !isPlaceholderEmail(trimmedGuestEmail)) {
       const key = `guest:${s.id}`;
       const sentEmail = new Set<number>(s.sentEmailReminders ?? []);
       byUserShift.set(key, {
@@ -438,7 +438,7 @@ export async function sendDueShiftReminders(
     const timeFormatted = formatShiftTime(shift.startTime, shift.endTime);
 
     // 1. E-Mail-Erinnerung prüfen
-    if (user.shiftRemindersEnabled && user.emailVerified && user.email) {
+    if (user.shiftRemindersEnabled && user.emailVerified && user.email && !isPlaceholderEmail(user.email)) {
       const dueEmailThresholds = user.emailReminderMinutes
         .filter((m) => diffMinutes <= m && !entry.sentEmail.has(m))
         .sort((a, b) => a - b);

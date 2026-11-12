@@ -212,6 +212,9 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         if (!replaced?.replacementWantedAt) {
           return reply.status(409).send({ error: 'Für diese Eintragung wird kein Ersatz mehr gesucht.' });
         }
+        if (replaced.attendance === 'PRESENT') {
+          return reply.status(409).send({ error: 'Die Person ist bereits anwesend. Diese Schicht kann nicht mehr übernommen werden.' });
+        }
         if (replaced.userId === request.user.id) {
           return reply.status(400).send({ error: 'Das ist deine eigene Eintragung.' });
         }
@@ -460,10 +463,14 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         if (replaced) {
           // Unter der Sperre: zurückgezogen oder schon von jemand anderem übernommen?
           const stillOffered = await tx.shiftSignup.findFirst({
-            where: { id: replaced.id, replacementWantedAt: { not: null } },
+            where: {
+              id: replaced.id,
+              replacementWantedAt: { not: null },
+              attendance: { not: 'PRESENT' },
+            },
             select: { id: true },
           });
-          if (!stillOffered) return { error: 'Diese Schicht wurde schon übernommen oder wird nicht mehr angeboten.' } as const;
+          if (!stillOffered) return { error: 'Diese Schicht wurde schon übernommen, ist bereits anwesend oder wird nicht mehr angeboten.' } as const;
           await tx.cateringToken.updateMany({
             where: { shiftSignupId: replaced.id, status: 'REDEEMED' },
             data: { shiftSignupId: null },
@@ -798,13 +805,15 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         request.log.error(logErr, 'Fehler beim Erstellen des Signoff-Logs');
       }
 
-      await fastify.prisma.cateringToken.updateMany({
-        where: { shiftSignupId: existingSignup.id, status: 'REDEEMED' },
-        data: { shiftSignupId: null },
-      });
+      await fastify.prisma.$transaction(async (tx) => {
+        await tx.cateringToken.updateMany({
+          where: { shiftSignupId: existingSignup.id, status: 'REDEEMED' },
+          data: { shiftSignupId: null },
+        });
 
-      await fastify.prisma.shiftSignup.delete({
-        where: { id: existingSignup.id },
+        await tx.shiftSignup.delete({
+          where: { id: existingSignup.id },
+        });
       });
       trackUsage('SIGNOFF', { dim: isSelf ? 'SELF' : 'OK', departmentId: event.departmentId });
 

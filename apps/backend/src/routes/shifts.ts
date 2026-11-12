@@ -606,10 +606,22 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      await fastify.prisma.shift.delete({
-        where: { id: shiftId },
+      await fastify.prisma.$transaction(async (tx) => {
+        await tx.cateringToken.updateMany({
+          where: {
+            OR: [
+              { shiftId },
+              { signup: { shiftId } },
+            ],
+            status: 'REDEEMED',
+          },
+          data: { shiftId: null, shiftSignupId: null },
+        });
+        await tx.shift.delete({
+          where: { id: shiftId },
+        });
+        await syncEventRange(tx, shift.eventId);
       });
-      await syncEventRange(fastify.prisma, shift.eventId);
 
       return { message: 'Schicht erfolgreich gelöscht' };
     }
@@ -814,6 +826,16 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               }
             }
           }
+          await tx.cateringToken.updateMany({
+            where: {
+              OR: [
+                { shiftId: { in: shiftIds } },
+                { signup: { shiftId: { in: shiftIds } } },
+              ],
+              status: 'REDEEMED',
+            },
+            data: { shiftId: null, shiftSignupId: null },
+          });
           updated = (await tx.shift.deleteMany({ where: { id: { in: shiftIds } } })).count;
         } else if (action.type === 'MOVE') {
           const move = (d: Date) => new Date(addZurichDays(d, action.days).getTime() + action.minutes * 60 * 1000);
@@ -862,7 +884,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
           updated = (
             await tx.shift.updateMany({ where: { id: { in: shiftIds } }, data: { isSetupTeardown: action.isSetupTeardown } })
           ).count;
-        } else {
+        } else if (action.type === 'SET_CATEGORY') {
           updated = (
             await tx.shift.updateMany({ where: { id: { in: shiftIds } }, data: { category: action.category || null } })
           ).count;

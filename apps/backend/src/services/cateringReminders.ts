@@ -139,12 +139,14 @@ export async function sendDueCateringReminders(
 
       let sent = false;
 
-      // Web Push
-      if (
+      const hasEligiblePush = Boolean(
         group.user &&
         group.user.pushNotifyCateringTokens !== false &&
         group.user._count.pushSubscriptions > 0
-      ) {
+      );
+
+      // Web Push
+      if (hasEligiblePush && group.user) {
         try {
           await sendPushToUser(prisma, group.user.id, {
             title: `🎁 Verpflegungs-Bons nicht vergessen!`,
@@ -159,7 +161,8 @@ export async function sendDueCateringReminders(
       // E-Mail
       const rawEmail = (group.user?.emailVerified && group.user?.email) ? group.user.email : group.guestEmail;
       const email = rawEmail && !isPlaceholderEmail(rawEmail) ? rawEmail : null;
-      if (email && (group.user ? group.user.emailNotifyCateringTokens !== false : true)) {
+      const hasEligibleEmail = Boolean(email && (group.user ? group.user.emailNotifyCateringTokens !== false : true));
+      if (hasEligibleEmail && email) {
         try {
           const orgName = getOrganizationByDbType(event.department.organization).name;
           await sendEmail({
@@ -196,12 +199,15 @@ export async function sendDueCateringReminders(
         } catch {}
       }
 
-      // Markiere diese Tokens atomar als erinnert
-      const tokenIds = group.tokens.map((x) => x.id);
-      await prisma.cateringToken.updateMany({
-        where: { id: { in: tokenIds } },
-        data: { reminderSentAt: now },
-      });
+      // Markiere diese Tokens als erinnert, wenn versendet oder wenn keine Kanäle eingerichtet sind
+      const hasEligibleChannel = hasEligiblePush || hasEligibleEmail;
+      if (sent || !hasEligibleChannel) {
+        const tokenIds = group.tokens.map((x) => x.id);
+        await prisma.cateringToken.updateMany({
+          where: { id: { in: tokenIds } },
+          data: { reminderSentAt: now },
+        });
+      }
 
       if (sent) totalSent++;
     }

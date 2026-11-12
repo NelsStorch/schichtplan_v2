@@ -9,7 +9,7 @@ import type {
   AdminUserListItemDto,
   LoginMethod,
 } from '@schichtplan/shared';
-import { AdminBatchDeleteUsersSchema, normalizePermissions } from '@schichtplan/shared';
+import { AdminBatchDeleteUsersSchema, isPlaceholderEmail, normalizePermissions } from '@schichtplan/shared';
 import { hashResetToken } from './passwordReset.js';
 import { getLoginPortalBaseUrl } from '../services/authSession.js';
 import { toCeviDbStufeDto } from '../services/homeDepartment.js';
@@ -489,6 +489,15 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
           data: { createdById: null },
         });
 
+        // Eingelöste Verpflegungs-Bons für Event-Abrechnung und Inventar erhalten
+        await tx.cateringToken.updateMany({
+          where: {
+            status: 'REDEEMED',
+            OR: [{ userId: targetUserId }, { signup: { userId: targetUserId } }],
+          },
+          data: { userId: null, shiftSignupId: null },
+        });
+
         // Benutzer löschen (kaskadiert zu ShiftSignups, DepartmentMembers, UserStufen, UserHitobitoStufen, EventOrganizers, EventAnswers, EventAccessGrants, EventDeregistrations)
         await tx.user.delete({
           where: { id: targetUserId },
@@ -540,8 +549,8 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
       if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
-      if (!user.email && !user.passwordHash) {
-        return reply.status(400).send({ error: 'Person hat weder E-Mail noch Passwort hinterlegt.' });
+      if (!user.email || isPlaceholderEmail(user.email)) {
+        return reply.status(400).send({ error: 'Person hat keine gültige E-Mail-Adresse hinterlegt.' });
       }
 
       const token = crypto.randomBytes(32).toString('base64url');
@@ -617,6 +626,14 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         await tx.eventAccessLink.updateMany({
           where: { createdById: { in: idsToDelete } },
           data: { createdById: null },
+        });
+        // Eingelöste Verpflegungs-Bons für Event-Abrechnung und Inventar erhalten
+        await tx.cateringToken.updateMany({
+          where: {
+            status: 'REDEEMED',
+            OR: [{ userId: { in: idsToDelete } }, { signup: { userId: { in: idsToDelete } } }],
+          },
+          data: { userId: null, shiftSignupId: null },
         });
         await tx.user.deleteMany({
           where: { id: { in: idsToDelete } },

@@ -101,7 +101,15 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
       const updated = await fastify.prisma.shiftSignup.update({
         where: { id: signup.id },
         data: status
-          ? { attendance: status, attendanceAt: new Date(), attendanceSource: 'OK', attendanceByName: byName }
+          ? {
+              attendance: status,
+              attendanceAt: new Date(),
+              attendanceSource: 'OK',
+              attendanceByName: byName,
+              ...(status === 'PRESENT'
+                ? { replacementWantedAt: null, replacementNote: null, replacementByName: null }
+                : {}),
+            }
           : { attendance: null, attendanceAt: null, attendanceSource: null, attendanceByName: null },
       });
 
@@ -209,7 +217,15 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
       if (toMark.length > 0) {
         await fastify.prisma.shiftSignup.updateMany({
           where: { id: { in: toMark.map((s) => s.id) } },
-          data: { attendance: 'PRESENT', attendanceAt: now, attendanceSource: 'QR', attendanceByName: myName },
+          data: {
+            attendance: 'PRESENT',
+            attendanceAt: now,
+            attendanceSource: 'QR',
+            attendanceByName: myName,
+            replacementWantedAt: null,
+            replacementNote: null,
+            replacementByName: null,
+          },
         });
         try {
           await fastify.prisma.shiftSignupLog.createMany({
