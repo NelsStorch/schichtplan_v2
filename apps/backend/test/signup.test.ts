@@ -122,7 +122,7 @@ describe.skipIf(!hasTestDb)('Eintragen in Schichten', () => {
     expect(denied.statusCode).toBe(403);
 
     const anonymous = await inject(app, { method: 'DELETE', url, tenant: department.slug });
-    expect(anonymous.statusCode).toBe(403);
+    expect(anonymous.statusCode).toBe(401);
 
     const byPlanner = await inject(app, { method: 'DELETE', url, tenant: department.slug, cookie: authCookie(app, planner) });
     expect(byPlanner.statusCode).toBe(200);

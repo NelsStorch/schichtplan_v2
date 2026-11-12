@@ -466,11 +466,12 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
             where: {
               id: replaced.id,
               replacementWantedAt: { not: null },
-              attendance: { not: 'PRESENT' },
             },
-            select: { id: true },
+            select: { id: true, attendance: true },
           });
-          if (!stillOffered) return { error: 'Diese Schicht wurde schon übernommen, ist bereits anwesend oder wird nicht mehr angeboten.' } as const;
+          if (!stillOffered || stillOffered.attendance === 'PRESENT') {
+            return { error: 'Diese Schicht wurde schon übernommen, ist bereits anwesend oder wird nicht mehr angeboten.' } as const;
+          }
           await tx.cateringToken.updateMany({
             where: { shiftSignupId: replaced.id, status: 'REDEEMED' },
             data: { shiftSignupId: null },

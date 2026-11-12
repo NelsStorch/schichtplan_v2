@@ -5,11 +5,13 @@
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { DEPARTMENT_PERMISSION_PRESETS, type OrganizationType } from '@schichtplan/shared';
 import { buildApp } from '../src/app.js';
+import { departmentCache } from '../src/services/departmentCache.js';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 export const hasTestDb = Boolean(TEST_DATABASE_URL);
 
 export async function createTestApp(): Promise<FastifyInstance> {
+  departmentCache.clear();
   process.env.DATABASE_URL = TEST_DATABASE_URL;
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-secret-test-secret-test-secret-1234';
@@ -22,6 +24,7 @@ export async function createTestApp(): Promise<FastifyInstance> {
 
 /** Alle Tabellen leeren (ausser Prismas Migrationstabelle) */
 export async function resetDb(app: FastifyInstance) {
+  departmentCache.clear();
   const tables = await app.prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length === 0) return;
@@ -34,6 +37,7 @@ const unique = () => `${Date.now().toString(36)}${(counter++).toString(36)}`;
 
 export async function createDepartment(app: FastifyInstance, data: { slug?: string; name?: string; membersOnly?: boolean } = {}) {
   const slug = data.slug ?? `abt${unique()}`;
+  departmentCache.clear();
   return app.prisma.department.create({
     data: { slug, name: data.name ?? `Cevi ${slug}`, membersOnly: data.membersOnly ?? false },
   });
