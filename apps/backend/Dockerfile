@@ -15,6 +15,9 @@ COPY apps/login/package.json ./apps/login/
 COPY apps/web/package.json ./apps/web/
 COPY apps/admin/package.json ./apps/admin/
 RUN --mount=type=cache,target=/root/.npm npm ci
+# Ordner immer anlegen: npm legt ihn nur an, wenn eine Abhängigkeit nicht ins Root hochgezogen wird
+# (sonst scheitern die COPY-Zeilen unten, sobald alles gehoistet ist)
+RUN mkdir -p apps/backend/node_modules
 
 # 2. Development target (for docker-compose.dev.yml)
 FROM base AS development
