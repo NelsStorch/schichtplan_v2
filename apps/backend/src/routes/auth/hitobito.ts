@@ -17,6 +17,7 @@ import {
 import { mergeCeviNameProfilesInto } from '../../services/mergeProfiles.js';
 import { trackUsage } from '../../services/usageStats.js';
 import { syncCeviDbLeadership } from '../../services/departmentLeaders.js';
+import { hitobitoCircuitBreaker } from '../../services/hitobitoCircuitBreaker.js';
 
 import {
   getOrganizationSlugFromHost,
@@ -36,11 +37,11 @@ import {
   loginPageUrl,
   PENDING_LINK_COOKIE,
   PENDING_LINK_TTL_SECONDS,
-  CEVIDB_REQUEST_TIMEOUT_MS,
   pendingLinks,
   createPendingLink,
   readPendingLink,
   ensureHelperMembership,
+  CEVIDB_REQUEST_TIMEOUT_MS,
   trackCeviDbFailure,
 } from '../../services/authSession.js';
 
@@ -114,6 +115,12 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!providerConfig.clientId) {
         fastify.log.error(`${providerConfig.type} OAuth ist nicht konfiguriert (CLIENT_ID fehlt in der Umgebung)`);
+        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, reqHost, providerConfig.type));
+      }
+
+      // Bei aktiver Störung von Hitobito gar nicht erst weiterleiten, sondern sofort Ausweich-Login anbieten
+      if (hitobitoCircuitBreaker.isOpen(providerConfig.type)) {
+        fastify.log.warn(`${providerConfig.type} Circuit Breaker ist aktiv (Hitobito temporär nicht erreichbar)`);
         return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, reqHost, providerConfig.type));
       }
 
@@ -221,6 +228,8 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
         if (!tokenRes.ok) {
           const errText = await tokenRes.text();
           fastify.log.error(`${providerConfig.type} Token-Abruf fehlgeschlagen: ${errText}`);
+          // Nur Serverfehler zählen als Störung; 4xx (z. B. abgelaufener Code) liegt nicht an Hitobito
+          if (tokenRes.status >= 500) hitobitoCircuitBreaker.recordFailure(providerConfig.type);
           trackCeviDbFailure();
           return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
         }
@@ -246,6 +255,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (!profileRes.ok) {
           fastify.log.error(`${providerConfig.type} Profilabruf fehlgeschlagen`);
+          if (profileRes.status >= 500) hitobitoCircuitBreaker.recordFailure(providerConfig.type);
           trackCeviDbFailure();
           return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
         }
@@ -293,8 +303,11 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
           groupIds: prioritizedGroupIds,
           provider: providerConfig.type,
         });
+
+        hitobitoCircuitBreaker.recordSuccess(providerConfig.type);
       } catch (err) {
         fastify.log.error(err, `${providerConfig.type} nicht erreichbar`);
+        hitobitoCircuitBreaker.recordFailure(providerConfig.type);
         trackCeviDbFailure();
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
       }

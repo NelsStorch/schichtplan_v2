@@ -79,13 +79,13 @@ function getLoginErrorMessage(code: string, org: OrganizationConfig): string | n
   switch (code) {
     case 'cevidb_unavailable':
     case 'hitobito_unavailable':
-      return `Die Anmeldung mit ${org.authProviderShort} ist im Moment nicht verfügbar. Melde dich bitte mit E-Mail oder ${org.nicknameTerm} an.`;
+      return `${org.authProviderShort} ist im Moment nicht erreichbar oder vorübergehend gestört. Bitte nutze die Ausweich-Optionen unten.`;
     case 'cevidb_denied':
     case 'hitobito_denied':
       return `Die Anmeldung bei ${org.authProviderShort} wurde abgebrochen.`;
     case 'cevidb_failed':
     case 'hitobito_failed':
-      return `Die Anmeldung mit ${org.authProviderShort} hat nicht geklappt. Bitte versuche es nochmals.`;
+      return `Die Verbindung zu ${org.authProviderShort} ist fehlgeschlagen oder hat zu lange gedauert.`;
     case 'cevidb_email_taken':
     case 'hitobito_email_taken':
       return `Die E-Mail aus deinem ${org.authProviderShort}-Profil gehört schon zu einem anderen Konto. Melde dich bitte bei den Betreibern des Schichtplans.`;
@@ -173,11 +173,18 @@ function LoginContent() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hitobitoDown, setHitobitoDown] = useState(false);
 
   useEffect(() => {
     const errCode = searchParams.get('error');
     if (errCode) {
       setError(getLoginErrorMessage(errCode, org) ?? 'Ein Fehler ist aufgetreten.');
+      setHitobitoDown(
+        errCode === 'cevidb_failed' ||
+        errCode === 'hitobito_failed' ||
+        errCode === 'cevidb_unavailable' ||
+        errCode === 'hitobito_unavailable'
+      );
     }
   }, [searchParams, org]);
   const [success, setSuccess] = useState<string | null>(null);
@@ -403,6 +410,48 @@ function LoginContent() {
           <Callout tone="danger">
             {error}
           </Callout>
+          {hitobitoDown && org.slug !== 'verein' && (
+            <div className="rounded-xl border border-line bg-surface p-4 text-xs space-y-3">
+              <div>
+                <span className="font-semibold text-fg block text-sm">
+                  Ausweich-Optionen bei {org.authProviderShort}-Störung
+                </span>
+                <p className="mt-1 text-fg-muted leading-relaxed">
+                  Ist die Verbandsdatenbank vorübergehend nicht erreichbar, kannst du dich trotzdem anmelden:
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="w-full justify-between"
+                  onClick={() => {
+                    setAuthMode('login');
+                    goTo('password');
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    <KeyRound className="size-3.5" />
+                    <span>Mit E-Mail &amp; Passwort anmelden</span>
+                  </span>
+                  <ChevronRight className="size-3.5" />
+                </Button>
+
+                <a
+                  href={`/passwort-vergessen${returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : ''}`}
+                  className={buttonClasses({
+                    variant: 'ghost',
+                    size: 'sm',
+                    className: 'w-full justify-start text-accent-ink hover:underline',
+                  })}
+                >
+                  → Noch kein Passwort? Notfall-Passwort per E-Mail anfordern
+                </a>
+              </div>
+            </div>
+          )}
           {errorAction === 'cevidb' && org.slug !== 'verein' && (
             <a href={cevidbAuthUrl} className={buttonClasses({ className: 'w-full justify-between' })}>
               Mit {org.authProviderShort} anmelden <ArrowUpRight className="size-4" />
