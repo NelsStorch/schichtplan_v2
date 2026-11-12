@@ -132,7 +132,7 @@ function LinkAccount() {
                 >
                   Neues Passwort setzen
                 </a>
-                , danach nochmals mit Cevi.DB anmelden. Zwei Konten mit derselben E-Mail gibt es nicht.
+                , danach nochmals mit {org.authProviderShort} anmelden. Zwei Konten mit derselben E-Mail gibt es nicht.
               </p>
             </div>
           </form>

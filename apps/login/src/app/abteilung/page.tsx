@@ -201,7 +201,7 @@ function DepartmentSetup() {
                         <li key={stufe.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-fg">{stufe.name}</span>
-                            {locked && <span className="block text-xs text-fg-subtle">aus Cevi.DB</span>}
+                            {locked && <span className="block text-xs text-fg-subtle">aus {org.authProviderShort || 'Verband'}</span>}
                           </span>
                           <div
                             role="radiogroup"
