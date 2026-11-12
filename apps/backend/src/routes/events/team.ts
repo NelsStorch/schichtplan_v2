@@ -166,6 +166,19 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const targetUser = resolved.user;
 
+      // Schutz: Die letzte OK-Leitung kann nicht zu einem einfachen Mitglied herabgestuft werden
+      if (role !== 'OK_LEAD') {
+        const currentOrg = event.organizers.find((o) => o.userId === targetUser.id);
+        if (currentOrg?.role === 'OK_LEAD') {
+          const otherLeads = event.organizers.filter((o) => o.role === 'OK_LEAD' && o.userId !== targetUser.id);
+          if (otherLeads.length === 0) {
+            return reply.status(400).send({
+              error: 'Mindestens eine Person mit Event-Leitung (OK-Leitung) muss im OK verbleiben.',
+            });
+          }
+        }
+      }
+
       const organizer = await fastify.prisma.eventOrganizer.upsert({
         where: {
           eventId_userId: {
@@ -233,6 +246,18 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
       const flags = await managerFlags(fastify.prisma, existing.event, request.user);
       if (!flags.can.ORGANIZERS) {
         return reply.status(403).send({ error: 'Keine Berechtigung zur OK-Verwaltung' });
+      }
+
+      // Schutz: Die letzte OK-Leitung kann nicht entfernt werden
+      if (existing.role === 'OK_LEAD') {
+        const otherLeads = existing.event.organizers.filter(
+          (o) => o.role === 'OK_LEAD' && o.id !== existing.id
+        );
+        if (otherLeads.length === 0) {
+          return reply.status(400).send({
+            error: 'Mindestens eine Person mit Event-Leitung (OK-Leitung) muss im OK verbleiben.',
+          });
+        }
       }
 
       await fastify.prisma.eventOrganizer.delete({

@@ -313,6 +313,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: event.id },
         data: { checkinToken: generateCheckinToken() },
       });
+      request.log.info({ userId: request.user.id, eventId: event.id }, 'Neuer Check-in-Code erzeugt');
       return { checkinToken: updated.checkinToken };
     }
   );

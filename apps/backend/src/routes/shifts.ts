@@ -830,6 +830,13 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               where: { shiftId: shift.id },
               data: { sentEmailReminders: [], sentPushReminders: [] },
             });
+            await tx.cateringToken.updateMany({
+              where: {
+                status: 'AVAILABLE',
+                OR: [{ shiftId: shift.id }, { signup: { shiftId: shift.id } }],
+              },
+              data: { reminderSentAt: null },
+            });
             updated++;
           }
         } else if (action.type === 'SET_SLOTS') {

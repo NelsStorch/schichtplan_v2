@@ -1,5 +1,5 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
-import { getOrganizationByDbType } from '@schichtplan/shared';
+import { getOrganizationByDbType, isPlaceholderEmail } from '@schichtplan/shared';
 import { sendEmail } from './email.js';
 import { sendPushToUser } from './webPush.js';
 import { eventUrl } from './shiftReminders.js';
@@ -157,7 +157,8 @@ export async function sendDueCateringReminders(
       }
 
       // E-Mail
-      const email = (group.user?.emailVerified && group.user?.email) ? group.user.email : group.guestEmail;
+      const rawEmail = (group.user?.emailVerified && group.user?.email) ? group.user.email : group.guestEmail;
+      const email = rawEmail && !isPlaceholderEmail(rawEmail) ? rawEmail : null;
       if (email && (group.user ? group.user.emailNotifyCateringTokens !== false : true)) {
         try {
           const orgName = getOrganizationByDbType(event.department.organization).name;

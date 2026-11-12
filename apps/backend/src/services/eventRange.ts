@@ -1,7 +1,7 @@
 import { addDaysToDayKey, addZurichDays } from '@schichtplan/shared';
 import type { PrismaClient } from '../generated/prisma/client.js';
 
-type Db = Pick<PrismaClient, 'shift' | 'event' | 'shiftSignup' | 'shiftResponsible' | 'eventDayResponsible'>;
+type Db = Pick<PrismaClient, 'shift' | 'event' | 'shiftSignup' | 'shiftResponsible' | 'eventDayResponsible' | 'cateringToken'>;
 
 /**
  * Zeitraum eines Anlasses = erste Schicht bis letzte Schicht. Wird nach jeder Änderung an Schichten
@@ -47,6 +47,16 @@ export async function moveEventByDays(db: Db, event: { id: string; startDate: Da
   await db.shiftResponsible.updateMany({
     where: { shift: { eventId: event.id } },
     data: { sentEmailReminders: [], sentPushReminders: [] },
+  });
+  await db.cateringToken.updateMany({
+    where: {
+      status: 'AVAILABLE',
+      OR: [
+        { shift: { eventId: event.id } },
+        { signup: { shift: { eventId: event.id } } },
+      ],
+    },
+    data: { reminderSentAt: null },
   });
   await db.event.update({
     where: { id: event.id },
