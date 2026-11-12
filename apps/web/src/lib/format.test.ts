@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { fmtDateRange, fmtDuration, fmtRelativeDay, fmtTime, groupByBusinessDay, hoursBetween, shiftName } from './format';
+import {
+  dayKeyToIso,
+  fmtDateRange,
+  fmtDayMonth,
+  fmtDuration,
+  fmtFullDate,
+  fmtRelativeDay,
+  fmtShortDate,
+  fmtShortWeekday,
+  fmtStand,
+  fmtTime,
+  fmtWeekday,
+  groupByBusinessDay,
+  hoursBetween,
+  isPast,
+  shiftName,
+} from './format';
 
 describe('Zeitanzeige in Schweizer Zeit', () => {
   it('rechnet UTC im Sommer und im Winter korrekt um', () => {
@@ -56,5 +72,50 @@ describe('shiftName', () => {
     expect(shiftName({ title: null, ...times })).toBe('18:00–22:00');
     expect(shiftName({ title: '   ', ...times })).toBe('18:00–22:00');
     expect(shiftName({ ...times })).not.toContain('null');
+  });
+});
+
+describe('Datumsformate und Wochentage', () => {
+  it('formatiert Wochentage auf Deutsch (Schweiz)', () => {
+    // 2026-10-17 ist ein Samstag
+    expect(fmtWeekday('2026-10-17T12:00:00Z')).toBe('Samstag');
+    expect(fmtShortWeekday('2026-10-17T12:00:00Z')).toBe('Sa');
+  });
+
+  it('formatiert Datumsangaben', () => {
+    expect(fmtDayMonth('2026-10-17T12:00:00Z')).toBe('17. Oktober');
+    expect(fmtShortDate('2026-10-17T12:00:00Z')).toBe('17.10.');
+    expect(fmtFullDate('2026-10-17T12:00:00Z')).toBe('17. Oktober 2026');
+  });
+
+  it('erzeugt ISO-Mittagszeitpunkt aus einem Datumsschlüssel', () => {
+    expect(dayKeyToIso('2026-10-17')).toBe('2026-10-17T12:00:00Z');
+  });
+});
+
+describe('fmtStand', () => {
+  it('formatiert Zeitstempel von heute, gestern und älteren Tagen', () => {
+    const today = new Date();
+    expect(fmtStand(today)).toContain('Heute,');
+    expect(fmtStand(today)).toContain('Uhr');
+
+    const yesterday = new Date(Date.now() - 86_400_000);
+    expect(fmtStand(yesterday)).toContain('Gestern,');
+
+    const older = new Date('2020-01-15T13:30:00Z');
+    expect(fmtStand(older)).toContain('15.01.,');
+  });
+
+  it('gibt leere Zeichenkette bei ungültigem Datum zurück', () => {
+    expect(fmtStand('ungültiges-datum')).toBe('');
+  });
+});
+
+describe('isPast', () => {
+  it('erkennt vergangene und zukünftige Zeitpunkte', () => {
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const future = new Date(Date.now() + 60_000).toISOString();
+    expect(isPast(past)).toBe(true);
+    expect(isPast(future)).toBe(false);
   });
 });
