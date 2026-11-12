@@ -556,6 +556,7 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
           qrCustomColors={form.qrCustomColors}
           qrColorPrimary={form.qrColorPrimary}
           qrColorSecondary={form.qrColorSecondary}
+          organization={department?.organization}
         />
       </fieldset>
 

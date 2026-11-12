@@ -76,6 +76,7 @@ export interface QrCodeInput {
   checkinEarlyMinutes?: number;
   checkinLateMinutes?: number;
   prisma?: PrismaClient;
+  organization?: OrganizationType;
 }
 
 /**

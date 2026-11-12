@@ -390,6 +390,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
           checkinEarlyMinutes: event.checkinEarlyMinutes ?? 30,
           checkinLateMinutes: event.checkinLateMinutes ?? 30,
           prisma: fastify.prisma,
+          organization: request.tenant.organization,
         });
       } catch (err) {
         request.log.error(err, 'QR-Code konnte nicht erzeugt werden');

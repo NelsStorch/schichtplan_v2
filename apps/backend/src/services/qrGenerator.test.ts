@@ -105,5 +105,49 @@ describe('qrGenerator', () => {
     expect(pdfBuf.subarray(0, 4).toString('utf8')).toBe('%PDF');
     const pdfStr = pdfBuf.toString('binary');
     expect(pdfStr).toContain('Pfadi Schichtplan');
+    expect(pdfStr).not.toContain('Cevi Schichtplan');
+  });
+
+  it('erzeugt Pfadi-QR-Code mit Pfadi-Logo und ohne Cevi-Logo', async () => {
+    const svg = await generateQrSvg({
+      text: 'https://schleife.pfadi-schichtplan.ch/events/lager/checkin?code=xyz',
+      color: '#20553e',
+    });
+
+    expect(svg).toContain('#20553e');
+    expect(svg).toContain('#f08a15'); // Pfadi-Orange
+    expect(svg).toContain('#103353'); // Pfadi-Marineblau
+    expect(svg).toContain('#f9ad36'); // Pfadi-Gelb
+    expect(svg).not.toContain('#e20031'); // Kein Cevi-Rot!
+  });
+
+  it('respektiert die explizite Organisation (PFADI) bei generischem Text', async () => {
+    const svg = await generateQrSvg({
+      text: 'https://custom-domain.ch/checkin?code=xyz',
+      organization: 'PFADI',
+    });
+
+    expect(svg).toContain('#20553e');
+    expect(svg).not.toContain('#e20031');
+  });
+
+  it('erzeugt Jubla-QR-Code mit Jubla-Logo und ohne Cevi-Logo', async () => {
+    const svg = await generateQrSvg({
+      text: 'https://st-martin.jubla-schichtplan.ch/events/lager/checkin?code=xyz',
+      color: '#283583',
+    });
+
+    expect(svg).toContain('#283583'); // Jubla-Blau
+    expect(svg).not.toContain('#e20031'); // Kein Cevi-Rot!
+  });
+
+  it('erzeugt Verein-QR-Code mit Verein-Logo und ohne Cevi-Logo', async () => {
+    const svg = await generateQrSvg({
+      text: 'https://fc-uster.vereins-schichtplan.ch/events/fest/checkin?code=xyz',
+      organization: 'OTHER',
+    });
+
+    expect(svg).toContain('#2563eb');
+    expect(svg).not.toContain('#003d8f'); // Kein Cevi-Blau!
   });
 });

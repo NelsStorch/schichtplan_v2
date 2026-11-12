@@ -1,13 +1,34 @@
-import { evaluateContrast, getOrganization, type ContrastEvaluation, type OrganizationType } from '@schichtplan/shared';
+import { evaluateContrast, getOrganization, getOrganizationByDbType, type ContrastEvaluation, type OrganizationType } from '@schichtplan/shared';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import type { PrismaClient } from '../db.js';
+import {
+  CEVI_LOGO_PATH_RED,
+  CEVI_LOGO_PATH_BLUE,
+  PFADI_LOGO_PATH_GREEN,
+  PFADI_LOGO_PATH_ORANGE,
+  PFADI_LOGO_PATH_NAVY,
+  PFADI_LOGO_PATH_YELLOW,
+  drawCeviLogoVector,
+  drawPfadiLogoVector,
+  drawVereinLogoVector,
+  drawJublaLogoVector,
+  renderOrgLogoSvg,
+} from './brandLogos.js';
 
-export const CEVI_LOGO_PATH_RED =
-  'M 321.69737,357.21491 C 287.28947,367.10965 252.80263,373.24123 220.24561,375.68421 L 342.04386,497.30702 L 385.28509,335.97368 C 366.14474,343.46491 345.02631,350.50439 321.69737,357.21491 z M 430.11403,155.98684 C 385.74123,184.9693 331.41228,209.90351 280.88158,224.43421 C 211.38596,244.41667 140.64474,250.60526 86.609649,241.46491 L 4.0745614,159.05263 L 462.29824,35.894737 L 430.11403,155.98684 z';
-
-export const CEVI_LOGO_PATH_BLUE =
-  'M 6.6710526,190.96053 C 6.0394737,188.60965 5.6622807,186.18421 5.4342105,183.72807 L 54.574561,232.79825 C 28.008772,223.31579 11.5,208.97807 6.6710526,190.96053 z M 497.38596,242.87719 C 462.67105,285.34649 407.07017,315.84649 317.23246,341.68421 C 225.59649,368.0307 134.16667,367.2193 84.307017,339.60965 C 66.763158,329.89035 55.763158,317.63596 51.614035,303.18421 L 25.328947,237.97807 C 26.320175,238.57456 27.307017,239.1886 28.289474,239.73246 C 82.078947,269.52193 183.01754,269.74123 285.43421,240.28947 C 367.38158,216.72368 453.30702,169.02632 497.38158,123.0307 L 497.38158,242.87719 L 497.38596,242.87719 z M 342.04386,51.662281 L 21.991228,137.16667 C 54.93421,90.149123 132.27193,43.894737 221.70614,18.179825 C 246.83333,10.95614 302.99561,1.881579 342.04386,3.3333334 L 342.04386,51.662281 z';
+export {
+  CEVI_LOGO_PATH_RED,
+  CEVI_LOGO_PATH_BLUE,
+  PFADI_LOGO_PATH_GREEN,
+  PFADI_LOGO_PATH_ORANGE,
+  PFADI_LOGO_PATH_NAVY,
+  PFADI_LOGO_PATH_YELLOW,
+  drawCeviLogoVector,
+  drawPfadiLogoVector,
+  drawVereinLogoVector,
+  drawJublaLogoVector,
+  renderOrgLogoSvg,
+};
 
 export interface ResolvedLogo {
   buffer?: Buffer;
@@ -34,8 +55,9 @@ export async function resolveLogo(
   prisma?: PrismaClient,
   organization?: OrganizationType
 ): Promise<ResolvedLogo> {
+  const isCeviDefault = organization === 'CEVI' || !organization;
   if (!logoUrl) {
-    return { isCeviDefault: organization === 'CEVI' || !organization, organization };
+    return { isCeviDefault, organization };
   }
 
   // Lokaler Upload in der Datenbank
@@ -56,7 +78,7 @@ export async function resolveLogo(
     }
   }
 
-  return { isCeviDefault: organization === 'CEVI' || !organization, organization };
+  return { isCeviDefault, organization };
 }
 
 export type QrStyle = 'CORNERS' | 'GRADIENT' | 'SOLID';
@@ -107,8 +129,15 @@ export function drawPdfLogo(doc: PDFKit.PDFDocument, logo: PdfLogo, x: number, y
       // Fallback
     }
   }
-  if (!logo.organization || logo.organization === 'CEVI') {
+  const org = logo.organization || 'CEVI';
+  if (org === 'CEVI') {
     drawCeviLogoVector(doc, x, y, size);
+  } else if (org === 'PFADI') {
+    drawPfadiLogoVector(doc, x, y, size);
+  } else if (org === 'JUBLA') {
+    drawJublaLogoVector(doc, x, y, size);
+  } else if (org === 'OTHER') {
+    drawVereinLogoVector(doc, x, y, size);
   }
 }
 
@@ -194,12 +223,13 @@ export interface QrOptions {
   checkinEarlyMinutes?: number;
   checkinLateMinutes?: number;
   prisma?: PrismaClient;
+  organization?: OrganizationType;
 }
 
 /**
  * Erzeugt einen QR-Code als SVG-String mit:
  * - Ein- oder zweifarbigem Design (Ecken, Farbverlauf oder einfarbig)
- * - Zentrierter Plakette mit Abteilungslogo (oder Cevi-Logo)
+ * - Zentrierter Plakette mit Abteilungslogo (oder Verbands-Logo)
  * - Level H Fehlerkorrektur (höchste Scan-Sicherheit)
  */
 export async function generateQrSvg(options: QrOptions): Promise<string> {
@@ -213,7 +243,8 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
   const style = options.qrStyle || (hasSecondary ? 'CORNERS' : 'SOLID');
   const isTwoTone = hasSecondary && secondaryQrColor !== primaryQrColor && style !== 'SOLID';
 
-  const logo = await resolveLogo(options.logoUrl, options.prisma);
+  const orgType: OrganizationType = options.organization ?? getOrganization(options.text).dbType;
+  const logo = await resolveLogo(options.logoUrl, options.prisma, orgType);
 
   const qr = QRCode.create(options.text, { errorCorrectionLevel: 'H' });
   const n = qr.modules.size;
@@ -256,15 +287,11 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
   const logoSize = badgeModules - badgePad * 2;
 
   let logoSvg = '';
-  if (!logo.isCeviDefault && logo.buffer && logo.mimeType) {
+  if (logo.buffer && logo.mimeType) {
     const dataUri = `data:${logo.mimeType};base64,${logo.buffer.toString('base64')}`;
     logoSvg = `<image href="${dataUri}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet" />`;
   } else {
-    const scale = logoSize / 500;
-    logoSvg = `<g transform="translate(${logoX}, ${logoY}) scale(${scale})">
-      <path d="${CEVI_LOGO_PATH_RED}" fill="#e20031" />
-      <path d="${CEVI_LOGO_PATH_BLUE}" fill="#003d8f" />
-    </g>`;
+    logoSvg = renderOrgLogoSvg(orgType, logoX, logoY, logoSize);
   }
 
   let defs = '';
@@ -304,7 +331,7 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
   const palette = resolveQrPalette(options.color, options.secondaryColor, options.qrStyle);
   const { primary: primaryColor, secondary: secondaryColor, isTwoTone } = palette;
 
-  const footerOrg = getOrganization(options.text);
+  const footerOrg = options.organization ? getOrganizationByDbType(options.organization) : getOrganization(options.text);
   const logo = await resolveLogo(options.logoUrl, options.prisma, footerOrg.dbType);
 
   return new Promise((resolve, reject) => {
@@ -411,7 +438,7 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
       {
         n: '2',
         title: 'Bestätigen',
-        text: 'Mit deinem Cevi Schichtplan-Konto anmelden oder als Gast deinen Namen bestätigen.',
+        text: `Mit deinem ${footerOrg.name}-Konto anmelden oder als Gast deinen Namen bestätigen.`,
       },
       {
         n: '3',
@@ -492,14 +519,4 @@ export async function generateCheckinPdf(options: QrOptions): Promise<Buffer> {
 
     doc.end();
   });
-}
-
-function drawCeviLogoVector(doc: PDFKit.PDFDocument, x: number, y: number, size: number) {
-  const scale = size / 500;
-  doc.save();
-  doc.translate(x, y);
-  doc.scale(scale);
-  doc.path(CEVI_LOGO_PATH_RED).fill('#e20031');
-  doc.path(CEVI_LOGO_PATH_BLUE).fill('#003d8f');
-  doc.restore();
 }

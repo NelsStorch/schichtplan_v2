@@ -24,7 +24,7 @@ import {
   type ShiftDto,
   type ShiftSignupDto,
 } from '@schichtplan/shared';
-import { Badge, Button, Callout, Card, Chip, EmptyState, Input, cn, trackUi, useConfirm, useToast } from '@schichtplan/ui';
+import { Badge, Button, Callout, Card, Chip, EmptyState, Input, cn, trackUi, useConfirm, useToast, useOrganization } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { dayKeyToIso, fmtDayMonth, fmtShortWeekday, fmtTime, fmtWeekday, groupByBusinessDay, fmtTimeRange } from '@/lib/format';
 import type { EventDetails } from '@/lib/types';
@@ -68,6 +68,7 @@ export function EventAttendancePanel({
   onOpenSettings: () => void;
   onChanged: () => Promise<void>;
 }) {
+  const org = useOrganization();
   const toast = useToast();
   const confirm = useConfirm();
   const mode = event.attendanceMode ?? 'OFF';
@@ -398,7 +399,7 @@ export function EventAttendancePanel({
               )}
             </div>
             <p className="text-[11px] text-fg-subtle">
-              Erstellt mit dem Cevi-QR-Generator (qr.cevi.tools). Der Link enthält einen geheimen Code: Wer ihn kennt,
+              Erstellt mit dem {org.name}-QR-Generator. Der Link enthält einen geheimen Code: Wer ihn kennt,
               kann sich von überall einchecken. Bei Bedarf erneuern.
             </p>
           </div>
