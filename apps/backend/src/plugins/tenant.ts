@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { Department, OrganizationType } from '../db.js';
 import { getOrganizationTypeFromHost, RESERVED_SUBDOMAINS } from '@schichtplan/shared';
+import { departmentCache } from '../services/departmentCache.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -70,9 +71,7 @@ const tenantPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     if (slug) {
-      const department = await fastify.prisma.department.findUnique({
-        where: { organization_slug: { organization, slug } },
-      });
+      const department = await departmentCache.getDepartment(fastify.prisma, organization, slug);
       request.tenant = department;
     } else {
       request.tenant = null;

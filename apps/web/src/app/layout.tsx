@@ -6,6 +6,7 @@ import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { CommandPalette, CommandPaletteProvider } from '@/components/command';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
+import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { getDepartmentPreview } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
 
@@ -28,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: title, template: `%s · ${brandName}` },
     description,
     robots: { index: false, follow: false },
-    manifest: '/manifest.json',
+    manifest: '/manifest.webmanifest',
     icons: {
       icon: [
         { url: org.logoUrl, type: 'image/svg+xml' },
@@ -65,6 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <CommandPaletteProvider>
               {children}
               <CommandPalette />
+              <PwaInstallBanner />
             </CommandPaletteProvider>
           </PortalProvider>
           <ServiceWorkerRegister />

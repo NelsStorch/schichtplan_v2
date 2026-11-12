@@ -17,6 +17,7 @@ import { recordAdminAction } from '../../services/adminAudit.js';
 import { recordDepartmentAction, toDepartmentAuditDto } from '../../services/departmentAudit.js';
 import { contactCandidateWhere } from '../departments.js';
 import { loginMethods, } from '../admin.js';
+import { departmentCache } from '../../services/departmentCache.js';
 import { isUniqueViolation, uniqueConflictMessage, eventSelect, toEventItems, departmentSelect, toDepartmentItems, attachCeviDbGroup } from './shared.js';
 
 /** Abteilungen und Rollen darin (nur globale Admins, siehe guard) */
@@ -218,6 +219,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const attached = hitobitoGroupId ? await attachCeviDbGroup(fastify.prisma, created.id, hitobitoGroupId, organization) : 0;
+    departmentCache.invalidate(organization, slug);
 
     await recordAdminAction(fastify.prisma, request, {
       action: 'DEPARTMENT_CREATE',
@@ -350,6 +352,11 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
         ? await attachCeviDbGroup(fastify.prisma, existing.id, newGroup, targetOrganization)
         : 0;
 
+    departmentCache.invalidate(existing.organization, existing.slug);
+    if (organizationChanged || (data.slug && data.slug !== existing.slug)) {
+      departmentCache.invalidate(targetOrganization, data.slug ?? existing.slug);
+    }
+
     await recordAdminAction(fastify.prisma, request, {
       action: 'DEPARTMENT_UPDATE',
       targetType: 'DEPARTMENT',
@@ -390,7 +397,7 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
 
     const department = await fastify.prisma.department.findUnique({
       where: { id: request.params.id },
-      select: { id: true, slug: true, name: true, _count: { select: { events: true, members: true } } },
+      select: { id: true, slug: true, name: true, organization: true, _count: { select: { events: true, members: true } } },
     }).catch(() => null);
     if (!department) return reply.status(404).send({ error: 'Abteilung nicht gefunden' });
     if (input.confirm !== department.slug) {
@@ -406,6 +413,8 @@ const adminDepartmentRoutes: FastifyPluginAsync = async (fastify) => {
       // Kaskadiert zu Anlässen, Schichten, Eintragungen, Rollen, Stufen, Vorlagen und Arbeiten
       fastify.prisma.department.delete({ where: { id: department.id } }),
     ]);
+
+    departmentCache.invalidate(department.organization, department.slug);
 
     await recordAdminAction(fastify.prisma, request, {
       action: 'DEPARTMENT_DELETE',

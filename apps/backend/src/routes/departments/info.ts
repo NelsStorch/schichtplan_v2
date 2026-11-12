@@ -12,6 +12,7 @@ import { autoCreateCeviDbDepartmentStufen, ceviDbGroupPeople, NO_HOME_CONFIRMATI
 import { isDepartmentInsider, } from '../../services/departmentVisibility.js';
 import { departmentAccess, } from '../../services/permissions.js';
 import { computeDepartmentStats } from '../../services/departmentStats.js';
+import { departmentCache } from '../../services/departmentCache.js';
 import { contactCandidateWhere, loadContactPerson, NOT_ELIGIBLE_MESSAGES, departmentCreationEligibility, requireDepartmentPermission, } from './shared.js';
 
 /** Abteilung: Angaben, Verzeichnis, Statistik, Anlegen und Einstellungen */
@@ -70,18 +71,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
     reply.header('Cache-Control', 'public, max-age=60');
-    const departments = await fastify.prisma.department.findMany({
-      where: { organization: request.organization },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        organization: true,
-        logoUrl: true,
-        stufen: { select: { id: true, name: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] },
-      },
-      orderBy: { name: 'asc' },
-    });
+    const departments = await departmentCache.getDirectory(fastify.prisma, request.organization);
     return departments satisfies DepartmentDirectoryItemDto[];
   });
 
@@ -311,6 +301,8 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
           await autoCreateCeviDbDepartmentStufen(fastify.prisma, departmentResult.department.id, memberId);
         }
 
+        departmentCache.invalidate(provider, slug);
+
         request.log.info(
           { userId: request.user.id, departmentId: departmentResult.department.id, slug, hitobitoGroupId: isOther ? null : ceviDbGroupId },
           isOther ? 'Verein von Vereinsleitung angelegt' : 'Abteilung von Abteilungsleitung (Cevi.DB) angelegt'
@@ -387,6 +379,8 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
           membersOnly: input.membersOnly,
         },
       });
+
+      departmentCache.invalidate(tenant.organization, tenant.slug);
 
       return {
         id: updated.id,
