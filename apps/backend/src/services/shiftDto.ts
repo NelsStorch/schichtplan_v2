@@ -1,4 +1,4 @@
-import { PLACEHOLDER_EMAIL_REGEX, type ResponsiblePersonDto } from '@schichtplan/shared';
+import { isPlaceholderEmail, type ResponsiblePersonDto } from '@schichtplan/shared';
 
 /** Welche Erinnerungsstufen sind bei einer Schicht, die bald beginnt, schon vorbei? */
 export function pastReminderMinutes(shiftStartTime: Date, pool: readonly number[], now = new Date()): number[] {
@@ -21,7 +21,7 @@ export function toResponsiblePersonDto(
   contactVisibility: string = 'BOTH'
 ): ResponsiblePersonDto {
   const allowPhone = contactVisibility === 'BOTH' || contactVisibility === 'PHONE';
-  const allowEmail = (contactVisibility === 'BOTH' || contactVisibility === 'EMAIL') && Boolean(r.user.email && !PLACEHOLDER_EMAIL_REGEX.test(r.user.email));
+  const allowEmail = (contactVisibility === 'BOTH' || contactVisibility === 'EMAIL') && Boolean(r.user.email && !isPlaceholderEmail(r.user.email));
   const nickname = r.user.nickname ?? r.user.ceviName ?? null;
   return {
     id: r.user.id,

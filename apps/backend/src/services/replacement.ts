@@ -38,6 +38,7 @@ type ReplacedSignup = {
   user: {
     id?: string;
     firstName: string;
+    nickname?: string | null;
     ceviName?: string | null;
     email: string | null;
     emailVerified: boolean;
@@ -77,7 +78,7 @@ export async function notifyReplacementTaken(
 
   return send({
     to,
-    name: replaced.user.ceviName || replaced.user.firstName,
+    name: replaced.user.nickname || replaced.user.ceviName || replaced.user.firstName,
     takenBy,
     eventTitle: event.title,
     shiftTitle: shiftDisplayTitle(shift),

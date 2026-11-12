@@ -114,7 +114,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!providerConfig.clientId) {
         fastify.log.error(`${providerConfig.type} OAuth ist nicht konfiguriert (CLIENT_ID fehlt in der Umgebung)`);
-        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, reqHost));
+        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, reqHost, providerConfig.type));
       }
 
       const stateObj = {
@@ -184,19 +184,19 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Abbruch durch die Person auf Hitobito (z. B. Zugriff verweigert)
       if (error) {
-        return reply.redirect(loginErrorUrl('cevidb_denied', returnTo, request.hostname));
+        return reply.redirect(loginErrorUrl('cevidb_denied', returnTo, request.hostname, providerConfig.type));
       }
 
       // state muss zum Cookie aus /cevidb/login passen, sonst könnte ein fremder Code untergeschoben werden
       if (!code || !state || state !== request.cookies.cevidb_oauth_state) {
         fastify.log.warn('Hitobito Callback ohne gültigen Code oder state');
-        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
+        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
       }
 
       // Ohne eigene Zugangsdaten des Verbands nichts an dessen Hitobito schicken
       if (!providerConfig.clientId || !providerConfig.clientSecret) {
         fastify.log.error(`${providerConfig.type} OAuth ist nicht konfiguriert (CLIENT_ID/SECRET fehlt)`);
-        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, request.hostname));
+        return reply.redirect(loginErrorUrl('cevidb_unavailable', returnTo, request.hostname, providerConfig.type));
       }
 
       let profile: any;
@@ -222,7 +222,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
           const errText = await tokenRes.text();
           fastify.log.error(`${providerConfig.type} Token-Abruf fehlgeschlagen: ${errText}`);
           trackCeviDbFailure();
-          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
+          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
         }
 
         const tokenData = (await tokenRes.json()) as {
@@ -247,7 +247,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
         if (!profileRes.ok) {
           fastify.log.error(`${providerConfig.type} Profilabruf fehlgeschlagen`);
           trackCeviDbFailure();
-          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
+          return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
         }
 
         profile = await profileRes.json();
@@ -287,7 +287,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
       } catch (err) {
         fastify.log.error(err, `${providerConfig.type} nicht erreichbar`);
         trackCeviDbFailure();
-        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname));
+        return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
       }
 
       trackUsage('EXTERNAL', { dim: 'CEVIDB_OK' });
@@ -373,7 +373,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
       if (byEmail && byEmail.providerId !== null) {
         // E-Mail gehört schon zu einer anderen Person des Providers: nicht überschreiben
         fastify.log.warn({ userId: byEmail.id, ceviDbId }, `${provider}-Login: E-Mail gehört zu anderem Provider-Konto`);
-        return loginErrorUrl('cevidb_email_taken', returnTo, reply.request?.hostname);
+        return loginErrorUrl('cevidb_email_taken', returnTo, reply.request?.hostname, provider);
       }
       if (byEmail?.passwordHash && byEmail.id !== linkConfirmedUserId) {
         // Passwort-Konto mit gleicher E-Mail: erst nach Passwort verknüpfen (login.<domain>/konto-verknuepfen)

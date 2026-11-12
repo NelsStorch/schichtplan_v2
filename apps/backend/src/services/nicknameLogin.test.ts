@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasRights, isCeviNameProfile, pickCeviNameMatch } from './nicknameLogin.js';
+import { hasRights, isCeviNameProfile, pickCeviNameMatch, resolveOrganizerUser } from './nicknameLogin.js';
 
 type Match = Parameters<typeof pickCeviNameMatch>[0][number];
 
@@ -57,5 +57,31 @@ describe('pickCeviNameMatch', () => {
 
   it('meldet NONE ohne Treffer', () => {
     expect(pickCeviNameMatch([])).toEqual({ kind: 'NONE' });
+  });
+});
+
+describe('resolveOrganizerUser', () => {
+  it('findet Person ueber nickname oder ceviName', async () => {
+    const mockPrisma = {
+      user: {
+        findUnique: async () => null,
+        findMany: async () => [
+          {
+            id: 'u-1',
+            passwordHash: 'hash',
+            providerId: null,
+            homeDepartmentId: 'dep-1',
+            memberships: [],
+          },
+        ],
+        count: async () => 0,
+      },
+    } as any;
+
+    const resNick = await resolveOrganizerUser(mockPrisma, 'dep-1', { nickname: 'Fuchs' });
+    expect(resNick).toEqual({ user: { id: 'u-1' } });
+
+    const resCevi = await resolveOrganizerUser(mockPrisma, 'dep-1', { ceviName: 'Fuchs' });
+    expect(resCevi).toEqual({ user: { id: 'u-1' } });
   });
 });

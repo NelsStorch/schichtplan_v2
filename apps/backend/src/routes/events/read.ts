@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { FastifyPluginAsync } from 'fastify';
 import {
   accessTypeConfig,
+  isPlaceholderEmail,
   toEventAccessType,
   ageAt,
   type ResponsiblePersonDto,
@@ -423,7 +424,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
               guestName: showName ? su.guestName : null,
               guestEmail: access.isManager ? su.guestEmail : null,
               guestPhone: access.isManager ? su.guestPhone : null,
-              userEmail: access.isManager ? su.user?.email || null : null,
+              userEmail: access.isManager && su.user?.email && !isPlaceholderEmail(su.user.email) ? su.user.email : null,
               userPhone: access.isManager ? su.user?.phone || null : null,
               displayName,
               userFirstName: showName ? su.user?.firstName || null : null,

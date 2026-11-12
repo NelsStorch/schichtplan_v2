@@ -3,7 +3,7 @@
  * Cevi.DB-Konten bringen Name, E-Mail und Geburtsdatum aus dem Profil mit (siehe Cevi.DB-Login in routes/auth.ts).
  */
 import {
-  PLACEHOLDER_EMAIL_REGEX,
+  isPlaceholderEmail,
   PLACEHOLDER_LAST_NAME,
   REQUIRED_PROFILE_FIELD_KEYS,
   type RequiredProfileField,
@@ -24,7 +24,7 @@ export function hasProfileField(user: ProfileFieldsSource, field: RequiredProfil
     case 'PHONE':
       return hasText(user.phone);
     case 'EMAIL':
-      return hasText(user.email) && !PLACEHOLDER_EMAIL_REGEX.test(user.email!);
+      return hasText(user.email) && !isPlaceholderEmail(user.email);
     case 'BIRTH_DATE':
       return user.birthDate !== null;
     case 'FULL_NAME':

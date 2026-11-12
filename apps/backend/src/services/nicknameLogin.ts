@@ -85,17 +85,19 @@ export function pickCeviNameMatch(
 export async function resolveOrganizerUser(
   prisma: Pick<PrismaClient, 'user'>,
   departmentId: string,
-  who: { userId?: string; ceviName?: string; email?: string }
+  who: { userId?: string; nickname?: string; ceviName?: string; email?: string }
 ): Promise<{ user: { id: string } } | { error: string; status: number }> {
   let user: { id: string; passwordHash: string | null; providerId: string | null } | null = null;
   const select = { id: true, passwordHash: true, providerId: true } as const;
+
+  const nick = (who.nickname || who.ceviName)?.trim();
 
   if (who.userId) {
     user = await prisma.user.findUnique({ where: { id: who.userId }, select });
   } else if (who.email) {
     user = await prisma.user.findUnique({ where: { email: who.email.trim().toLowerCase() }, select });
-  } else if (who.ceviName?.trim()) {
-    const name = who.ceviName.trim();
+  } else if (nick) {
+    const name = nick;
     const candidates = await prisma.user.findMany({
       where: {
         nickname: { equals: name, mode: 'insensitive' },

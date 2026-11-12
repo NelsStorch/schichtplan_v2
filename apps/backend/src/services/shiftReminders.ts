@@ -14,7 +14,7 @@
 import {
   DEFAULT_EMAIL_REMINDER_MINUTES,
   DEFAULT_PUSH_REMINDER_MINUTES,
-  PLACEHOLDER_EMAIL_REGEX,
+  isPlaceholderEmail,
   formatReminderLeadTime,
   getOrganization,
   getOrganizationByDbType,
@@ -460,7 +460,7 @@ export async function sendDueShiftReminders(
         }
 
         if (claimedMinutes.length > 0 || claimedCompanionMinutes.length > 0) {
-          if (!PLACEHOLDER_EMAIL_REGEX.test(user.email)) {
+          if (!isPlaceholderEmail(user.email)) {
             let ok = false;
             try {
               ok = await send({

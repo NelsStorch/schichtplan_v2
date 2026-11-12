@@ -157,10 +157,10 @@ const eventTeamRoutes: FastifyPluginAsync = async (fastify) => {
 
       const input = request.body as z.output<typeof AddEventOrganizerSchema>;
 
-      const { userId, ceviName, email, role, roleTitle } = input;
+      const { userId, nickname, ceviName, email, role, roleTitle } = input;
 
-      // Benutzer finden anhand ID, E-Mail oder Cevi-Name (nur Konten mit Cevi.DB oder Passwort)
-      const resolved = await resolveOrganizerUser(fastify.prisma, request.tenant.id, { userId, ceviName, email });
+      // Benutzer finden anhand ID, E-Mail oder Cevi-/Spitzname (nur Konten mit Cevi.DB oder Passwort)
+      const resolved = await resolveOrganizerUser(fastify.prisma, request.tenant.id, { userId, nickname, ceviName, email });
       if ('error' in resolved) {
         return reply.status(resolved.status).send({ error: resolved.error });
       }

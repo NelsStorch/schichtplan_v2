@@ -114,6 +114,23 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
+      // Schutz: Die letzte Leitung einer Abteilung kann sich nicht selbst löschen,
+      // da die Abteilung sonst führungslos wird
+      const ledDepartments = await fastify.prisma.departmentMember.findMany({
+        where: { userId, role: 'ADMIN' },
+        select: { departmentId: true, department: { select: { name: true } } },
+      });
+      for (const m of ledDepartments) {
+        const otherLeaders = await fastify.prisma.departmentMember.count({
+          where: { departmentId: m.departmentId, role: 'ADMIN', userId: { not: userId } },
+        });
+        if (otherLeaders === 0) {
+          return reply.status(400).send({
+            error: `Du bist die einzige Leitung der Abteilung «${m.department.name}». Bitte übertrage die Leitung zuerst an eine andere Person.`,
+          });
+        }
+      }
+
       await fastify.prisma.$transaction(async (tx) => {
         // EventAccessLinks entkoppeln, falls dieser User gebunden war
         await tx.eventAccessLink.updateMany({

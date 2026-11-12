@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowUpRight, Bell, Building2, CalendarDays, CalendarPlus, CalendarSync, Check, Copy, Database, LogOut, Trash2 } from 'lucide-react';
 import {
-  PLACEHOLDER_EMAIL_REGEX,
+  isPlaceholderEmail,
   PLACEHOLDER_LAST_NAME,
   STUFE_ROLES,
   getDepartmentSetupUrl,
@@ -121,7 +121,7 @@ export default function ProfilePage() {
         lastName: me.lastName === PLACEHOLDER_LAST_NAME ? '' : (me.lastName ?? ''),
         phone: me.phone ?? '',
         // Unbestätigte, selbst eingetragene Adresse vorausfüllen, damit sich ein Tippfehler korrigieren lässt
-        email: me.email && !me.emailVerified && !me.hasPassword && !me.hasCeviDb && !PLACEHOLDER_EMAIL_REGEX.test(me.email) ? me.email : '',
+        email: me.email && !me.emailVerified && !me.hasPassword && !me.hasCeviDb && !isPlaceholderEmail(me.email) ? me.email : '',
         birthDate: me.birthDate ?? '',
       });
       const shiftsRes = await fetch('/api/shifts/my', { cache: 'no-store' });
@@ -133,7 +133,7 @@ export default function ProfilePage() {
     })().catch(() => setMessage({ tone: 'danger', text: 'Profil konnte nicht geladen werden.' }));
   }, []);
 
-  const hasRealEmail = Boolean(user?.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  const hasRealEmail = Boolean(user?.email && !isPlaceholderEmail(user.email));
   // Wie canChangeOwnEmail im Backend: ohne echte Adresse, oder selbst eingetragen und noch unbestätigt
   const emailEditable = !hasRealEmail || Boolean(user && !user.emailVerified && !user.hasPassword && !user.hasCeviDb);
   // Geburtsdatum aus Cevi.DB zählt für Altersgrenzen: nur dort änderbar

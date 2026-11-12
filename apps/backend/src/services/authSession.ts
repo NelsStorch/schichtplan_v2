@@ -112,9 +112,10 @@ export function cleanReturnTo(value: unknown, fallback = '/', reqHost?: string):
 export function loginErrorUrl(
   code: 'cevidb_unavailable' | 'cevidb_denied' | 'cevidb_failed' | 'cevidb_email_taken',
   returnTo: string | null,
-  reqHost?: string
+  reqHost?: string,
+  organization?: OrganizationType | string
 ) {
-  const base = getLoginPortalBaseUrl(process.env, reqHost);
+  const base = getLoginPortalBaseUrl(process.env, reqHost, organization);
   return `${base}/?error=${code}${returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : ''}`;
 }
 

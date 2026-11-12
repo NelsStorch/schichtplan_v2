@@ -664,14 +664,14 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
           signupId: z.string().uuid().optional().describe('ID der konkreten Schicht-Eintragung'),
         }),
       },
-      preHandler: [fastify.optionalAuthenticate],
+      preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
       const shiftId = request.params.id;
       const { signupId } = request.query;
 
-      if (!signupId && !request.user) {
-        return reply.status(401).send({ error: 'Nicht autorisiert' });
+      if (!request.user) {
+        return reply.status(401).send({ error: 'Nicht angemeldet' });
       }
 
       let existingSignup = null;

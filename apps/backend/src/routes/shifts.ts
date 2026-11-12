@@ -15,7 +15,7 @@ import {
 } from '../services/eventAccess.js';
 import { UNRELATED_PERSON_ERROR, allUsersRelatedToEvent } from '../services/departmentVisibility.js';
 import { syncEventRange } from '../services/eventRange.js';
-import { EMAIL_REMINDER_MINUTES, PUSH_REMINDER_MINUTES, PLACEHOLDER_EMAIL_REGEX } from '@schichtplan/shared';
+import { EMAIL_REMINDER_MINUTES, PUSH_REMINDER_MINUTES, isPlaceholderEmail } from '@schichtplan/shared';
 import { pastReminderMinutes, toResponsiblePersonDto } from '../services/shiftDto.js';
 import { formatShiftTime, eventUrl } from '../services/shiftReminders.js';
 import { sendShiftCancelledEmail } from '../services/email.js';
@@ -578,7 +578,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
             ? (s.task?.title && s.task.title !== shift.title ? `${shift.title} · ${s.task.title}` : shift.title)
             : (s.task?.title || 'Schicht');
 
-          if (s.user?.email && s.user.emailVerified && !PLACEHOLDER_EMAIL_REGEX.test(s.user.email)) {
+          if (s.user?.email && s.user.emailVerified && !isPlaceholderEmail(s.user.email)) {
             void sendShiftCancelledEmail({
               to: s.user.email,
               name: s.user.nickname || s.user.firstName,
@@ -590,7 +590,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
               accentColor: shift.event.department.primaryColor,
               organization: shift.event.department.organization,
             }).catch((err) => request.log.error(err, 'Absage-Mail fehlgeschlagen'));
-          } else if (!s.userId && s.guestEmail?.trim() && s.guestEmail.includes('@')) {
+          } else if (!s.userId && s.guestEmail?.trim() && !isPlaceholderEmail(s.guestEmail) && s.guestEmail.includes('@')) {
             void sendShiftCancelledEmail({
               to: s.guestEmail.trim(),
               name: s.guestName?.trim() || 'Helfer*in',
@@ -786,7 +786,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                   : (s.task?.title || 'Schicht');
                 const timeFormatted = formatShiftTime(s.shift.startTime, s.shift.endTime);
 
-                if (s.user?.email && s.user.emailVerified && !PLACEHOLDER_EMAIL_REGEX.test(s.user.email)) {
+                if (s.user?.email && s.user.emailVerified && !isPlaceholderEmail(s.user.email)) {
                   void sendShiftCancelledEmail({
                     to: s.user.email,
                     name: s.user.nickname || s.user.firstName,
@@ -798,7 +798,7 @@ const shiftRoutes: FastifyPluginAsync = async (fastify) => {
                     accentColor: event.department.primaryColor,
                     organization: event.department.organization,
                   }).catch((err) => request.log.error(err, 'Bulk-Absage-Mail fehlgeschlagen'));
-                } else if (!s.userId && s.guestEmail?.trim() && s.guestEmail.includes('@')) {
+                } else if (!s.userId && s.guestEmail?.trim() && !isPlaceholderEmail(s.guestEmail) && s.guestEmail.includes('@')) {
                   void sendShiftCancelledEmail({
                     to: s.guestEmail.trim(),
                     name: s.guestName?.trim() || 'Helfer*in',

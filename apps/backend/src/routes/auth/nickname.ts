@@ -30,17 +30,16 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
   //    Cevi-Name + Geburtsdatum + Abteilung bestimmen das Profil. Nur reine Cevi-Name-Profile ohne
   //    Rechte lassen sich so anmelden; Cevi.DB- und Passwort-Konten verlangen ihren eigenen Login.
   //    Findet sich niemand, bietet das Login-Portal die Registrierung an (ceviname-register).
-  fastify.post(
-    '/api/auth/ceviname-login',
-    {
-      schema: {
-        tags: ['Auth'],
-        summary: 'Schnellanmeldung mit Cevi-Name und Geburtsdatum',
-        description: 'Passwortlose Helfer-Anmeldung an einer Abteilung mit Cevi-Name und Geburtsdatum.',
-        body: CeviNameQuickLoginSchema,
-      },
+  const loginOpts = {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Schnellanmeldung mit Cevi-Name und Geburtsdatum',
+      description: 'Passwortlose Helfer-Anmeldung an einer Abteilung mit Cevi-Name und Geburtsdatum.',
+      body: CeviNameQuickLoginSchema,
     },
-    async (request, reply) => {
+  };
+
+  const loginHandler = async (request: any, reply: FastifyReply) => {
     if (tooManyRequests(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
@@ -95,20 +94,22 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const user = await fastify.prisma.user.findUniqueOrThrow({ where: { id: result.userId } });
     trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
     return signInCeviNameProfile(reply, user, returnTo);
-  });
+  };
+
+  fastify.post('/api/auth/ceviname-login', loginOpts, loginHandler);
+  fastify.post('/api/auth/nickname-login', loginOpts, loginHandler);
 
   // 3b. Neues Cevi-Name-Profil an einer Abteilung (nach einem Login ohne Treffer)
-  fastify.post(
-    '/api/auth/ceviname-register',
-    {
-      schema: {
-        tags: ['Auth'],
-        summary: 'Neues Helferprofil mit Cevi-Name anlegen',
-        description: 'Erstellt ein neues passwortloses Helferprofil für eine Abteilung.',
-        body: CeviNameRegisterSchema,
-      },
+  const registerOpts = {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Neues Helferprofil mit Cevi-Name anlegen',
+      description: 'Erstellt ein neues passwortloses Helferprofil für eine Abteilung.',
+      body: CeviNameRegisterSchema,
     },
-    async (request, reply) => {
+  };
+
+  const registerHandler = async (request: any, reply: FastifyReply) => {
     if (tooManyRequests(request.ip)) {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
@@ -188,7 +189,10 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
     trackUsage('REGISTER', { dim: 'ceviname', departmentId: department.id });
     trackUsage('LOGIN', { dim: 'ceviname', departmentId: department.id });
     return signInCeviNameProfile(reply, user, returnTo);
-  });
+  };
+
+  fastify.post('/api/auth/ceviname-register', registerOpts, registerHandler);
+  fastify.post('/api/auth/nickname-register', registerOpts, registerHandler);
 
   /** Cookie setzen und Profil zurückgeben (Login und Registrierung mit Cevi-Name) */
   async function signInCeviNameProfile(
@@ -198,11 +202,12 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
   ) {
     const nick = user.nickname ?? user.ceviName ?? 'helfer';
     const orgDomain = getOrganizationByDbType(reply.request?.organization).domain;
+    const cleanNick = nick.toLowerCase().replace(/[^a-z0-9]/g, '') || 'helfer';
     const token = fastify.signAuthToken({
       id: user.id,
       email:
         user.email ||
-        `${nick.toLowerCase().replace(/[^a-z0-9]/g, '')}@guest.${orgDomain}`,
+        `${cleanNick}@guest.${orgDomain}`,
       isGlobalAdmin: user.isGlobalAdmin,
       amr: 'ceviname',
     });

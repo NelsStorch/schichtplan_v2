@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Bell, Building2, Database, Trash2 } from 'lucide-react';
 import {
-  PLACEHOLDER_EMAIL_REGEX,
+  isPlaceholderEmail,
   PLACEHOLDER_LAST_NAME,
   STUFE_ROLES,
   getLoginUrl,
@@ -56,7 +56,7 @@ export default function DepartmentProfilePage() {
     }
   }, [loading, user]);
 
-  const hasRealEmail = Boolean(user?.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  const hasRealEmail = Boolean(user?.email && !isPlaceholderEmail(user.email));
   const birthDateFromCeviDb = Boolean(user?.hasCeviDb && user.birthDate);
 
   const handleProfileResend = async () => {

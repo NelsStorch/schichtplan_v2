@@ -28,6 +28,9 @@ import {
   type DisambiguationCandidate,
 } from '../services/disambiguation.js';
 import { applyProfileUpdate } from '../services/profileUpdate.js';
+import { createRateLimiter } from '../services/rateLimit.js';
+
+const redeemLimiter = createRateLimiter(10 * 60 * 1000, 20);
 
 /** Fehlermeldung bei ungültiger Antwort (Auswahl nicht in den Optionen, Ja/Nein falsch), sonst null */
 export function validateAnswers(
@@ -247,6 +250,9 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate],
     },
     async (request, reply) => {
+      if (redeemLimiter.hit(`${request.ip}:${request.user.id}`)) {
+        return reply.status(429).send({ error: 'Zu viele Versuche. Bitte warte ein paar Minuten.' });
+      }
       const event = await loadEvent(request, reply);
       if (!event) return;
 

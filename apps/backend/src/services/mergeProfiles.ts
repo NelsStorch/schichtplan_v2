@@ -176,6 +176,17 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
   await tx.department.updateMany({ where: { contactUserId: sourceId }, data: { contactUserId: targetId } });
   await tx.shiftSignupLog.updateMany({ where: { helperUserId: sourceId }, data: { helperUserId: targetId } });
   await tx.shiftSignupLog.updateMany({ where: { performedByUserId: sourceId }, data: { performedByUserId: targetId } });
+  await tx.cateringToken.updateMany({ where: { userId: sourceId }, data: { userId: targetId } });
+  await tx.user.updateMany({ where: { homeDepartmentConfirmedById: sourceId }, data: { homeDepartmentConfirmedById: targetId } });
+
+  // Push-Abonnements übernehmen: Doppelte Endpoints der Zielperson behalten
+  const targetEndpoints = new Set(
+    (await tx.pushSubscription.findMany({ where: { userId: targetId }, select: { endpoint: true } })).map((p) => p.endpoint)
+  );
+  const sourceSubs = await tx.pushSubscription.findMany({ where: { userId: sourceId }, select: { id: true, endpoint: true } });
+  const dupSubs = sourceSubs.filter((s) => targetEndpoints.has(s.endpoint)).map((s) => s.id);
+  if (dupSubs.length) await tx.pushSubscription.deleteMany({ where: { id: { in: dupSubs } } });
+  await tx.pushSubscription.updateMany({ where: { userId: sourceId }, data: { userId: targetId } });
 
   // Rest (doppelte Antworten, Mitgliedschaften usw.) verschwindet mit dem Profil
   await tx.user.delete({ where: { id: sourceId } });

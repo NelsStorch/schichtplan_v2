@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../db.js';
 import {
+  isPlaceholderEmail,
   normalizePermissions,
   UpdateDepartmentPersonSchema,
   type DepartmentPersonDto,
@@ -117,7 +118,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           isHomeDepartment: isHome,
           source: isHome ? homeSource(u.homeDepartmentSource) : null,
           canConfirmHome: canConfirmHome(access, request.user.id, u, tenant.id, ortsgruppeId),
-          email: u.email,
+          email: u.email && !isPlaceholderEmail(u.email) ? u.email : null,
           phone: u.phone,
           confirmedAt: isHome ? (u.homeDepartmentConfirmedAt?.toISOString() ?? null) : null,
           confirmedBy: isHome && u.homeDepartmentConfirmedBy ? personLabel(u.homeDepartmentConfirmedBy) : null,

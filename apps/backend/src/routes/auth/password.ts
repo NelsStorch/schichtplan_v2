@@ -360,7 +360,7 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const token = request.query.token;
-      const loginBase = getLoginPortalBaseUrl(process.env, request.headers.host);
+      const loginBase = getLoginPortalBaseUrl(process.env, request.headers.host, request.organization);
       if (!token) {
         return reply.redirect(`${loginBase}/verify-email?error=missing_token`);
       }

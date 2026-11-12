@@ -141,7 +141,7 @@ const eventManageRoutes: FastifyPluginAsync = async (fastify) => {
           }
           const resolved = await resolveOrganizerUser(fastify.prisma, request.tenant.id, item);
           if ('error' in resolved) {
-            const who = item.ceviName || item.email || 'Eine Person';
+            const who = (item as { nickname?: string; ceviName?: string; email?: string }).nickname || item.ceviName || item.email || 'Eine Person';
             return reply.status(resolved.status).send({ error: `OK: ${who}: ${resolved.error}` });
           }
           const targetUser = resolved.user;

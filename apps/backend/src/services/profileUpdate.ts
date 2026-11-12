@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from '../db.js';
-import { PLACEHOLDER_EMAIL_REGEX, type UpdateProfileInput } from '@schichtplan/shared';
+import { isPlaceholderEmail, type UpdateProfileInput } from '@schichtplan/shared';
 import { findCeviNameMatches, isCeviNameProfile } from './nicknameLogin.js';
 
 /**
@@ -14,7 +14,7 @@ export function canChangeOwnEmail(user: {
   providerId?: string | null;
   ceviDbId?: number | null;
 }): boolean {
-  const hasRealEmail = Boolean(user.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  const hasRealEmail = Boolean(user.email && !isPlaceholderEmail(user.email));
   if (!hasRealEmail) return true;
   const hasProvider = user.providerId !== undefined ? Boolean(user.providerId) : user.ceviDbId !== null && user.ceviDbId !== undefined;
   return !user.emailVerified && !user.passwordHash && !hasProvider;

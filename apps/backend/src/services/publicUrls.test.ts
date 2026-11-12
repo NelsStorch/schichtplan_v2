@@ -71,6 +71,9 @@ describe('Adressen nur aus der Konfiguration', () => {
     expect(loginErrorUrl('cevidb_failed', 'https://dev.vereins-schichtplan.ch/ok', 'dev.vereins-schichtplan.ch')).toBe(
       'https://login.dev.vereins-schichtplan.ch/?error=cevidb_failed&return_to=' + encodeURIComponent('https://dev.vereins-schichtplan.ch/ok')
     );
+    expect(loginErrorUrl('cevidb_failed', 'https://pfadi-beispiel.ch', 'pfadi-schichtplan.ch', 'PFADI')).toBe(
+      'https://login.pfadi-schichtplan.ch/?error=cevidb_failed&return_to=' + encodeURIComponent('https://pfadi-beispiel.ch')
+    );
     expect(loginPageUrl('/abteilung', 'https://dev.vereins-schichtplan.ch/ok', 'dev.vereins-schichtplan.ch')).toBe(
       'https://login.dev.vereins-schichtplan.ch/abteilung?return_to=' + encodeURIComponent('https://dev.vereins-schichtplan.ch/ok')
     );

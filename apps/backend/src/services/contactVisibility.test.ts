@@ -3,7 +3,7 @@ import {
   AdminMergeUserSchema,
   AdminUpdateUserSchema,
   CreateEventSchema,
-  PLACEHOLDER_EMAIL_REGEX,
+  isPlaceholderEmail,
   SendEventMessageSchema,
   UpdateEventSchema,
   type EventContactVisibility,
@@ -23,7 +23,7 @@ function redactResponsible(
   const allowPhone = contactVisibility === 'BOTH' || contactVisibility === 'PHONE';
   const allowEmail =
     (contactVisibility === 'BOTH' || contactVisibility === 'EMAIL') &&
-    Boolean(u.email && !PLACEHOLDER_EMAIL_REGEX.test(u.email));
+    Boolean(u.email && !isPlaceholderEmail(u.email));
   return {
     id: u.id,
     displayName: u.ceviName ? `${u.firstName} / ${u.ceviName}` : `${u.firstName} ${u.lastName}`,

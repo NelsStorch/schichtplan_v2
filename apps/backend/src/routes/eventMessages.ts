@@ -1,11 +1,11 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import {
-  PLACEHOLDER_EMAIL_REGEX,
   SendEventMessageSchema,
   accessTypeConfig,
   businessDayKey,
   getVocabulary,
+  isPlaceholderEmail,
   toZurichInput,
   type EventMessageDto,
   type EventMessageResultDto,
@@ -30,7 +30,7 @@ type Recipient = { id: string; label: string; email: string | null; pushNotifyMe
 
 /** Nur bestätigte, echte Adressen (keine Platzhalter aus Cevi.DB, keine selbst eingetragenen unbestätigten) */
 export function usableEmail(u: { email: string | null; emailVerified: boolean }): string | null {
-  if (!u.email || !u.emailVerified || PLACEHOLDER_EMAIL_REGEX.test(u.email)) return null;
+  if (!u.email || !u.emailVerified || isPlaceholderEmail(u.email)) return null;
   return u.email;
 }
 
