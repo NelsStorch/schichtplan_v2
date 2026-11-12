@@ -52,6 +52,10 @@ services:
       MIDATA_BASE_URL: ${MIDATA_BASE_URL:-https://pbs.puzzle.ch}
       MIDATA_CLIENT_ID: ${MIDATA_CLIENT_ID:-}
       MIDATA_CLIENT_SECRET: ${MIDATA_CLIENT_SECRET:-}
+      # Jubla (Jubla-DB)
+      JUBLADB_BASE_URL: ${JUBLADB_BASE_URL:-https://db.jubla.ch}
+      JUBLADB_CLIENT_ID: ${JUBLADB_CLIENT_ID:-}
+      JUBLADB_CLIENT_SECRET: ${JUBLADB_CLIENT_SECRET:-}
       SMTP_HOST: ${SMTP_HOST:-mail.infomaniak.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-admin@cevi-schichtplan.ch}

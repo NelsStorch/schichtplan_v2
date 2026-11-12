@@ -16,7 +16,7 @@ import {
   getUnitRoleKey,
   classifyUnitRole,
 } from '@schichtplan/shared';
-import { hitobitoConfig, cevidbConfig } from '../config/hitobito.js';
+import { cevidbConfig } from '../config/hitobito.js';
 
 export interface CeviDbLeadership {
   /** Hat eine Rolle aus `departmentLeaderRoleClasses` */

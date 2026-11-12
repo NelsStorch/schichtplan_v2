@@ -8,7 +8,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { OrganizationType, PrismaClient } from '../db.js';
 import { getHitobitoConfig } from '@schichtplan/shared';
-import { parseHitobitoGroupId, parseCeviDbGroupId, type HitobitoGroupInfo, type CeviDbGroupInfo } from './hitobito.js';
+import { parseCeviDbGroupId, type CeviDbGroupInfo } from './hitobito.js';
 
 /** Solange gilt ein Eintrag als aktuell (die Gruppenstruktur ändert sich selten) */
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
