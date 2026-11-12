@@ -257,6 +257,15 @@ export interface EventTemplateData {
   allowReplacement?: boolean;
   replacementCutoffHours?: number;
   reminderNote?: string | null;
+  dayCutoffTime?: string;
+  responsibleMode?: string;
+  contactVisibility?: string;
+  checkinEarlyMinutes?: number;
+  checkinLateMinutes?: number;
+  cateringTokensEnabled?: boolean;
+  cateringTokenItems?: string[];
+  cateringEarlyHours?: number;
+  cateringRemindersEnabled?: boolean;
 }
 
 export interface EventTemplateDto {

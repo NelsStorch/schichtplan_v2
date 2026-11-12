@@ -50,12 +50,20 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
     tx.user.findUniqueOrThrow({ where: { id: targetId } }),
   ]);
   const targetIsGuest = isCeviNameProfile(target);
+  // Kalender-Abonnement nicht verlieren: falls das Zielkonto noch keinen Token hat, den des Quellkontos übernehmen
+  let transferredCalendarToken: string | undefined = undefined;
+  if (!target.calendarToken && source.calendarToken) {
+    transferredCalendarToken = source.calendarToken;
+    await tx.user.update({ where: { id: sourceId }, data: { calendarToken: null } });
+  }
+
   await tx.user.update({
     where: { id: targetId },
     data: {
       phone: target.phone || source.phone,
       nickname: target.nickname || source.nickname,
       birthDate: target.birthDate ?? source.birthDate,
+      calendarToken: transferredCalendarToken,
       lastName:
         (!target.lastName || target.lastName === PLACEHOLDER_LAST_NAME) && source.lastName !== PLACEHOLDER_LAST_NAME
           ? source.lastName
@@ -105,6 +113,11 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
     async () => (await tx.userStufe.findMany({ where: { userId: targetId }, select: { stufeId: true } })).map((r) => r.stufeId),
     async () => (await tx.userStufe.findMany({ where: { userId: sourceId }, select: { id: true, stufeId: true } })).map((r) => ({ id: r.id, key: r.stufeId })),
     (ids) => tx.userStufe.updateMany({ where: { id: { in: ids } }, data: { userId: targetId } })
+  );
+  await moveUnique(
+    async () => (await tx.userHitobitoStufe.findMany({ where: { userId: targetId }, select: { groupId: true } })).map((r) => String(r.groupId)),
+    async () => (await tx.userHitobitoStufe.findMany({ where: { userId: sourceId }, select: { id: true, groupId: true } })).map((r) => ({ id: r.id, key: String(r.groupId) })),
+    (ids) => tx.userHitobitoStufe.updateMany({ where: { id: { in: ids } }, data: { userId: targetId } })
   );
   await moveUnique(
     async () => (await tx.eventOrganizer.findMany({ where: { userId: targetId }, select: { eventId: true } })).map((r) => r.eventId),
@@ -178,6 +191,11 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
   await tx.shiftSignupLog.updateMany({ where: { performedByUserId: sourceId }, data: { performedByUserId: targetId } });
   await tx.cateringToken.updateMany({ where: { userId: sourceId }, data: { userId: targetId } });
   await tx.user.updateMany({ where: { homeDepartmentConfirmedById: sourceId }, data: { homeDepartmentConfirmedById: targetId } });
+  await tx.eventMessage.updateMany({ where: { sentByUserId: sourceId }, data: { sentByUserId: targetId } });
+  await tx.departmentAuditLog.updateMany({ where: { actorId: sourceId }, data: { actorId: targetId } });
+  await tx.departmentAuditLog.updateMany({ where: { targetUserId: sourceId }, data: { targetUserId: targetId } });
+  await tx.adminAuditLog.updateMany({ where: { adminId: sourceId }, data: { adminId: targetId } });
+  await tx.adminAuditLog.updateMany({ where: { targetType: 'USER', targetId: sourceId }, data: { targetId: targetId } });
 
   // Push-Abonnements übernehmen: Doppelte Endpoints der Zielperson behalten
   const targetEndpoints = new Set(

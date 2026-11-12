@@ -591,6 +591,10 @@ const eventManageRoutes: FastifyPluginAsync = async (fastify) => {
             allowReplacement: event.allowReplacement,
             replacementCutoffHours: event.replacementCutoffHours,
             reminderNote: event.reminderNote || null,
+            cateringTokensEnabled: event.cateringTokensEnabled,
+            cateringTokenItems: event.cateringTokenItems,
+            cateringEarlyHours: event.cateringEarlyHours,
+            cateringRemindersEnabled: event.cateringRemindersEnabled,
             questions: event.questions.map((q) => {
               const { id: _id, ...rest } = toQuestionDto(q);
               return rest;

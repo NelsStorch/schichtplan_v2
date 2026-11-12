@@ -148,6 +148,19 @@ const taskDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { title, description, minAge, ageRequirementType } = input;
 
+      if (title !== undefined && title.trim().toLowerCase() !== task.title.toLowerCase()) {
+        const conflict = await fastify.prisma.taskDefinition.findFirst({
+          where: {
+            departmentId: request.tenant.id,
+            title: { equals: title.trim(), mode: 'insensitive' },
+            id: { not: task.id },
+          },
+        });
+        if (conflict) {
+          return reply.status(409).send({ error: `Eine Arbeit mit dem Namen "${title.trim()}" existiert bereits.` });
+        }
+      }
+
       const updated = await fastify.prisma.taskDefinition.update({
         where: { id: request.params.id },
         data: {

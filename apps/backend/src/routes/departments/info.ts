@@ -197,19 +197,18 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Abteilung anlegen als Abteilungsleitung: ohne Passwort, verknüpft mit der Cevi.DB-Gruppe.
   // Für Vereine (organization = 'OTHER'): ohne Hitobito-Gruppe mit leaderSource = 'MANUAL'.
-  fastify.post(
-    '/api/departments/cevidb',
-    {
-      schema: {
-        tags: ['Abteilungen'],
-        summary: 'Neue Abteilung über Cevi.DB erstellen',
-        description: 'Legt eine neue Abteilung anhand der Cevi.DB-Leitungsrolle an und weist die Subdomain zu.',
-        security: [{ bearerAuth: [] }],
-        body: CreateDepartmentFromCeviDbSchema,
-      },
-      preHandler: [fastify.authenticate],
+  const createDepartmentOpts = {
+    schema: {
+      tags: ['Abteilungen'],
+      summary: 'Neue Abteilung über Hitobito/Cevi.DB erstellen',
+      description: 'Legt eine neue Abteilung anhand der Leitungsrolle an und weist die Subdomain zu.',
+      security: [{ bearerAuth: [] }],
+      body: CreateDepartmentFromCeviDbSchema,
     },
-    async (request, reply) => {
+    preHandler: [fastify.authenticate],
+  };
+
+  const createDepartmentHandler = async (request: FastifyRequest, reply: FastifyReply) => {
       const input = request.body as z.output<typeof CreateDepartmentFromCeviDbSchema>;
       const { departmentName, slug } = input;
       const isOther = request.organization === 'OTHER';
@@ -336,8 +335,10 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         }
         throw err;
       }
-    }
-  );
+  };
+
+  fastify.post('/api/departments/cevidb', createDepartmentOpts, createDepartmentHandler);
+  fastify.post('/api/departments/hitobito', createDepartmentOpts, createDepartmentHandler);
 
   // Abteilungs-Einstellungen aktualisieren (Logo, Name, Kontaktperson): Recht «Abteilung bearbeiten»
   fastify.patch(

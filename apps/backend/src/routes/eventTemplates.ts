@@ -227,13 +227,28 @@ const eventTemplateRoutes: FastifyPluginAsync = async (fastify) => {
             contactUserId: input.contactUserId || null,
             dayCutoffTime: input.dayCutoffTime || '04:00',
             responsibleMode: input.responsibleMode || 'BY_SHIFT',
-            contactVisibility: input.contactVisibility || (template.data as any)?.contactVisibility || 'BOTH',
+            contactVisibility: input.contactVisibility || templateData?.contactVisibility || 'BOTH',
             signupOpensAt: input.signupOpensAt ? new Date(input.signupOpensAt) : null,
             attendanceMode: instantiateAttendanceMode,
             allowReplacement: input.allowReplacement ?? templateData?.allowReplacement ?? true,
             replacementCutoffHours: input.replacementCutoffHours ?? templateData?.replacementCutoffHours ?? 0,
             reminderNote: input.reminderNote !== undefined ? (input.reminderNote?.trim() || null) : (templateData?.reminderNote || null),
+            checkinEarlyMinutes: input.checkinEarlyMinutes ?? templateData?.checkinEarlyMinutes ?? 30,
+            checkinLateMinutes: input.checkinLateMinutes ?? templateData?.checkinLateMinutes ?? 30,
+            cateringTokensEnabled: input.cateringTokensEnabled ?? templateData?.cateringTokensEnabled ?? false,
+            cateringTokenItems: input.cateringTokenItems ?? templateData?.cateringTokenItems ?? ['1x Helfermenü', '1x Getränk'],
+            cateringEarlyHours: input.cateringEarlyHours ?? templateData?.cateringEarlyHours ?? 2,
+            cateringRemindersEnabled: templateData?.cateringRemindersEnabled ?? true,
             checkinToken: instantiateAttendanceMode === 'OK_AND_QR' ? generateCheckinToken() : null,
+            organizers: {
+              create: [
+                {
+                  userId: request.user.id,
+                  role: 'OK_LEAD',
+                  roleTitle: 'Event-Leitung',
+                },
+              ],
+            },
           },
         });
         await replaceAccessLists(tx, ev.id, lists.departmentIds, lists.stufeIds);

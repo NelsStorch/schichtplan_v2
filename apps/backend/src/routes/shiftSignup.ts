@@ -716,6 +716,20 @@ const shiftSignupRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Keine Berechtigung zum Löschen dieser Eintragung' });
       }
 
+      // Hat die Schicht bereits begonnen oder ist vorbei, darf sich eine Person nicht mehr selbst austragen
+      if (!isManager && existingSignup.shift.startTime <= new Date()) {
+        return reply.status(403).send({
+          error: 'Diese Schicht hat bereits begonnen oder ist vorbei. Austragen ist nur über das OK möglich.',
+        });
+      }
+
+      // Wurde die Anwesenheit bereits erfasst, darf man sich ebenfalls nicht mehr selbst austragen
+      if (!isManager && existingSignup.attendance === 'PRESENT') {
+        return reply.status(403).send({
+          error: 'Du bist für diese Schicht bereits als anwesend erfasst und kannst dich nicht mehr selbst austragen.',
+        });
+      }
+
       // Austrag-Sperre prüfen: Helfer können sich ab X Tagen vor Event-Beginn nicht mehr selbst austragen
       if (!isManager && event.cancelDeadlineDays !== null && event.cancelDeadlineDays !== undefined) {
         const deadline = cancelDeadlineAt(event.startDate, event.cancelDeadlineDays);

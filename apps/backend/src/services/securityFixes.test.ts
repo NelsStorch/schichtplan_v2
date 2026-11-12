@@ -129,3 +129,20 @@ describe('Stand-PIN', () => {
     expect(CreateEventSchema.safeParse({ ...base, cateringStaffPin: tooShort }).success).toBe(false);
   });
 });
+
+describe('Event-Vorlagen Verpflegungs-Felder', () => {
+  it('übernimmt Verpflegungs-Konfiguration in Vorlagen-Instanziierung', () => {
+    const { InstantiateTemplateSchema } = require('@schichtplan/shared');
+    const parsed = InstantiateTemplateSchema.parse({
+      title: 'Sommerfest',
+      slug: 'sommerfest',
+      startDate: '2026-08-01T10:00:00.000Z',
+      cateringTokensEnabled: true,
+      cateringTokenItems: ['1x Bratwurst', '1x Mineral'],
+      cateringEarlyHours: 3,
+    });
+    expect(parsed.cateringTokensEnabled).toBe(true);
+    expect(parsed.cateringTokenItems).toEqual(['1x Bratwurst', '1x Mineral']);
+    expect(parsed.cateringEarlyHours).toBe(3);
+  });
+});
