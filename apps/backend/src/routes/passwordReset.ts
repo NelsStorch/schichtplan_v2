@@ -1,7 +1,7 @@
 /**
  * «Passwort vergessen» für Konten mit E-Mail und Passwort.
  *
- * 1. POST /api/auth/password-reset/request {email}: schickt einen Link (2 Stunden gültig) an die
+ * 1. POST /api/auth/password-reset/request {email}: schickt einen Link (1 Stunde gültig) an die
  *    Adresse, falls es dazu ein Passwort-Konto gibt. Die Antwort ist immer gleich, damit sich nicht
  *    herausfinden lässt, welche E-Mails ein Konto haben.
  * 2. POST /api/auth/password-reset/confirm {token, password}: setzt das neue Passwort. Danach gelten
@@ -20,7 +20,7 @@ import { RATE_LIMIT_ERROR } from '../services/nicknameLogin.js';
 import { getLoginPortalBaseUrl } from '../services/authSession.js';
 import { trackUsage } from '../services/usageStats.js';
 
-export const PASSWORD_RESET_TTL_HOURS = 2;
+export const PASSWORD_RESET_TTL_HOURS = 1;
 
 /** Höchstens 10 Anfragen pro IP und Stunde (gegen Mail-Bomben) */
 const requestsByIp = createRateLimiter(60 * 60 * 1000, 10);
@@ -42,7 +42,7 @@ const passwordResetRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['Auth'],
         summary: 'Link zum Zurücksetzen des Passworts anfordern',
         description:
-          'Sendet einen Link zum Zurücksetzen des Passworts an die angegebene E-Mail-Adresse (2 Stunden gültig). Aus Sicherheitsgründen ist die Antwort stets identisch, unabhängig davon, ob ein Passwort-Konto existiert.',
+          'Sendet einen Link zum Zurücksetzen des Passworts an die angegebene E-Mail-Adresse (1 Stunde gültig). Aus Sicherheitsgründen ist die Antwort stets identisch, unabhängig davon, ob ein Passwort-Konto existiert.',
         body: RequestPasswordResetSchema,
       },
     },
