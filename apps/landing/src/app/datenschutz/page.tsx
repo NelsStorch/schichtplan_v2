@@ -492,6 +492,11 @@ export default async function DatenschutzPage() {
                 "Gewählte Ansicht eines Anlasses",
                 "bis du es löschst",
               ],
+              [
+                "schichtplan.pwa_install_dismissed",
+                "Merkt sich, wenn der Installationshinweis für die App («Zum Home-Bildschirm») weggeklickt wurde",
+                "14 Tage",
+              ],
             ]}
           />
           <p>
