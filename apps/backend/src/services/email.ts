@@ -276,9 +276,12 @@ function replaceUntilStable(input: string, pattern: RegExp, replacement: string)
 
 /** Macht Werte für Logzeilen unschädlich (keine Zeilenumbrüche/Steuerzeichen, kein Log-Spoofing). */
 function safeLog(value: unknown): string {
-  return String(value ?? '')
-    .replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ')
-    .slice(0, 500);
+  let out = '';
+  for (const ch of String(value ?? '').slice(0, 500)) {
+    const code = ch.charCodeAt(0);
+    out += code < 0x20 || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : ch;
+  }
+  return out;
 }
 
 /**
