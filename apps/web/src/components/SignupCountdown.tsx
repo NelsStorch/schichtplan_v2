@@ -24,7 +24,8 @@ export function SignupCountdown({
   autoReload = true,
   reloadShiftId,
 }: SignupCountdownProps) {
-  const [diff, setDiff] = useState<number>(() => new Date(opensAt).getTime() - Date.now());
+  const [diff, setDiff] = useState<number | null>(null);
+  // Erst nach dem Mount berechnen: Date.now() waere sonst auf Server und Client verschieden (Hydration-Fehler #418)
   const hasTriggeredRef = useRef(false);
   const reloadShiftIdRef = useRef(reloadShiftId);
   reloadShiftIdRef.current = reloadShiftId;
@@ -126,6 +127,10 @@ export function SignupCountdown({
       if (reloadTimerId !== null) clearTimeout(reloadTimerId);
     };
   }, [opensAt, onOpen, autoReload]);
+
+  if (diff === null) {
+    return <span className={cn('inline-block min-h-[1em]', className)} aria-hidden="true" />;
+  }
 
   if (diff <= 0) {
     if (compact) {
