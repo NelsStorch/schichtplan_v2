@@ -14,6 +14,7 @@ import { hashResetToken } from './passwordReset.js';
 import { getLoginPortalBaseUrl } from '../services/authSession.js';
 import { toCeviDbStufeDto } from '../services/homeDepartment.js';
 import { recordAdminAction } from '../services/adminAudit.js';
+import { trackUsage } from '../services/usageStats.js';
 
 const ListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -344,6 +345,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: request.params.id },
         select: {
           ...userSelect,
+          totpEnabledAt: true,
           hitobitoStufen: true,
           organizedEvents: {
             select: {
@@ -395,6 +397,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       const detail: AdminUserDetailDto = {
         ...toListItem(user),
+        twoFactorEnabled: Boolean(user.totpEnabledAt),
         stufen: user.hitobitoStufen
           .map(toCeviDbStufeDto)
           .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.groupName.localeCompare(b.groupName, 'de')),
@@ -579,6 +582,52 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return { resetUrl, expiresAt: expiresAt.toISOString() };
+    }
+  );
+
+  // Zwei-Faktor zurücksetzen, wenn jemand Handy und Wiederherstellungscodes verloren hat
+  fastify.post<{ Params: { id: string } }>(
+    '/api/admin/users/:id/2fa/reset',
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Zwei-Faktor-Anmeldung zurücksetzen (Admin)',
+        description:
+          'Schaltet die Zwei-Faktor-Anmeldung einer Person aus (Secret und Wiederherstellungscodes werden gelöscht). Nur nach Prüfung der Identität verwenden.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID des Benutzers'),
+        }),
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
+    async (request, reply) => {
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, email: true, firstName: true, lastName: true, nickname: true, totpEnabledAt: true },
+      });
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+      if (!user.totpEnabledAt) return reply.status(400).send({ error: 'Die Person hat keine Zwei-Faktor-Anmeldung eingeschaltet.' });
+
+      await fastify.prisma.$transaction([
+        fastify.prisma.user.update({
+          where: { id: user.id },
+          data: { totpSecret: null, totpPendingSecret: null, totpEnabledAt: null, totpLastStep: null, totpOnProviderLogin: false },
+        }),
+        fastify.prisma.twoFactorRecoveryCode.deleteMany({ where: { userId: user.id } }),
+      ]);
+
+      const name = user.nickname ? `${user.nickname} (${user.firstName} ${user.lastName})` : `${user.firstName} ${user.lastName}`;
+      await recordAdminAction(fastify.prisma, request, {
+        action: 'USER_TWO_FACTOR_RESET',
+        targetType: 'USER',
+        targetId: user.id,
+        targetLabel: name,
+        details: { email: user.email, enabledAt: user.totpEnabledAt.toISOString() },
+      });
+      trackUsage('TWO_FACTOR', { dim: 'ADMIN_RESET' });
+
+      return { success: true };
     }
   );
 

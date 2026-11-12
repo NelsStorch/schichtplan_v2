@@ -22,6 +22,7 @@ import {
   Input,
   NotificationSettings,
   PasswordSettings,
+  TwoFactorSettings,
   ThemeToggle,
   buttonClasses,
   useConfirm,
@@ -368,6 +369,7 @@ export default function ProfilePage() {
             </form>
 
             <PasswordSettings user={user} onUserChange={setUser} />
+            <TwoFactorSettings user={user} onUserChange={setUser} />
 
             <section className="rounded-card border border-line bg-surface p-5">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-subtle">

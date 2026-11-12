@@ -18,6 +18,7 @@ import {
 import { trackUsage } from '../services/usageStats.js';
 import { accessFrom } from '../services/permissions.js';
 import { createRateLimiter } from '../services/rateLimit.js';
+import { isTwoFactorConfigured } from '../services/twoFactor.js';
 
 /** Passwort-Login: höchstens 30 Fehlversuche pro IP in 10 Minuten, 10 pro E-Mail in 15 Minuten */
 export const loginFailuresByIp = createRateLimiter(10 * 60 * 1000, 30);
@@ -278,7 +279,7 @@ export async function loadUserDto(
       memberships: tenantId ? { where: { departmentId: tenantId } } : { take: 0 },
       homeDepartment: { select: { id: true, name: true, slug: true, organization: true } },
       stufen: { include: { stufe: { select: { name: true, departmentId: true, sortOrder: true } } } },
-      _count: { select: { pushSubscriptions: true } },
+      _count: { select: { pushSubscriptions: true, twoFactorRecoveryCodes: { where: { usedAt: null } } } },
     },
   });
   if (!user) return null;
@@ -303,6 +304,14 @@ export async function loadUserDto(
     hasProviderAuth: Boolean(user.providerId),
     hasCeviDb: Boolean(user.providerId && user.provider === 'CEVI'),
     hasPassword: Boolean(user.passwordHash),
+    twoFactor: {
+      available: Boolean(user.passwordHash || user.providerId),
+      configured: isTwoFactorConfigured(),
+      enabled: Boolean(user.totpEnabledAt),
+      enabledAt: user.totpEnabledAt ? user.totpEnabledAt.toISOString() : null,
+      onProviderLogin: Boolean(user.totpEnabledAt && user.totpOnProviderLogin),
+      recoveryCodesLeft: user.totpEnabledAt ? user._count.twoFactorRecoveryCodes : 0,
+    },
     emailVerified: user.emailVerified,
     canSelfDelete: Boolean(user.providerId !== null || user.passwordHash !== null),
     homeDepartment: user.homeDepartment,

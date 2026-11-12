@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Building2, CalendarClock, GitMerge, History, KeyRound, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowUpRight, Building2, CalendarClock, GitMerge, History, KeyRound, Mail, ShieldCheck, Phone, Plus, Trash2, Users } from 'lucide-react';
 import {
   Avatar,
   Badge,
@@ -220,6 +220,29 @@ export function UserDialog({
       });
     } finally {
       setGeneratingReset(false);
+    }
+  };
+  const [resettingTwoFactor, setResettingTwoFactor] = useState(false);
+
+  const handleResetTwoFactor = async () => {
+    if (!user?.id) return;
+    const ok = await confirm({
+      title: 'Zwei-Faktor zurücksetzen?',
+      description:
+        'Die Person kann sich danach wieder nur mit Passwort bzw. Verbands-Login anmelden und muss 2FA neu einrichten. Prüfe vorher, dass die Anfrage wirklich von ihr kommt.',
+      confirmLabel: 'Zurücksetzen',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setResettingTwoFactor(true);
+    try {
+      await api(`/api/admin/users/${user.id}/2fa/reset`, { method: 'POST' });
+      toast({ tone: 'success', title: 'Zwei-Faktor zurückgesetzt' });
+      setReload((n) => n + 1);
+    } catch (err) {
+      toast({ tone: 'error', title: 'Zurücksetzen fehlgeschlagen', description: errorMessage(err) });
+    } finally {
+      setResettingTwoFactor(false);
     }
   };
   const [saving, setSaving] = useState(false);
@@ -631,6 +654,21 @@ export function UserDialog({
                       Erstellt einen Notfall-Einmallink zur direkten Neuvergabe des Passworts.
                     </span>
                   </div>
+                </Fact>
+                <Fact label="Zwei-Faktor" wide>
+                  {detail?.twoFactorEnabled ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-accent-ink">
+                        <ShieldCheck className="size-3.5" aria-hidden /> Eingeschaltet
+                      </span>
+                      <Button size="sm" variant="secondary" onClick={handleResetTwoFactor} disabled={resettingTwoFactor}>
+                        {resettingTwoFactor ? 'Wird zurückgesetzt …' : 'Zurücksetzen'}
+                      </Button>
+                      <span className="text-xs text-fg-subtle">Nur wenn Handy und Wiederherstellungscodes verloren sind.</span>
+                    </div>
+                  ) : (
+                    <span className="text-fg-muted">Aus</span>
+                  )}
                 </Fact>
                 <Fact label="Registriert">{formatDateTime(user.createdAt)}</Fact>
                 <Fact label="Zuletzt aktiv">{formatLastSeen(user.lastSeenOn)}</Fact>

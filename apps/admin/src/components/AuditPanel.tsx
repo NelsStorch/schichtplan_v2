@@ -47,6 +47,7 @@ const actionLabels: Record<string, string> = {
   USER_DELETE: 'Konto gelöscht',
   USER_BATCH_DELETE: 'Stapellöschung von Konten',
   USER_PASSWORD_RESET_LINK_GENERATE: 'Notfall-Reset-Link erstellt',
+  USER_TWO_FACTOR_RESET: 'Zwei-Faktor zurückgesetzt',
   DEPARTMENT_STUFEN_SYNC: 'Stufen mit Cevi.DB abgeglichen',
 };
 
@@ -131,6 +132,8 @@ function summary(entry: AdminAuditEntryDto): string | null {
       return `${d.deletedCount ?? 0} Konten gelöscht`;
     case 'USER_PASSWORD_RESET_LINK_GENERATE':
       return `Reset-Link für ${d.targetEmail ?? 'Konto'} erstellt`;
+    case 'USER_TWO_FACTOR_RESET':
+      return typeof d.email === 'string' ? d.email : null;
     case 'DEPARTMENT_STUFEN_SYNC':
       return `${d.createdCount ?? 0} Stufen synchronisiert`;
     default:

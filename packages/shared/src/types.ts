@@ -308,6 +308,8 @@ export interface UserDto {
   hasCeviDb?: boolean;
   /** Konto hat ein Passwort (E-Mail/Passwort-Login) */
   hasPassword?: boolean;
+  /** Zwei-Faktor-Anmeldung (Authenticator-App) */
+  twoFactor?: TwoFactorStatusDto;
   /** E-Mail-Adresse wurde bestätigt */
   emailVerified?: boolean;
   /** Darf das Konto selbst löschen (Cevi.DB- oder Passwort-Account) */
@@ -835,6 +837,8 @@ export interface AdminUserDetailDto extends AdminUserListItemDto {
   organizedEvents: AdminUserOrganizerDto[];
   /** Die neusten Eintragungen (maximal 50) */
   signups: AdminUserSignupDto[];
+  /** Zwei-Faktor-Anmeldung eingeschaltet */
+  twoFactorEnabled?: boolean;
 }
 
 export interface AdminOverviewDto {
@@ -1193,4 +1197,18 @@ export interface BulkShiftsResultDto {
   updated: number;
   /** Schichten, die nicht geändert wurden, mit Grund */
   skipped: { id: string; title: string | null; reason: string }[];
+}
+
+/** Stand der Zwei-Faktor-Anmeldung im eigenen Profil */
+export interface TwoFactorStatusDto {
+  /** Für dieses Konto möglich (Passwort oder Cevi.DB/Hitobito) */
+  available: boolean;
+  /** Auf dem Server eingerichtet (Schlüssel vorhanden) */
+  configured: boolean;
+  enabled: boolean;
+  enabledAt: string | null;
+  /** Auch beim Login über Cevi.DB/Hitobito nach dem Code fragen */
+  onProviderLogin: boolean;
+  /** Noch nicht verwendete Wiederherstellungscodes */
+  recoveryCodesLeft: number;
 }

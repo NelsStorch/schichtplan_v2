@@ -59,3 +59,4 @@ export { trackUi, usageOptedOut } from './stats/usage';
 export { UsageTracker } from './stats/UsageTracker';
 export { NotificationSettings, type NotificationSettingsProps } from './components/NotificationSettings';
 export { PasswordSettings, type PasswordSettingsProps } from './components/PasswordSettings';
+export { TwoFactorSettings, type TwoFactorSettingsProps } from './components/TwoFactorSettings';

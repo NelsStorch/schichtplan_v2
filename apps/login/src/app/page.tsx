@@ -377,6 +377,12 @@ function LoginContent() {
         return;
       }
 
+      // Zwei-Faktor eingeschaltet: Code aus der Authenticator-App auf eigener Seite abfragen
+      if (data.twoFactorRequired) {
+        window.location.href = withReturnTo('/zwei-faktor', returnTo);
+        return;
+      }
+
       setSuccess(
         authMode === 'login'
           ? 'Angemeldet. Du wirst weitergeleitet …'

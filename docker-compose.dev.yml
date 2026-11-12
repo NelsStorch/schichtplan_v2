@@ -30,6 +30,8 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan}:${DB_PASSWORD:-cevi_schichtplan_dev_pw}@db:5432/${DB_NAME:-cevi_schichtplan_dev}?schema=public
       JWT_SECRET: ${JWT_SECRET:-super-secret-development-key-min-32-chars}
+      # Schlüssel für die 2FA-Secrets (32 Byte, Base64 oder Hex). Leer: 2FA in Produktion aus, lokal abgeleitet
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       CORS_ORIGIN: "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
       CEVIDB_BASE_URL: ${CEVIDB_BASE_URL:-https://db.cevi.ch}
       CEVIDB_CLIENT_ID: ${CEVIDB_CLIENT_ID:-}

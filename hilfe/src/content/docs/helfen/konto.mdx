@@ -43,6 +43,28 @@ Auf der Profilseite verwaltest du dein persönliches Passwort:
 - **Konto mit Passwort:** Du kannst dein bisheriges Passwort jederzeit ändern (bisheriges Passwort eingeben, neues Passwort wählen).
 - **Konto mit Cevi.DB / MiData / Jubla-DB:** Du kannst dir ein **Fallback-Passwort** festlegen. Damit meldest du dich mit deiner E-Mail-Adresse und dem Passwort an, falls die Verbandsdatenbank vorübergehend nicht erreichbar sein sollte. Deine Schichten und Leitungsrechte bleiben voll erhalten.
 
+### Zwei-Faktor-Anmeldung
+
+Mit der Zwei-Faktor-Anmeldung fragt der Schichtplan beim Login zusätzlich nach einem 6-stelligen Code aus einer **Authenticator-App** auf deinem Handy. Es funktioniert jede App nach dem offenen Standard TOTP, zum Beispiel Google Authenticator, Microsoft Authenticator, Aegis, 2FAS, 1Password oder Bitwarden. Die Option gibt es für Konten mit Passwort oder Verbands-Login, nicht für Cevi-Name-Profile.
+
+So richtest du sie ein:
+
+1. Auf der Profilseite bei **Zwei-Faktor-Anmeldung** auf <Btn variant="secondary">Einrichten</Btn> tippen. Hast du ein Passwort, gibst du es zur Bestätigung ein.
+2. In der Authenticator-App ein neues Konto hinzufügen und den QR-Code scannen (oder den Schlüssel abtippen).
+3. Den Code aus der App eingeben und <Btn variant="primary">Einschalten</Btn>.
+4. Die **10 Wiederherstellungscodes** sicher aufbewahren, zum Beispiel im Passwort-Manager oder ausgedruckt. Sie werden nur dieses eine Mal angezeigt.
+
+**Wann wird nach dem Code gefragt?**
+
+- **Anmeldung mit Passwort** (auch das Fallback-Passwort): immer.
+- **Anmeldung mit Cevi.DB / MiData / Jubla-DB**: standardmässig nicht, nur wenn du den Schalter **Auch beim Login über … nach dem Code fragen** einschaltest. Die Verbandsdatenbank hat eine eigene Zwei-Faktor-Anmeldung. Ist sie dort schon eingeschaltet, brauchst du den Schalter hier nicht.
+
+Ausschalten, den Schalter ändern oder neue Wiederherstellungscodes erzeugen geht nur mit einem aktuellen Code. Wer kurz an deinem offenen Gerät sitzt, kann die Zwei-Faktor-Anmeldung also nicht einfach abschalten.
+
+:::caution[Handy verloren?]
+Melde dich mit einem Wiederherstellungscode an (auf der Code-Seite **Wiederherstellungscode verwenden**). Jeder Code funktioniert einmal. Erstelle danach im Profil neue Codes. Sind auch die Codes weg, wende dich an die [Kontaktadresse](/wissen/kontakt/). Nach einer Prüfung kann die Zwei-Faktor-Anmeldung zurückgesetzt werden.
+:::
+
 ### Benachrichtigungen & Erinnerungen
 
 Sowohl im **Konto-Fenster** als auch auf der **Profilseite** (`/profil`) stellst du ein, wie und wann du erinnert werden möchtest:

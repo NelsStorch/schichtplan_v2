@@ -16,6 +16,7 @@ import {
 } from '../../services/nicknameLogin.js';
 import { trackUsage } from '../../services/usageStats.js';
 import { createRateLimiter } from '../../services/rateLimit.js';
+import { needsSecondFactor, setChallengeCookie } from '../../services/twoFactor.js';
 
 import {
   loginFailuresByIp,
@@ -68,7 +69,15 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const user = await fastify.prisma.user.findUnique({
       where: { email: emailKey },
-      select: { id: true, email: true, passwordHash: true, emailVerified: true, isGlobalAdmin: true },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        emailVerified: true,
+        isGlobalAdmin: true,
+        totpEnabledAt: true,
+        totpOnProviderLogin: true,
+      },
     });
 
     // Auch ohne Konto ein Passwort prüfen: sonst verriete die Antwortzeit, ob es die Adresse gibt
@@ -87,6 +96,12 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
         requiresVerification: true,
         email: user.email,
       });
+    }
+
+    // Mit Zwei-Faktor: noch kein Login, erst der Code aus der App (POST /api/auth/2fa/verify)
+    if (needsSecondFactor(user, 'password')) {
+      setChallengeCookie(reply, { uid: user.id, amr: 'password' });
+      return { twoFactorRequired: true };
     }
 
     const token = fastify.signAuthToken({

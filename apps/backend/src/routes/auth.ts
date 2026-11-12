@@ -3,6 +3,7 @@ import hitobitoAuthRoutes from './auth/hitobito.js';
 import nicknameAuthRoutes from './auth/nickname.js';
 import passwordAuthRoutes from './auth/password.js';
 import accountRoutes from './auth/account.js';
+import twoFactorRoutes from './auth/twoFactor.js';
 
 export { hashVerificationToken } from './auth/password.js';
 
@@ -15,6 +16,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(nicknameAuthRoutes);
   await fastify.register(passwordAuthRoutes);
   await fastify.register(accountRoutes);
+  await fastify.register(twoFactorRoutes);
 };
 
 export default authRoutes;

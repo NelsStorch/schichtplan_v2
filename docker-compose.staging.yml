@@ -30,6 +30,8 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${DB_USER:-cevi_schichtplan_dev}:${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}@db:5432/${DB_NAME:-cevi_schichtplan_dev}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET muss in .env gesetzt sein}
+      # Schlüssel für die 2FA-Secrets (32 Byte, Base64 oder Hex). Leer: 2FA in Produktion aus, lokal abgeleitet
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       DOMAIN: ${DOMAIN_DEV:-dev.cevi-schichtplan.ch}
       COOKIE_DOMAIN: .${DOMAIN_DEV:-dev.cevi-schichtplan.ch}
       # Eigener Name: das Prod-Cookie "token" wird auch an *.dev.<domain> gesendet

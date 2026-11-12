@@ -187,6 +187,16 @@ model User {
   calendarToken       String?            @unique @map("calendar_token")
   /// Letzter Tag mit Nutzung (nur das Datum, ohne Uhrzeit). Höchstens ein Schreibzugriff pro Person und Tag (plugins/jwt.ts)
   lastSeenOn          DateTime?          @db.Date @map("last_seen_on")
+  /// Zwei-Faktor (TOTP, RFC 6238): Secret AES-256-GCM-verschlüsselt (services/twoFactor.ts), nie im Klartext
+  totpSecret          String?            @map("totp_secret")
+  /// Secret während der Einrichtung, bis der erste Code bestätigt ist
+  totpPendingSecret   String?            @map("totp_pending_secret")
+  /// Gesetzt = 2FA aktiv. Gilt immer beim Passwort-Login.
+  totpEnabledAt       DateTime?          @map("totp_enabled_at")
+  /// Zuletzt verwendeter TOTP-Zeitschritt (gegen das erneute Verwenden desselben Codes)
+  totpLastStep        Int?               @map("totp_last_step")
+  /// 2FA auch beim Login über Cevi.DB/Hitobito verlangen (sonst nur beim Passwort-Login)
+  totpOnProviderLogin Boolean            @default(false) @map("totp_on_provider_login")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   homeDepartment Department?       @relation("UserHomeDepartment", fields: [homeDepartmentId], references: [id], onDelete: SetNull)
@@ -200,6 +210,7 @@ model User {
   deregistrations EventDeregistration[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
+  twoFactorRecoveryCodes  TwoFactorRecoveryCode[]
   contactForEvents        Event[]            @relation("EventContactUser")
   contactForDepartments   Department[]       @relation("DepartmentContactUser")
   shiftResponsibles       ShiftResponsible[]
@@ -743,6 +754,19 @@ model DepartmentAuditLog {
 }
 
 /// Abgemeldete Login-Tokens (jti): gelten bis zu ihrem Ablauf nicht mehr. Abgelaufene werden beim Abmelden gelöscht.
+/// Wiederherstellungscodes für 2FA (je einmal verwendbar). In der DB nur der SHA-256-Hash.
+model TwoFactorRecoveryCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("two_factor_recovery_codes")
+}
+
 model RevokedToken {
   jti       String   @id
   expiresAt DateTime @map("expires_at")

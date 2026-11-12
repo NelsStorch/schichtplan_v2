@@ -20,6 +20,7 @@ import {
   Input,
   NotificationSettings,
   PasswordSettings,
+  TwoFactorSettings,
   buttonClasses,
   useConfirm,
   useOrganization,
@@ -269,6 +270,7 @@ export default function DepartmentProfilePage() {
             </form>
 
             <PasswordSettings user={user} onUserChange={setUser} />
+            <TwoFactorSettings user={user} onUserChange={setUser} />
 
             <section className="rounded-card border border-line bg-surface p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
