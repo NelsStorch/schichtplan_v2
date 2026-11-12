@@ -13,7 +13,7 @@ COPY packages/shared/src/organizations.ts /app/packages/shared/src/organizations
 COPY hilfe ./
 RUN npm run build
 
-FROM nginx:1.29-alpine AS runner
+FROM nginx:1.31-alpine AS runner
 COPY --from=builder /app/hilfe/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/hilfe/dist /usr/share/nginx/html
 EXPOSE 3004
