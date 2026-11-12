@@ -258,7 +258,12 @@ export function normalizeUsageDim(metric: UsageMetricKey, dim: string | null | u
   const def: UsageMetricDef = USAGE_METRICS[metric];
   if (def.dims) return dim && Object.prototype.hasOwnProperty.call(def.dims, dim) ? dim : null;
   if (def.openDim) {
-    const clean = (dim ?? '').trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+    const raw = (dim ?? '').trim().toLowerCase();
+    let from = 0;
+    let to = raw.length;
+    while (from < to && raw[from] === '/') from++;
+    while (to > from && raw[to - 1] === '/') to--;
+    const clean = raw.slice(from, to);
     if (clean === '') return 'index';
     return STATS_OPEN_DIM_PATTERN.test(clean) && !clean.includes('//') ? clean : null;
   }

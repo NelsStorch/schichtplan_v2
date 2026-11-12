@@ -588,7 +588,9 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     const password = typeof (request.body as any)?.password === 'string' ? (request.body as any).password : '';
     const user = await fastify.prisma.user.findUnique({ where: { id: link.userId } });
-    if (!user?.passwordHash || !password || !(await bcrypt.compare(password, user.passwordHash))) {
+    // Der Vergleich läuft immer über bcrypt; ein leeres Passwort oder fehlender Hash zählt nur als Fehlversuch
+    const passwordOk = user?.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
+    if (!user || !passwordOk || !password) {
       link.failedAttempts++;
       if (link.failedAttempts >= MAX_LINK_ATTEMPTS) {
         pendingLinks.delete(token!);

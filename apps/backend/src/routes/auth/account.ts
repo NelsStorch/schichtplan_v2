@@ -14,6 +14,10 @@ import {
 } from '../../services/homeDepartment.js';
 import { applyProfileUpdate } from '../../services/profileUpdate.js';
 import { trackUsage } from '../../services/usageStats.js';
+import { createRateLimiter } from '../../services/rateLimit.js';
+
+/** Bremse gegen das Durchprobieren des aktuellen Passworts bei der Passwort-Änderung (pro Konto) */
+const passwordChangeFailures = createRateLimiter(15 * 60 * 1000, 10);
 
 import {
   loadUserDto,
@@ -111,8 +115,15 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
             code: 'CURRENT_PASSWORD_REQUIRED',
           });
         }
+        if (passwordChangeFailures.isBlocked(user.id)) {
+          return reply.status(429).send({
+            error: 'Zu viele Versuche. Bitte warte ein paar Minuten.',
+            code: 'RATE_LIMITED',
+          });
+        }
         const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
         if (!matches) {
+          passwordChangeFailures.hit(user.id);
           return reply.status(401).send({
             error: 'Das aktuelle Passwort ist nicht korrekt.',
             code: 'CURRENT_PASSWORD_WRONG',

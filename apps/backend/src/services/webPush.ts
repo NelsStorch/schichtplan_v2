@@ -33,16 +33,22 @@ export interface PushSubscriptionKeys {
 const PUSH_SERVICE_HOSTS = ['fcm.googleapis.com', 'android.googleapis.com'];
 const PUSH_SERVICE_SUFFIXES = ['.push.services.mozilla.com', '.push.apple.com', '.notify.windows.com'];
 
-export function isAllowedPushEndpoint(endpoint: string): boolean {
+/** Liefert die geprüfte, normalisierte Push-Adresse oder null, wenn der Host kein bekannter Push-Dienst ist */
+export function parseAllowedPushEndpoint(endpoint: string): URL | null {
   let url: URL;
   try {
     url = new URL(endpoint);
   } catch {
-    return false;
+    return null;
   }
-  if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
   const host = url.hostname.toLowerCase();
-  return PUSH_SERVICE_HOSTS.includes(host) || PUSH_SERVICE_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  const allowed = PUSH_SERVICE_HOSTS.includes(host) || PUSH_SERVICE_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  return allowed ? url : null;
+}
+
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  return parseAllowedPushEndpoint(endpoint) !== null;
 }
 
 interface VapidKeys {
@@ -248,13 +254,14 @@ export async function sendPushNotification(
   ttlSeconds = 86_400,
 ): Promise<SendPushResult> {
   // Auch bei älteren Abos prüfen (vorher liess sich jede Adresse speichern); «gone» räumt sie weg
-  if (!isAllowedPushEndpoint(sub.endpoint)) {
+  const endpointUrl = parseAllowedPushEndpoint(sub.endpoint);
+  if (!endpointUrl) {
     return { ok: false, status: 410, gone: true, errorText: 'Push-Endpoint nicht erlaubt' };
   }
   const body = encryptWebPushPayload(JSON.stringify(payload), sub.p256dh, sub.auth);
-  const authorization = createVapidAuthorizationHeader(sub.endpoint);
+  const authorization = createVapidAuthorizationHeader(endpointUrl.href);
 
-  const response = await fetch(sub.endpoint, {
+  const response = await fetch(endpointUrl.href, {
     method: 'POST',
     headers: {
       Authorization: authorization,

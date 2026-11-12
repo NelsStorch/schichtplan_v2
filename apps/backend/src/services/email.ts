@@ -219,21 +219,83 @@ function getDefaultGreeting(orgSlug: string): string {
   }
 }
 
+/** Entfernt alle Blöcke `<tag ...> ... </tag ...>` samt Inhalt (linear, ohne Regex-Backtracking). */
+function stripBlocks(html: string, tag: string): string {
+  const lower = html.toLowerCase();
+  const open = `<${tag}`;
+  const close = `</${tag}`;
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const a = lower.indexOf(open, pos);
+    if (a === -1) break;
+    // «<headline» ist kein <head>: nach dem Tag-Namen muss ein Trennzeichen folgen
+    const next = lower.charAt(a + open.length);
+    if (next !== '>' && next !== '/' && !/\s/.test(next)) {
+      out += html.slice(pos, a + open.length);
+      pos = a + open.length;
+      continue;
+    }
+    out += html.slice(pos, a);
+    const b = lower.indexOf(close, a + open.length);
+    if (b === -1) {
+      pos = html.length;
+      break;
+    }
+    const e = lower.indexOf('>', b + close.length);
+    pos = e === -1 ? html.length : e + 1;
+  }
+  return out + html.slice(pos);
+}
+
+/** Entfernt HTML-Kommentare `<!-- ... -->` (linear; ein nicht geschlossener Kommentar reicht bis zum Ende). */
+function stripComments(html: string): string {
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const a = html.indexOf('<!--', pos);
+    if (a === -1) break;
+    out += html.slice(pos, a);
+    const b = html.indexOf('-->', a + 4);
+    if (b === -1) return out;
+    pos = b + 3;
+  }
+  return out + html.slice(pos);
+}
+
+/** Wendet eine Ersetzung wiederholt an, bis sich nichts mehr ändert (gegen verschachtelte Muster wie `<<b>b>`). */
+function replaceUntilStable(input: string, pattern: RegExp, replacement: string): string {
+  let prev: string;
+  let cur = input;
+  do {
+    prev = cur;
+    cur = cur.replace(pattern, replacement);
+  } while (cur !== prev);
+  return cur;
+}
+
+/** Macht Werte für Logzeilen unschädlich (keine Zeilenumbrüche/Steuerzeichen, kein Log-Spoofing). */
+function safeLog(value: unknown): string {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ')
+    .slice(0, 500);
+}
+
 /**
  * Konvertiert HTML-Mails sauber in reinen Text (ohne CSS-Blöcke, XML oder HTML-Entities).
  * Verhindert hohe SpamAssassin-Scores (MPART_ALT_DIFF).
  */
 export function htmlToPlainText(html: string): string {
-  return html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<head[\s\S]*?<\/head>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
+  let text = stripComments(html);
+  text = stripBlocks(text, 'head');
+  text = stripBlocks(text, 'style');
+  text = stripBlocks(text, 'script');
+  text = text
     .replace(/<div[^>]*mso-hide:\s*all[^>]*>[\s\S]*?<\/div>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|h1|h2|h3|tr|li)>/gi, '\n')
-    .replace(/<td[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<td[^>]*>/gi, ' ');
+  return replaceUntilStable(text, /<[^<>]*>/g, '')
     .replace(/&zwnj;/gi, '')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&bull;/gi, '•')
@@ -736,11 +798,11 @@ export async function sendEmail({
   }
 
   if (!smtpConfig.pass) {
-    console.warn(`\n[Mail-Dev / Mock] Kein SMTP_PASSWORD für ${orgType} gesetzt. E-Mail wird geloggt:`);
-    console.warn(`Von:       ${formattedFrom}`);
-    console.warn(`Empfänger: ${to}`);
-    console.warn(`Betreff:   ${finalSubject}`);
-    console.warn(`Text:      ${plainText}\n`);
+    console.warn('\n[Mail-Dev / Mock] Kein SMTP_PASSWORD für %s gesetzt. E-Mail wird geloggt:', safeLog(orgType));
+    console.warn('Von:       %s', safeLog(formattedFrom));
+    console.warn('Empfänger: %s', safeLog(to));
+    console.warn('Betreff:   %s', safeLog(finalSubject));
+    console.warn('Text:      %s\n', safeLog(plainText));
     return true; // Im Dev-Modus ohne SMTP als Erfolg werten, damit Flows getestet werden können
   }
 
@@ -762,11 +824,11 @@ export async function sendEmail({
           }
         : undefined,
     });
-    console.log(`[Mail (${orgType})] Gesendet an ${to} (ID: ${info.messageId})`);
+    console.log('[Mail (%s)] Gesendet an %s (ID: %s)', safeLog(orgType), safeLog(to), safeLog(info.messageId));
     trackUsage('MAIL_SENT', { dim: kind });
     return true;
   } catch (error) {
-    console.error(`[Mail (${orgType})] Fehler beim Senden an ${to}:`, error);
+    console.error('[Mail (%s)] Fehler beim Senden an %s:', safeLog(orgType), safeLog(to), error);
     trackUsage('MAIL_FAILED', { dim: kind });
     return false;
   }

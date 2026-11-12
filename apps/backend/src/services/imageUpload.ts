@@ -17,11 +17,31 @@ export function detectImageType(buf: Buffer): ImageMime | null {
   }
   if (startsWith(buf, [0x52, 0x49, 0x46, 0x46]) && startsWith(buf, [0x57, 0x45, 0x42, 0x50], 8)) return 'image/webp';
   // SVG ist Text: <svg muss im Kopf des Dokuments stehen (nach BOM, XML-Deklaration, Kommentaren)
-  const head = buf.subarray(0, 2048).toString('utf8').replace(/^﻿/, '');
-  if (/^\s*(<\?xml[^>]*\?>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE\s+svg[^>]*>\s*)?<svg[\s>]/i.test(head)) {
-    return 'image/svg+xml';
+  const head = buf.subarray(0, 2048).toString('utf8');
+  return startsWithSvgRoot(head) ? 'image/svg+xml' : null;
+}
+
+/** Prüft linear (ohne verschachtelte Regex-Wiederholungen), ob das Dokument mit <svg beginnt */
+function startsWithSvgRoot(text: string): boolean {
+  let rest = text.replace(/^﻿/, '').trimStart();
+  for (;;) {
+    if (rest.startsWith('<?')) {
+      const end = rest.indexOf('?>');
+      if (end === -1) return false;
+      rest = rest.slice(end + 2).trimStart();
+    } else if (rest.startsWith('<!--')) {
+      const end = rest.indexOf('-->');
+      if (end === -1) return false;
+      rest = rest.slice(end + 3).trimStart();
+    } else if (/^<!DOCTYPE\s/i.test(rest)) {
+      const end = rest.indexOf('>');
+      if (end === -1) return false;
+      rest = rest.slice(end + 1).trimStart();
+    } else {
+      break;
+    }
   }
-  return null;
+  return /^<svg[\s>]/i.test(rest);
 }
 
 const UNSAFE_SVG: [RegExp, string][] = [
