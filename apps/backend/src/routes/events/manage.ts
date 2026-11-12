@@ -13,7 +13,7 @@ import {
 import {
   managerFlags,
 } from '../../services/eventAccess.js';
-import { resolveOrganizerUser } from '../../services/ceviNameLogin.js';
+import { resolveOrganizerUser } from '../../services/nicknameLogin.js';
 import { hasDepartmentPermission } from '../../services/permissions.js';
 import {
   UNRELATED_PERSON_ERROR,

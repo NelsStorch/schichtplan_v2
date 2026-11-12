@@ -11,7 +11,7 @@ import {
   getVocabulary,
 } from '@schichtplan/shared';
 import { autoCreateAllCeviDbDepartmentStufen, NO_HOME_CONFIRMATION } from '../../services/homeDepartment.js';
-import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../../services/ceviNameLogin.js';
+import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../../services/nicknameLogin.js';
 import { personLabel } from '../../services/profile.js';
 import { recordAdminAction } from '../../services/adminAudit.js';
 import { recordDepartmentAction, toDepartmentAuditDto } from '../../services/departmentAudit.js';

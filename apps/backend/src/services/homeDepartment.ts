@@ -6,7 +6,7 @@
  */
 import type { OrganizationType, PrismaClient } from '../db.js';
 import type { CeviDbStufeDto, StufeRole, UserStufeDto } from '@schichtplan/shared';
-import { placeCeviDbPerson, type CeviDbDerived, type CeviDbPlacement } from './cevidb.js';
+import { placeCeviDbPerson, type CeviDbDerived, type CeviDbPlacement } from './hitobito.js';
 
 type Db = Pick<
   PrismaClient,

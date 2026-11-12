@@ -14,7 +14,7 @@ import {
 } from '../services/homeDepartment.js';
 import {
   isCeviNameProfile,
-} from '../services/ceviNameLogin.js';
+} from '../services/nicknameLogin.js';
 import { trackUsage } from '../services/usageStats.js';
 import { accessFrom } from '../services/permissions.js';
 import { createRateLimiter } from '../services/rateLimit.js';

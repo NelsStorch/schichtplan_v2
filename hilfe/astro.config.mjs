@@ -117,7 +117,7 @@ export default defineConfig({
             'abteilung/stufen',
             'abteilung/personen',
             'abteilung/rechte',
-            'abteilung/cevidb',
+            'abteilung/hitobito',
             'abteilung/gruppen-und-rollen',
           ],
         },

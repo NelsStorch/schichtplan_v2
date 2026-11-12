@@ -12,7 +12,7 @@ import { personLabel } from '../../services/profile.js';
 import { UNRELATED_PERSON_ERROR, isDepartmentManager } from '../../services/departmentVisibility.js';
 import { canGrantPermissions, } from '../../services/permissions.js';
 import { recordDepartmentAction, toDepartmentAuditDto } from '../../services/departmentAudit.js';
-import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../../services/ceviNameLogin.js';
+import { CEVINAME_ROLE_ERROR, isCeviNameProfile } from '../../services/nicknameLogin.js';
 import { contactCandidateWhere, requireDepartmentPermission, canEditPerson, homeSource, canConfirmHome } from './shared.js';
 
 /** Personen der Abteilung: Rechte, Stufen, Zugehörigkeit, Protokoll, Mitglieder */

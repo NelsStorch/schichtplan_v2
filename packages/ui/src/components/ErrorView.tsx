@@ -17,7 +17,7 @@ import {
 import { cn } from '../utils/cn';
 import { Button, buttonClasses } from './Button';
 import { Badge } from './Badge';
-import { CeviLogo } from './CeviLogo';
+import { BrandLogo } from './BrandLogo';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { ORGANIZATIONS, getLandingUrl, getOrganization } from '@schichtplan/shared';
 import { useOrganizationSlug } from './OrganizationContext';
@@ -203,7 +203,7 @@ export function ErrorView({
           href={homeHref}
           className="group inline-flex items-center gap-3 transition hover:opacity-90 focus-visible:outline-none"
         >
-          <CeviLogo logoUrl={displayLogoUrl} size="sm" alt={orgName} />
+          <BrandLogo logoUrl={displayLogoUrl} size="sm" alt={orgName} />
           <div className="flex flex-col">
             <span className="font-display text-sm font-bold tracking-tight text-fg group-hover:text-accent-ink transition-colors">
               {departmentName || orgName}

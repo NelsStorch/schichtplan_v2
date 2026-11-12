@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveCeviDbFields, isDepartmentLeaderRole, parseCeviDbGroupId, placeCeviDbPerson } from './cevidb.js';
+import { deriveCeviDbFields, isDepartmentLeaderRole, parseCeviDbGroupId, placeCeviDbPerson } from './hitobito.js';
 import { missingProfileFields, personLabel } from './profile.js';
 
 const profile = {

@@ -26,7 +26,7 @@ import {
   useConfirm,
   useToast,
 } from '@schichtplan/ui';
-import { CeviLogo } from '@/components/CeviLogo';
+import { BrandLogo } from '@/components/BrandLogo';
 
 /** Antwort von GET /api/shifts/my (Schichten über alle Abteilungen) */
 interface CalendarTokenData {
@@ -220,7 +220,7 @@ export default function ProfilePage() {
       <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[420px] bg-campfire opacity-80" />
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-5 sm:px-6">
         <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-fg-muted transition hover:text-fg">
-          <ArrowLeft className="size-4" /> <CeviLogo className="size-7" /> Cevi Schichtplan
+          <ArrowLeft className="size-4" /> <BrandLogo className="size-7" /> Cevi Schichtplan
         </Link>
         <ThemeToggle />
       </header>

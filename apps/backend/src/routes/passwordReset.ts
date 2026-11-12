@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { RequestPasswordResetSchema, ResetPasswordSchema } from '@schichtplan/shared';
 import { sendPasswordResetEmail } from '../services/email.js';
 import { createRateLimiter } from '../services/rateLimit.js';
-import { RATE_LIMIT_ERROR } from '../services/ceviNameLogin.js';
+import { RATE_LIMIT_ERROR } from '../services/nicknameLogin.js';
 import { getLoginPortalBaseUrl } from '../services/authSession.js';
 import { trackUsage } from '../services/usageStats.js';
 

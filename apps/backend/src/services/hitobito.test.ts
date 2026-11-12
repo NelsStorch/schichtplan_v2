@@ -10,7 +10,7 @@ import {
   isDepartmentLeaderRole,
   isUnitRoleClass,
 } from '@schichtplan/shared';
-import { deriveCeviDbFields } from './cevidb.js';
+import { deriveCeviDbFields } from './hitobito.js';
 
 describe('Hitobito & Vokabular (Multi-Verband)', () => {
   describe('Vokabular-Definitionen', () => {

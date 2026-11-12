@@ -12,7 +12,7 @@ import {
   Flame,
 } from 'lucide-react';
 import type { OrganizationConfig } from '@schichtplan/shared';
-import { BrandLogo } from './CeviLogo';
+import { BrandLogo } from './BrandLogo';
 
 interface ConfettiPiece {
   id: number;

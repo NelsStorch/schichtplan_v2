@@ -3,7 +3,7 @@ import { CreateEventSchema, STAFF_PIN_MIN_LENGTH, UpdateEventSchema } from '@sch
 import { isAllowedPushEndpoint, purgeDisallowedPushSubscriptions } from './webPush.js';
 import { canChangeOwnEmail } from './profileUpdate.js';
 import { createRateLimiter } from './rateLimit.js';
-import { claimCeviNameAttempt, releaseCeviNameAttempt } from './ceviNameLogin.js';
+import { claimCeviNameAttempt, releaseCeviNameAttempt } from './nicknameLogin.js';
 import { tenantHeaderAllowed } from '../plugins/tenant.js';
 import { cateringBaseUrl } from '../routes/catering.js';
 

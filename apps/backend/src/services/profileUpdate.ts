@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from '../db.js';
 import { PLACEHOLDER_EMAIL_REGEX, type UpdateProfileInput } from '@schichtplan/shared';
-import { findCeviNameMatches, isCeviNameProfile } from './ceviNameLogin.js';
+import { findCeviNameMatches, isCeviNameProfile } from './nicknameLogin.js';
 
 /**
  * Darf die Person ihre E-Mail selbst setzen bzw. ändern? Wo noch keine echte steht immer. Eine selbst

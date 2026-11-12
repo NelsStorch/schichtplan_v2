@@ -1,6 +1,6 @@
 import { Lock, Calendar, Users } from 'lucide-react';
 import type { OrganizationConfig } from '@schichtplan/shared';
-import { BrandLogo } from './CeviLogo';
+import { BrandLogo } from './BrandLogo';
 
 export function SubdomainIsometricGraphic({
   className = '',

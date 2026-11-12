@@ -1,6 +1,6 @@
 import type { PrismaClient } from '../db.js';
 import { PLACEHOLDER_LAST_NAME } from '@schichtplan/shared';
-import { findCeviNameMatches, isCeviNameProfile } from './ceviNameLogin.js';
+import { findCeviNameMatches, isCeviNameProfile } from './nicknameLogin.js';
 
 type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 

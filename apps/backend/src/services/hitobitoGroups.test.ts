@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyBaseLogger } from 'fastify';
-import { parseCeviDbGroup, refreshCeviDbGroups } from './cevidbGroups.js';
+import { parseCeviDbGroup, refreshCeviDbGroups } from './hitobitoGroups.js';
 
 // Gekürzte echte Antworten von db.cevi.ch (Oktober 2026), Personendaten ersetzt
 const joschija = {

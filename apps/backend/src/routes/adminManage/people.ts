@@ -7,7 +7,7 @@ import {
   type AdminAuditListDto,
 } from '@schichtplan/shared';
 import { NO_HOME_CONFIRMATION } from '../../services/homeDepartment.js';
-import { isCeviNameProfile } from '../../services/ceviNameLogin.js';
+import { isCeviNameProfile } from '../../services/nicknameLogin.js';
 import { mergeUserInto } from '../../services/mergeProfiles.js';
 import { personLabel } from '../../services/profile.js';
 import { notifyAdminChange, recordAdminAction } from '../../services/adminAudit.js';

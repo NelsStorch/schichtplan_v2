@@ -7,7 +7,7 @@ Prüfen die wichtigsten Abläufe im echten Browser (Playwright, Chromium) gegen 
 | `login.spec.ts` | Login-Portal mit E-Mail und Passwort, falsches Passwort, kein offener Redirect |
 | `membersOnly.spec.ts` | Abteilung «Nur für Mitglieder»: ohne Anmeldung keine Anlässe, kein Arbeitskatalog |
 | `helperSignup.spec.ts` | Helfer*in trägt sich ein, sieht die Schicht in «Meine Schichten», trägt sich aus; ohne Anmeldung kein Eintragen |
-| `ceviName.spec.ts` | Cevi-Name-Profil anlegen und wieder anmelden, falsches Geburtsdatum |
+| `nickname.spec.ts` | Spitznamen-Profil anlegen und wieder anmelden, falsches Geburtsdatum |
 | `okArea.spec.ts` | Abteilungsleitung im OK-Bereich, Helfende ohne Rechte bekommen keine OK-Daten |
 
 Die Tests legen pro Lauf eigene Anlässe in der Zukunft an (Slug `e2e-…`) und löschen sie danach wieder.

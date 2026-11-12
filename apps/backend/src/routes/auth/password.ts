@@ -13,7 +13,7 @@ import {
 import { sendAccountExistsEmail, sendVerificationEmail } from '../../services/email.js';
 import {
   RATE_LIMIT_ERROR,
-} from '../../services/ceviNameLogin.js';
+} from '../../services/nicknameLogin.js';
 import { trackUsage } from '../../services/usageStats.js';
 import { createRateLimiter } from '../../services/rateLimit.js';
 

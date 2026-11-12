@@ -12,7 +12,7 @@ import {
 } from "@schichtplan/shared";
 import { ThemeToggle } from "@schichtplan/ui";
 import { getRequestOrigin } from "@schichtplan/ui/og";
-import { BrandLogo } from "@/components/CeviLogo";
+import { BrandLogo } from "@/components/BrandLogo";
 import { ContactReveal } from "./ContactReveal";
 
 export async function generateMetadata(): Promise<Metadata> {

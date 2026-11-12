@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasRights, isCeviNameProfile, pickCeviNameMatch } from './ceviNameLogin.js';
+import { hasRights, isCeviNameProfile, pickCeviNameMatch } from './nicknameLogin.js';
 
 type Match = Parameters<typeof pickCeviNameMatch>[0][number];
 

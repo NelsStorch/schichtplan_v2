@@ -52,6 +52,11 @@ server {
         return 301 /sitemap-index.xml;
     }
 
+    # Weiterleitung alter Cevi.DB-Dokupfad
+    location ~* ^/abteilung/cevidb/?$ {
+        return 301 /abteilung/hitobito/;
+    }
+
     location / {
         try_files $uri $uri/ $uri.html =404;
         add_header Cache-Control "public, max-age=300" always;

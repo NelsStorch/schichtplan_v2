@@ -12,14 +12,14 @@ import {
 } from 'lucide-react';
 import { helpUrl, statusUrl, getOrganization } from '@schichtplan/shared';
 import { getRequestOrigin } from '@schichtplan/ui/og';
-import { BrandLogo } from '@/components/CeviLogo';
+import { BrandLogo } from '@/components/BrandLogo';
 import { ThemeToggle, buttonClasses } from '@schichtplan/ui';
 import { CampfireBackground } from '@/components/CampfireBackground';
 import { Hero3DStage } from '@/components/Hero3DStage';
 import { ComparisonTable } from '@/components/ComparisonTable';
 import { Reveal } from '@/components/Reveal';
 import { StepsTimeline } from '@/components/StepsTimeline';
-import { CeviDbIsometricGraphic } from '@/components/CeviDbIsometricGraphic';
+import { HitobitoIsometricGraphic } from '@/components/HitobitoIsometricGraphic';
 import { SubdomainIsometricGraphic } from '@/components/SubdomainIsometricGraphic';
 import { MultiEventIsometricGraphic } from '@/components/MultiEventIsometricGraphic';
 import { MobilePwaIsometricGraphic } from '@/components/MobilePwaIsometricGraphic';
@@ -272,7 +272,7 @@ export default async function LandingPage() {
 
                     {/* Clean Visual */}
                     <div className="my-5">
-                      <CeviDbIsometricGraphic org={org} />
+                      <HitobitoIsometricGraphic org={org} />
                     </div>
 
                     <div className="pt-4 border-t border-line/80 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted">
