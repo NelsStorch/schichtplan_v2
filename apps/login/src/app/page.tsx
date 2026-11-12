@@ -708,15 +708,17 @@ function LoginContent() {
                 </ul>
 
                 {verbandLogins.length > 0 && (
-                  <p className="mt-5 text-xs leading-relaxed text-fg-subtle">
-                    Leitest du bei Cevi, Pfadi oder Jubla? Dann melde dich im Login deines Verbands an:{' '}
-                    {verbandLogins.map((v, i) => (
-                      <span key={v.org.slug}>
-                        {i > 0 && ' · '}
-                        <a href={v.href} className="font-semibold text-accent-ink hover:underline">
-                          {v.org.orgName} <span className="font-normal">({v.org.authProviderShort})</span>
-                        </a>
-                      </span>
+                  <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-fg-subtle">
+                    <span>Leitest du bei Cevi, Pfadi oder Jubla?</span>
+                    {verbandLogins.map((v) => (
+                      <a
+                        key={v.org.slug}
+                        href={v.href}
+                        title={`Login mit ${v.org.authProviderShort}`}
+                        className="rounded-full border border-line px-2 py-0.5 font-medium text-fg-muted transition hover:border-fg-subtle/40 hover:text-fg"
+                      >
+                        {v.org.orgName}
+                      </a>
                     ))}
                   </p>
                 )}

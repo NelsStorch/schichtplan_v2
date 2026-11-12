@@ -7,6 +7,7 @@ import {
   LifeBuoy,
   ShieldCheck,
   ChevronDown,
+  ArrowUpRight,
   Heart,
   Users,
 } from 'lucide-react';
@@ -153,19 +154,6 @@ export default async function LandingPage() {
                       {org.slug === 'verein' ? 'Du leitest einen Verein?' : `Du leitest eine ${org.orgName}-${org.unitTerm}?`}{' '}
                       <CreateDepartmentButton unitTerm={org.unitTerm} />
                     </div>
-                    {verbandLinks.length > 0 && (
-                      <div className="text-fg-subtle leading-relaxed">
-                        Gehörst du zu Cevi, Pfadi oder Jubla? In der Version deines Verbands meldest du dich mit deinem Verbandskonto an:{' '}
-                        {verbandLinks.map((v, i) => (
-                          <span key={v.org.slug}>
-                            {i > 0 && ' · '}
-                            <a href={v.href} className="font-semibold text-accent-ink hover:underline">
-                              {v.org.orgName}
-                            </a>
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   {/* Proof Points Strip */}
@@ -204,6 +192,46 @@ export default async function LandingPage() {
               </div>
             </div>
           </section>
+
+          {/* Nur neutrale Vereins-Seite: Weiche zu den Verbandsinstanzen mit eigenem Verbands-Login */}
+          {verbandLinks.length > 0 && (
+            <section aria-labelledby="verbaende-heading" className="py-12 md:py-16 border-t border-line/60 relative">
+              <div className="mx-auto max-w-6xl px-4">
+                <Reveal className="max-w-2xl">
+                  <h2
+                    id="verbaende-heading"
+                    className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-fg"
+                  >
+                    Bei Cevi, Pfadi oder Jubla? Dafür gibt es eigene Versionen.
+                  </h2>
+                  <p className="mt-3 text-base text-fg-muted leading-relaxed">
+                    Leitende melden sich dort direkt mit ihrem Verbandskonto an, Abteilung bzw. Schar und
+                    Leitungsrechte werden automatisch übernommen. Gleiche Funktionen, ebenfalls kostenlos.
+                  </p>
+                </Reveal>
+                <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                  {verbandLinks.map((v) => (
+                    <a
+                      key={v.org.slug}
+                      href={v.href}
+                      className="group flex items-start justify-between gap-4 rounded-card border border-line bg-surface/80 p-5 shadow-soft transition hover:border-fg-subtle/40 hover:bg-surface-2"
+                    >
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2">
+                          <span aria-hidden className="size-2.5 rounded-full" style={{ backgroundColor: v.org.primaryColor }} />
+                          <span className="font-display text-lg font-bold text-fg">{v.org.name}</span>
+                        </span>
+                        <span className="mt-1.5 block text-sm text-fg-muted">Für {v.org.targetGroup}</span>
+                        <span className="mt-0.5 block text-sm text-fg-subtle">Login mit {v.org.authProviderShort}</span>
+                        <span className="mt-3 block font-mono text-xs text-fg-subtle">{v.org.domain}</span>
+                      </span>
+                      <ArrowUpRight className="size-5 shrink-0 text-fg-subtle transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-fg" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* So funktioniert's: drei Schritte aus Sicht des OK */}
           <section id="so-funktionierts" className="scroll-mt-24 py-16 md:py-20 border-t border-line/60 relative">
