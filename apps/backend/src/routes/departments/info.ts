@@ -548,17 +548,38 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Person per E-Mail in die Abteilung / den Verein einladen
+  // Personen per E-Mail (Einzeladresse oder Liste) in die Abteilung / den Verein einladen
+  const emailValidator = z.string().email();
+  const extractEmails = (raw?: string, list?: string[]): string[] => {
+    const chunks = [...(raw ? raw.split(/[,;\n\r]+/) : []), ...(list ?? [])];
+    const out: string[] = [];
+    for (const chunk of chunks) {
+      const trimmed = chunk.trim();
+      if (!trimmed) continue;
+      const angle = trimmed.match(/<([^<>@\s]+@[^<>@\s]+)>/);
+      if (angle) {
+        out.push(angle[1].toLowerCase().trim());
+      } else {
+        for (const token of trimmed.split(/\s+/)) {
+          const clean = token.toLowerCase().trim();
+          if (clean) out.push(clean);
+        }
+      }
+    }
+    return [...new Set(out)];
+  };
+
   fastify.post(
     '/api/departments/current/invite',
     {
       schema: {
         tags: ['Abteilungen'],
-        summary: 'Person per E-Mail einladen',
-        description: 'Sendet eine E-Mail-Einladung mit dem geheimen Einladungs-Link.',
+        summary: 'Personen per E-Mail einladen',
+        description: 'Sendet E-Mail-Einladungen (Einzeladresse oder Liste) mit dem geheimen Einladungs-Link.',
         security: [{ bearerAuth: [] }],
         body: z.object({
-          email: z.string().trim().email('Bitte eine gültige E-Mail-Adresse angeben.'),
+          email: z.string().trim().max(4000).optional(),
+          emails: z.array(z.string().trim().max(254)).max(50).optional(),
           preset: z
             .enum(['MEMBER', 'EVENT_CREATION', 'EVENT_COORDINATION', 'EVENT_EDITING', 'ADMINISTRATION'])
             .optional()
@@ -573,7 +594,24 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       if (!access.permissions.has('DEPARTMENT_SETTINGS') && !access.permissions.has('PEOPLE_MANAGE')) {
         return reply.status(403).send({ error: 'Keine Berechtigung.' });
       }
-      const { email, preset = 'MEMBER' } = request.body as { email: string; preset?: InvitePreset };
+      const { email, emails: rawList, preset = 'MEMBER' } = request.body as {
+        email?: string;
+        emails?: string[];
+        preset?: InvitePreset;
+      };
+      const recipients = extractEmails(email, rawList);
+      if (recipients.length === 0) {
+        return reply.status(400).send({ error: 'Bitte mindestens eine gültige E-Mail-Adresse angeben.' });
+      }
+      if (recipients.length > 50) {
+        return reply.status(400).send({ error: 'Bitte höchstens 50 E-Mail-Adressen auf einmal einladen.' });
+      }
+      for (const addr of recipients) {
+        if (!emailValidator.safeParse(addr).success) {
+          return reply.status(400).send({ error: `Ungültige E-Mail-Adresse: ${addr}` });
+        }
+      }
+
       if (preset !== 'MEMBER') {
         const presetPerms = DEPARTMENT_PERMISSION_PRESETS[preset].permissions;
         if (!canGrantPermissions(access, [], presetPerms)) {
@@ -582,28 +620,39 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
       }
-      const cleanEmail = email.toLowerCase().trim();
 
       // Bremse gegen Massenversand: pro Person und pro Abteilung, dazu nie zweimal kurz nacheinander an dieselbe Adresse
       const limitKeyUser = `user:${request.user.id}`;
       const limitKeyDept = `dept:${request.tenant.id}`;
-      const limitKeyRecipient = `to:${request.tenant.id}:${cleanEmail}`;
-      if (inviteRecipientLimiter.isBlocked(limitKeyRecipient)) {
+      const toSend: string[] = [];
+      let skippedCount = 0;
+      for (const addr of recipients) {
+        const limitKeyRecipient = `to:${request.tenant.id}:${addr}`;
+        if (inviteRecipientLimiter.isBlocked(limitKeyRecipient)) {
+          skippedCount++;
+        } else {
+          toSend.push(addr);
+        }
+      }
+
+      if (toSend.length === 0) {
         return reply.status(429).send({
           code: 'RATE_LIMITED',
-          error: 'An diese Adresse wurde heute schon eine Einladung geschickt. Du kannst ihr auch den Einladungs-Link direkt weitergeben.',
+          error:
+            recipients.length === 1
+              ? 'An diese Adresse wurde heute schon eine Einladung geschickt. Du kannst ihr auch den Einladungs-Link direkt weitergeben.'
+              : 'An alle angegebenen Adressen wurde heute bereits eine Einladung geschickt.',
         });
       }
-      if (
-        inviteUserLimiter.hit(limitKeyUser) ||
-        inviteDeptLimiter.hit(limitKeyDept)
-      ) {
+      if (inviteUserLimiter.hit(limitKeyUser) || inviteDeptLimiter.hit(limitKeyDept)) {
         return reply.status(429).send({
           code: 'RATE_LIMITED',
           error: 'Zu viele Einladungen in kurzer Zeit. Bitte versuche es später wieder.',
         });
       }
-      inviteRecipientLimiter.hit(limitKeyRecipient);
+      for (const addr of toSend) {
+        inviteRecipientLimiter.hit(`to:${request.tenant.id}:${addr}`);
+      }
 
       let inviteToken = request.tenant.inviteToken;
       if (!inviteToken) {
@@ -628,18 +677,22 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
           ? `<p>Dir wurde dabei direkt die Berechtigung <strong>${escapeHtml(DEPARTMENT_PERMISSION_PRESETS[preset].label)}</strong> zugewiesen.</p>`
           : '';
 
-      const sent = await sendGenericEmail({
-        to: cleanEmail,
-        subject: `Einladung zu ${name} (${org.name})`,
-        eyebrow: name,
-        title: `Du wurdest zu ${name} eingeladen`,
-        messageHtml: `<p>Du wurdest eingeladen, <strong>${escapeHtml(name)}</strong> beizutreten, um dich für Schichten einzutragen.</p>${presetNote}<p>Klicke auf den Button unten, um dich anzumelden oder ein Konto zu erstellen. Danach bestätigst du den Beitritt.</p>`,
-        ctaText: `${name} beitreten`,
-        ctaUrl: inviteUrl,
-        organization: request.tenant.organization,
-      });
+      let sentCount = 0;
+      for (const addr of toSend) {
+        const ok = await sendGenericEmail({
+          to: addr,
+          subject: `Einladung zu ${name} (${org.name})`,
+          eyebrow: name,
+          title: `Du wurdest zu ${name} eingeladen`,
+          messageHtml: `<p>Du wurdest eingeladen, <strong>${escapeHtml(name)}</strong> beizutreten, um dich für Schichten einzutragen.</p>${presetNote}<p>Klicke auf den Button unten, um dich anzumelden oder ein Konto zu erstellen. Danach bestätigst du den Beitritt.</p>`,
+          ctaText: `${name} beitreten`,
+          ctaUrl: inviteUrl,
+          organization: request.tenant.organization,
+        });
+        if (ok) sentCount++;
+      }
 
-      return { ok: true, sent, inviteToken };
+      return { ok: true, sent: sentCount > 0, sentCount, skippedCount, total: recipients.length, inviteToken };
     }
   );
 };

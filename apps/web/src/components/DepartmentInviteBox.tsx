@@ -8,7 +8,7 @@ import {
   type DepartmentPermissionPreset,
 } from '@schichtplan/shared';
 import { getLoginUrl } from '@schichtplan/shared/redirect';
-import { Button, Input, Select, useToast } from '@schichtplan/ui';
+import { Button, Select, Textarea, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 
@@ -20,6 +20,25 @@ const PRESET_ORDER: DepartmentPermissionPreset[] = [
   'EVENT_EDITING',
   'ADMINISTRATION',
 ];
+
+function parseEmailList(raw: string): string[] {
+  const chunks = raw.split(/[,;\n\r]+/);
+  const out: string[] = [];
+  for (const chunk of chunks) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+    const angle = trimmed.match(/<([^<>@\s]+@[^<>@\s]+)>/);
+    if (angle) {
+      out.push(angle[1].toLowerCase().trim());
+    } else {
+      for (const token of trimmed.split(/\s+/)) {
+        const clean = token.toLowerCase().trim();
+        if (clean) out.push(clean);
+      }
+    }
+  }
+  return [...new Set(out)];
+}
 
 export function DepartmentInviteBox({ onError }: { onError?: (msg: string) => void }) {
   const { department, refresh, isDeptAdmin, permissions, can } = usePortal();
@@ -38,6 +57,7 @@ export function DepartmentInviteBox({ onError }: { onError?: (msg: string) => vo
   }, [department?.inviteToken]);
 
   const canInvite = can('DEPARTMENT_SETTINGS') || can('PEOPLE_MANAGE');
+  const parsedEmails = useMemo(() => parseEmailList(inviteEmail), [inviteEmail]);
 
   const allowedPresets = useMemo(() => {
     if (isDeptAdmin) return PRESET_ORDER;
@@ -108,63 +128,80 @@ export function DepartmentInviteBox({ onError }: { onError?: (msg: string) => vo
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Input
-          type="email"
+      <div className="space-y-2">
+        <Textarea
+          rows={2}
           value={inviteEmail}
           onChange={(e) => setInviteEmail(e.target.value)}
-          placeholder="person@beispiel.ch"
-          aria-label="E-Mail-Adresse für Einladung"
-          className="h-9 min-w-48 flex-1"
+          placeholder="person@beispiel.ch, zweite@beispiel.ch … (einzeln oder Liste mit Komma, Semikolon oder Zeilenumbruch)"
+          aria-label="E-Mail-Adressen für Einladung"
+          className="min-h-[2.5rem] text-sm"
         />
-        {allowedPresets.length > 0 && (
-          <Select
-            value={preset}
-            onChange={(e) => setPreset(e.target.value as InvitePresetOption)}
-            aria-label="Rolle / Rechte bei Einladung"
-            className="h-9 w-auto min-w-44 text-xs"
-          >
-            <option value="MEMBER">Als Mitglied (ohne Zusatzrechte)</option>
-            {allowedPresets.map((key) => (
-              <option key={key} value={key}>
-                Mit Recht: {DEPARTMENT_PERMISSION_PRESETS[key].label}
-              </option>
-            ))}
-          </Select>
-        )}
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          loading={inviting}
-          disabled={!inviteEmail.trim()}
-          onClick={async () => {
-            setInviting(true);
-            try {
-              const res = await api<{ ok: boolean; sent: boolean; inviteToken?: string }>(
-                '/api/departments/current/invite',
-                {
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {allowedPresets.length > 0 && (
+              <Select
+                value={preset}
+                onChange={(e) => setPreset(e.target.value as InvitePresetOption)}
+                aria-label="Rolle / Rechte bei Einladung"
+                className="h-9 w-auto min-w-44 text-xs"
+              >
+                <option value="MEMBER">Als Mitglied (ohne Zusatzrechte)</option>
+                {allowedPresets.map((key) => (
+                  <option key={key} value={key}>
+                    Mit Recht: {DEPARTMENT_PERMISSION_PRESETS[key].label}
+                  </option>
+                ))}
+              </Select>
+            )}
+            {parsedEmails.length > 1 && (
+              <span className="text-2xs font-medium text-fg-muted">
+                {parsedEmails.length} E-Mail-Adressen erkannt
+              </span>
+            )}
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            loading={inviting}
+            disabled={parsedEmails.length === 0}
+            onClick={async () => {
+              setInviting(true);
+              try {
+                const res = await api<{
+                  ok: boolean;
+                  sent: boolean;
+                  sentCount?: number;
+                  skippedCount?: number;
+                  inviteToken?: string;
+                }>('/api/departments/current/invite', {
                   method: 'POST',
-                  json: { email: inviteEmail.trim(), preset },
-                }
-              );
-              if (res.inviteToken) setInviteToken(res.inviteToken);
-              setInviteEmail('');
-              await refresh();
-              toast({
-                title: res.sent
-                  ? 'Einladung per E-Mail gesendet'
-                  : 'Einladung hinterlegt (kein Mailversand konfiguriert – bitte Link kopieren)',
-              });
-            } catch (err) {
-              reportError(err);
-            } finally {
-              setInviting(false);
-            }
-          }}
-        >
-          <Mail className="size-3.5" /> Einladen
-        </Button>
+                  json: { emails: parsedEmails, preset },
+                });
+                if (res.inviteToken) setInviteToken(res.inviteToken);
+                setInviteEmail('');
+                await refresh();
+                const count = res.sentCount ?? parsedEmails.length;
+                const skippedNote = res.skippedCount ? ` (${res.skippedCount} heute bereits eingeladen)` : '';
+                toast({
+                  title: res.sent
+                    ? count === 1
+                      ? `Einladung per E-Mail gesendet${skippedNote}`
+                      : `${count} Einladungen per E-Mail gesendet${skippedNote}`
+                    : 'Einladung hinterlegt (kein Mailversand konfiguriert – bitte Link kopieren)',
+                });
+              } catch (err) {
+                reportError(err);
+              } finally {
+                setInviting(false);
+              }
+            }}
+          >
+            <Mail className="size-3.5" />{' '}
+            {parsedEmails.length > 1 ? `${parsedEmails.length} Personen einladen` : 'Einladen'}
+          </Button>
+        </div>
       </div>
     </div>
   );
