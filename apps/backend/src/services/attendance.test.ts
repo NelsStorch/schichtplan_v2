@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   checkinUrl,
-  fetchCeviQrCode,
+  createQrCode,
   generateCheckinToken,
   isInCheckinWindow,
   personLabel,
-  qrApiBaseUrl,
 } from './attendance.js';
 
 describe('isInCheckinWindow', () => {
@@ -86,34 +85,14 @@ describe('personLabel', () => {
   });
 });
 
-describe('fetchCeviQrCode', () => {
-  it('ruft den Cevi-QR-Generator mit Titel für das PDF auf', async () => {
-    const fetchImpl = vi.fn(async () => new Response('%PDF', { status: 200 }));
-    const file = await fetchCeviQrCode(
-      'pdf',
-      { text: 'https://x', title: 'Chilbi', subtitle: 'Check-in' },
-      fetchImpl as unknown as typeof fetch,
-      {} as NodeJS.ProcessEnv
-    );
-    expect(file.toString()).toBe('%PDF');
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://backend.qr.cevi.tools/pdf');
-    expect(JSON.parse(init.body as string)).toEqual({
-      text: 'https://x',
-      title: 'Chilbi',
-      subtitle: 'Check-in',
-      show_url: false,
-    });
-  });
-
-  it('meldet Fehler des Generators', async () => {
-    const fetchImpl = vi.fn(async () => new Response('kaputt', { status: 500 }));
-    await expect(
-      fetchCeviQrCode('svg', { text: 'https://x' }, fetchImpl as unknown as typeof fetch, {} as NodeJS.ProcessEnv)
-    ).rejects.toThrow('500');
-  });
-
-  it('lässt sich per QR_API_URL umbiegen', () => {
-    expect(qrApiBaseUrl({ QR_API_URL: 'http://qr:5000/' } as NodeJS.ProcessEnv)).toBe('http://qr:5000');
+describe('createQrCode', () => {
+  it('erzeugt SVG und PDF lokal, ohne externen Dienst', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const svg = await createQrCode('svg', { text: 'https://x.cevi-schichtplan.ch/events/a/checkin?code=b' });
+    expect(svg.toString('utf8')).toContain('<svg');
+    const pdf = await createQrCode('pdf', { text: 'https://x', title: 'Chilbi', subtitle: 'Check-in' });
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

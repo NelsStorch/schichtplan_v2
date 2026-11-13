@@ -17,7 +17,7 @@ import {
 } from '../services/cateringTokens.js';
 import {
   checkinUrl,
-  fetchCeviQrCode,
+  createQrCode,
   generateCheckinToken,
   isInCheckinWindow,
   personLabel,
@@ -378,7 +378,7 @@ const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
           ? request.tenant.qrColorSecondary
           : request.tenant.secondaryColor;
 
-        file = await fetchCeviQrCode(format, {
+        file = await createQrCode(format, {
           text: checkinUrl(request.tenant.slug, event.slug, event.checkinToken, request.tenant.organization),
           title: event.title,
           subtitle: 'Anwesenheit: QR-Code scannen und einchecken',

@@ -44,6 +44,7 @@ import {
   ensureHelperMembership,
   CEVIDB_REQUEST_TIMEOUT_MS,
   trackCeviDbFailure,
+  trackHitobitoSuccess,
 } from '../../services/authSession.js';
 
 
@@ -231,7 +232,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
           fastify.log.error(`${providerConfig.type} Token-Abruf fehlgeschlagen: ${errText}`);
           // Nur Serverfehler zählen als Störung; 4xx (z. B. abgelaufener Code) liegt nicht an Hitobito
           if (tokenRes.status >= 500) hitobitoCircuitBreaker.recordFailure(providerConfig.type);
-          trackCeviDbFailure();
+          trackCeviDbFailure(providerConfig.type);
           return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
         }
 
@@ -257,7 +258,7 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
         if (!profileRes.ok) {
           fastify.log.error(`${providerConfig.type} Profilabruf fehlgeschlagen`);
           if (profileRes.status >= 500) hitobitoCircuitBreaker.recordFailure(providerConfig.type);
-          trackCeviDbFailure();
+          trackCeviDbFailure(providerConfig.type);
           return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
         }
 
@@ -309,11 +310,11 @@ const hitobitoAuthRoutes: FastifyPluginAsync = async (fastify) => {
       } catch (err) {
         fastify.log.error(err, `${providerConfig.type} nicht erreichbar`);
         hitobitoCircuitBreaker.recordFailure(providerConfig.type);
-        trackCeviDbFailure();
+        trackCeviDbFailure(providerConfig.type);
         return reply.redirect(loginErrorUrl('cevidb_failed', returnTo, request.hostname, providerConfig.type));
       }
 
-      trackUsage('EXTERNAL', { dim: 'CEVIDB_OK' });
+      trackHitobitoSuccess(providerConfig.type);
       reply.clearCookie('cevidb_oauth_state', { path: '/' });
       return reply.redirect(await finishCeviDbLogin(reply, profile, returnTo, tenantSlug, undefined, providerConfig.type));
     }

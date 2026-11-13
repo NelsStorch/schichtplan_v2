@@ -88,7 +88,7 @@ export const USAGE_METRICS = {
       CEVINAME_NOT_FOUND: 'Cevi-Name nicht gefunden',
       CEVINAME_USE_CEVIDB: 'Cevi-Name: Konto mit Cevi.DB',
       CEVINAME_USE_PASSWORD: 'Cevi-Name: Konto mit Passwort',
-      CEVIDB_ERROR: 'Cevi.DB-Fehler',
+      CEVIDB_ERROR: 'Hitobito nicht erreichbar',
       TWO_FACTOR_WRONG: 'Falscher 2FA-Code',
     },
   },
@@ -142,7 +142,15 @@ export const USAGE_METRICS = {
     label: 'Externe Dienste',
     group: 'BETRIEB',
     source: 'server',
-    dims: { CEVIDB_OK: 'Cevi.DB ok', CEVIDB_ERROR: 'Cevi.DB Fehler', QR_OK: 'QR-Generator ok', QR_ERROR: 'QR-Generator Fehler' },
+    // Anmeldungen über die drei Hitobito-Datenbanken. QR-Codes entstehen lokal, ohne externen Dienst.
+    dims: {
+      CEVIDB_OK: 'Cevi.DB ok',
+      CEVIDB_ERROR: 'Cevi.DB Fehler',
+      MIDATA_OK: 'PBS MiData ok',
+      MIDATA_ERROR: 'PBS MiData Fehler',
+      JUBLADB_OK: 'Jubla-DB ok',
+      JUBLADB_ERROR: 'Jubla-DB Fehler',
+    },
   },
 
   // --- Anlässe und Schichten -----------------------------------------------------------------

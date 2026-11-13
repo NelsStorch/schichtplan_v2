@@ -38,8 +38,12 @@ const def = (key: UsageMetricKey): UsageMetricDef => USAGE_METRICS[key];
 /** Unterteilungen einer Kennzahl mit Bezeichnung */
 function dimItems(m: AdminStatsMetricDto | undefined) {
   if (!m) return [];
-  const labels = def(m.metric).dims ?? {};
-  return m.byDim.map((d) => ({ key: d.dim || '-', label: labels[d.dim] ?? (d.dim ? `/${d.dim}` : 'gesamt'), count: d.total }));
+  const { dims } = def(m.metric);
+  const labels = dims ?? {};
+  return m.byDim
+    // Feste Unterteilungen: nur bekannte zeigen (alte Zählungen wie der frühere externe QR-Generator fallen weg)
+    .filter((d) => !dims || Object.prototype.hasOwnProperty.call(dims, d.dim))
+    .map((d) => ({ key: d.dim || '-', label: labels[d.dim] ?? (d.dim ? `/${d.dim}` : 'gesamt'), count: d.total }));
 }
 
 function MetricCard({ m }: { m: AdminStatsMetricDto }) {

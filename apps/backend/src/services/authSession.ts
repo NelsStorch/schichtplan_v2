@@ -373,8 +373,20 @@ export function registrationAccepted(email: string) {
   };
 }
 
-/** Cevi.DB nicht erreichbar oder Antwort unbrauchbar (für die Statistik) */
-export function trackCeviDbFailure() {
-  trackUsage('EXTERNAL', { dim: 'CEVIDB_ERROR' });
+/** Statistik-Kennung der Hitobito-Datenbank eines Verbands (Cevi.DB, PBS MiData, Jubla-DB) */
+export function hitobitoStatsKey(provider: string | null | undefined): 'CEVIDB' | 'MIDATA' | 'JUBLADB' {
+  if (provider === 'PFADI') return 'MIDATA';
+  if (provider === 'JUBLA') return 'JUBLADB';
+  return 'CEVIDB';
+}
+
+/** Anmeldung über Hitobito geklappt (für «Externe Dienste» in der Statistik) */
+export function trackHitobitoSuccess(provider: string | null | undefined) {
+  trackUsage('EXTERNAL', { dim: `${hitobitoStatsKey(provider)}_OK` });
+}
+
+/** Hitobito (Cevi.DB, PBS MiData, Jubla-DB) nicht erreichbar oder Antwort unbrauchbar (für die Statistik) */
+export function trackCeviDbFailure(provider?: string | null) {
+  trackUsage('EXTERNAL', { dim: `${hitobitoStatsKey(provider)}_ERROR` });
   trackUsage('LOGIN_FAILED', { dim: 'CEVIDB_ERROR' });
 }

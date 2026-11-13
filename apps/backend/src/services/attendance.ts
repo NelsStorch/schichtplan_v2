@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { CHECKIN_EARLY_MINUTES, type OrganizationType } from '@schichtplan/shared';
 import { eventUrl } from './shiftReminders.js';
-import { trackUsage } from './usageStats.js';
 import { generateCheckinPdf, generateQrSvg } from './qrGenerator.js';
 import type { PrismaClient } from '../db.js';
 
@@ -59,11 +58,6 @@ export function personLabel(
 
 export type QrFormat = 'svg' | 'pdf';
 
-/** Basis-URL des Cevi-QR-Generators (https://github.com/cevi/qr-code-generator) */
-export function qrApiBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.QR_API_URL || 'https://backend.qr.cevi.tools').replace(/\/+$/, '');
-}
-
 export interface QrCodeInput {
   text: string;
   title?: string;
@@ -80,40 +74,11 @@ export interface QrCodeInput {
 }
 
 /**
- * QR-Code im Cevi-Stil erzeugen: SVG zum Anzeigen oder A4-PDF (mit Titel/Untertitel) zum Ausdrucken.
- * Läuft lokal ohne externe Abhängigkeiten. Wenn `fetchImpl` oder `QR_API_URL` gesetzt ist, wird
- * für Tests oder Sonderfälle die externe API aufgerufen.
+ * QR-Code im Stil der Abteilung erzeugen: SVG zum Anzeigen oder A4-PDF (mit Titel/Untertitel) zum Ausdrucken.
+ * Läuft komplett lokal, ohne externen Dienst.
  */
-export async function fetchCeviQrCode(
-  format: QrFormat,
-  input: QrCodeInput,
-  fetchImpl?: typeof fetch,
-  env: NodeJS.ProcessEnv = process.env
-): Promise<Buffer> {
-  // Wenn explizit eine externe URL konfiguriert ist oder ein Mock-Fetch übergeben wurde (Vitest)
-  if (env.QR_API_URL || fetchImpl) {
-    const body =
-      format === 'pdf'
-        ? { text: input.text, title: input.title, subtitle: input.subtitle, show_url: false }
-        : { text: input.text };
-    const res = await (fetchImpl ?? fetch)(`${qrApiBaseUrl(env)}/${format}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) {
-      trackUsage('EXTERNAL', { dim: 'QR_ERROR' });
-      throw new Error(`QR-Generator antwortet mit ${res.status}`);
-    }
-    trackUsage('EXTERNAL', { dim: 'QR_OK' });
-    return Buffer.from(await res.arrayBuffer());
-  }
-
-  // Lokale Generierung: SVG oder A4-PDF mit Abteilungsfarbe und zentriertem Logo
-  if (format === 'pdf') {
-    return generateCheckinPdf(input);
-  }
+export async function createQrCode(format: QrFormat, input: QrCodeInput): Promise<Buffer> {
+  if (format === 'pdf') return generateCheckinPdf(input);
   const svg = await generateQrSvg(input);
   return Buffer.from(svg, 'utf8');
 }
