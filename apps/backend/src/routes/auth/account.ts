@@ -329,8 +329,8 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
         const validInvite = Boolean(input.inviteToken && dept.inviteToken && input.inviteToken === dept.inviteToken);
 
         if (validInvite) {
-          confirmedByInvite = true;
-          staysConfirmed = false;
+          // Bereits bestätigt: Bestätigung (wer, wann) nicht überschreiben
+          if (!staysConfirmed) confirmedByInvite = true;
         } else if (!alreadyMember) {
           if (dept.joinMode === 'INVITE_ONLY') {
             return reply.status(403).send({
@@ -338,6 +338,10 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
               error: 'Beitritt nur per Einladung möglich. Bitte nutze einen gültigen Einladungs-Link.',
             });
           }
+          // LINK_ONLY ist bewusst keine Zugriffsschranke: Der Abteilungs-Link (Subdomain) ist öffentlich,
+          // und viaLink setzt der Browser selbst. Die Prüfung hält die Abteilung nur aus der allgemeinen
+          // Auswahl heraus. Eine Selbstzuordnung (SELF) bleibt unbestätigt; wer wirklich geschlossen sein
+          // will, wählt INVITE_ONLY (dort zählt nur Einladung oder Bestätigung durch die Leitung).
           if (dept.joinMode === 'LINK_ONLY' && !input.viaLink && request.tenant?.id !== departmentId) {
             return reply.status(403).send({
               code: 'LINK_REQUIRED',

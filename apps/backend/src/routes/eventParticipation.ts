@@ -536,7 +536,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
           departmentLeader: true,
           homeDepartmentId: true,
           homeDepartmentSource: true,
-          homeDepartment: { select: { id: true, name: true } },
+          homeDepartment: { select: { id: true, name: true, joinMode: true } },
           memberships: {
             where: { departmentId: { in: targetDeptIds } },
             select: { departmentId: true, role: true, permissions: true },
@@ -595,6 +595,7 @@ const eventParticipationRoutes: FastifyPluginAsync = async (fastify) => {
             hitobitoStufen: u.hitobitoStufen,
             homeDepartmentId: u.homeDepartmentId,
             homeDepartmentSource: u.homeDepartmentSource,
+            homeDepartment: u.homeDepartment,
             stufen: u.stufen.map((s) => ({ stufeId: s.stufeId, role: s.role, source: s.source })),
           };
           const check = checkRules(event, accessUser, event.department.name);

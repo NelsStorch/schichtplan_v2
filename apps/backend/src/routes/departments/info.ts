@@ -8,6 +8,7 @@ import {
   type DepartmentDirectoryItemDto,
   type DepartmentJoinMode,
   type DepartmentPermission,
+  type PasswordlessAccountsDto,
   getOrganizationByDbType,
 } from '@schichtplan/shared';
 import { autoCreateCeviDbDepartmentStufen, ceviDbGroupPeople, NO_HOME_CONFIRMATION } from '../../services/homeDepartment.js';
@@ -16,8 +17,14 @@ import { departmentAccess, } from '../../services/permissions.js';
 import { computeDepartmentStats } from '../../services/departmentStats.js';
 import { departmentCache } from '../../services/departmentCache.js';
 import { getLoginPortalBaseUrl, rootDomain } from '../../services/authSession.js';
-import { sendGenericEmail } from '../../services/email.js';
+import { escapeHtml, sendGenericEmail } from '../../services/email.js';
+import { createRateLimiter } from '../../services/rateLimit.js';
 import { contactCandidateWhere, loadContactPerson, NOT_ELIGIBLE_MESSAGES, departmentCreationEligibility, requireDepartmentPermission, } from './shared.js';
+
+/* Bremse für E-Mail-Einladungen (im Speicher, siehe rateLimit.ts) */
+const inviteUserLimiter = createRateLimiter(60 * 60 * 1000, 30);
+const inviteDeptLimiter = createRateLimiter(24 * 60 * 60 * 1000, 200);
+const inviteRecipientLimiter = createRateLimiter(24 * 60 * 60 * 1000, 1);
 
 /** Abteilung: Angaben, Verzeichnis, Statistik, Anlegen und Einstellungen */
 const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
@@ -425,6 +432,81 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Abteilung zu einem Einladungs-Token (Login-Portal, wenn der Link ohne Abteilungs-Ziel kommt)
+  fastify.get(
+    '/api/departments/invite-lookup',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Abteilung zu einem Einladungs-Link finden',
+        description: 'Liefert die Abteilung (wie im Verzeichnis) zu einem gültigen Einladungs-Token.',
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({ token: z.string().trim().min(8).max(128) }),
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      const { token } = request.query as { token: string };
+      const dept = await fastify.prisma.department.findUnique({
+        where: { inviteToken: token },
+        select: { id: true, organization: true },
+      });
+      const item =
+        dept && dept.organization === request.organization
+          ? (await departmentCache.getDirectory(fastify.prisma, request.organization)).find((d) => d.id === dept.id)
+          : undefined;
+      if (!item) {
+        return reply.status(404).send({
+          code: 'INVITE_INVALID',
+          error: 'Dieser Einladungslink ist ungültig oder wurde inzwischen ersetzt.',
+        });
+      }
+      return item satisfies DepartmentDirectoryItemDto;
+    }
+  );
+
+  // Konten, die nur passwortlos (Spitzname + Geburtsdatum) hineinkommen: Warnung vor dem Abschalten
+  fastify.get(
+    '/api/departments/current/passwordless-accounts',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Konten ohne Passwort, E-Mail und Verbands-Login',
+        description:
+          'Personen der Abteilung, die sich nur mit Spitzname und Geburtsdatum anmelden können und beim Abschalten der passwortlosen Anmeldung ausgesperrt würden.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      const ctx = await requirePermission(request, reply, 'DEPARTMENT_SETTINGS');
+      if (!ctx) return;
+      reply.header('Cache-Control', 'no-store');
+      const people = await fastify.prisma.user.findMany({
+        where: {
+          passwordHash: null,
+          providerId: null,
+          email: null,
+          nickname: { not: null },
+          OR: [{ homeDepartmentId: ctx.tenant.id }, { memberships: { some: { departmentId: ctx.tenant.id } } }],
+        },
+        select: { id: true, nickname: true, firstName: true, lastName: true, lastSeenOn: true },
+        orderBy: [{ nickname: 'asc' }, { firstName: 'asc' }],
+      });
+      return {
+        count: people.length,
+        people: people.map((p) => ({
+          id: p.id,
+          nickname: p.nickname,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          lastSeenOn: p.lastSeenOn ? p.lastSeenOn.toISOString().slice(0, 10) : null,
+        })),
+      } satisfies PasswordlessAccountsDto;
+    }
+  );
+
   // Neuen geheimen Einladungs-Link für die Abteilung erzeugen (macht alte ungültig)
   fastify.post(
     '/api/departments/current/invite-token',
@@ -474,6 +556,28 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const { email } = request.body as { email: string };
       const cleanEmail = email.toLowerCase().trim();
+
+      // Bremse gegen Massenversand: pro Person und pro Abteilung, dazu nie zweimal kurz nacheinander an dieselbe Adresse
+      const limitKeyUser = `user:${request.user.id}`;
+      const limitKeyDept = `dept:${request.tenant.id}`;
+      const limitKeyRecipient = `to:${request.tenant.id}:${cleanEmail}`;
+      if (inviteRecipientLimiter.isBlocked(limitKeyRecipient)) {
+        return reply.status(429).send({
+          code: 'RATE_LIMITED',
+          error: 'An diese Adresse wurde heute schon eine Einladung geschickt. Du kannst ihr auch den Einladungs-Link direkt weitergeben.',
+        });
+      }
+      if (
+        inviteUserLimiter.hit(limitKeyUser) ||
+        inviteDeptLimiter.hit(limitKeyDept)
+      ) {
+        return reply.status(429).send({
+          code: 'RATE_LIMITED',
+          error: 'Zu viele Einladungen in kurzer Zeit. Bitte versuche es später wieder.',
+        });
+      }
+      inviteRecipientLimiter.hit(limitKeyRecipient);
+
       let inviteToken = request.tenant.inviteToken;
       if (!inviteToken) {
         inviteToken = crypto.randomBytes(18).toString('base64url');
@@ -484,48 +588,26 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         departmentCache.invalidate(request.tenant.organization, request.tenant.slug);
       }
 
-      // Falls die Person bereits ein Konto mit dieser E-Mail hat (ohne Hitobito-Bindung), direkt bestätigen
-      const existing = await fastify.prisma.user.findUnique({
-        where: { email: cleanEmail },
-        select: { id: true, homeDepartmentId: true, homeDepartmentSource: true },
-      });
-      if (existing) {
-        await fastify.prisma.departmentMember.upsert({
-          where: { departmentId_userId: { departmentId: request.tenant.id, userId: existing.id } },
-          update: {},
-          create: { departmentId: request.tenant.id, userId: existing.id, role: 'HELPER' },
-        });
-        if (!existing.homeDepartmentId) {
-          await fastify.prisma.user.update({
-            where: { id: existing.id },
-            data: {
-              homeDepartmentId: request.tenant.id,
-              homeDepartmentSource: 'CONFIRMED',
-              homeDepartmentConfirmedAt: new Date(),
-              homeDepartmentConfirmedById: request.user.id,
-              departmentSetupAt: new Date(),
-            },
-          });
-        }
-      }
-
+      // Bewusst keine Änderung an bestehenden Konten: Aufgenommen wird erst, wer den Link selbst einlöst.
+      // Die Antwort verrät auch nicht, ob es zur Adresse schon ein Konto gibt.
       const org = getOrganizationByDbType(request.tenant.organization);
       const portalUrl = `https://${request.tenant.slug}.${rootDomain(request.headers.host)}`;
       const loginUrl = getLoginPortalBaseUrl(process.env, request.headers.host, request.tenant.organization);
       const inviteUrl = `${loginUrl}/?return_to=${encodeURIComponent(portalUrl)}&invite=${encodeURIComponent(inviteToken)}`;
+      const name = request.tenant.name;
 
       const sent = await sendGenericEmail({
         to: cleanEmail,
-        subject: `Einladung zu ${request.tenant.name} (${org.name})`,
-        eyebrow: request.tenant.name,
-        title: `Du wurdest zu ${request.tenant.name} eingeladen`,
-        messageHtml: `<p>Du wurdest eingeladen, <strong>${request.tenant.name}</strong> beizutreten, um dich für Schichten einzutragen.</p><p>Klicke auf den Button unten, um dich anzumelden oder ein Konto zu erstellen – du wirst danach direkt aufgenommen.</p>`,
-        ctaText: `${request.tenant.name} beitreten`,
+        subject: `Einladung zu ${name} (${org.name})`,
+        eyebrow: name,
+        title: `Du wurdest zu ${name} eingeladen`,
+        messageHtml: `<p>Du wurdest eingeladen, <strong>${escapeHtml(name)}</strong> beizutreten, um dich für Schichten einzutragen.</p><p>Klicke auf den Button unten, um dich anzumelden oder ein Konto zu erstellen. Danach bestätigst du den Beitritt.</p>`,
+        ctaText: `${name} beitreten`,
         ctaUrl: inviteUrl,
         organization: request.tenant.organization,
       });
 
-      return { ok: true, sent, alreadyRegistered: Boolean(existing), inviteToken };
+      return { ok: true, sent, inviteToken };
     }
   );
 };

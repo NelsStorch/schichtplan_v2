@@ -39,12 +39,15 @@ describe('departmentCache', () => {
     const findMany = vi.fn().mockResolvedValue(mockList);
     const mockPrisma = { department: { findMany } } as any;
 
+    // Ohne gespeicherten Beitrittsmodus gilt LINK_ONLY
+    const expected = [{ id: 'd1', name: 'Cevi Wetzikon', slug: 'wetzikon', joinMode: 'LINK_ONLY' }];
+
     const first = await departmentCache.getDirectory(mockPrisma, 'CEVI');
-    expect(first).toEqual(mockList);
+    expect(first).toEqual(expected);
     expect(findMany).toHaveBeenCalledTimes(1);
 
     const second = await departmentCache.getDirectory(mockPrisma, 'CEVI');
-    expect(second).toEqual(mockList);
+    expect(second).toEqual(expected);
     expect(findMany).toHaveBeenCalledTimes(1);
 
     departmentCache.invalidate('CEVI');

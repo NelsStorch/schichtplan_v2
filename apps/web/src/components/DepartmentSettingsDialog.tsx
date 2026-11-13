@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Check, Copy, Mail, QrCode, RefreshCw, Settings2 } from 'lucide-react';
-import type { DepartmentJoinMode, DepartmentPermission } from '@schichtplan/shared';
+import { Check, ChevronDown, Copy, Mail, QrCode, RefreshCw, Settings2 } from 'lucide-react';
+import type { DepartmentJoinMode, DepartmentPermission, PasswordlessAccountsDto } from '@schichtplan/shared';
 import { getLoginUrl } from '@schichtplan/shared/redirect';
 import {
   Button,
@@ -139,11 +139,16 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<{ userId: string; displayName: string; isLeader: boolean }[] | null>(null);
+  const [passwordless, setPasswordless] = useState<PasswordlessAccountsDto | null>(null);
+  const [showLockedOut, setShowLockedOut] = useState(false);
 
   useEffect(() => {
     api<{ userId: string; displayName: string; isLeader: boolean }[]>('/api/departments/current/contact-candidates')
       .then(setCandidates)
       .catch(() => setCandidates([]));
+    api<PasswordlessAccountsDto>('/api/departments/current/passwordless-accounts')
+      .then(setPasswordless)
+      .catch(() => setPasswordless(null));
   }, []);
 
   const pickPrimaryColor = (color: string) => {
@@ -243,8 +248,55 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
         checked={form.allowPasswordless}
         onChange={(v) => setForm((f) => ({ ...f, allowPasswordless: v }))}
         label="Passwortlose Anmeldung erlauben"
-        description={`Helfende dürfen sich auf diesem Portal nur mit ${org.nicknameTerm} und Geburtsdatum ohne Passwort anmelden.`}
+        description={`Helfende können sich auf diesem Portal mit ${org.nicknameTerm} und Geburtsdatum ohne Passwort anmelden.`}
       />
+
+      {!form.allowPasswordless && passwordless && passwordless.count > 0 && (
+        <Callout
+          tone="warning"
+          title={
+            passwordless.count === 1
+              ? '1 Konto wird ausgesperrt'
+              : `${passwordless.count} Konten werden ausgesperrt`
+          }
+        >
+          <p className="mt-1 text-[13px] leading-relaxed text-fg">
+            {passwordless.count === 1 ? 'Diese Person hat' : 'Diese Personen haben'} weder E-Mail noch Passwort noch
+            Verbands-Login. Ohne passwortlose Anmeldung {passwordless.count === 1 ? 'kommt sie' : 'kommen sie'} hier
+            nicht mehr hinein und {passwordless.count === 1 ? 'kann' : 'können'} das Konto auch nicht selbst wiederherstellen.
+            Ihre Eintragungen bleiben bestehen.
+          </p>
+          <button
+            type="button"
+            aria-expanded={showLockedOut}
+            onClick={() => setShowLockedOut((v) => !v)}
+            className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-accent-ink underline underline-offset-2"
+          >
+            {showLockedOut ? 'Details ausblenden' : 'Details anzeigen'}
+            <ChevronDown className={cn('size-3.5 transition-transform', showLockedOut && 'rotate-180')} />
+          </button>
+          {showLockedOut && (
+            <ul className="mt-2 max-h-56 divide-y divide-line overflow-y-auto rounded-xl border border-line bg-surface">
+              {passwordless.people.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]">
+                  <span className="min-w-0 truncate">
+                    <span className="font-semibold text-fg">{p.nickname || p.firstName}</span>
+                    {p.nickname && (
+                      <span className="text-fg-muted">
+                        {' '}
+                        ({[p.firstName, p.lastName].filter(Boolean).join(' ')})
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-2xs text-fg-subtle">
+                    {p.lastSeenOn ? `zuletzt aktiv ${p.lastSeenOn.split('-').reverse().join('.')}` : 'nie aktiv'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Callout>
+      )}
 
       <Field
         label="Beitritt für E-Mail-Konten"

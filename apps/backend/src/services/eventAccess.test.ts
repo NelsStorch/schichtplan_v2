@@ -271,3 +271,31 @@ describe('pendingLink & personal link logic', () => {
     expect(alreadyRedeemed).toBe(false);
   });
 });
+
+describe('Abteilung nur per Einladung (INVITE_ONLY)', () => {
+  const internal = event({ accessType: 'DEPARTMENT' });
+  const inviteOnly = { joinMode: 'INVITE_ONLY' };
+
+  it('zählt eine unbestätigte Selbstzuordnung nicht', () => {
+    const result = checkRules(
+      internal,
+      user({ homeDepartmentId: HOME, homeDepartmentSource: 'SELF', homeDepartment: inviteOnly }),
+      'Cevi Home'
+    );
+    expect(result).toMatchObject({ ok: false, reason: 'WRONG_DEPARTMENT' });
+  });
+
+  it('lässt bestätigte Mitglieder zu', () => {
+    const person = user({ homeDepartmentId: HOME, homeDepartmentSource: 'CONFIRMED', homeDepartment: inviteOnly });
+    expect(checkRules(internal, person, 'Cevi Home').ok).toBe(true);
+  });
+
+  it('lässt bei anderen Beitrittsmodi auch Selbstzuordnung zu', () => {
+    const person = user({
+      homeDepartmentId: HOME,
+      homeDepartmentSource: 'SELF',
+      homeDepartment: { joinMode: 'LINK_ONLY' },
+    });
+    expect(checkRules(internal, person, 'Cevi Home').ok).toBe(true);
+  });
+});

@@ -58,7 +58,23 @@ export interface AccessUser {
   ceviDbStufen?: { kind: string }[];
   homeDepartmentId: string | null;
   homeDepartmentSource: string | null;
+  /** Beitrittsmodus der Heimabteilung: Bei INVITE_ONLY zählt eine unbestätigte Selbstzuordnung nicht */
+  homeDepartment?: { joinMode?: string | null } | null;
   stufen: { stufeId: string; role: string; source: string }[];
+}
+
+/**
+ * Heimabteilung, die für Abteilungs-Regeln zählt. Selbst angegeben (SELF) zählt nicht bei Cevi.DB-Anlässen
+ * und nicht bei Abteilungen, die nur per Einladung aufnehmen (INVITE_ONLY).
+ */
+export function effectiveHomeDepartmentId(
+  user: Pick<AccessUser, 'homeDepartmentId' | 'homeDepartmentSource' | 'homeDepartment'>,
+  requireVerified = false
+): string | null {
+  if (!user.homeDepartmentId) return null;
+  if (isVerifiedHomeSource(user.homeDepartmentSource)) return user.homeDepartmentId;
+  if (requireVerified || user.homeDepartment?.joinMode === 'INVITE_ONLY') return null;
+  return user.homeDepartmentId;
 }
 
 export const accessUserSelect = {
@@ -69,6 +85,7 @@ export const accessUserSelect = {
   hitobitoStufen: { select: { kind: true } },
   homeDepartmentId: true,
   homeDepartmentSource: true,
+  homeDepartment: { select: { joinMode: true } },
   stufen: { select: { stufeId: true, role: true, source: true } },
 } as const;
 
@@ -161,10 +178,15 @@ export function checkRules(event: AccessEvent, user: AccessUser, departmentName:
       event.departmentId,
       ...(cfg.whitelist ? event.allowedDepartments.map((a) => a.departmentId) : []),
     ]);
-    const personDepartmentId =
-      cfg.ceviDb && !isVerifiedHomeSource(user.homeDepartmentSource) ? null : user.homeDepartmentId;
+    const personDepartmentId = effectiveHomeDepartmentId(user, cfg.ceviDb);
 
     if (!personDepartmentId) {
+      if (!cfg.ceviDb && user.homeDepartmentId) {
+        return deny(
+          'WRONG_DEPARTMENT',
+          `Deine Zugehörigkeit zur Abteilung ist noch nicht bestätigt. Eintragen dürfen: ${audience}.`
+        );
+      }
       return cfg.ceviDb
         ? deny('WRONG_DEPARTMENT', `Laut Cevi.DB gehörst du nicht dazu. Eintragen dürfen: ${audience}.`)
         : deny('NO_DEPARTMENT', `Gib zuerst an, zu welcher Abteilung du gehörst. Eintragen dürfen: ${audience}.`);

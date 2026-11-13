@@ -31,6 +31,8 @@ function DepartmentSetup() {
   const [selected, setSelected] = useState<string | null>(null);
   const [stufen, setStufen] = useState<Record<string, StufeRole>>({});
   const [inviteLocked, setInviteLocked] = useState(false);
+  const [inviteDeptId, setInviteDeptId] = useState<string | null>(null);
+  const [switchFrom, setSwitchFrom] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,29 +57,57 @@ function DepartmentSetup() {
       const dirList: DepartmentDirectoryItemDto[] = dirRes.ok ? await dirRes.json() : [];
       setDepartments(dirList);
 
-      const target = returnToSlug ? dirList.find((d) => d.slug === returnToSlug) : undefined;
+      let target = returnToSlug ? dirList.find((d) => d.slug === returnToSlug) : undefined;
+      // Einladungslink ohne (passendes) Abteilungs-Ziel: Abteilung über den Token bestimmen
+      if (inviteToken && !target) {
+        const lookupRes = await fetch(`/api/departments/invite-lookup?token=${encodeURIComponent(inviteToken)}`, {
+          cache: 'no-store',
+        });
+        if (lookupRes.ok) {
+          const found = (await lookupRes.json()) as DepartmentDirectoryItemDto;
+          target = dirList.find((d) => d.id === found.id) ?? found;
+          if (!dirList.some((d) => d.id === found.id)) setDepartments([...dirList, found]);
+        } else {
+          const data = await lookupRes.json().catch(() => ({}));
+          setError(data.error || 'Dieser Einladungslink ist ungültig oder wurde inzwischen ersetzt.');
+        }
+      }
+
+      const join = async (stufenList: { stufeId: string; role: StufeRole }[]) => {
+        const joinRes = await fetch('/api/auth/me/department', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ departmentId: target!.id, inviteToken, viaLink: true, stufen: stufenList }),
+        });
+        const joinData = await joinRes.json().catch(() => ({}));
+        if (joinRes.ok) {
+          window.location.href = finalDestination(returnTo, joinData as UserDto, org.dbType);
+          return;
+        }
+        setError(joinData.error || 'Der Einladungslink konnte nicht eingelöst werden.');
+      };
+
       if (inviteToken && target) {
+        setInviteDeptId(target.id);
         if (me.homeDepartmentFromCeviDb) {
           if (!(me.homeDepartment?.id === target.id && me.needsDepartmentSetup && target.stufen.length > 0)) {
             window.location.href = finalDestination(returnTo, me, org.dbType);
             return;
           }
         } else if (me.homeDepartment?.id === target.id && !me.needsDepartmentSetup) {
-          window.location.href = finalDestination(returnTo, me, org.dbType);
+          // Gleiche Abteilung: Einladung bestätigt die Zugehörigkeit, Stufen bleiben, wie sie sind
+          await join((me.stufen ?? []).map((s) => ({ stufeId: s.stufeId, role: s.role })));
           return;
-        } else if (target.stufen.length === 0) {
-          const joinRes = await fetch('/api/auth/me/department', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ departmentId: target.id, inviteToken, viaLink: true, stufen: [] }),
-          });
-          const joinData = await joinRes.json().catch(() => ({}));
-          if (joinRes.ok) {
-            window.location.href = finalDestination(returnTo, joinData as UserDto, org.dbType);
-            return;
-          }
-          setError(joinData.error || 'Der Einladungslink konnte nicht eingelöst werden.');
+        } else if (!me.homeDepartment && target.stufen.length === 0) {
+          // Noch keine Abteilung und nichts zu wählen: direkt aufnehmen
+          await join([]);
+          return;
         } else {
+          // Wechsel von einer anderen Abteilung oder Stufen wählen: nur mit ausdrücklichem Speichern
+          if (me.homeDepartment && me.homeDepartment.id !== target.id) {
+            setStufen({});
+            setSwitchFrom(me.homeDepartment.name);
+          }
           setSelected(target.id);
           setInviteLocked(true);
         }
@@ -94,16 +124,22 @@ function DepartmentSetup() {
   );
   const selectedDepartment = departments?.find((d) => d.id === selected) ?? null;
 
+  // Wählbar: offene Abteilungen, die eigene, die des Links und die der Einladung (vor dem Suchfilter)
+  const selectable = useMemo(
+    () =>
+      (departments ?? []).filter((d) => {
+        if (d.id === user?.homeDepartment?.id) return true;
+        if (d.id === inviteDeptId) return true;
+        if (d.joinMode === 'LINK_ONLY' && returnToSlug && d.slug === returnToSlug) return true;
+        return !d.joinMode || d.joinMode === 'OPEN';
+      }),
+    [departments, user?.homeDepartment?.id, inviteDeptId, returnToSlug]
+  );
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = (departments ?? []).filter((d) => {
-      if (d.id === user?.homeDepartment?.id) return true;
-      if (inviteToken && returnToSlug && d.slug === returnToSlug) return true;
-      if (d.joinMode === 'LINK_ONLY' && returnToSlug && d.slug === returnToSlug) return true;
-      return !d.joinMode || d.joinMode === 'OPEN';
-    });
-    return q ? list.filter((d) => d.name.toLowerCase().includes(q) || d.slug.includes(q)) : list;
-  }, [departments, query, user?.homeDepartment?.id, inviteToken, returnToSlug]);
+    return q ? selectable.filter((d) => d.name.toLowerCase().includes(q) || d.slug.includes(q)) : selectable;
+  }, [selectable, query]);
 
   const choose = (id: string) => {
     if (fromCeviDb) return;
@@ -174,6 +210,25 @@ function DepartmentSetup() {
             </div>
           ) : (
             <>
+              {switchFrom && selectedDepartment && (
+                <Callout tone="warning" title={`Wechsel von ${switchFrom}`}>
+                  <p className="mt-1 text-[13px] leading-relaxed text-fg">
+                    Du gehörst bisher zu <strong>{switchFrom}</strong>. Mit «Speichern und weiter» wechselst du zu{' '}
+                    <strong>{selectedDepartment.name}</strong>. Eine bisherige Bestätigung deiner Zugehörigkeit gilt
+                    dann nicht mehr.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 text-[13px] font-semibold text-accent-ink underline underline-offset-2"
+                    onClick={() => {
+                      if (user) window.location.href = finalDestination(returnTo, user, org.dbType);
+                    }}
+                  >
+                    Nicht wechseln, bei {switchFrom} bleiben
+                  </button>
+                </Callout>
+              )}
+
               {(fromCeviDb || inviteLocked) && selectedDepartment ? (
                 <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
                   {inviteLocked ? (
@@ -194,7 +249,7 @@ function DepartmentSetup() {
                 </div>
               ) : (
                 <section aria-label={`${org.unitTerm} wählen`} className="space-y-3">
-                  {visible.length > 6 && (
+                  {selectable.length > 6 && (
                     <div className="relative">
                       <Search
                         aria-hidden
@@ -210,7 +265,7 @@ function DepartmentSetup() {
                       />
                     </div>
                   )}
-                  {(visible.length > 0 || query.trim()) ? (
+                  {selectable.length > 0 ? (
                     <ul
                       role="radiogroup"
                       className="max-h-[22rem] divide-y divide-line overflow-y-auto rounded-card border border-line bg-surface/70"

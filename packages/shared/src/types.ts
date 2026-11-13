@@ -16,6 +16,19 @@ import type { OrganizationType } from './organizations.js';
 
 export type DepartmentJoinMode = 'OPEN' | 'LINK_ONLY' | 'INVITE_ONLY';
 
+/** Konten einer Abteilung, die nur passwortlos (Spitzname + Geburtsdatum) hineinkommen */
+export interface PasswordlessAccountsDto {
+  count: number;
+  people: {
+    id: string;
+    nickname: string | null;
+    firstName: string;
+    lastName: string | null;
+    /** Zuletzt aktiv (JJJJ-MM-TT) */
+    lastSeenOn: string | null;
+  }[];
+}
+
 export interface DepartmentDto {
   id: string;
   name: string;
