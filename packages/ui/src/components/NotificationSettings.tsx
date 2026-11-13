@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { BellRing, Check, Mail, Send, Smartphone } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { BellRing, Check, Info, Send, Smartphone } from 'lucide-react';
 import {
   DEFAULT_EMAIL_REMINDER_MINUTES,
   DEFAULT_PUSH_REMINDER_MINUTES,
@@ -73,29 +73,62 @@ function waitForSwPushShown(timeoutMs = 2500): Promise<boolean> {
   });
 }
 
+/** iPhone/iPad (auch iPadOS im Desktop-Modus): Web Push nur in der zum Home-Bildschirm hinzugefügten App */
+function isAppleMobile(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 export interface NotificationSettingsProps {
   user: UserDto;
   onUserChange: (updated: UserDto) => void;
-  /** Kompakte Darstellung für das Konto-Dialogfenster in der Abteilungs-App */
+  /** Kompakte Darstellung für das Konto-Dialogfenster in der Abteilungs-App (nur Gerät und Schicht-Erinnerung) */
   compact?: boolean;
+  /**
+   * Adresse der installierbaren Abteilungs-App (z. B. auf der Landingpage). Auf dem iPhone funktioniert
+   * Web Push nur in der zum Home-Bildschirm hinzugefügten App, deshalb verweisen wir dorthin.
+   */
+  appUrl?: string;
 }
 
-export function NotificationSettings({ user, onUserChange, compact = false }: NotificationSettingsProps) {
+type Channel = 'email' | 'push';
+
+interface MatrixRow {
+  key: string;
+  label: string;
+  description: string;
+  email: { checked: boolean; toggle: (v: boolean) => void };
+  push: { checked: boolean; toggle: (v: boolean) => void };
+}
+
+/**
+ * Benachrichtigungs-Einstellungen: oben das Gerät (Web Push gilt pro Browser und Gerät), darunter eine
+ * Tabelle «was × wie» (E-Mail / Push) und die Zeitpunkte der Schicht-Erinnerung. Alles speichert sofort.
+ */
+export function NotificationSettings({ user, onUserChange, compact = false, appUrl }: NotificationSettingsProps) {
   const toast = useToast();
   const [pushSupported, setPushSupported] = useState(false);
+  const [appleMobile, setAppleMobile] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [deviceSubscribed, setDeviceSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
 
   const hasRealEmail = Boolean(user.email && !PLACEHOLDER_EMAIL_REGEX.test(user.email));
+  const emailUsable = hasRealEmail && Boolean(user.emailVerified);
   const emailMinutes = user.emailReminderMinutes ?? [...DEFAULT_EMAIL_REMINDER_MINUTES];
   const pushMinutes = user.pushReminderMinutes ?? [...DEFAULT_PUSH_REMINDER_MINUTES];
+  const subscriptionCount = user.pushSubscriptionCount ?? 0;
+  const otherDevices = Math.max(0, subscriptionCount - (deviceSubscribed ? 1 : 0));
+  const pushUsable = deviceSubscribed || subscriptionCount > 0;
+
+  const emailReminderOn = emailUsable && user.shiftReminders !== false && emailMinutes.length > 0;
+  const pushReminderOn = user.pushReminders !== false && pushMinutes.length > 0;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const supported =
-      'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    setAppleMobile(isAppleMobile());
+    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     setPushSupported(supported);
     if (!supported) return;
 
@@ -105,9 +138,9 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
       try {
         const reg = await ensureActiveServiceWorker();
         const sub = await reg.pushManager.getSubscription();
-        const url = sub
-          ? `/api/push/status?endpoint=${encodeURIComponent(sub.endpoint)}`
-          : '/api/push/status';
+        // Das Backend erkennt das Gerät zusätzlich über ein Cookie der ganzen Domain, damit ein auf einer
+        // anderen Subdomain (Startseite oder andere Abteilung) eingerichtetes Abo hier als aktiv gilt.
+        const url = sub ? `/api/push/status?endpoint=${encodeURIComponent(sub.endpoint)}` : '/api/push/status';
         const res = await fetch(url, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
@@ -147,32 +180,32 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
     }
   };
 
-  const toggleEmailMinute = (minute: number) => {
-    const current = new Set(emailMinutes);
-    if (current.has(minute)) {
-      current.delete(minute);
-    } else {
-      current.add(minute);
-    }
+  const toggleMinute = (channel: Channel, minute: number) => {
+    const current = new Set(channel === 'email' ? emailMinutes : pushMinutes);
+    if (current.has(minute)) current.delete(minute);
+    else current.add(minute);
     const next = [...current].sort((a, b) => a - b);
-    void patchProfile({
-      emailReminderMinutes: next,
-      shiftReminders: next.length > 0,
-    });
+    void patchProfile(
+      channel === 'email'
+        ? { emailReminderMinutes: next, shiftReminders: next.length > 0 }
+        : { pushReminderMinutes: next, pushReminders: next.length > 0 }
+    );
   };
 
-  const togglePushMinute = (minute: number) => {
-    const current = new Set(pushMinutes);
-    if (current.has(minute)) {
-      current.delete(minute);
+  const setShiftReminder = (channel: Channel, enabled: boolean) => {
+    if (channel === 'email') {
+      const nextMinutes = enabled ? (emailMinutes.length > 0 ? emailMinutes : [...DEFAULT_EMAIL_REMINDER_MINUTES]) : [];
+      void patchProfile(
+        { shiftReminders: enabled, emailReminderMinutes: nextMinutes },
+        enabled ? 'E-Mail-Erinnerung eingeschaltet' : 'E-Mail-Erinnerung ausgeschaltet'
+      );
     } else {
-      current.add(minute);
+      const nextMinutes = enabled ? (pushMinutes.length > 0 ? pushMinutes : [...DEFAULT_PUSH_REMINDER_MINUTES]) : [];
+      void patchProfile(
+        { pushReminders: enabled, pushReminderMinutes: nextMinutes },
+        enabled ? 'Push-Erinnerung eingeschaltet' : 'Push-Erinnerung ausgeschaltet'
+      );
     }
-    const next = [...current].sort((a, b) => a - b);
-    void patchProfile({
-      pushReminderMinutes: next,
-      pushReminders: next.length > 0,
-    });
   };
 
   const subscribeCurrentOrigin = async (reg: ServiceWorkerRegistration) => {
@@ -218,7 +251,7 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
         if (perm !== 'granted') {
           toast({
             title: 'Berechtigung verweigert',
-            description: 'Bitte erlaube Benachrichtigungen in den Browser-Einstellungen für diese Seite.',
+            description: 'Erlaube Benachrichtigungen in den Browser-Einstellungen für diese Seite.',
             tone: 'error',
           });
           return;
@@ -230,7 +263,7 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
         setDeviceSubscribed(true);
         onUserChange({
           ...user,
-          pushSubscriptionCount: data.subscriptionCount ?? (user.pushSubscriptionCount ?? 0) + 1,
+          pushSubscriptionCount: data.subscriptionCount ?? subscriptionCount + 1,
         });
 
         const swShown = await shownPromise;
@@ -246,8 +279,8 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
         }
 
         toast({
-          title: 'Browser-Benachrichtigungen aktiviert',
-          description: 'Dieses Gerät empfängt jetzt Push-Mitteilungen.',
+          title: 'Push auf diesem Gerät aktiviert',
+          description: 'Gilt für diesen Browser, auch auf den anderen Seiten des Schichtplans.',
           tone: 'success',
         });
       } else {
@@ -265,11 +298,9 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
         onUserChange({
           ...user,
           pushSubscriptionCount:
-            typeof data.subscriptionCount === 'number'
-              ? data.subscriptionCount
-              : Math.max(0, (user.pushSubscriptionCount ?? 1) - 1),
+            typeof data.subscriptionCount === 'number' ? data.subscriptionCount : Math.max(0, subscriptionCount - 1),
         });
-        toast({ title: 'Auf diesem Gerät deaktiviert' });
+        toast({ title: 'Push auf diesem Gerät ausgeschaltet' });
       }
     } catch (err) {
       toast({
@@ -321,7 +352,7 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
       toast({
         title: 'Test-Benachrichtigung gesendet',
         description:
-          'Falls kein Popup sichtbar ist, prüfe bitte in den Windows-/macOS-Systemeinstellungen, ob Mitteilungen für deinen Browser erlaubt sind und «Nicht stören» aus ist.',
+          'Falls kein Popup sichtbar ist, prüfe in den Windows-/macOS-Systemeinstellungen, ob Mitteilungen für deinen Browser erlaubt sind und «Nicht stören» aus ist.',
         tone: 'success',
       });
     } catch (err) {
@@ -335,207 +366,252 @@ export function NotificationSettings({ user, onUserChange, compact = false }: No
     }
   };
 
-  return (
-    <div className={cn('space-y-5', compact && 'space-y-4')}>
-      {/* 1. E-Mail-Erinnerungen */}
-      <div className={cn('space-y-3', !compact && 'rounded-field border border-line bg-surface-1 p-4')}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-fg">
-              <Mail className="size-4 text-accent-ink shrink-0" />
-              <span>E-Mail-Erinnerung vor meinen Schichten</span>
-            </div>
-            <p className="mt-0.5 text-xs text-fg-muted">
-              {hasRealEmail && user.emailVerified
-                ? `Wähle aus, wann wir dir vor Schichtbeginn eine Erinnerung an ${user.email} senden.`
-                : 'Dafür braucht dein Konto eine bestätigte E-Mail-Adresse.'}
-            </p>
+  const rows: MatrixRow[] = [
+    {
+      key: 'shift',
+      label: 'Schicht-Erinnerung',
+      description: 'Vor dem Beginn deiner Schichten',
+      email: { checked: emailReminderOn, toggle: (v) => setShiftReminder('email', v) },
+      push: { checked: pushReminderOn, toggle: (v) => setShiftReminder('push', v) },
+    },
+    {
+      key: 'catering',
+      label: 'Offene Verpflegungs-Bons',
+      description: 'Nach Schichtende und vor Festende',
+      email: {
+        checked: user.emailNotifyCateringTokens !== false,
+        toggle: (v) => void patchProfile({ emailNotifyCateringTokens: v }),
+      },
+      push: {
+        checked: user.pushNotifyCateringTokens !== false,
+        toggle: (v) => void patchProfile({ pushNotifyCateringTokens: v }),
+      },
+    },
+    {
+      key: 'replacement',
+      label: 'Ersatz gefunden',
+      description: 'Jemand übernimmt deine angebotene Schicht',
+      email: {
+        checked: user.emailNotifyReplacement !== false,
+        toggle: (v) => void patchProfile({ emailNotifyReplacement: v }),
+      },
+      push: {
+        checked: user.pushNotifyReplacement !== false,
+        toggle: (v) => void patchProfile({ pushNotifyReplacement: v }),
+      },
+    },
+    {
+      key: 'messages',
+      label: 'Mitteilungen vom OK',
+      description: 'Infos zu deinen eingetragenen Anlässen',
+      email: {
+        checked: user.emailNotifyMessages !== false,
+        toggle: (v) => void patchProfile({ emailNotifyMessages: v }),
+      },
+      push: {
+        checked: user.pushNotifyMessages !== false,
+        toggle: (v) => void patchProfile({ pushNotifyMessages: v }),
+      },
+    },
+  ];
+  const visibleRows = compact ? rows.slice(0, 1) : rows;
+
+  /** Auf der Profilseite eigenständige Karten, im Konto-Dialog schlichte Felder */
+  const box = compact ? 'rounded-field border border-line bg-surface-1' : 'rounded-card border border-line bg-surface';
+  const pad = compact ? 'p-4' : 'p-4 sm:p-5';
+
+  const deviceCard = (
+    <div className={cn('space-y-3', box, pad)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
+            <BellRing className="size-4 shrink-0 text-accent-ink" />
+            <span>Push auf diesem Gerät</span>
+            {deviceSubscribed ? (
+              <Badge tone="success" size="sm">
+                Aktiv
+              </Badge>
+            ) : (
+              <Badge tone="neutral" size="sm">
+                Aus
+              </Badge>
+            )}
           </div>
-          <Switch
-            checked={user.shiftReminders !== false && emailMinutes.length > 0}
-            disabled={!hasRealEmail || !user.emailVerified}
-            onChange={(enabled) => {
-              const nextMinutes = enabled
-                ? emailMinutes.length > 0
-                  ? emailMinutes
-                  : [...DEFAULT_EMAIL_REMINDER_MINUTES]
-                : [];
-              void patchProfile(
-                { shiftReminders: enabled, emailReminderMinutes: nextMinutes },
-                enabled ? 'E-Mail-Erinnerungen eingeschaltet' : 'E-Mail-Erinnerungen ausgeschaltet'
-              );
-            }}
-          />
+          <p className="mt-0.5 text-xs text-fg-muted">
+            Auch bei geschlossenem Browser. Gilt pro Gerät und Browser, egal wo im Schichtplan du es einschaltest.
+          </p>
         </div>
-
-        {hasRealEmail && user.emailVerified && user.shiftReminders !== false && (
-          <div className="pt-1">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle">
-              Zeitpunkte (Mehrfachauswahl möglich)
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {EMAIL_REMINDER_MINUTES.map((m) => {
-                const active = emailMinutes.includes(m);
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => toggleEmailMinute(m)}
-                    className={cn(
-                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition',
-                      active
-                        ? 'border-accent bg-accent/15 text-accent-ink'
-                        : 'border-line bg-surface-2 text-fg-muted hover:border-line-strong hover:text-fg'
-                    )}
-                  >
-                    {active && <Check className="size-3" />}
-                    {REMINDER_MINUTE_LABELS[m]?.short || `${m} Min.`}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {!compact && hasRealEmail && user.emailVerified && (
-          <div className="space-y-2.5 border-t border-line pt-3">
-            <Switch
-              checked={user.emailNotifyCateringTokens !== false}
-              onChange={(v) => void patchProfile({ emailNotifyCateringTokens: v })}
-              label="E-Mail bei offenen Verpflegungs-Bons"
-              description="Erinnerung nach Schichtende und vor Festende, falls du noch nicht eingelöste Bons hast."
-            />
-            <Switch
-              checked={user.emailNotifyReplacement !== false}
-              onChange={(v) => void patchProfile({ emailNotifyReplacement: v })}
-              label="E-Mail bei «Ersatz gefunden»"
-              description="Informieren, wenn jemand deine angebotene Schicht übernimmt."
-            />
-            <Switch
-              checked={user.emailNotifyMessages !== false}
-              onChange={(v) => void patchProfile({ emailNotifyMessages: v })}
-              label="E-Mail bei Mitteilungen vom OK"
-              description="Wichtige Infos und Rundschreiben zu deinen eingetragenen Anlässen."
-            />
-          </div>
+        {pushSupported && (
+          <Switch
+            checked={deviceSubscribed}
+            disabled={subscribing}
+            ariaLabel="Push auf diesem Gerät"
+            onChange={(enable) => void handleToggleDevicePush(enable)}
+          />
         )}
       </div>
 
-      {/* 2. Browser-Push-Benachrichtigungen */}
-      <div className={cn('space-y-3', !compact && 'rounded-field border border-line bg-surface-1 p-4')}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
-              <BellRing className="size-4 text-accent-ink shrink-0" />
-              <span>Browser-Benachrichtigungen (Web Push)</span>
-              {deviceSubscribed && (
-                <Badge tone="success" size="sm">
-                  Auf diesem Gerät aktiv
-                </Badge>
+      {!pushSupported && (
+        <Callout tone="info">
+          {appleMobile ? (
+            <>
+              Auf dem iPhone und iPad funktioniert Push nur in der App auf dem Home-Bildschirm.{' '}
+              {appUrl ? (
+                <>
+                  <a href={appUrl} className="font-semibold underline underline-offset-2">
+                    Öffne den Schichtplan deiner Abteilung
+                  </a>
+                  , füge ihn über «Teilen → Zum Home-Bildschirm» hinzu und schalte Push dort ein.
+                </>
+              ) : (
+                <>Füge den Schichtplan über «Teilen → Zum Home-Bildschirm» hinzu und schalte Push in der App ein.</>
               )}
-              {!deviceSubscribed && (user.pushSubscriptionCount ?? 0) > 0 && (
-                <Badge tone="outline" size="sm">
-                  {user.pushSubscriptionCount} {user.pushSubscriptionCount === 1 ? 'anderes Gerät' : 'andere Geräte'}
-                </Badge>
-              )}
-            </div>
-            <p className="mt-0.5 text-xs text-fg-muted">
-              Erhalte Mitteilungen direkt auf dein Handy oder deinen Computer – auch wenn der Browser geschlossen ist.
-            </p>
-          </div>
-          {pushSupported && (
-            <Switch
-              checked={deviceSubscribed}
-              disabled={subscribing}
-              onChange={(enable) => void handleToggleDevicePush(enable)}
-            />
+            </>
+          ) : (
+            'Dieser Browser unterstützt keine Push-Mitteilungen.'
+          )}
+        </Callout>
+      )}
+
+      {pushSupported && permission === 'denied' && !deviceSubscribed && (
+        <Callout tone="warning">
+          Du hast Benachrichtigungen im Browser blockiert. Erlaube sie über das Schloss-Symbol in der Adresszeile.
+        </Callout>
+      )}
+
+      {pushUsable && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+          <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
+            <Smartphone className="size-3.5" />
+            {deviceSubscribed
+              ? otherDevices > 0
+                ? `Hier und auf ${otherDevices} ${otherDevices === 1 ? 'weiterem Gerät' : 'weiteren Geräten'} aktiv`
+                : 'Nur auf diesem Gerät aktiv'
+              : `Auf ${subscriptionCount} ${subscriptionCount === 1 ? 'anderem Gerät' : 'anderen Geräten'} aktiv`}
+          </span>
+          {!compact && (
+            <Button type="button" variant="secondary" size="sm" loading={testingPush} onClick={handleTestPush}>
+              <Send className="size-3.5" /> Test senden
+            </Button>
           )}
         </div>
+      )}
+    </div>
+  );
 
-        {!pushSupported && (
-          <Callout tone="info">
-            Dein aktueller Browser unterstützt keine Web-Push-Mitteilungen. Auf dem iPhone/iPad füge den Schichtplan zuerst über «Teilen → Zum Home-Bildschirm» als App hinzu.
-          </Callout>
-        )}
-
-        {pushSupported && permission === 'denied' && !deviceSubscribed && (
-          <Callout tone="warning">
-            Du hast Benachrichtigungen im Browser blockiert. Bitte erlaube sie über das Schloss-Symbol in der Adresszeile.
-          </Callout>
-        )}
-
-        {(deviceSubscribed || (user.pushSubscriptionCount ?? 0) > 0) && (
-          <div className="space-y-3 pt-1">
-            <div>
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle">
-                Push-Erinnerung vor Schichtbeginn
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {PUSH_REMINDER_MINUTES.map((m) => {
-                  const active = (user.pushReminders ?? true) && pushMinutes.includes(m);
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => togglePushMinute(m)}
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition',
-                        active
-                          ? 'border-accent bg-accent/15 text-accent-ink'
-                          : 'border-line bg-surface-2 text-fg-muted hover:border-line-strong hover:text-fg'
-                      )}
-                    >
-                      {active && <Check className="size-3" />}
-                      {REMINDER_MINUTE_LABELS[m]?.short || `${m} Min.`}
-                    </button>
-                  );
-                })}
-              </div>
+  const matrix = (
+    <div className={cn('overflow-hidden', box)}>
+      <div
+        className="grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem] items-center gap-2 border-b border-line bg-surface-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle sm:grid-cols-[minmax(0,1fr)_5rem_5rem]"
+      >
+        <span>{compact ? 'Erinnerung' : 'Was'}</span>
+        <span className="text-center">
+          E-Mail
+        </span>
+        <span className="text-center">
+          Push
+        </span>
+      </div>
+      <div className="divide-y divide-line">
+        {visibleRows.map((row) => (
+          <div
+            key={row.key}
+            className="grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem] items-center gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_5rem_5rem]"
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-fg">{row.label}</div>
+              {!compact && <div className="mt-0.5 text-xs text-fg-subtle">{row.description}</div>}
             </div>
-
-            {!compact && (
-              <div className="space-y-2.5 border-t border-line pt-3">
-                <Switch
-                  checked={user.pushNotifyCateringTokens !== false}
-                  onChange={(v) => void patchProfile({ pushNotifyCateringTokens: v })}
-                  label="Push bei offenen Verpflegungs-Bons"
-                  description="Mitteilung auf dein Handy nach Schichtende oder vor Festende bei offenen Bons."
-                />
-                <Switch
-                  checked={user.pushNotifyReplacement !== false}
-                  onChange={(v) => void patchProfile({ pushNotifyReplacement: v })}
-                  label="Push bei «Ersatz gefunden»"
-                  description="Sofort informieren, wenn jemand deine angebotene Schicht übernimmt."
-                />
-                <Switch
-                  checked={user.pushNotifyMessages !== false}
-                  onChange={(v) => void patchProfile({ pushNotifyMessages: v })}
-                  label="Push bei Nachrichten vom OK"
-                  description="Kurze Vorschau auf dem Gerät, wenn das OK eine Nachricht an deinen Anlass schickt."
-                />
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <span className="text-xs text-fg-subtle flex items-center gap-1">
-                <Smartphone className="size-3.5" />
-                {(user.pushSubscriptionCount ?? 0) > 0
-                  ? `Auf ${user.pushSubscriptionCount} ${user.pushSubscriptionCount === 1 ? 'Gerät' : 'Geräten'} eingerichtet`
-                  : 'Auf diesem Gerät aktiv'}
-              </span>
-              <Button
-                type="button"
-                variant="secondary"
+            <div className="flex justify-center">
+              <Switch
                 size="sm"
-                loading={testingPush}
-                onClick={handleTestPush}
-              >
-                <Send className="size-3.5" /> Test-Benachrichtigung senden
-              </Button>
+                checked={emailUsable && row.email.checked}
+                disabled={!emailUsable}
+                ariaLabel={`${row.label} per E-Mail`}
+                onChange={row.email.toggle}
+              />
+            </div>
+            <div className="flex justify-center">
+              <Switch
+                size="sm"
+                checked={pushUsable && row.push.checked}
+                disabled={!pushUsable}
+                ariaLabel={`${row.label} per Push`}
+                onChange={row.push.toggle}
+              />
             </div>
           </div>
-        )}
+        ))}
       </div>
+      {(!emailUsable || !pushUsable) && (
+        <div className="space-y-1 border-t border-line bg-surface-1 px-4 py-2.5 text-xs text-fg-muted">
+          {!emailUsable && (
+            <p className="flex items-start gap-1.5">
+              <Info className="mt-0.5 size-3.5 shrink-0" />
+              E-Mails brauchen eine bestätigte E-Mail-Adresse (unter «Angaben»).
+            </p>
+          )}
+          {!pushUsable && (
+            <p className="flex items-start gap-1.5">
+              <Info className="mt-0.5 size-3.5 shrink-0" />
+              Für Push zuerst oben «Push auf diesem Gerät» einschalten.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const minuteChips = (channel: Channel, title: ReactNode) => {
+    const options = channel === 'email' ? EMAIL_REMINDER_MINUTES : PUSH_REMINDER_MINUTES;
+    const selected = channel === 'email' ? emailMinutes : pushMinutes;
+    return (
+      <div>
+        <div className="mb-1.5 text-xs font-semibold text-fg-subtle">{title}</div>
+        <div className="flex flex-wrap gap-1.5">
+          {options.map((m) => {
+            const active = selected.includes(m);
+            return (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleMinute(channel, m)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition',
+                  active
+                    ? 'border-accent bg-accent/15 text-accent-ink'
+                    : 'border-line bg-surface-2 text-fg-muted hover:border-line-strong hover:text-fg'
+                )}
+              >
+                {active && <Check className="size-3" />}
+                {REMINDER_MINUTE_LABELS[m]?.short || `${m} Min.`}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const showEmailTimes = emailReminderOn;
+  const showPushTimes = pushUsable && pushReminderOn;
+
+  return (
+    <div className={cn('space-y-4', compact && 'space-y-3')}>
+      {deviceCard}
+      {matrix}
+      {!compact && (showEmailTimes || showPushTimes) && (
+        <div className={cn('space-y-3', box, pad)}>
+          <div>
+            <div className="text-sm font-semibold text-fg">Wann erinnern?</div>
+            <p className="mt-0.5 text-xs text-fg-muted">Wie lange vor Schichtbeginn. Mehrere Zeitpunkte sind möglich.</p>
+          </div>
+          {showEmailTimes && minuteChips('email', `E-Mail an ${user.email}`)}
+          {showPushTimes && minuteChips('push', 'Push')}
+        </div>
+      )}
+      {!compact && <p className="text-center text-xs text-fg-subtle">Änderungen werden sofort gespeichert.</p>}
     </div>
   );
 }

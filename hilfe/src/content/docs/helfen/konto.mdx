@@ -24,7 +24,14 @@ Im Fenster findest du:
 
 <Path steps={['cevi-schichtplan.ch/profil']} />
 
-Hier änderst du **Vorname, Nachname, Handynummer und Geburtsdatum**. Diese Angaben verwendet der Schichtplan, wenn ein Anlass sie [verlangt](/helfen/angaben-und-fragen/).
+Die Profilseite sieht auf der Startseite und im Schichtplan deiner Abteilung (`<abteilung>.cevi-schichtplan.ch/profil`) gleich aus. Sie hat vier Tabs:
+
+- **Übersicht**: deine nächsten Schichten mit Kalender-Abo, deine Abteilung und Stufen und was im Profil noch fehlt
+- **Angaben**: Name, Handynummer, Geburtsdatum und E-Mail
+- **Benachrichtigungen**: E-Mail und Push
+- **Sicherheit**: Passwort, Zwei-Faktor-Anmeldung und Konto löschen
+
+Im Tab **Angaben** änderst du **Vorname, Nachname, Handynummer und Geburtsdatum**. Diese Angaben verwendet der Schichtplan, wenn ein Anlass sie [verlangt](/helfen/angaben-und-fragen/).
 
 Bei Cevi.DB-Konten kommt das Geburtsdatum aus der Cevi.DB und lässt sich hier nicht ändern. Der Name wird bei jedem Login aus der Cevi.DB übernommen. Ändere ihn also besser dort. Die Handynummer verwaltest du nur hier. Eine Adresse speichert der Schichtplan nicht.
 
@@ -34,11 +41,11 @@ Meldest du dich mit Cevi-Name an, ist das Geburtsdatum Teil deines Logins. Ände
 
 Steht neben deiner E-Mail **Nicht bestätigt**, tippe auf **Bestätigungslink anfordern** und öffne den Link in der E-Mail. Ohne bestätigte E-Mail kannst du dich mit E-Mail und Passwort nicht anmelden.
 
-Hast du noch gar keine E-Mail hinterlegt, kannst du sie auf der Profilseite ergänzen.
+Hast du noch gar keine E-Mail hinterlegt, kannst du sie im Tab **Angaben** ergänzen.
 
 ### Passwort & Fallback-Login
 
-Auf der Profilseite verwaltest du dein persönliches Passwort:
+Im Tab **Sicherheit** verwaltest du dein persönliches Passwort:
 
 - **Konto mit Passwort:** Du kannst dein bisheriges Passwort jederzeit ändern (bisheriges Passwort eingeben, neues Passwort wählen).
 - **Konto mit Cevi.DB / MiData / Jubla-DB:** Du kannst dir ein **Fallback-Passwort** festlegen. Damit meldest du dich mit deiner E-Mail-Adresse und dem Passwort an, falls die Verbandsdatenbank vorübergehend nicht erreichbar sein sollte. Deine Schichten und Leitungsrechte bleiben voll erhalten.
@@ -49,7 +56,7 @@ Mit der Zwei-Faktor-Anmeldung fragt der Schichtplan beim Login zusätzlich nach 
 
 So richtest du sie ein:
 
-1. Auf der Profilseite bei **Zwei-Faktor-Anmeldung** auf <Btn variant="secondary">Einrichten</Btn> tippen. Hast du ein Passwort, gibst du es zur Bestätigung ein.
+1. Im Tab **Sicherheit** bei **Zwei-Faktor-Anmeldung** auf <Btn variant="secondary">Einrichten</Btn> tippen. Hast du ein Passwort, gibst du es zur Bestätigung ein.
 2. In der Authenticator-App ein neues Konto hinzufügen und den QR-Code scannen (oder den Schlüssel abtippen).
 3. Den Code aus der App eingeben und <Btn variant="primary">Einschalten</Btn>.
 4. Die **10 Wiederherstellungscodes** sicher aufbewahren, zum Beispiel im Passwort-Manager oder ausgedruckt. Sie werden nur dieses eine Mal angezeigt.
@@ -67,16 +74,21 @@ Melde dich mit einem Wiederherstellungscode an (auf der Code-Seite **Wiederherst
 
 ### Benachrichtigungen & Erinnerungen
 
-Sowohl im **Konto-Fenster** als auch auf der **Profilseite** (`/profil`) stellst du ein, wie und wann du erinnert werden möchtest:
+Im Tab **Benachrichtigungen** der Profilseite stellst du ein, wie und wann du erinnert werden möchtest. Alles wird sofort gespeichert. Die Schicht-Erinnerung lässt sich auch im **Konto-Fenster** ein- und ausschalten.
 
-- **E-Mail-Erinnerungen**: Bei bestätigter E-Mail-Adresse wählst du frei aus, zu welchen Zeitpunkten vor Schichtbeginn du eine Erinnerung mit Kalender-Eintrag (`.ics`) bekommst (z. B. 1 Woche, 2 Tage, 1 Tag oder 2 Stunden vorher – auch mehrere Zeitpunkte gleichzeitig).
-- **Browser-Benachrichtigungen (Web Push)**: Du kannst Push-Mitteilungen direkt auf deinem Handy oder Computer aktivieren (auch für Cevi-Name-Profile ohne E-Mail). Mit dem Knopf **Test-Benachrichtigung senden** prüfst du sofort, ob alles klappt.
+- **Push auf diesem Gerät**: Schaltet Push-Mitteilungen für den Browser ein, mit dem du gerade surfst (auch für Cevi-Name-Profile ohne E-Mail). Push gilt pro Gerät und Browser, egal ob du es auf der Startseite oder im Schichtplan deiner Abteilung einschaltest. Auf deinem Handy und anderen Computern schaltest du es dort separat ein. Mit **Test senden** prüfst du, ob alles klappt.
+- **Was per E-Mail, was per Push**: Eine Tabelle mit den Spalten E-Mail und Push für Schicht-Erinnerung, offene Verpflegungs-Bons, «Ersatz gefunden» und Mitteilungen vom OK. E-Mails brauchen eine bestätigte Adresse.
+- **Wann erinnern?**: Zu welchen Zeitpunkten vor Schichtbeginn die Erinnerung kommt (z. B. 1 Woche, 2 Tage, 1 Tag oder 2 Stunden vorher, auch mehrere gleichzeitig). E-Mail-Erinnerungen enthalten einen Kalender-Eintrag (`.ics`).
+
+:::note[iPhone und iPad]
+Push funktioniert auf iPhone und iPad nur in der App auf dem Home-Bildschirm. Öffne den Schichtplan deiner Abteilung, füge ihn über **Teilen → Zum Home-Bildschirm** hinzu und schalte Push in der App ein.
+:::
 
 ## Konto löschen
 
 Löschen entfernt dein Konto mit allen Schicht-Eintragungen, Abteilungs- und OK-Rollen. Du bist danach sofort abgemeldet. Das lässt sich nicht rückgängig machen. Zur Sicherheit wird der Knopf erst nach einigen Sekunden aktiv.
 
-- Konten mit **Cevi.DB** oder **Passwort** löschen sich selbst, im Konto-Fenster oder ganz unten auf der Profilseite.
+- Konten mit **Cevi.DB** oder **Passwort** löschen sich selbst, im Konto-Fenster oder auf der Profilseite im Tab **Sicherheit**.
 - Profile nur mit **Cevi-Name** haben diese Option nicht. Sie sind als kurzfristige Helferprofile gedacht. Soll so ein Profil weg, wende dich an die [Kontaktadresse](/wissen/kontakt/).
 
 :::caution[Vorher austragen ist netter]

@@ -474,7 +474,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
                 <span className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
                   Schicht-Erinnerungen
                 </span>
-                <Link href="/profil" onClick={onClose} className="text-xs font-semibold text-accent-ink hover:underline">
+                <Link href="/profil?tab=benachrichtigungen" onClick={onClose} className="text-xs font-semibold text-accent-ink hover:underline">
                   Profil bearbeiten
                 </Link>
               </div>

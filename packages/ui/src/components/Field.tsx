@@ -125,9 +125,13 @@ export interface SwitchProps {
   description?: ReactNode;
   disabled?: boolean;
   className?: string;
+  /** Zugänglicher Name, wenn der Schalter ohne sichtbares Label steht (z. B. in einer Tabelle) */
+  ariaLabel?: string;
+  /** Kleinere Variante für dichte Tabellen */
+  size?: 'md' | 'sm';
 }
 
-export function Switch({ checked, onChange, label, description, disabled, className }: SwitchProps) {
+export function Switch({ checked, onChange, label, description, disabled, className, ariaLabel, size = 'md' }: SwitchProps) {
   const id = useId();
   return (
     <div className={cn('flex items-start justify-between gap-4', className)}>
@@ -142,20 +146,23 @@ export function Switch({ checked, onChange, label, description, disabled, classN
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={ariaLabel}
         disabled={disabled}
         onClick={() => {
           if (!disabled) onChange(!checked);
         }}
         className={cn(
-          'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200',
+          'relative inline-flex shrink-0 items-center rounded-full transition-colors duration-200',
+          size === 'sm' ? 'h-6 w-10' : 'h-7 w-12',
           checked ? 'bg-accent' : 'bg-surface-3 ring-1 ring-inset ring-line-strong',
           disabled && 'cursor-not-allowed opacity-50'
         )}
       >
         <span
           className={cn(
-            'size-5 rounded-full bg-white shadow-soft transition-transform duration-300 ease-out-expo',
-            checked ? 'translate-x-6' : 'translate-x-1'
+            'rounded-full bg-white shadow-soft transition-transform duration-300 ease-out-expo',
+            size === 'sm' ? 'size-4' : 'size-5',
+            checked ? (size === 'sm' ? 'translate-x-5' : 'translate-x-6') : 'translate-x-1'
           )}
         />
       </button>

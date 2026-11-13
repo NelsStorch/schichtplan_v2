@@ -1121,7 +1121,7 @@ export async function sendShiftReminderEmail({
   const eyebrow = isResponsible ? 'Schichtleitung · Erinnerung' : 'Einsatz-Erinnerung';
   const title = leadMinutes !== undefined ? `Deine Schicht beginnt ${leadLabel}!` : 'Deine Schicht steht bevor!';
   const preheader = `Dein Einsatz «${shiftTitle}» bei ${eventTitle} beginnt ${leadLabel} (${timeRangeFormatted}).`;
-  const profileUrl = `https://${org.domain}/profil`;
+  const profileUrl = `https://${org.domain}/profil?tab=benachrichtigungen`;
 
   const cleanNote = reminderNote?.trim() || null;
   const noteBlockHtml = cleanNote

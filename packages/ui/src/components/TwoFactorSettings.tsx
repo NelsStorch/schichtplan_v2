@@ -208,8 +208,8 @@ export function TwoFactorSettings({ user, onUserChange }: TwoFactorSettingsProps
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">
-              <Smartphone className="size-4" /> Zwei-Faktor-Anmeldung
+            <h2 className="flex items-center gap-2 text-base font-bold text-fg">
+              <Smartphone className="size-4 text-accent-ink" /> Zwei-Faktor-Anmeldung
             </h2>
             {status.enabled ? (
               <Badge tone="success" size="sm" className="gap-1">

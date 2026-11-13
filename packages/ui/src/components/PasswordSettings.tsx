@@ -96,8 +96,8 @@ export function PasswordSettings({ user, onUserChange }: PasswordSettingsProps) 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-subtle">
-              <KeyRound className="size-4" /> Passwort &amp; Fallback-Login
+            <h2 className="flex items-center gap-2 text-base font-bold text-fg">
+              <KeyRound className="size-4 text-accent-ink" /> Passwort &amp; Fallback-Login
             </h2>
             {user.hasPassword ? (
               <Badge tone="success" size="sm" className="gap-1">

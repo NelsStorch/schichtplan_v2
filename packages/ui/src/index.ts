@@ -61,3 +61,4 @@ export { ConsoleBanner, printConsoleBanner } from './console/ConsoleBanner';
 export { NotificationSettings, type NotificationSettingsProps } from './components/NotificationSettings';
 export { PasswordSettings, type PasswordSettingsProps } from './components/PasswordSettings';
 export { TwoFactorSettings, type TwoFactorSettingsProps } from './components/TwoFactorSettings';
+export { ProfileView, PROFILE_TABS, type ProfileTab, type ProfileViewProps } from './components/ProfileView';
