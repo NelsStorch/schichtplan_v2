@@ -19,6 +19,7 @@ function VerifyEmailContent() {
   const token = searchParams.get('token');
   const errorParam = searchParams.get('error');
   const returnTo = cleanReturnTo(searchParams.get('return_to'));
+  const inviteToken = searchParams.get('invite')?.trim() || '';
 
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState<string | null>(null);
@@ -133,7 +134,7 @@ function VerifyEmailContent() {
               E-Mail bestätigt!
             </h1>
             <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">{success}</p>
-            <Button size="lg" className="mt-8 w-full" onClick={() => (window.location.href = withReturnTo('/', returnTo))}>
+            <Button size="lg" className="mt-8 w-full" onClick={() => (window.location.href = withReturnTo('/', returnTo, inviteToken))}>
               Zur Anmeldung
             </Button>
           </div>

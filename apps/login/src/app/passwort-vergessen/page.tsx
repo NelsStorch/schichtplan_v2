@@ -12,6 +12,7 @@ function ForgotPassword() {
   const searchParams = useSearchParams();
   // Verband der Domain, vom Server-Layout bereitgestellt (richtig schon beim ersten Rendern)
   const org = useOrganization();
+  const inviteToken = searchParams.get('invite')?.trim() || '';
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
@@ -59,7 +60,7 @@ function ForgotPassword() {
             size="lg"
             variant="secondary"
             className="mt-8 w-full"
-            onClick={() => (window.location.href = withReturnTo('/', returnTo))}
+            onClick={() => (window.location.href = withReturnTo('/', returnTo, inviteToken))}
           >
             Zur Anmeldung
           </Button>

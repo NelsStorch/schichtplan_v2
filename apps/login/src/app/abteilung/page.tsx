@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Check, Database, Search, UsersRound } from 'lucide-react';
 import type { DepartmentDirectoryItemDto, StufeRole, UserDto } from '@schichtplan/shared';
 import { Button, Callout, BrandLogo, Input, ThemeToggle, cn, useOrganization } from '@schichtplan/ui';
-import { cleanReturnTo, finalDestination } from '@/lib/destination';
+import { cleanReturnTo, departmentSlugFromReturnTo, finalDestination } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
 const NONE = 'NONE';
@@ -19,6 +19,8 @@ const ROLE_OPTIONS: { value: StufeRole | null; label: string }[] = [
 function DepartmentSetup() {
   const searchParams = useSearchParams();
   const returnTo = cleanReturnTo(searchParams.get('return_to'));
+  const inviteToken = searchParams.get('invite')?.trim() || null;
+  const returnToSlug = departmentSlugFromReturnTo(returnTo);
 
   // Verband der Domain, vom Server-Layout bereitgestellt (richtig schon beim ersten Rendern)
   const org = useOrganization();
@@ -28,6 +30,7 @@ function DepartmentSetup() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [stufen, setStufen] = useState<Record<string, StufeRole>>({});
+  const [inviteLocked, setInviteLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +38,11 @@ function DepartmentSetup() {
     (async () => {
       const meRes = await fetch('/api/auth/me', { cache: 'no-store' });
       if (meRes.status === 401) {
-        window.location.href = `/?return_to=${encodeURIComponent(window.location.href)}`;
+        const params = new URLSearchParams();
+        if (returnTo) params.set('return_to', returnTo);
+        if (inviteToken) params.set('invite', inviteToken);
+        const qs = params.toString();
+        window.location.href = qs ? `/?${qs}` : '/';
         return;
       }
       const me = (await meRes.json()) as UserDto;
@@ -45,9 +52,40 @@ function DepartmentSetup() {
       setStufen(Object.fromEntries((me.stufen ?? []).map((s) => [s.stufeId, s.role])));
 
       const dirRes = await fetch('/api/departments/directory');
-      setDepartments(dirRes.ok ? await dirRes.json() : []);
+      const dirList: DepartmentDirectoryItemDto[] = dirRes.ok ? await dirRes.json() : [];
+      setDepartments(dirList);
+
+      const target = returnToSlug ? dirList.find((d) => d.slug === returnToSlug) : undefined;
+      if (inviteToken && target) {
+        if (me.homeDepartmentFromCeviDb) {
+          if (!(me.homeDepartment?.id === target.id && me.needsDepartmentSetup && target.stufen.length > 0)) {
+            window.location.href = finalDestination(returnTo, me, org.dbType);
+            return;
+          }
+        } else if (me.homeDepartment?.id === target.id && !me.needsDepartmentSetup) {
+          window.location.href = finalDestination(returnTo, me, org.dbType);
+          return;
+        } else if (target.stufen.length === 0) {
+          const joinRes = await fetch('/api/auth/me/department', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ departmentId: target.id, inviteToken, viaLink: true, stufen: [] }),
+          });
+          const joinData = await joinRes.json().catch(() => ({}));
+          if (joinRes.ok) {
+            window.location.href = finalDestination(returnTo, joinData as UserDto, org.dbType);
+            return;
+          }
+          setError(joinData.error || 'Der Einladungslink konnte nicht eingelöst werden.');
+        } else {
+          setSelected(target.id);
+          setInviteLocked(true);
+        }
+      } else if (!me.homeDepartment && target && (target.joinMode === 'OPEN' || target.joinMode === 'LINK_ONLY')) {
+        setSelected(target.id);
+      }
     })().catch(() => setError('Die Angaben konnten nicht geladen werden. Bitte lade die Seite neu.'));
-  }, [returnTo]);
+  }, [returnTo, inviteToken, returnToSlug, org.dbType]);
 
   const fromCeviDb = Boolean(user?.homeDepartmentFromCeviDb);
   const lockedStufen = useMemo(
@@ -58,9 +96,14 @@ function DepartmentSetup() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = departments ?? [];
+    const list = (departments ?? []).filter((d) => {
+      if (d.id === user?.homeDepartment?.id) return true;
+      if (inviteToken && returnToSlug && d.slug === returnToSlug) return true;
+      if (d.joinMode === 'LINK_ONLY' && returnToSlug && d.slug === returnToSlug) return true;
+      return !d.joinMode || d.joinMode === 'OPEN';
+    });
     return q ? list.filter((d) => d.name.toLowerCase().includes(q) || d.slug.includes(q)) : list;
-  }, [departments, query]);
+  }, [departments, query, user?.homeDepartment?.id, inviteToken, returnToSlug]);
 
   const choose = (id: string) => {
     if (fromCeviDb) return;
@@ -79,6 +122,8 @@ function DepartmentSetup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           departmentId,
+          inviteToken: inviteToken || undefined,
+          viaLink: Boolean(returnToSlug && selectedDepartment?.slug === returnToSlug),
           stufen: departmentId
             ? Object.entries(stufen)
                 .filter(([stufeId]) => selectedDepartment?.stufen.some((s) => s.id === stufeId))
@@ -129,19 +174,27 @@ function DepartmentSetup() {
             </div>
           ) : (
             <>
-              {fromCeviDb && selectedDepartment ? (
+              {(fromCeviDb || inviteLocked) && selectedDepartment ? (
                 <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-accent/10 text-accent-ink">
-                    <Database className="size-[18px]" />
-                  </span>
+                  {inviteLocked ? (
+                    <BrandLogo className="size-10 shrink-0" logoUrl={selectedDepartment.logoUrl} alt="" />
+                  ) : (
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-tile bg-accent/10 text-accent-ink">
+                      <Database className="size-[18px]" />
+                    </span>
+                  )}
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-fg">{selectedDepartment.name}</span>
-                    <span className="block text-[13px] text-fg-subtle">Aus deinem {org.authProviderShort}-Profil übernommen</span>
+                    <span className="block text-[13px] text-fg-subtle">
+                      {fromCeviDb
+                        ? `Aus deinem ${org.authProviderShort}-Profil übernommen`
+                        : 'Über deinen Einladungslink ausgewählt'}
+                    </span>
                   </span>
                 </div>
               ) : (
                 <section aria-label={`${org.unitTerm} wählen`} className="space-y-3">
-                  {departments.length > 6 && (
+                  {visible.length > 6 && (
                     <div className="relative">
                       <Search
                         aria-hidden
@@ -157,24 +210,30 @@ function DepartmentSetup() {
                       />
                     </div>
                   )}
-                  <ul
-                    role="radiogroup"
-                    className="max-h-[22rem] divide-y divide-line overflow-y-auto rounded-card border border-line bg-surface/70"
-                  >
-                    {visible.map((d) => (
-                      <DepartmentOption
-                        key={d.id}
-                        selected={selected === d.id}
-                        onSelect={() => choose(d.id)}
-                        title={d.name}
-                        subtitle={`${d.slug}.${rootHost}`}
-                        logoUrl={d.logoUrl}
-                      />
-                    ))}
-                    {visible.length === 0 && (
-                      <li className="px-5 py-4 text-sm text-fg-subtle">Keine {org.unitTerm} gefunden.</li>
-                    )}
-                  </ul>
+                  {(visible.length > 0 || query.trim()) ? (
+                    <ul
+                      role="radiogroup"
+                      className="max-h-[22rem] divide-y divide-line overflow-y-auto rounded-card border border-line bg-surface/70"
+                    >
+                      {visible.map((d) => (
+                        <DepartmentOption
+                          key={d.id}
+                          selected={selected === d.id}
+                          onSelect={() => choose(d.id)}
+                          title={d.name}
+                          subtitle={`${d.slug}.${rootHost}`}
+                          logoUrl={d.logoUrl}
+                        />
+                      ))}
+                      {visible.length === 0 && (
+                        <li className="px-5 py-4 text-sm text-fg-subtle">Keine {org.unitTerm} gefunden.</li>
+                      )}
+                    </ul>
+                  ) : (
+                    <Callout tone="info">
+                      Um einer {org.unitTerm} beizutreten, öffne bitte den direkten Link oder Einladungslink deiner {org.unitTerm}.
+                    </Callout>
+                  )}
                   <ul role="radiogroup" className="overflow-hidden rounded-card border border-line bg-surface/70">
                     <DepartmentOption
                       selected={selected === NONE}

@@ -113,6 +113,7 @@ function LoginContent() {
   // der Browser mit Ziel, und React meldet einen Hydration-Fehler
   const [returnTo, setReturnTo] = useState<string | null>(null);
   useEffect(() => setReturnTo(cleanReturnTo(searchParams.get('return_to'))), [searchParams]);
+  const inviteToken = searchParams.get('invite')?.trim() || '';
   const destination = destinationHost(returnTo);
   const [landingHref, setLandingHref] = useState('/');
   useEffect(() => setLandingHref(getLandingUrl()), []);
@@ -265,7 +266,7 @@ function LoginContent() {
     if (res.ok) {
       setSuccess(`Hallo ${data.user.nickname || data.user.ceviName || data.user.firstName}. Du wirst weitergeleitet …`);
       setTimeout(() => {
-        window.location.href = afterLogin(data.user, returnTo, org.dbType);
+        window.location.href = afterLogin(data.user, returnTo, org.dbType, inviteToken);
       }, 700);
       return;
     }
@@ -324,6 +325,7 @@ function LoginContent() {
           lastName: quickLastName.trim() || undefined,
           stufen: Object.entries(quickStufen).map(([stufeId, role]) => ({ stufeId, role })),
           returnTo: returnTo ?? undefined,
+          inviteToken: inviteToken || undefined,
         }),
       });
       await handleCeviNameResponse(res);
@@ -351,6 +353,8 @@ function LoginContent() {
               firstName: regFirstName,
               lastName: regLastName.trim() || undefined,
               ceviName: regCeviName.trim() || undefined,
+              returnTo: returnTo ?? undefined,
+              inviteToken: inviteToken || undefined,
             };
 
       const res = await fetch(endpoint, {
@@ -379,7 +383,7 @@ function LoginContent() {
 
       // Zwei-Faktor eingeschaltet: Code aus der Authenticator-App auf eigener Seite abfragen
       if (data.twoFactorRequired) {
-        window.location.href = withReturnTo('/zwei-faktor', returnTo);
+        window.location.href = withReturnTo('/zwei-faktor', returnTo, inviteToken);
         return;
       }
 
@@ -389,7 +393,7 @@ function LoginContent() {
           : 'Konto erstellt. Du wirst weitergeleitet …'
       );
       setTimeout(() => {
-        window.location.href = afterLogin(data.user, returnTo, org.dbType);
+        window.location.href = afterLogin(data.user, returnTo, org.dbType, inviteToken);
       }, 700);
     } catch (err: any) {
       setError(err.message || 'Ein Fehler ist aufgetreten');
@@ -446,7 +450,7 @@ function LoginContent() {
                 </Button>
 
                 <a
-                  href={`/passwort-vergessen${returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : ''}`}
+                  href={withReturnTo('/passwort-vergessen', returnTo, inviteToken)}
                   className={buttonClasses({
                     variant: 'ghost',
                     size: 'sm',
@@ -558,7 +562,7 @@ function LoginContent() {
 
             <div className="mt-6 space-y-3">
               <a
-                href={afterLogin(existingUser, returnTo, org.dbType)}
+                href={afterLogin(existingUser, returnTo, org.dbType, inviteToken)}
                 className={buttonClasses({
                   size: 'lg',
                   className: 'w-full justify-between shadow-soft',
@@ -735,7 +739,7 @@ function LoginContent() {
                   )}
 
                   {/* Spitzname / Cevi-Name: Fallback für Personen ohne E-Mail */}
-                  {department && (
+                  {department && department.allowPasswordless !== false && (
                     <li>
                       <button
                         type="button"
@@ -860,6 +864,14 @@ function LoginContent() {
 
                 <div className="mt-6 space-y-4.5">
                   {feedback}
+
+                  {department.joinMode === 'INVITE_ONLY' && !inviteToken && (
+                    <Callout tone="danger" title="Einladungslink erforderlich">
+                      <p className="mt-1 text-[13px] leading-relaxed text-fg">
+                        {department.name} nimmt neue Mitglieder nur über einen persönlichen Einladungslink auf.
+                      </p>
+                    </Callout>
+                  )}
 
                   <Callout tone="warning" title="Wichtiger Sicherheitshinweis: Kein Passwort-Schutz">
                     <p className="mt-1 text-[13px] leading-relaxed text-fg">

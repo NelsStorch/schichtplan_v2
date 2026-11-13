@@ -10,11 +10,14 @@ import type { PrismaClient } from '../db.js';
 import type { DepartmentPermission } from '@schichtplan/shared';
 import { accessFrom } from './permissions.js';
 
-type Db = Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer'>;
+type Db = Pick<PrismaClient, 'user' | 'departmentMember' | 'eventOrganizer' | 'department'>;
 
 async function loadMembership(prisma: Db, departmentId: string, userId: string) {
   const [user, member, organizer] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { homeDepartmentId: true, isGlobalAdmin: true } }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { homeDepartmentId: true, homeDepartmentSource: true, isGlobalAdmin: true },
+    }),
     prisma.departmentMember.findUnique({
       where: { departmentId_userId: { departmentId, userId } },
       select: { role: true, permissions: true },
@@ -29,7 +32,17 @@ export async function isDepartmentInsider(prisma: Db, departmentId: string, user
   if (!userId) return false;
   const m = await loadMembership(prisma, departmentId, userId);
   if (!m) return false;
-  return m.user.homeDepartmentId === departmentId || m.access.permissions.size > 0 || m.isOrganizer;
+  if (m.access.permissions.size > 0 || m.isOrganizer) return true;
+  if (m.user.homeDepartmentId !== departmentId) return false;
+  if (m.user.homeDepartmentSource === 'CEVIDB' || m.user.homeDepartmentSource === 'CONFIRMED') {
+    return true;
+  }
+  // Bei geschlossenen Abteilungen (INVITE_ONLY) zählt eine unbestätigte Selbstzuordnung nicht als Insider
+  const dept = await prisma.department.findUnique({
+    where: { id: departmentId },
+    select: { joinMode: true },
+  });
+  return dept?.joinMode !== 'INVITE_ONLY';
 }
 
 /**

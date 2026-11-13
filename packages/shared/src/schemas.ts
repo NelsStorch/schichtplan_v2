@@ -108,6 +108,8 @@ export const RegisterHelperSchema = z.object({
   nickname: z.string().trim().max(60).optional(),
   ceviName: z.string().trim().max(60).optional(),
   phone: z.string().trim().max(30).optional(),
+  returnTo: z.string().max(500).optional(),
+  inviteToken: z.string().trim().max(128).optional(),
 });
 
 export type RegisterHelperInput = z.infer<typeof RegisterHelperSchema>;
@@ -153,6 +155,7 @@ export const CeviNameRegisterSchema = CeviNameQuickLoginSchema.extend({
     .array(z.object({ stufeId: z.string().uuid(), role: z.enum(['LEITUNG', 'TEILNEHMER']) }))
     .max(20)
     .default([]),
+  inviteToken: z.string().trim().max(128).optional(),
 });
 
 export type CeviNameRegisterInput = z.infer<typeof CeviNameRegisterSchema>;
@@ -386,6 +389,10 @@ export const RedeemAccessLinkSchema = z.object({
 /** Heimabteilung und Stufen beim Login angeben. departmentId null = keine Abteilung. */
 export const SetHomeDepartmentSchema = z.object({
   departmentId: z.string().uuid().nullable(),
+  /** Optionaler geheimer Einladungs-Token (für INVITE_ONLY oder bestätigten Beitritt) */
+  inviteToken: z.string().trim().min(8).max(120).optional().nullable(),
+  /** Ob der Aufruf über den direkten Abteilungs-Link (return_to auf Subdomain) erfolgt */
+  viaLink: z.boolean().optional(),
   stufen: z
     .array(z.object({ stufeId: z.string().uuid(), role: z.enum(['LEITUNG', 'TEILNEHMER']) }))
     .max(20)
@@ -403,6 +410,8 @@ export const StufeInputSchema = z.object({
 
 export type StufeInput = z.infer<typeof StufeInputSchema>;
 
+export const DepartmentJoinModeSchema = z.enum(['OPEN', 'LINK_ONLY', 'INVITE_ONLY']);
+
 export const UpdateDepartmentSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   logoUrl: ImageUrlSchema.optional().nullable(),
@@ -414,6 +423,8 @@ export const UpdateDepartmentSchema = z.object({
   qrColorSecondary: HexColorSchema.optional().nullable(),
   contactUserId: z.string().uuid().optional().nullable(),
   membersOnly: z.boolean().optional(),
+  allowPasswordless: z.boolean().optional(),
+  joinMode: DepartmentJoinModeSchema.optional(),
 });
 
 export type UpdateDepartmentInput = z.infer<typeof UpdateDepartmentSchema>;

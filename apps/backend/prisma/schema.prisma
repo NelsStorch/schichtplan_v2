@@ -39,6 +39,12 @@ model Department {
   hitobitoGroupId Int?              @map("hitobito_group_id")
   // Startseite (Liste der Anlässe) nur für Mitglieder (Vorgabe: an); öffentliche Anlässe bleiben per Link erreichbar
   membersOnly   Boolean           @default(true) @map("members_only")
+  // Passwortlose Anmeldung (Spitzname + Geburtsdatum) für diese Abteilung erlaubt
+  allowPasswordless Boolean       @default(true) @map("allow_passwordless")
+  // Beitrittsmodus für E-Mail-Konten: OPEN (Verzeichnis), LINK_ONLY (Abteilungs-Link), INVITE_ONLY (nur Einladung)
+  joinMode      String            @default("LINK_ONLY") @map("join_mode")
+  // Geheimer Einladungs-Token für bestätigten Beitritt (v. a. bei INVITE_ONLY)
+  inviteToken   String?           @unique @map("invite_token")
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   events       Event[]

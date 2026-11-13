@@ -45,20 +45,30 @@ export function finalDestination(
   return returnTo ?? getDefaultDestination(user?.homeDepartment?.slug, targetOrg);
 }
 
-/** Wer seine Abteilung noch nicht angegeben hat, kommt zuerst auf /abteilung (mit dem gleichen Ziel). */
+/** Wer per Einladung kommt oder über einen Abteilungslink einsteigt und noch kein Setup hat, landet auf /abteilung. */
 export function afterLogin(
   user?: { needsDepartmentSetup?: boolean; homeDepartment?: { slug: string; organization?: OrganizationType } | null } | null,
   returnTo?: string | null,
-  org?: OrganizationType | string
+  org?: OrganizationType | string,
+  inviteToken?: string | null
 ): string {
-  if (user?.needsDepartmentSetup) {
-    return returnTo ? `/abteilung?return_to=${encodeURIComponent(returnTo)}` : '/abteilung';
+  const hasDeptContext = Boolean(user?.homeDepartment) || Boolean(departmentSlugFromReturnTo(returnTo ?? null));
+  if (inviteToken || (user?.needsDepartmentSetup && hasDeptContext)) {
+    const params = new URLSearchParams();
+    if (returnTo) params.set('return_to', returnTo);
+    if (inviteToken) params.set('invite', inviteToken);
+    const qs = params.toString();
+    return qs ? `/abteilung?${qs}` : '/abteilung';
   }
   return finalDestination(returnTo ?? null, user, org);
 }
 
-/** Pfad im Login-Portal mit unverändertem Ziel */
-export function withReturnTo(path: string, returnTo: string | null): string {
-  if (!returnTo) return path;
-  return `${path}${path.includes('?') ? '&' : '?'}return_to=${encodeURIComponent(returnTo)}`;
+/** Pfad im Login-Portal mit unverändertem Ziel (und optionalem Einladungs-Token) */
+export function withReturnTo(path: string, returnTo: string | null, inviteToken?: string | null): string {
+  const params = new URLSearchParams();
+  if (returnTo) params.set('return_to', returnTo);
+  if (inviteToken) params.set('invite', inviteToken);
+  const qs = params.toString();
+  if (!qs) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}${qs}`;
 }

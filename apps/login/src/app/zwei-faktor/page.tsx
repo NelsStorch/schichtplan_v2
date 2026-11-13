@@ -14,6 +14,7 @@ import { AuthFooter } from '@/components/AuthFooter';
 function TwoFactor() {
   const searchParams = useSearchParams();
   const org = useOrganization();
+  const inviteToken = searchParams.get('invite')?.trim() || '';
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading');
   const [viaProvider, setViaProvider] = useState(false);
@@ -53,7 +54,7 @@ function TwoFactor() {
         throw new Error(data.error || 'Das hat nicht geklappt.');
       }
       setDone(true);
-      const target = data.redirectUrl || afterLogin(data.user, returnTo, org.dbType);
+      const target = data.redirectUrl || afterLogin(data.user, returnTo, org.dbType, inviteToken);
       if (typeof data.recoveryCodesLeft === 'number' && data.recoveryCodesLeft <= 3) {
         // Kurz stehen lassen, damit der Hinweis gelesen werden kann
         setNotice(
@@ -84,7 +85,7 @@ function TwoFactor() {
 
   const cancel = async () => {
     await fetch('/api/auth/2fa/challenge', { method: 'DELETE' }).catch(() => undefined);
-    window.location.href = withReturnTo('/', returnTo);
+    window.location.href = withReturnTo('/', returnTo, inviteToken);
   };
 
   return (

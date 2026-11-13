@@ -66,11 +66,13 @@ describe('Ziel nach dem Login', () => {
     expect(finalDestination('https://illnau.cevi-schichtplan.ch/x')).toBe('https://illnau.cevi-schichtplan.ch/x');
   });
 
-  it('schickt Personen ohne Abteilungsangabe zuerst auf /abteilung und merkt sich das Ziel', () => {
-    expect(afterLogin({ needsDepartmentSetup: true }, null)).toBe('/abteilung');
+  it('schickt Personen ohne Abteilungsangabe nur mit Abteilungs-Kontext oder Einladung auf /abteilung', () => {
+    onHost('login.cevi-schichtplan.ch');
+    expect(afterLogin({ needsDepartmentSetup: true }, null)).toBe(finalDestination(null));
     expect(afterLogin({ needsDepartmentSetup: true }, 'https://a.cevi-schichtplan.ch/')).toBe(
       `/abteilung?return_to=${encodeURIComponent('https://a.cevi-schichtplan.ch/')}`
     );
+    expect(afterLogin({ needsDepartmentSetup: false }, null, undefined, 'inv-123')).toBe('/abteilung?invite=inv-123');
   });
 
   it('hängt return_to korrekt an Pfade an', () => {

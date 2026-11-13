@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { Prisma, } from '../../db.js';
@@ -5,6 +6,7 @@ import {
   CreateDepartmentFromCeviDbSchema,
   UpdateDepartmentSchema,
   type DepartmentDirectoryItemDto,
+  type DepartmentJoinMode,
   type DepartmentPermission,
   getOrganizationByDbType,
 } from '@schichtplan/shared';
@@ -13,6 +15,8 @@ import { isDepartmentInsider, } from '../../services/departmentVisibility.js';
 import { departmentAccess, } from '../../services/permissions.js';
 import { computeDepartmentStats } from '../../services/departmentStats.js';
 import { departmentCache } from '../../services/departmentCache.js';
+import { getLoginPortalBaseUrl, rootDomain } from '../../services/authSession.js';
+import { sendGenericEmail } from '../../services/email.js';
 import { contactCandidateWhere, loadContactPerson, NOT_ELIGIBLE_MESSAGES, departmentCreationEligibility, requireDepartmentPermission, } from './shared.js';
 
 /** Abteilung: Angaben, Verzeichnis, Statistik, Anlegen und Einstellungen */
@@ -38,6 +42,12 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
     }
     reply.header('Cache-Control', 'no-store');
 
+    let canSeeInviteToken = false;
+    if (request.user) {
+      const access = await departmentAccess(fastify.prisma, request.tenant.id, request.user.id);
+      canSeeInviteToken = access.permissions.has('DEPARTMENT_SETTINGS') || access.permissions.has('PEOPLE_MANAGE');
+    }
+
     return {
       id: request.tenant.id,
       name: request.tenant.name,
@@ -54,6 +64,9 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       hitobitoGroupId: request.tenant.hitobitoGroupId,
       ceviDbGroupId: request.tenant.hitobitoGroupId,
       membersOnly: request.tenant.membersOnly,
+      allowPasswordless: request.tenant.allowPasswordless,
+      joinMode: (request.tenant.joinMode as DepartmentJoinMode) || 'LINK_ONLY',
+      ...(canSeeInviteToken ? { inviteToken: request.tenant.inviteToken } : {}),
       viewerIsMember: await isDepartmentInsider(fastify.prisma, request.tenant.id, request.user?.id),
       createdAt: request.tenant.createdAt.toISOString(),
     };
@@ -259,8 +272,10 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
               where: { id: request.user.id },
               data: {
                 homeDepartmentId: created.id,
-                homeDepartmentSource: isOther ? 'SELF' : 'CEVIDB',
-                ...NO_HOME_CONFIRMATION,
+                homeDepartmentSource: isOther ? 'CONFIRMED' : 'CEVIDB',
+                ...(isOther
+                  ? { homeDepartmentConfirmedAt: new Date(), homeDepartmentConfirmedById: null }
+                  : NO_HOME_CONFIRMATION),
                 departmentSetupAt: new Date(),
               },
             });
@@ -364,6 +379,11 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
+      const nextInviteToken =
+        input.joinMode === 'INVITE_ONLY' && !tenant.inviteToken
+          ? crypto.randomBytes(18).toString('base64url')
+          : undefined;
+
       const updated = await fastify.prisma.department.update({
         where: { id: tenant.id },
         data: {
@@ -377,6 +397,9 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
           qrColorSecondary: input.qrColorSecondary !== undefined ? input.qrColorSecondary : undefined,
           contactUserId,
           membersOnly: input.membersOnly,
+          allowPasswordless: input.allowPasswordless,
+          joinMode: input.joinMode,
+          ...(nextInviteToken !== undefined ? { inviteToken: nextInviteToken } : {}),
         },
       });
 
@@ -394,7 +417,115 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         qrColorPrimary: updated.qrColorPrimary,
         qrColorSecondary: updated.qrColorSecondary,
         contactUserId: updated.contactUserId,
+        membersOnly: updated.membersOnly,
+        allowPasswordless: updated.allowPasswordless,
+        joinMode: updated.joinMode as DepartmentJoinMode,
+        inviteToken: updated.inviteToken,
       };
+    }
+  );
+
+  // Neuen geheimen Einladungs-Link für die Abteilung erzeugen (macht alte ungültig)
+  fastify.post(
+    '/api/departments/current/invite-token',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Einladungs-Token neu erzeugen',
+        description: 'Erzeugt einen neuen geheimen Einladungs-Token für die Abteilung.',
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      if (!request.tenant) return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+      const access = await departmentAccess(fastify.prisma, request.tenant.id, request.user.id);
+      if (!access.permissions.has('DEPARTMENT_SETTINGS') && !access.permissions.has('PEOPLE_MANAGE')) {
+        return reply.status(403).send({ error: 'Keine Berechtigung.' });
+      }
+      const inviteToken = crypto.randomBytes(18).toString('base64url');
+      await fastify.prisma.department.update({
+        where: { id: request.tenant.id },
+        data: { inviteToken },
+      });
+      departmentCache.invalidate(request.tenant.organization, request.tenant.slug);
+      return { inviteToken };
+    }
+  );
+
+  // Person per E-Mail in die Abteilung / den Verein einladen
+  fastify.post(
+    '/api/departments/current/invite',
+    {
+      schema: {
+        tags: ['Abteilungen'],
+        summary: 'Person per E-Mail einladen',
+        description: 'Sendet eine E-Mail-Einladung mit dem geheimen Einladungs-Link.',
+        security: [{ bearerAuth: [] }],
+        body: z.object({ email: z.string().trim().email('Bitte eine gültige E-Mail-Adresse angeben.') }),
+      },
+      preHandler: [fastify.authenticate],
+    },
+    async (request, reply) => {
+      if (!request.tenant) return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+      const access = await departmentAccess(fastify.prisma, request.tenant.id, request.user.id);
+      if (!access.permissions.has('DEPARTMENT_SETTINGS') && !access.permissions.has('PEOPLE_MANAGE')) {
+        return reply.status(403).send({ error: 'Keine Berechtigung.' });
+      }
+      const { email } = request.body as { email: string };
+      const cleanEmail = email.toLowerCase().trim();
+      let inviteToken = request.tenant.inviteToken;
+      if (!inviteToken) {
+        inviteToken = crypto.randomBytes(18).toString('base64url');
+        await fastify.prisma.department.update({
+          where: { id: request.tenant.id },
+          data: { inviteToken },
+        });
+        departmentCache.invalidate(request.tenant.organization, request.tenant.slug);
+      }
+
+      // Falls die Person bereits ein Konto mit dieser E-Mail hat (ohne Hitobito-Bindung), direkt bestätigen
+      const existing = await fastify.prisma.user.findUnique({
+        where: { email: cleanEmail },
+        select: { id: true, homeDepartmentId: true, homeDepartmentSource: true },
+      });
+      if (existing) {
+        await fastify.prisma.departmentMember.upsert({
+          where: { departmentId_userId: { departmentId: request.tenant.id, userId: existing.id } },
+          update: {},
+          create: { departmentId: request.tenant.id, userId: existing.id, role: 'HELPER' },
+        });
+        if (!existing.homeDepartmentId) {
+          await fastify.prisma.user.update({
+            where: { id: existing.id },
+            data: {
+              homeDepartmentId: request.tenant.id,
+              homeDepartmentSource: 'CONFIRMED',
+              homeDepartmentConfirmedAt: new Date(),
+              homeDepartmentConfirmedById: request.user.id,
+              departmentSetupAt: new Date(),
+            },
+          });
+        }
+      }
+
+      const org = getOrganizationByDbType(request.tenant.organization);
+      const portalUrl = `https://${request.tenant.slug}.${rootDomain(request.headers.host)}`;
+      const loginUrl = getLoginPortalBaseUrl(process.env, request.headers.host, request.tenant.organization);
+      const inviteUrl = `${loginUrl}/?return_to=${encodeURIComponent(portalUrl)}&invite=${encodeURIComponent(inviteToken)}`;
+
+      const sent = await sendGenericEmail({
+        to: cleanEmail,
+        subject: `Einladung zu ${request.tenant.name} (${org.name})`,
+        eyebrow: request.tenant.name,
+        title: `Du wurdest zu ${request.tenant.name} eingeladen`,
+        messageHtml: `<p>Du wurdest eingeladen, <strong>${request.tenant.name}</strong> beizutreten, um dich für Schichten einzutragen.</p><p>Klicke auf den Button unten, um dich anzumelden oder ein Konto zu erstellen – du wirst danach direkt aufgenommen.</p>`,
+        ctaText: `${request.tenant.name} beitreten`,
+        ctaUrl: inviteUrl,
+        organization: request.tenant.organization,
+      });
+
+      return { ok: true, sent, alreadyRegistered: Boolean(existing), inviteToken };
     }
   );
 };

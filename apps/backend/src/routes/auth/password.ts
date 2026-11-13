@@ -28,6 +28,7 @@ import {
   loadUserDto,
   ensureHelperMembership,
   registrationAccepted,
+  cleanReturnTo,
 } from '../../services/authSession.js';
 
 
@@ -219,7 +220,11 @@ const passwordAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Bestätigungs-E-Mail versenden
     const loginPortalUrl = getLoginPortalBaseUrl(process.env, request.headers.host, request.organization);
-    const verificationUrl = `${loginPortalUrl}/verify-email?token=${verificationToken}`;
+    const verifyParams = new URLSearchParams({ token: verificationToken });
+    const safeReturnTo = input.returnTo ? cleanReturnTo(input.returnTo, '', request.headers.host) : '';
+    if (safeReturnTo) verifyParams.set('return_to', safeReturnTo);
+    if (input.inviteToken) verifyParams.set('invite', input.inviteToken);
+    const verificationUrl = `${loginPortalUrl}/verify-email?${verifyParams.toString()}`;
     await sendVerificationEmail({
       to: cleanEmail,
       name: user.nickname || user.firstName,

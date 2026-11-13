@@ -59,3 +59,13 @@ export function loginUrl(returnTo?: string) {
 export function departmentSetupUrl(returnTo?: string) {
   return getDepartmentSetupUrl(returnTo);
 }
+
+/**
+ * Abteilungs-Auswahl-URL für gerenderte Links: zuerst "/abteilung" (identisch auf Server und Client),
+ * nach dem Mount die echte SSO-URL mit Rücksprung auf die aktuelle Seite.
+ */
+export function useDepartmentSetupHref() {
+  const [href, setHref] = useState('/abteilung');
+  useEffect(() => setHref(departmentSetupUrl()), []);
+  return href;
+}

@@ -1,5 +1,5 @@
 import type { PrismaClient, Department, OrganizationType } from '../db.js';
-import type { DepartmentDirectoryItemDto } from '@schichtplan/shared';
+import type { DepartmentDirectoryItemDto, DepartmentJoinMode } from '@schichtplan/shared';
 
 interface CacheEntry<T> {
   value: T;
@@ -60,13 +60,20 @@ class DepartmentCache {
         slug: true,
         organization: true,
         logoUrl: true,
+        allowPasswordless: true,
+        joinMode: true,
         stufen: { select: { id: true, name: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] },
       },
       orderBy: { name: 'asc' },
     });
 
-    this.directoryMap.set(org, { value: list, expiresAt: now + ttlMs });
-    return list;
+    const mapped: DepartmentDirectoryItemDto[] = list.map((d) => ({
+      ...d,
+      joinMode: (d.joinMode as DepartmentJoinMode) || 'LINK_ONLY',
+    }));
+
+    this.directoryMap.set(org, { value: mapped, expiresAt: now + ttlMs });
+    return mapped;
   }
 
   invalidate(org?: OrganizationType, slug?: string): void {

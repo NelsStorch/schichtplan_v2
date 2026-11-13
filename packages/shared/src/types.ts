@@ -14,6 +14,8 @@ import type {
 } from './constants.js';
 import type { OrganizationType } from './organizations.js';
 
+export type DepartmentJoinMode = 'OPEN' | 'LINK_ONLY' | 'INVITE_ONLY';
+
 export interface DepartmentDto {
   id: string;
   name: string;
@@ -36,6 +38,12 @@ export interface DepartmentDto {
   ceviDbGroupId?: number | null;
   /** Startseite nur für Mitglieder (öffentliche Anlässe bleiben per Link erreichbar) */
   membersOnly?: boolean;
+  /** Passwortlose Anmeldung (Spitzname + Geburtsdatum) erlaubt */
+  allowPasswordless?: boolean;
+  /** Beitrittsmodus für E-Mail-Konten */
+  joinMode?: DepartmentJoinMode;
+  /** Geheimer Einladungs-Token (nur für Berechtigte sichtbar) */
+  inviteToken?: string | null;
   /** Angemeldete Person gehört dazu (Heimabteilung, Rolle, OK) und sieht die Startseite */
   viewerIsMember?: boolean;
   createdAt: string;
@@ -410,6 +418,8 @@ export interface DepartmentDirectoryItemDto {
   slug: string;
   organization?: OrganizationType;
   logoUrl?: string | null;
+  allowPasswordless?: boolean;
+  joinMode?: DepartmentJoinMode;
   stufen: { id: string; name: string }[];
 }
 

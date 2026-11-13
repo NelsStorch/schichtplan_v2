@@ -40,7 +40,7 @@ import {
   statusUrl,
   type MyHoursSummaryDto,
 } from '@schichtplan/shared';
-import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
+import { api, useDepartmentSetupHref, useLoginHref } from '@/lib/api';
 import { displayName, usePortal } from '@/lib/portal';
 import { clearOfflineData, useInstallPrompt } from '@/lib/offline';
 import { CommandPaletteButton } from './command';
@@ -57,6 +57,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
   const org = useOrganization();
   const [accountOpen, setAccountOpen] = useState(false);
   const loginHref = useLoginHref();
+  const departmentSetupHref = useDepartmentSetupHref();
 
   return (
     <div className="grain flex min-h-[100dvh] flex-col bg-campfire bg-no-repeat">
@@ -124,7 +125,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
               <span className="font-semibold">Zu welcher Abteilung gehörst du?</span>{' '}
               <span className="text-fg-muted">Manche Anlässe sind nur für eine Abteilung oder Stufe.</span>
             </p>
-            <a href={departmentSetupUrl()} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
+            <a href={departmentSetupHref} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
               <Building2 /> Abteilung angeben
             </a>
           </div>
@@ -222,6 +223,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
 function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, setUser, department, logout } = usePortal();
   const org = useOrganization();
+  const departmentSetupHref = useDepartmentSetupHref();
   const confirm = useConfirm();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
@@ -462,7 +464,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
                 <Ticket className="size-4 text-accent" />
                 <span>Meine Schichten</span>
               </Link>
-              <a href={departmentSetupUrl()} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
+              <a href={departmentSetupHref} className={buttonClasses({ variant: 'secondary', className: 'justify-start' })}>
                 <Building2 className="size-4 text-accent" />
                 <span>Abteilung &amp; Stufen</span>
               </a>

@@ -53,10 +53,16 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
           slug: departmentSlug.toLowerCase(),
         },
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, allowPasswordless: true },
     });
     if (!department) {
       return reply.status(404).send({ error: 'Diese Abteilung gibt es nicht.' });
+    }
+    if (!department.allowPasswordless) {
+      return reply.status(403).send({
+        code: 'PASSWORDLESS_DISABLED',
+        error: 'Die passwortlose Anmeldung ist hier deaktiviert. Bitte melde dich mit E-Mail und Passwort oder Verbands-Login an.',
+      });
     }
 
     // Sperre vor der Suche: Auch ein richtiges Geburtsdatum kommt während der Sperre nicht durch
@@ -115,7 +121,7 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(429).send({ error: RATE_LIMIT_ERROR, code: 'RATE_LIMITED' });
     }
     const input = request.body as z.output<typeof CeviNameRegisterSchema>;
-    const { departmentSlug, ceviName, birthDate, firstName, lastName, phone, stufen, returnTo } = input;
+    const { departmentSlug, ceviName, birthDate, firstName, lastName, phone, stufen, returnTo, inviteToken } = input;
 
     const department = await fastify.prisma.department.findUnique({
       where: {
@@ -124,10 +130,23 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
           slug: departmentSlug.toLowerCase(),
         },
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, allowPasswordless: true, joinMode: true, inviteToken: true },
     });
     if (!department) {
       return reply.status(404).send({ error: 'Diese Abteilung gibt es nicht.' });
+    }
+    if (!department.allowPasswordless) {
+      return reply.status(403).send({
+        code: 'PASSWORDLESS_DISABLED',
+        error: 'Die passwortlose Anmeldung ist hier deaktiviert. Bitte melde dich mit E-Mail und Passwort oder Verbands-Login an.',
+      });
+    }
+    const validInvite = Boolean(inviteToken && department.inviteToken && inviteToken === department.inviteToken);
+    if (department.joinMode === 'INVITE_ONLY' && !validInvite) {
+      return reply.status(403).send({
+        code: 'INVITE_REQUIRED',
+        error: 'Für diese Abteilung brauchst du einen gültigen Einladungslink.',
+      });
     }
 
     // Gleicher Cevi-Name und gleiches Geburtsdatum in derselben Abteilung gibt es nur einmal.
@@ -170,7 +189,8 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
           birthDate: new Date(`${birthDate}T00:00:00Z`),
           phone: phone?.trim() || null,
           homeDepartmentId: department.id,
-          homeDepartmentSource: 'SELF',
+          homeDepartmentSource: validInvite ? 'CONFIRMED' : 'SELF',
+          homeDepartmentConfirmedAt: validInvite ? new Date() : null,
           departmentSetupAt: new Date(),
         },
       });

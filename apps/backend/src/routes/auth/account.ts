@@ -306,11 +306,45 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       const fromCeviDb = current.homeDepartmentSource === 'CEVIDB';
       const departmentId = fromCeviDb ? current.homeDepartmentId : input.departmentId;
       // Stufen ändern lässt eine Bestätigung bestehen, ein Abteilungswechsel beendet sie
-      const staysConfirmed = current.homeDepartmentSource === 'CONFIRMED' && departmentId === current.homeDepartmentId;
+      let staysConfirmed = current.homeDepartmentSource === 'CONFIRMED' && departmentId === current.homeDepartmentId;
+      let confirmedByInvite = false;
 
       if (departmentId && !fromCeviDb) {
-        const exists = await fastify.prisma.department.count({ where: { id: departmentId } });
-        if (!exists) return reply.status(400).send({ error: 'Diese Abteilung gibt es nicht' });
+        const dept = await fastify.prisma.department.findUnique({
+          where: { id: departmentId },
+          select: { id: true, joinMode: true, inviteToken: true },
+        });
+        if (!dept) return reply.status(400).send({ error: 'Diese Abteilung gibt es nicht' });
+
+        const alreadyMember =
+          current.homeDepartmentId === departmentId ||
+          (await fastify.prisma.departmentMember.count({
+            where: {
+              departmentId,
+              userId,
+              OR: [{ role: { not: 'HELPER' } }, { permissions: { isEmpty: false } }],
+            },
+          })) > 0 ||
+          (await fastify.prisma.eventOrganizer.count({ where: { userId, event: { departmentId } } })) > 0;
+        const validInvite = Boolean(input.inviteToken && dept.inviteToken && input.inviteToken === dept.inviteToken);
+
+        if (validInvite) {
+          confirmedByInvite = true;
+          staysConfirmed = false;
+        } else if (!alreadyMember) {
+          if (dept.joinMode === 'INVITE_ONLY') {
+            return reply.status(403).send({
+              code: 'INVITE_REQUIRED',
+              error: 'Beitritt nur per Einladung möglich. Bitte nutze einen gültigen Einladungs-Link.',
+            });
+          }
+          if (dept.joinMode === 'LINK_ONLY' && !input.viaLink && request.tenant?.id !== departmentId) {
+            return reply.status(403).send({
+              code: 'LINK_REQUIRED',
+              error: 'Beitritt nur über den Link der Abteilung/des Vereins oder per Einladung möglich.',
+            });
+          }
+        }
       }
 
       const wanted = departmentId ? input.stufen : [];
@@ -331,7 +365,16 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
             homeDepartmentId: departmentId,
             ...(staysConfirmed
               ? {}
-              : { homeDepartmentSource: departmentId ? (fromCeviDb ? 'CEVIDB' : 'SELF') : null, ...NO_HOME_CONFIRMATION }),
+              : confirmedByInvite
+                ? {
+                    homeDepartmentSource: 'CONFIRMED',
+                    homeDepartmentConfirmedAt: new Date(),
+                    homeDepartmentConfirmedById: null,
+                  }
+                : {
+                    homeDepartmentSource: departmentId ? (fromCeviDb ? 'CEVIDB' : 'SELF') : null,
+                    ...NO_HOME_CONFIRMATION,
+                  }),
             departmentSetupAt: new Date(),
           },
         });

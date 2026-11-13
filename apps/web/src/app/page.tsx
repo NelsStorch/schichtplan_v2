@@ -10,7 +10,7 @@ import { AppShell } from '@/components/AppShell';
 import { DepartmentSettingsDialog } from '@/components/DepartmentSettingsDialog';
 import { EventFormDialog } from '@/components/EventFormDialog';
 import { EventTile, eventStatus } from '@/components/EventTile';
-import { api, departmentSetupUrl, useLoginHref } from '@/lib/api';
+import { api, useDepartmentSetupHref, useLoginHref } from '@/lib/api';
 import { fmtDayMonth, fmtRelativeDay, fmtShortDate, fmtTimeRange, fmtWeekday } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
 import type { MyShift } from '@/lib/types';
@@ -258,6 +258,7 @@ function TenantNotFound() {
 function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
   const { department } = usePortal();
   const loginHref = useLoginHref();
+  const departmentSetupHref = useDepartmentSetupHref();
   const org = useOrganization();
   return (
     <AppShell>
@@ -272,7 +273,7 @@ function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
           }
           action={
             loggedIn ? (
-              <a href={departmentSetupUrl()} className={buttonClasses({})}>
+              <a href={departmentSetupHref} className={buttonClasses({})}>
                 <Building2 /> {org.unitTerm} angeben
               </a>
             ) : (
