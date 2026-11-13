@@ -4,6 +4,7 @@ import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { Prisma, } from '../../db.js';
 import {
   CreateDepartmentFromCeviDbSchema,
+  DEPARTMENT_PERMISSION_PRESETS,
   UpdateDepartmentSchema,
   type DepartmentDirectoryItemDto,
   type DepartmentJoinMode,
@@ -13,7 +14,13 @@ import {
 } from '@schichtplan/shared';
 import { autoCreateCeviDbDepartmentStufen, ceviDbGroupPeople, NO_HOME_CONFIRMATION } from '../../services/homeDepartment.js';
 import { isDepartmentInsider, } from '../../services/departmentVisibility.js';
-import { departmentAccess, } from '../../services/permissions.js';
+import { canGrantPermissions, departmentAccess, } from '../../services/permissions.js';
+import {
+  createDepartmentInviteToken,
+  extractBaseInviteToken,
+  verifyDepartmentInviteToken,
+  type InvitePreset,
+} from '../../services/inviteToken.js';
 import { computeDepartmentStats } from '../../services/departmentStats.js';
 import { departmentCache } from '../../services/departmentCache.js';
 import { getLoginPortalBaseUrl, rootDomain } from '../../services/authSession.js';
@@ -448,12 +455,16 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
       const { token } = request.query as { token: string };
-      const dept = await fastify.prisma.department.findUnique({
-        where: { inviteToken: token },
-        select: { id: true, organization: true },
-      });
+      const baseToken = extractBaseInviteToken(token);
+      const dept = baseToken
+        ? await fastify.prisma.department.findUnique({
+            where: { inviteToken: baseToken },
+            select: { id: true, organization: true, inviteToken: true },
+          })
+        : null;
+      const verified = dept ? verifyDepartmentInviteToken(dept.id, dept.inviteToken, token) : null;
       const item =
-        dept && dept.organization === request.organization
+        dept && verified?.valid && dept.organization === request.organization
           ? (await departmentCache.getDirectory(fastify.prisma, request.organization)).find((d) => d.id === dept.id)
           : undefined;
       if (!item) {
@@ -544,7 +555,13 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         summary: 'Person per E-Mail einladen',
         description: 'Sendet eine E-Mail-Einladung mit dem geheimen Einladungs-Link.',
         security: [{ bearerAuth: [] }],
-        body: z.object({ email: z.string().trim().email('Bitte eine gültige E-Mail-Adresse angeben.') }),
+        body: z.object({
+          email: z.string().trim().email('Bitte eine gültige E-Mail-Adresse angeben.'),
+          preset: z
+            .enum(['MEMBER', 'EVENT_CREATION', 'EVENT_COORDINATION', 'EVENT_EDITING', 'ADMINISTRATION'])
+            .optional()
+            .default('MEMBER'),
+        }),
       },
       preHandler: [fastify.authenticate],
     },
@@ -554,7 +571,15 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       if (!access.permissions.has('DEPARTMENT_SETTINGS') && !access.permissions.has('PEOPLE_MANAGE')) {
         return reply.status(403).send({ error: 'Keine Berechtigung.' });
       }
-      const { email } = request.body as { email: string };
+      const { email, preset = 'MEMBER' } = request.body as { email: string; preset?: InvitePreset };
+      if (preset !== 'MEMBER') {
+        const presetPerms = DEPARTMENT_PERMISSION_PRESETS[preset].permissions;
+        if (!canGrantPermissions(access, [], presetPerms)) {
+          return reply.status(403).send({
+            error: 'Du kannst beim Einladen nur Rechte vergeben, die du selbst verwalten darfst.',
+          });
+        }
+      }
       const cleanEmail = email.toLowerCase().trim();
 
       // Bremse gegen Massenversand: pro Person und pro Abteilung, dazu nie zweimal kurz nacheinander an dieselbe Adresse
@@ -593,15 +618,20 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
       const org = getOrganizationByDbType(request.tenant.organization);
       const portalUrl = `https://${request.tenant.slug}.${rootDomain(request.headers.host)}`;
       const loginUrl = getLoginPortalBaseUrl(process.env, request.headers.host, request.tenant.organization);
-      const inviteUrl = `${loginUrl}/?return_to=${encodeURIComponent(portalUrl)}&invite=${encodeURIComponent(inviteToken)}`;
+      const signedInvite = createDepartmentInviteToken(request.tenant.id, inviteToken, preset);
+      const inviteUrl = `${loginUrl}/?return_to=${encodeURIComponent(portalUrl)}&invite=${encodeURIComponent(signedInvite)}`;
       const name = request.tenant.name;
+      const presetNote =
+        preset !== 'MEMBER'
+          ? `<p>Dir wurde dabei direkt die Berechtigung <strong>${escapeHtml(DEPARTMENT_PERMISSION_PRESETS[preset].label)}</strong> zugewiesen.</p>`
+          : '';
 
       const sent = await sendGenericEmail({
         to: cleanEmail,
         subject: `Einladung zu ${name} (${org.name})`,
         eyebrow: name,
         title: `Du wurdest zu ${name} eingeladen`,
-        messageHtml: `<p>Du wurdest eingeladen, <strong>${escapeHtml(name)}</strong> beizutreten, um dich für Schichten einzutragen.</p><p>Klicke auf den Button unten, um dich anzumelden oder ein Konto zu erstellen. Danach bestätigst du den Beitritt.</p>`,
+        messageHtml: `<p>Du wurdest eingeladen, <strong>${escapeHtml(name)}</strong> beizutreten, um dich für Schichten einzutragen.</p>${presetNote}<p>Klicke auf den Button unten, um dich anzumelden oder ein Konto zu erstellen. Danach bestätigst du den Beitritt.</p>`,
         ctaText: `${name} beitreten`,
         ctaUrl: inviteUrl,
         organization: request.tenant.organization,

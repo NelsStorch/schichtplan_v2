@@ -260,6 +260,12 @@ model DepartmentMember {
   permissions  String[]   @default([])
   // Woher die Abteilungsleitung kommt: CEVIDB (Login entzieht sie wieder) oder MANUAL (Admin-Portal)
   leaderSource String?    @map("leader_source")
+  // Ausdrücklich beigetreten (zusätzlich zur Heimabteilung, selbst oder per Einladung). Null = nur technischer
+  // Helfer-Eintrag (z. B. vom Login an der Subdomain), zählt nicht als Zugehörigkeit.
+  joinedAt     DateTime?  @map("joined_at")
+  // Von der Leitung bestätigt (Einladung oder von Hand). Bei INVITE_ONLY zählt nur eine bestätigte Mitgliedschaft.
+  confirmedAt   DateTime? @map("confirmed_at")
+  confirmedById String?   @map("confirmed_by_id")
   createdAt    DateTime   @default(now())
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)

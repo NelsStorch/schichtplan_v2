@@ -17,6 +17,7 @@ import {
 import { Badge, Button, Callout, EmptyState, Input, Skeleton, cn, useConfirm, useOrganization, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
+import { DepartmentInviteBox } from './DepartmentInviteBox';
 import { PermissionEditor } from './PermissionEditor';
 
 const roleLabel = (p: DepartmentPersonDto) =>
@@ -112,6 +113,8 @@ export function DepartmentPeoplePanel() {
 
   return (
     <div className="space-y-4">
+      <DepartmentInviteBox />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-fg-muted">
           {people.length} Personen.{' '}

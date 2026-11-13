@@ -91,7 +91,7 @@ function DepartmentSetup() {
         setInviteDeptId(target.id);
         if (me.homeDepartmentFromCeviDb) {
           if (!(me.homeDepartment?.id === target.id && me.needsDepartmentSetup && target.stufen.length > 0)) {
-            window.location.href = finalDestination(returnTo, me, org.dbType);
+            await join((me.stufen ?? []).map((s) => ({ stufeId: s.stufeId, role: s.role })));
             return;
           }
         } else if (me.homeDepartment?.id === target.id && !me.needsDepartmentSetup) {

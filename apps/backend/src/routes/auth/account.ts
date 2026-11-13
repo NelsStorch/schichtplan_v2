@@ -6,12 +6,16 @@ import {
   SetProfilePasswordSchema,
   UpdateProfileSchema,
   isPlaceholderEmail,
+  normalizePermissions,
+  type DepartmentPermission,
 } from '@schichtplan/shared';
 import {
   autoCreateCeviDbDepartmentStufen,
   NO_HOME_CONFIRMATION,
   syncCeviDbStufen,
 } from '../../services/homeDepartment.js';
+import { verifyDepartmentInviteToken } from '../../services/inviteToken.js';
+import { isCeviNameProfile } from '../../services/nicknameLogin.js';
 import { applyProfileUpdate } from '../../services/profileUpdate.js';
 import { trackUsage } from '../../services/usageStats.js';
 import { createRateLimiter } from '../../services/rateLimit.js';
@@ -299,7 +303,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.id;
       const current = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { homeDepartmentId: true, homeDepartmentSource: true, providerId: true },
+        select: { homeDepartmentId: true, homeDepartmentSource: true, providerId: true, passwordHash: true, email: true },
       });
       if (!current) return reply.status(404).send({ error: 'Person nicht gefunden' });
 
@@ -308,30 +312,35 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       // Stufen ändern lässt eine Bestätigung bestehen, ein Abteilungswechsel beendet sie
       let staysConfirmed = current.homeDepartmentSource === 'CONFIRMED' && departmentId === current.homeDepartmentId;
       let confirmedByInvite = false;
+      let grantedPermissions: DepartmentPermission[] = [];
+      const inviteTargetDeptId = input.departmentId ?? departmentId;
 
-      if (departmentId && !fromCeviDb) {
+      if (inviteTargetDeptId && (!fromCeviDb || input.inviteToken)) {
         const dept = await fastify.prisma.department.findUnique({
-          where: { id: departmentId },
+          where: { id: inviteTargetDeptId },
           select: { id: true, joinMode: true, inviteToken: true },
         });
         if (!dept) return reply.status(400).send({ error: 'Diese Abteilung gibt es nicht' });
 
         const alreadyMember =
-          current.homeDepartmentId === departmentId ||
+          current.homeDepartmentId === inviteTargetDeptId ||
           (await fastify.prisma.departmentMember.count({
             where: {
-              departmentId,
+              departmentId: inviteTargetDeptId,
               userId,
               OR: [{ role: { not: 'HELPER' } }, { permissions: { isEmpty: false } }],
             },
           })) > 0 ||
-          (await fastify.prisma.eventOrganizer.count({ where: { userId, event: { departmentId } } })) > 0;
-        const validInvite = Boolean(input.inviteToken && dept.inviteToken && input.inviteToken === dept.inviteToken);
+          (await fastify.prisma.eventOrganizer.count({ where: { userId, event: { departmentId: inviteTargetDeptId } } })) > 0;
+        const inviteCheck = verifyDepartmentInviteToken(dept.id, dept.inviteToken, input.inviteToken);
 
-        if (validInvite) {
+        if (inviteCheck.valid) {
           // Bereits bestätigt: Bestätigung (wer, wann) nicht überschreiben
-          if (!staysConfirmed) confirmedByInvite = true;
-        } else if (!alreadyMember) {
+          if (!fromCeviDb && !staysConfirmed) confirmedByInvite = true;
+          if (!isCeviNameProfile(current) && inviteCheck.permissions.length > 0) {
+            grantedPermissions = inviteCheck.permissions;
+          }
+        } else if (!fromCeviDb && !alreadyMember) {
           if (dept.joinMode === 'INVITE_ONLY') {
             return reply.status(403).send({
               code: 'INVITE_REQUIRED',
@@ -342,7 +351,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
           // und viaLink setzt der Browser selbst. Die Prüfung hält die Abteilung nur aus der allgemeinen
           // Auswahl heraus. Eine Selbstzuordnung (SELF) bleibt unbestätigt; wer wirklich geschlossen sein
           // will, wählt INVITE_ONLY (dort zählt nur Einladung oder Bestätigung durch die Leitung).
-          if (dept.joinMode === 'LINK_ONLY' && !input.viaLink && request.tenant?.id !== departmentId) {
+          if (dept.joinMode === 'LINK_ONLY' && !input.viaLink && request.tenant?.id !== inviteTargetDeptId) {
             return reply.status(403).send({
               code: 'LINK_REQUIRED',
               error: 'Beitritt nur über den Link der Abteilung/des Vereins oder per Einladung möglich.',
@@ -404,6 +413,18 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
           await syncCeviDbStufen(fastify.prisma, userId);
         }
         await ensureHelperMembership(fastify.prisma, departmentId, userId);
+      }
+      if (inviteTargetDeptId && grantedPermissions.length > 0) {
+        const existingMember = await fastify.prisma.departmentMember.findUnique({
+          where: { departmentId_userId: { departmentId: inviteTargetDeptId, userId } },
+          select: { permissions: true },
+        });
+        const merged = normalizePermissions([...(existingMember?.permissions ?? []), ...grantedPermissions]);
+        await fastify.prisma.departmentMember.upsert({
+          where: { departmentId_userId: { departmentId: inviteTargetDeptId, userId } },
+          update: { permissions: merged },
+          create: { departmentId: inviteTargetDeptId, userId, role: 'HELPER', permissions: merged },
+        });
       }
       return loadUserDto(fastify.prisma, userId, request.tenant?.id ?? null);
     }

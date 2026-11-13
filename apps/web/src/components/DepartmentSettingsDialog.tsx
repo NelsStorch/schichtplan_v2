@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Check, ChevronDown, Copy, Mail, QrCode, RefreshCw, Settings2 } from 'lucide-react';
+import { Check, ChevronDown, QrCode, Settings2 } from 'lucide-react';
 import type { DepartmentJoinMode, DepartmentPermission, PasswordlessAccountsDto } from '@schichtplan/shared';
-import { getLoginUrl } from '@schichtplan/shared/redirect';
 import {
   Button,
   Callout,
@@ -20,6 +19,7 @@ import {
 import { api, errorMessage } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
 import { DepartmentAuditPanel } from './DepartmentAuditPanel';
+import { DepartmentInviteBox } from './DepartmentInviteBox';
 import { DepartmentPeoplePanel } from './DepartmentPeoplePanel';
 import { DepartmentStatsPanel } from './DepartmentStatsPanel';
 import { DepartmentStufenPanel } from './DepartmentStufenPanel';
@@ -132,10 +132,6 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
     allowPasswordless: department?.allowPasswordless ?? true,
     joinMode: (department?.joinMode ?? 'LINK_ONLY') as DepartmentJoinMode,
   });
-  const [inviteToken, setInviteToken] = useState<string | null>(department?.inviteToken ?? null);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviting, setInviting] = useState(false);
-  const [rotatingToken, setRotatingToken] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<{ userId: string; displayName: string; isLeader: boolean }[] | null>(null);
@@ -173,7 +169,7 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
     setSaving(true);
     setError(null);
     try {
-      const updated = await api<{ inviteToken?: string | null }>('/api/departments/current', {
+      await api<{ inviteToken?: string | null }>('/api/departments/current', {
         method: 'PATCH',
         json: {
           name: form.name.trim() || undefined,
@@ -190,7 +186,6 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
           joinMode: form.joinMode,
         },
       });
-      if (updated.inviteToken !== undefined) setInviteToken(updated.inviteToken);
       await refresh();
       toast({ title: 'Abteilung gespeichert' });
       onDone();
@@ -312,97 +307,7 @@ function DepartmentForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
         </Select>
       </Field>
 
-      <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-bold text-fg">Geheimer Einladungs-Link &amp; E-Mail-Einladung</p>
-              <p className="text-2xs text-fg-muted">
-                Wer diesen Link nutzt oder per E-Mail eingeladen wird, wird direkt als bestätigtes Mitglied aufgenommen.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {inviteToken && typeof window !== 'undefined' && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={async () => {
-                    const base = getLoginUrl(window.location.origin);
-                    const url = `${base}${base.includes('?') ? '&' : '?'}invite=${encodeURIComponent(inviteToken)}`;
-                    await navigator.clipboard.writeText(url);
-                    toast({ title: 'Einladungs-Link kopiert' });
-                  }}
-                >
-                  <Copy className="size-3.5" /> Link kopieren
-                </Button>
-              )}
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                loading={rotatingToken}
-                onClick={async () => {
-                  setRotatingToken(true);
-                  try {
-                    const res = await api<{ inviteToken: string }>('/api/departments/current/invite-token', {
-                      method: 'POST',
-                    });
-                    setInviteToken(res.inviteToken);
-                    await refresh();
-                    toast({ title: 'Neuer Einladungs-Link erzeugt' });
-                  } catch (err) {
-                    setError(errorMessage(err));
-                  } finally {
-                    setRotatingToken(false);
-                  }
-                }}
-              >
-                <RefreshCw className="size-3.5" /> {inviteToken ? 'Neu erzeugen' : 'Link erzeugen'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="person@beispiel.ch"
-              aria-label="E-Mail-Adresse für Einladung"
-              className="h-9 flex-1"
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              loading={inviting}
-              disabled={!inviteEmail.trim()}
-              onClick={async () => {
-                setInviting(true);
-                try {
-                  const res = await api<{ ok: boolean; sent: boolean; inviteToken?: string }>('/api/departments/current/invite', {
-                    method: 'POST',
-                    json: { email: inviteEmail.trim() },
-                  });
-                  if (res.inviteToken) setInviteToken(res.inviteToken);
-                  setInviteEmail('');
-                  await refresh();
-                  toast({
-                    title: res.sent
-                      ? 'Einladung per E-Mail gesendet'
-                      : 'Einladung hinterlegt (kein Mailversand konfiguriert – bitte Link kopieren)',
-                  });
-                } catch (err) {
-                  setError(errorMessage(err));
-                } finally {
-                  setInviting(false);
-                }
-              }}
-            >
-              <Mail className="size-3.5" /> Einladen
-            </Button>
-          </div>
-      </div>
+      <DepartmentInviteBox onError={setError} />
 
       {/* Farben & QR-Code Gestaltung */}
       <fieldset className="space-y-5 rounded-2xl border border-line bg-surface p-4">

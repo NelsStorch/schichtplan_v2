@@ -60,7 +60,37 @@ export interface AccessUser {
   homeDepartmentSource: string | null;
   /** Beitrittsmodus der Heimabteilung: Bei INVITE_ONLY zählt eine unbestätigte Selbstzuordnung nicht */
   homeDepartment?: { joinMode?: string | null } | null;
+  /**
+   * Zusätzliche Mitgliedschaften (department_members). Zählen nur mit joinedAt; bei INVITE_ONLY bzw.
+   * Cevi.DB-Anlässen nur bestätigt. Fehlt das Feld, zählt nur die Heimabteilung.
+   */
+  memberships?: {
+    departmentId: string;
+    joinedAt?: Date | null;
+    confirmedAt?: Date | null;
+    department?: { joinMode?: string | null } | null;
+  }[];
   stufen: { stufeId: string; role: string; source: string }[];
+}
+
+/** Abteilungen, denen die Person zusätzlich zur Heimabteilung angehört (für Abteilungs-Regeln) */
+export function joinedDepartmentIds(user: Pick<AccessUser, 'memberships'>, requireVerified = false): string[] {
+  return (user.memberships ?? [])
+    .filter(
+      (m) =>
+        Boolean(m.joinedAt) &&
+        (Boolean(m.confirmedAt) || (!requireVerified && m.department?.joinMode !== 'INVITE_ONLY'))
+    )
+    .map((m) => m.departmentId);
+}
+
+/** Alle Abteilungen, die für Abteilungs-Regeln zählen: Heimabteilung und Beitritte */
+export function personDepartmentIds(
+  user: Pick<AccessUser, 'homeDepartmentId' | 'homeDepartmentSource' | 'homeDepartment' | 'memberships'>,
+  requireVerified = false
+): string[] {
+  const home = effectiveHomeDepartmentId(user, requireVerified);
+  return [...new Set([...(home ? [home] : []), ...joinedDepartmentIds(user, requireVerified)])];
 }
 
 /**
@@ -86,6 +116,10 @@ export const accessUserSelect = {
   homeDepartmentId: true,
   homeDepartmentSource: true,
   homeDepartment: { select: { joinMode: true } },
+  memberships: {
+    where: { joinedAt: { not: null } },
+    select: { departmentId: true, joinedAt: true, confirmedAt: true, department: { select: { joinMode: true } } },
+  },
   stufen: { select: { stufeId: true, role: true, source: true } },
 } as const;
 
@@ -178,10 +212,11 @@ export function checkRules(event: AccessEvent, user: AccessUser, departmentName:
       event.departmentId,
       ...(cfg.whitelist ? event.allowedDepartments.map((a) => a.departmentId) : []),
     ]);
-    const personDepartmentId = effectiveHomeDepartmentId(user, cfg.ceviDb);
+    const personDepartments = personDepartmentIds(user, cfg.ceviDb);
 
-    if (!personDepartmentId) {
-      if (!cfg.ceviDb && user.homeDepartmentId) {
+    if (personDepartments.length === 0) {
+      const hasUnconfirmed = Boolean(user.homeDepartmentId) || (user.memberships ?? []).some((m) => m.joinedAt);
+      if (!cfg.ceviDb && hasUnconfirmed) {
         return deny(
           'WRONG_DEPARTMENT',
           `Deine Zugehörigkeit zur Abteilung ist noch nicht bestätigt. Eintragen dürfen: ${audience}.`
@@ -191,15 +226,26 @@ export function checkRules(event: AccessEvent, user: AccessUser, departmentName:
         ? deny('WRONG_DEPARTMENT', `Laut Cevi.DB gehörst du nicht dazu. Eintragen dürfen: ${audience}.`)
         : deny('NO_DEPARTMENT', `Gib zuerst an, zu welcher Abteilung du gehörst. Eintragen dürfen: ${audience}.`);
     }
-    if (!allowedDepartmentIds.has(personDepartmentId)) {
+    const matching = personDepartments.filter((id) => allowedDepartmentIds.has(id));
+    if (matching.length === 0) {
       return deny('WRONG_DEPARTMENT', `Dieser Anlass ist nur für ${audience}.`);
     }
 
-    // Stufen-Filter gilt pro Abteilung: hat die Abteilung der Person ausgewählte Stufen, muss sie in einer davon sein
-    const filter = event.allowedStufen.filter((s) => s.stufe.departmentId === personDepartmentId);
-    if (filter.length > 0) {
+    // Stufen-Filter gilt pro Abteilung: hat eine Abteilung der Person ausgewählte Stufen, muss sie in einer davon
+    // sein. Bei mehreren Abteilungen reicht eine, die passt.
+    let unfiltered = false;
+    const filtered = new Map<string, (typeof stufen)[number]>();
+    for (const departmentId of matching) {
+      const filter = event.allowedStufen.filter((s) => s.stufe.departmentId === departmentId);
+      if (filter.length === 0) {
+        unfiltered = true;
+        continue;
+      }
       const filterIds = new Set(filter.map((s) => s.stufeId));
-      relevantStufen = stufen.filter((s) => filterIds.has(s.stufeId));
+      for (const s of stufen) if (filterIds.has(s.stufeId)) filtered.set(s.stufeId, s);
+    }
+    if (!unfiltered) {
+      relevantStufen = [...filtered.values()];
       if (relevantStufen.length === 0) {
         return deny('WRONG_STUFE', `Dieser Anlass ist nur für ${audience}. Deine Stufe ist nicht dabei.`);
       }

@@ -242,7 +242,14 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
             homeDepartment: { select: { joinMode: true } },
             memberships: {
               where: { departmentId: { in: targetDeptIds } },
-              select: { departmentId: true, role: true, permissions: true },
+              select: {
+                departmentId: true,
+                role: true,
+                permissions: true,
+                joinedAt: true,
+                confirmedAt: true,
+                department: { select: { joinMode: true } },
+              },
             },
             stufen: {
               where: { stufe: { departmentId: { in: targetDeptIds } } },
@@ -281,6 +288,7 @@ const eventMessageRoutes: FastifyPluginAsync = async (fastify) => {
             homeDepartmentId: u.homeDepartmentId,
             homeDepartmentSource: u.homeDepartmentSource,
             homeDepartment: u.homeDepartment,
+            memberships: u.memberships,
             stufen: u.stufen,
           };
           return checkRules(event, accessUser, event.department.name).ok;

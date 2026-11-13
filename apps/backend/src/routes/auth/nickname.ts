@@ -15,6 +15,7 @@ import {
   tooManyRequests,
 } from '../../services/nicknameLogin.js';
 import { trackUsage } from '../../services/usageStats.js';
+import { verifyDepartmentInviteToken } from '../../services/inviteToken.js';
 
 import {
   setAuthCookie,
@@ -141,7 +142,7 @@ const nicknameAuthRoutes: FastifyPluginAsync = async (fastify) => {
         error: 'Die passwortlose Anmeldung ist hier deaktiviert. Bitte melde dich mit E-Mail und Passwort oder Verbands-Login an.',
       });
     }
-    const validInvite = Boolean(inviteToken && department.inviteToken && inviteToken === department.inviteToken);
+    const validInvite = verifyDepartmentInviteToken(department.id, department.inviteToken, inviteToken).valid;
     if (department.joinMode === 'INVITE_ONLY' && !validInvite) {
       return reply.status(403).send({
         code: 'INVITE_REQUIRED',

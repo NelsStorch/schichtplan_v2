@@ -1,9 +1,11 @@
 /**
  * Sichtbarkeit einer Abteilung mit «Startseite nur für Mitglieder» (departments.members_only).
  *
- * Mitglied ist, wer die Abteilung als Heimabteilung hat, dort Abteilungsleitung ist oder Rechte hat,
- * im OK eines ihrer Anlässe sitzt oder globaler Admin ist. Die Mitgliedschaft ohne Rechte (department_members
- * HELPER, «Gast») zählt bewusst nicht: Sie entsteht schon durch ein Login von der Subdomain aus.
+ * Mitglied ist, wer die Abteilung als Heimabteilung hat oder ihr zusätzlich beigetreten ist (department_members
+ * mit joined_at), dort Abteilungsleitung ist oder Rechte hat, im OK eines ihrer Anlässe sitzt oder globaler Admin
+ * ist. Der reine Helfer-Eintrag ohne Beitritt (department_members HELPER ohne joined_at, «Gast») zählt bewusst
+ * nicht: Er entsteht schon durch ein Login von der Subdomain aus.
+ * Bei INVITE_ONLY zählen Heimabteilung und Beitritt nur bestätigt (Cevi.DB, Einladung oder Leitung).
  * Dazu Prüfungen, wer in einer Abteilung planen bzw. Bilder hochladen darf.
  */
 import type { PrismaClient } from '../db.js';
@@ -20,12 +22,26 @@ async function loadMembership(prisma: Db, departmentId: string, userId: string) 
     }),
     prisma.departmentMember.findUnique({
       where: { departmentId_userId: { departmentId, userId } },
-      select: { role: true, permissions: true },
+      select: { role: true, permissions: true, joinedAt: true, confirmedAt: true },
     }),
     prisma.eventOrganizer.findFirst({ where: { userId, event: { departmentId } }, select: { id: true } }),
   ]);
   if (!user) return null;
-  return { user, access: accessFrom(member, user.isGlobalAdmin), isOrganizer: Boolean(organizer) };
+  return { user, member, access: accessFrom(member, user.isGlobalAdmin), isOrganizer: Boolean(organizer) };
+}
+
+/** Selbst angegebene Zugehörigkeit (Heimabteilung SELF oder Beitritt ohne Bestätigung) zählt nicht bei INVITE_ONLY */
+export function unconfirmedCounts(joinMode: string | null | undefined): boolean {
+  return joinMode !== 'INVITE_ONLY';
+}
+
+/** Zählt eine zusätzliche Mitgliedschaft als Zugehörigkeit? */
+export function membershipCounts(
+  member: { joinedAt?: Date | null; confirmedAt?: Date | null } | null | undefined,
+  joinMode: string | null | undefined
+): boolean {
+  if (!member?.joinedAt) return false;
+  return Boolean(member.confirmedAt) || unconfirmedCounts(joinMode);
 }
 
 export async function isDepartmentInsider(prisma: Db, departmentId: string, userId: string | null | undefined): Promise<boolean> {
@@ -33,16 +49,18 @@ export async function isDepartmentInsider(prisma: Db, departmentId: string, user
   const m = await loadMembership(prisma, departmentId, userId);
   if (!m) return false;
   if (m.access.permissions.size > 0 || m.isOrganizer) return true;
-  if (m.user.homeDepartmentId !== departmentId) return false;
-  if (m.user.homeDepartmentSource === 'CEVIDB' || m.user.homeDepartmentSource === 'CONFIRMED') {
+  const isHome = m.user.homeDepartmentId === departmentId;
+  if (isHome && (m.user.homeDepartmentSource === 'CEVIDB' || m.user.homeDepartmentSource === 'CONFIRMED')) {
     return true;
   }
-  // Bei geschlossenen Abteilungen (INVITE_ONLY) zählt eine unbestätigte Selbstzuordnung nicht als Insider
+  if (m.member?.joinedAt && m.member.confirmedAt) return true;
+  if (!isHome && !m.member?.joinedAt) return false;
+  // Unbestätigt (Heimabteilung SELF oder Beitritt ohne Einladung): zählt nur, wenn die Abteilung nicht geschlossen ist
   const dept = await prisma.department.findUnique({
     where: { id: departmentId },
     select: { joinMode: true },
   });
-  return dept?.joinMode !== 'INVITE_ONLY';
+  return unconfirmedCounts(dept?.joinMode);
 }
 
 /**
