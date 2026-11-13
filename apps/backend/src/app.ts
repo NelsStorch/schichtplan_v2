@@ -4,6 +4,7 @@ import { z } from 'zod';
 import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import compress from '@fastify/compress';
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 
@@ -151,6 +152,20 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(compress);
+
+  // Grosszügiges globales Limit pro IP als Sicherheitsnetz gegen Scraping und Dauerlast.
+  // Die strengen Bremsen (Login, 2FA, PIN usw.) gelten zusätzlich und bleiben unverändert.
+  await app.register(rateLimit, {
+    global: true,
+    max: Number(process.env.RATE_LIMIT_MAX) || 300,
+    timeWindow: '1 minute',
+    // Health-Checks von Docker/Monitoring nie bremsen
+    allowList: (request) => request.url === '/health' || request.url.startsWith('/api/health'),
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: context.statusCode,
+      error: 'Zu viele Anfragen. Bitte warte einen Moment und versuche es dann nochmals.',
+    }),
+  });
 
   // Custom core plugins
   await app.register(prismaPlugin);
