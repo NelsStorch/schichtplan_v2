@@ -111,6 +111,23 @@ model UserHitobitoStufe {
   @@map("user_hitobito_stufen")
 }
 
+// Alle Rollen einer Person laut Hitobito (Cevi.DB, MiData, Jubla-DB), bei jedem Login ersetzt (keine Historie).
+// Nur Rollentyp und Gruppe, kein Rohprofil. Zweck: nachvollziehen, warum jemand ein Recht hat oder nicht.
+// Lesen dürfen sie nur globale Admins (Diagnose im Admin-Portal). Wie eine Rolle zählt, wird beim Anzeigen
+// mit der aktuellen Konfiguration berechnet und nicht gespeichert.
+model UserHitobitoRole {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  roleClass String  @map("role_class")
+  roleName  String? @map("role_name")
+  groupId   Int?    @map("group_id")
+  groupName String? @map("group_name")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_hitobito_roles")
+}
+
 // Stufe einer Person mit Rolle. Quelle CEVIDB wird bei jedem Cevi.DB-Login neu abgeglichen.
 model UserStufe {
   id        String          @id @default(uuid())
@@ -203,6 +220,7 @@ model User {
   memberships   DepartmentMember[]
   stufen        UserStufe[]
   hitobitoStufen UserHitobitoStufe[]
+  hitobitoRoles  UserHitobitoRole[]
   signups       ShiftSignup[]
   organizedEvents EventOrganizer[]
   eventAnswers  EventAnswer[]

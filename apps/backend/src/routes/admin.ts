@@ -3,7 +3,9 @@ import { FastifyPluginAsync } from 'fastify';
 import { Prisma } from '../db.js';
 import { z } from 'zod';
 import type {
+  AdminHitobitoRoleDto,
   AdminOverviewDto,
+  AdminUserAccessDiagnosisDto,
   AdminUserDetailDto,
   AdminUserListDto,
   AdminUserListItemDto,
@@ -13,6 +15,8 @@ import { AdminBatchDeleteUsersSchema, isPlaceholderEmail, normalizePermissions }
 import { hashResetToken } from './passwordReset.js';
 import { getLoginPortalBaseUrl } from '../services/authSession.js';
 import { toCeviDbStufeDto } from '../services/homeDepartment.js';
+import { hitobitoRoleKind } from '../services/hitobito.js';
+import { departmentCreationEligibility } from './departments/shared.js';
 import { recordAdminAction } from '../services/adminAudit.js';
 import { trackUsage } from '../services/usageStats.js';
 
@@ -427,6 +431,103 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         })),
       };
       return detail;
+    }
+  );
+
+  // Berechtigungs-Diagnose: Rollen vom letzten Login und was der Schichtplan daraus macht.
+  // Separat vom Detail, damit die Rollen nur geladen werden, wenn jemand sie wirklich braucht.
+  fastify.get<{ Params: { id: string } }>(
+    '/api/admin/users/:id/access-diagnosis',
+    {
+      schema: {
+        tags: ['Administration'],
+        summary: 'Berechtigungs-Diagnose einer Person (Admin)',
+        description:
+          'Rollen aus Hitobito (Cevi.DB, MiData, Jubla-DB) vom letzten Login, ihre Auswertung mit der aktuellen Konfiguration und ob die Person eine Abteilung anlegen darf.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({
+          id: z.string().uuid().describe('ID des Benutzers'),
+        }),
+      },
+      preHandler: [fastify.requireGlobalAdmin],
+    },
+    async (request, reply) => {
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: request.params.id },
+        select: {
+          id: true,
+          provider: true,
+          providerId: true,
+          providerSyncedAt: true,
+          hitobitoRoles: { orderBy: [{ groupName: 'asc' }, { roleClass: 'asc' }] },
+          memberships: {
+            select: { role: true, leaderSource: true, department: { select: { name: true, slug: true } } },
+            orderBy: { department: { name: 'asc' } },
+          },
+        },
+      });
+      if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+
+      const provider = user.provider;
+      const hasProvider = user.providerId !== null;
+      const groupIds = [...new Set(user.hitobitoRoles.flatMap((r) => (r.groupId !== null ? [r.groupId] : [])))];
+      const groups = groupIds.length
+        ? await fastify.prisma.hitobitoGroup.findMany({ where: { provider, id: { in: groupIds } } })
+        : [];
+      const groupById = new Map(groups.map((g) => [g.id, g]));
+      // Gruppen-IDs, zu denen eine Abteilung gehören kann: die Gruppe selbst, ihre Jungschar, ihre Ortsgruppe
+      const candidateIds = [
+        ...new Set([...groupIds, ...groups.flatMap((g) => [g.jungscharId, g.ortsgruppeId])].filter((id): id is number => id !== null)),
+      ];
+      const departments = candidateIds.length
+        ? await fastify.prisma.department.findMany({
+            where: { organization: provider, hitobitoGroupId: { in: candidateIds } },
+            select: { name: true, slug: true, hitobitoGroupId: true },
+          })
+        : [];
+      const departmentsOf = (groupId: number | null) => {
+        if (groupId === null) return [];
+        const group = groupById.get(groupId);
+        const ids = new Set([groupId, group?.jungscharId, group?.ortsgruppeId].filter((id) => id != null));
+        return departments.filter((d) => d.hitobitoGroupId !== null && ids.has(d.hitobitoGroupId)).map(({ name, slug }) => ({ name, slug }));
+      };
+
+      // Ohne Verbands-Login gibt es keine Rollen. Konten mit Login, aber ohne gespeicherte Rollen,
+      // haben sich seit Einführung der Diagnose noch nicht angemeldet.
+      const roles: AdminHitobitoRoleDto[] | null =
+        hasProvider && user.hitobitoRoles.length === 0
+          ? null
+          : user.hitobitoRoles.map((r) => {
+              const group = r.groupId !== null ? groupById.get(r.groupId) : undefined;
+              return {
+                roleClass: r.roleClass,
+                roleName: r.roleName,
+                groupId: r.groupId,
+                groupName: r.groupName,
+                kind: hitobitoRoleKind(r.roleClass, provider),
+                group: group
+                  ? { groupType: group.groupType, jungscharId: group.jungscharId, ortsgruppeId: group.ortsgruppeId }
+                  : null,
+                departments: departmentsOf(r.groupId),
+              };
+            });
+
+      request.log.info({ adminId: request.user.id, userId: user.id }, 'Admin: Berechtigungs-Diagnose abgerufen');
+
+      const result: AdminUserAccessDiagnosisDto = {
+        provider,
+        hasProvider,
+        syncedAt: user.providerSyncedAt?.toISOString() ?? null,
+        roles,
+        departmentCreation: await departmentCreationEligibility(fastify.prisma, user.id, provider),
+        memberships: user.memberships.map((m) => ({
+          departmentName: m.department.name,
+          departmentSlug: m.department.slug,
+          role: m.role,
+          leaderSource: m.leaderSource,
+        })),
+      };
+      return result;
     }
   );
 

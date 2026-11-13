@@ -10,7 +10,7 @@ import {
   isDepartmentLeaderRole,
   isUnitRoleClass,
 } from '@schichtplan/shared';
-import { deriveCeviDbFields } from './hitobito.js';
+import { deriveCeviDbFields, hitobitoRoleKind, hitobitoRoles } from './hitobito.js';
 
 describe('Hitobito & Vokabular (Multi-Verband)', () => {
   describe('Vokabular-Definitionen', () => {
@@ -268,6 +268,50 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
         kind: 'LEITUNG',
         isPrimary: true,
       });
+    });
+  });
+
+  describe('Rollen-Snapshot für die Berechtigungs-Diagnose', () => {
+    it('speichert nur Rollentyp und Gruppe, ohne Duplikate und weitere Profilfelder', () => {
+      const roles = hitobitoRoles({
+        email: 'x@example.ch',
+        address: 'Geheimweg 1',
+        roles: [
+          { role_class: 'Group::Jungschar::Abteilungsleiter', role_name: 'Abteilungsleiter', group_id: '161', group_name: 'JS Illnau', extra: 'x' },
+          { role_class: 'Group::Jungschar::Abteilungsleiter', group_id: 161, group_name: 'JS Illnau' },
+          { role_class: 'Group::Vorstand::Mitglied', group_name: 'Vorstand' },
+          { group_id: 5 },
+          'kaputt',
+        ],
+      });
+      expect(roles).toEqual([
+        { roleClass: 'Group::Jungschar::Abteilungsleiter', roleName: 'Abteilungsleiter', groupId: 161, groupName: 'JS Illnau' },
+        { roleClass: 'Group::Vorstand::Mitglied', roleName: null, groupId: null, groupName: 'Vorstand' },
+      ]);
+      expect(hitobitoRoles(null)).toEqual([]);
+    });
+
+    it('ist Teil der abgeleiteten Felder', () => {
+      const derived = deriveCeviDbFields({ roles: [{ role_class: 'Group::Flock::Leader', group_id: 601 }] }, 'JUBLA');
+      expect(derived.roles).toEqual([{ roleClass: 'Group::Flock::Leader', roleName: null, groupId: 601, groupName: null }]);
+    });
+
+    it('wertet Rollen pro Verband aus (Cevi, Pfadi, Jubla)', () => {
+      // Cevi
+      expect(hitobitoRoleKind('Group::Jungschar::Abteilungsleiter', 'CEVI')).toBe('DEPARTMENT_LEADER');
+      expect(hitobitoRoleKind('Group::Stufe::Stufenleiter', 'CEVI')).toBe('LEITUNG');
+      expect(hitobitoRoleKind('Group::Stufe::Teilnehmer', 'CEVI')).toBe('TEILNEHMER');
+      expect(hitobitoRoleKind('Group::Vorstand::Mitglied', 'CEVI')).toBe('NONE');
+      // Pfadi
+      expect(hitobitoRoleKind('Group::Abteilung::Abteilungsleitung', 'PFADI')).toBe('DEPARTMENT_LEADER');
+      expect(hitobitoRoleKind('Group::Woelfe::Einheitsleitung', 'PFADI')).toBe('LEITUNG');
+      expect(hitobitoRoleKind('Group::Pfadi::Pfadi', 'PFADI')).toBe('TEILNEHMER');
+      expect(hitobitoRoleKind('Group::Abteilung::Coach', 'PFADI')).toBe('NONE');
+      // Jubla
+      expect(hitobitoRoleKind('Group::Flock::Leader', 'JUBLA')).toBe('DEPARTMENT_LEADER');
+      expect(hitobitoRoleKind('Group::ChildGroup::Leader', 'JUBLA')).toBe('LEITUNG');
+      expect(hitobitoRoleKind('Group::ChildGroup::Child', 'JUBLA')).toBe('TEILNEHMER');
+      expect(hitobitoRoleKind('Group::Flock::Coach', 'JUBLA')).toBe('NONE');
     });
   });
 });

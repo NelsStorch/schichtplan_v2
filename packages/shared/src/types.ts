@@ -831,6 +831,46 @@ export interface HitobitoStufeDto {
 /** Alias für HitobitoStufeDto für Abwärtskompatibilität */
 export type CeviDbStufeDto = HitobitoStufeDto;
 
+/**
+ * Wie der Schichtplan eine Hitobito-Rolle auswertet: DEPARTMENT_LEADER (Abteilungs-/Scharleitung),
+ * LEITUNG / TEILNEHMER / ANDERE (Rolle in einer Stufe, Einheit oder Kindergruppe), NONE (nicht ausgewertet).
+ */
+export type HitobitoRoleKindDto = 'DEPARTMENT_LEADER' | 'LEITUNG' | 'TEILNEHMER' | 'ANDERE' | 'NONE';
+
+export interface AdminHitobitoRoleDto {
+  roleClass: string;
+  roleName: string | null;
+  groupId: number | null;
+  groupName: string | null;
+  /** Mit der aktuellen Konfiguration berechnet */
+  kind: HitobitoRoleKindDto;
+  /** Gruppe aus der Gruppenstruktur; null: Gruppe (noch) nicht bekannt */
+  group: { groupType: string | null; jungscharId: number | null; ortsgruppeId: number | null } | null;
+  /** Abteilungen im Schichtplan, zu denen die Gruppe gehört (direkt, über Jungschar oder Ortsgruppe) */
+  departments: { name: string; slug: string }[];
+}
+
+/** Berechtigungs-Diagnose einer Person (nur globale Admins). Wird beim Abruf berechnet, nicht gespeichert. */
+export interface AdminUserAccessDiagnosisDto {
+  provider: OrganizationType;
+  /** Konto mit Verbands-Login (Hitobito) */
+  hasProvider: boolean;
+  /** Letzter Abgleich mit Hitobito (Login) */
+  syncedAt: string | null;
+  /** Rollen vom letzten Login; null: noch kein Stand gespeichert (vor dieser Funktion zuletzt angemeldet) */
+  roles: AdminHitobitoRoleDto[] | null;
+  /** Darf die Person eine Abteilung anlegen, und wenn nicht, warum? (gleiche Prüfung wie beim Anlegen) */
+  departmentCreation: DepartmentCreationEligibilityDto;
+  /** Zugehörigkeiten mit Herkunft der Abteilungsleitung */
+  memberships: {
+    departmentName: string;
+    departmentSlug: string;
+    role: string;
+    /** CEVIDB: aus dem Login (wird dort auch wieder entzogen), MANUAL: im Admin-Portal gesetzt */
+    leaderSource: string | null;
+  }[];
+}
+
 export interface AdminUserDetailDto extends AdminUserListItemDto {
   /** Stufen laut Hitobito/Cevi.DB (leer ohne Hitobito-Login) */
   stufen: HitobitoStufeDto[];

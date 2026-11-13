@@ -83,6 +83,13 @@ export async function storeCeviDbFields(
         skipDuplicates: true,
       });
     }
+    // Rollen-Stand für die Berechtigungs-Diagnose: immer nur der letzte Login, keine Historie
+    await tx.userHitobitoRole.deleteMany({ where: { userId } });
+    if (derived.roles.length) {
+      await tx.userHitobitoRole.createMany({
+        data: derived.roles.map((r) => ({ userId, ...r })),
+      });
+    }
   });
 }
 

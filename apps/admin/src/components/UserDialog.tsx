@@ -36,6 +36,7 @@ import {
   fullName,
   organizerRoleLabels,
 } from '../lib/format';
+import { AccessDiagnosis } from './AccessDiagnosis';
 import { AdminPermissionChecks } from './DepartmentDialog';
 import { LoginMethodBadges } from './LoginMethodBadges';
 import { PersonPicker } from './PersonPicker';
@@ -802,6 +803,10 @@ export function UserDialog({
                   </Button>
                 </div>
               )}
+            </Section>
+
+            <Section title="Berechtigungs-Diagnose">
+              <AccessDiagnosis key={user.id} userId={user.id} />
             </Section>
 
             {error && <Callout tone="danger">{error}</Callout>}

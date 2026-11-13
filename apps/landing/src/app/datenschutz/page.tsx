@@ -270,7 +270,11 @@ export default async function DatenschutzPage() {
                 {org.slug === "cevi"
                   ? "welche Gruppe zu welcher Jungschar und Ortsgruppe gehört"
                   : "welche Gruppe zu welcher übergeordneten Gruppe gehört"}
-                ). Deine Postadresse aus der {dbShort} übernehmen und
+                ). Von deinen Rollen speichern wir nur Rollentyp und Gruppe,
+                jeweils den Stand vom letzten Login (keine Historie). Sie
+                dienen dazu, nachzuvollziehen, warum du ein Recht hast oder
+                nicht, und sind nur für die globalen Admins des Schichtplans
+                sichtbar. Deine Postadresse aus der {dbShort} übernehmen und
                 speichern wir nicht.
               </li>
             )}

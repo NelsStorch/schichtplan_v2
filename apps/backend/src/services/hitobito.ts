@@ -1,6 +1,7 @@
 /**
  * Auswertung des Hitobito-Profils (`/oauth/profile` mit Scope `with_roles`).
  * Wird nur beim Hitobito-Login (Cevi.DB, MiData, Jubla-DB) auf die frische Antwort angewendet (`deriveHitobitoFields`), das Rohprofil wird nicht gespeichert.
+ * Von den Rollen bleiben nur Rollentyp und Gruppe (`hitobitoRoles`), für die Berechtigungs-Diagnose im Admin-Portal.
  * Welche Rollen was bedeuten, steht in `config/hitobito.ts` und `@schichtplan/shared`.
  *
  * Vertrauen: `roles` vergibt die Leitung im Hitobito-System, `primary_group_id` lässt sich nur aus den eigenen Rollen
@@ -9,6 +10,7 @@
  */
 import {
   type CeviDbStufeDto,
+  type HitobitoRoleKindDto,
   type OrganizationType,
   getHitobitoConfig,
   isDepartmentLeaderRole as isDepartmentLeaderRoleShared,
@@ -85,18 +87,19 @@ export function isDepartmentLeaderRole(
   return isDepartmentLeaderRoleShared(roleClass, configuredRolesOrOrg);
 }
 
-export function ceviDbLeadership(profile: unknown, orgType: OrganizationType = 'CEVI'): CeviDbLeadership {
+/** Zählt die Rolle beim Login als Abteilungs-/Scharleitung des Verbands? (Konfiguration aus `.env` oder Vorgabe) */
+export function isLeaderRoleFor(roleClass: string, orgType: OrganizationType = 'CEVI'): boolean {
   const configuredRoles =
     orgType === 'CEVI'
       ? cevidbConfig().departmentLeaderRoleClasses
       : getHitobitoConfig(orgType).departmentLeaderRoleClasses;
+  return isDepartmentLeaderRole(roleClass, configuredRoles) || isDepartmentLeaderRoleShared(roleClass, orgType);
+}
 
+export function ceviDbLeadership(profile: unknown, orgType: OrganizationType = 'CEVI'): CeviDbLeadership {
   const leaderRoles = profileRoles(profile).filter((role) => {
     const roleClass = roleClassOf(role);
-    return (
-      roleClass !== null &&
-      (isDepartmentLeaderRole(roleClass, configuredRoles) || isDepartmentLeaderRoleShared(roleClass, orgType))
-    );
+    return roleClass !== null && isLeaderRoleFor(roleClass, orgType);
   });
   const leaderRole = leaderRoles[0];
 
@@ -115,6 +118,63 @@ export function ceviDbLeadership(profile: unknown, orgType: OrganizationType = '
 const kindRank: Record<CeviDbStufeDto['kind'], number> = { LEITUNG: 0, TEILNEHMER: 1, ANDERE: 2 };
 
 /**
+ * Rolle in einer Stufe / Einheit / Kindergruppe: Leitung, Teilnehmer*in oder Andere. null, wenn die Rolle
+ * keine Stufen-Rolle ist (z. B. Abteilungsleitung, Coach, Vorstand).
+ */
+export function unitRoleKind(roleClass: string, orgType: OrganizationType = 'CEVI'): CeviDbStufeDto['kind'] | null {
+  // Scharleitungs- und Abteilungsleitungs-Rollen sind die Leitung der Organisation, keine Unter-Einheit/Stufe
+  if (isDepartmentLeaderRole(roleClass, orgType)) return null;
+  const ceviCfg = orgType === 'CEVI' ? cevidbConfig() : null;
+  const isCeviStufe = ceviCfg ? roleClass.startsWith(ceviCfg.stufeRoleClassPrefix) : false;
+  if (!isCeviStufe && !isUnitRoleClass(roleClass, orgType)) return null;
+  if (ceviCfg && isCeviStufe) {
+    const roleKey = getUnitRoleKey(roleClass);
+    return ceviCfg.stufeLeaderRoles.includes(roleKey)
+      ? 'LEITUNG'
+      : ceviCfg.stufeParticipantRoles.includes(roleKey)
+        ? 'TEILNEHMER'
+        : 'ANDERE';
+  }
+  return classifyUnitRole(roleClass, orgType);
+}
+
+/** Wie der Schichtplan eine Rolle auswertet (für die Diagnose im Admin-Portal) */
+export function hitobitoRoleKind(roleClass: string, orgType: OrganizationType = 'CEVI'): HitobitoRoleKindDto {
+  if (isLeaderRoleFor(roleClass, orgType)) return 'DEPARTMENT_LEADER';
+  return unitRoleKind(roleClass, orgType) ?? 'NONE';
+}
+
+/** Rollen der Person, gekürzt auf Rollentyp und Gruppe. Doppelte (gleicher Typ in gleicher Gruppe) nur einmal. */
+export function hitobitoRoles(profile: unknown): HitobitoRoleSnapshot[] {
+  const seen = new Set<string>();
+  const roles: HitobitoRoleSnapshot[] = [];
+  for (const role of profileRoles(profile)) {
+    const roleClass = roleClassOf(role);
+    if (roleClass === null || !roleClass.trim()) continue;
+    const groupId = parseCeviDbGroupId(role.group_id);
+    const key = `${roleClass}|${groupId ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    roles.push({
+      roleClass: roleClass.slice(0, 200),
+      roleName: typeof role.role_name === 'string' ? role.role_name.slice(0, 200) : null,
+      groupId,
+      groupName: typeof role.group_name === 'string' ? role.group_name.slice(0, 200) : null,
+    });
+    // Schutz gegen übergrosse Antworten: so viele Rollen hat niemand
+    if (roles.length >= 200) break;
+  }
+  return roles;
+}
+
+export interface HitobitoRoleSnapshot {
+  roleClass: string;
+  roleName: string | null;
+  groupId: number | null;
+  groupName: string | null;
+}
+
+/**
  * Stufen / Einheiten der Person: alle Gruppen, in denen sie eine Rolle hat.
  * Pro Gruppe zählt die stärkste Rolle (Leitung vor Teilnehmer*in).
  * Die Haupt-Gruppe (`primary_group_id` des Profils) steht zuerst.
@@ -122,30 +182,16 @@ const kindRank: Record<CeviDbStufeDto['kind'], number> = { LEITUNG: 0, TEILNEHME
 export function ceviDbStufen(profile: unknown, orgType: OrganizationType = 'CEVI'): CeviDbStufeDto[] {
   const primaryGroupId = isRecord(profile) ? parseCeviDbGroupId(profile.primary_group_id) : null;
   const byGroup = new Map<number, CeviDbStufeDto>();
-  const ceviCfg = orgType === 'CEVI' ? cevidbConfig() : null;
 
   for (const role of profileRoles(profile)) {
     const roleClass = roleClassOf(role);
     const groupId = parseCeviDbGroupId(role.group_id);
     if (roleClass === null || groupId === null) continue;
 
-    // Scharleitungs- und Abteilungsleitungs-Rollen sind die Leitung der Organisation, keine Unter-Einheit/Stufe
-    if (isDepartmentLeaderRole(roleClass, orgType)) continue;
-
-    const isCeviStufe = ceviCfg ? roleClass.startsWith(ceviCfg.stufeRoleClassPrefix) : false;
-    if (!isCeviStufe && !isUnitRoleClass(roleClass, orgType)) continue;
+    const kind = unitRoleKind(roleClass, orgType);
+    if (kind === null) continue;
 
     const roleKey = getUnitRoleKey(roleClass);
-    let kind: CeviDbStufeDto['kind'];
-    if (ceviCfg && isCeviStufe) {
-      kind = ceviCfg.stufeLeaderRoles.includes(roleKey)
-        ? 'LEITUNG'
-        : ceviCfg.stufeParticipantRoles.includes(roleKey)
-          ? 'TEILNEHMER'
-          : 'ANDERE';
-    } else {
-      kind = classifyUnitRole(roleClass, orgType);
-    }
     const roleName = typeof role.role_name === 'string' ? role.role_name : roleKey;
 
     const existing = byGroup.get(groupId);
@@ -193,6 +239,8 @@ export interface CeviDbDerived {
   roleGroupIds: number[];
   primaryGroupId: number | null;
   stufen: CeviDbStufeDto[];
+  /** Alle Rollen (nur Rollentyp und Gruppe), für die Berechtigungs-Diagnose */
+  roles: HitobitoRoleSnapshot[];
 }
 
 /**
@@ -210,6 +258,7 @@ export function deriveCeviDbFields(profile: unknown, orgType: OrganizationType =
     roleGroupIds: ceviDbRoleGroupIds(profile),
     primaryGroupId: isRecord(profile) ? parseCeviDbGroupId(profile.primary_group_id) : null,
     stufen: ceviDbStufen(profile, orgType),
+    roles: hitobitoRoles(profile),
   };
 }
 
