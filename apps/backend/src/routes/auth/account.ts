@@ -302,7 +302,14 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.id;
       const current = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { homeDepartmentId: true, homeDepartmentSource: true, providerId: true, passwordHash: true, email: true },
+        select: {
+          homeDepartmentId: true,
+          homeDepartmentSource: true,
+          providerId: true,
+          provider: true,
+          passwordHash: true,
+          email: true,
+        },
       });
       if (!current) return reply.status(404).send({ error: 'Person nicht gefunden' });
 
@@ -452,7 +459,7 @@ const accountRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.id;
       const current = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        select: { homeDepartmentId: true, passwordHash: true, providerId: true },
+        select: { homeDepartmentId: true, passwordHash: true, providerId: true, provider: true },
       });
       if (!current) return reply.status(404).send({ error: 'Person nicht gefunden' });
       if (current.homeDepartmentId === input.departmentId) {

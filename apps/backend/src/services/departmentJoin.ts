@@ -3,7 +3,7 @@
  * kann beliebig vielen weiteren beitreten (department_members.joined_at). Hier liegen die Regeln, die für
  * beide Wege gelten: Beitrittsmodus (OPEN, LINK_ONLY, INVITE_ONLY), Einladungs-Token und Stufen.
  */
-import type { PrismaClient } from '../db.js';
+import type { OrganizationType, PrismaClient } from '../db.js';
 import { normalizePermissions, type DepartmentPermission } from '@schichtplan/shared';
 import { verifyDepartmentInviteToken } from './inviteToken.js';
 import { isCeviNameProfile } from './nicknameLogin.js';
@@ -29,7 +29,12 @@ export async function checkDepartmentJoin(
   prisma: Db,
   params: {
     userId: string;
-    user: { homeDepartmentId: string | null; passwordHash: string | null; providerId: string | null };
+    user: {
+      homeDepartmentId: string | null;
+      passwordHash: string | null;
+      providerId: string | null;
+      provider?: OrganizationType | null;
+    };
     departmentId: string;
     inviteToken?: string | null;
     viaLink?: boolean;
@@ -39,7 +44,7 @@ export async function checkDepartmentJoin(
   const { userId, user, departmentId } = params;
   const dept = await prisma.department.findUnique({
     where: { id: departmentId },
-    select: { id: true, joinMode: true, inviteToken: true },
+    select: { id: true, joinMode: true, inviteToken: true, organization: true },
   });
   if (!dept) return { ok: false, status: 400, error: 'Diese Abteilung gibt es nicht' };
 
@@ -72,11 +77,16 @@ export async function checkDepartmentJoin(
       error: 'Beitritt nur per Einladung möglich. Bitte nutze einen gültigen Einladungs-Link.',
     };
   }
+  // Personen mit Verbands-Login (Cevi.DB, MiData, Jubla.DB) werden nach dem OAuth-Login direkt auf
+  // login.<domain>/abteilung geleitet, wenn ihre Rollen keine eindeutige Jungschar ergeben (z. B.
+  // geteilte Ortsgruppe). Sie kommen dort ohne Abteilungs-Subdomain an und dürfen bei LINK_ONLY wählen.
+  const hasProviderLogin = user.providerId !== null && (!user.provider || user.provider === dept.organization);
+
   // LINK_ONLY ist bewusst keine Zugriffsschranke: Der Abteilungs-Link (Subdomain) ist öffentlich,
   // und viaLink setzt der Browser selbst. Die Prüfung hält die Abteilung nur aus der allgemeinen
   // Auswahl heraus. Ein Beitritt ohne Einladung bleibt unbestätigt; wer wirklich geschlossen sein
   // will, wählt INVITE_ONLY (dort zählt nur Einladung oder Bestätigung durch die Leitung).
-  if (dept.joinMode === 'LINK_ONLY' && !params.viaLink && params.tenantId !== departmentId) {
+  if (dept.joinMode === 'LINK_ONLY' && !params.viaLink && params.tenantId !== departmentId && !hasProviderLogin) {
     return {
       ok: false,
       status: 403,

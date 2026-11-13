@@ -160,16 +160,17 @@ function DepartmentSetup() {
   );
   const selectedDepartment = departments?.find((d) => d.id === selected) ?? null;
 
-  // Wählbar: offene Abteilungen, die eigene, die des Links und die der Einladung (vor dem Suchfilter)
+  // Wählbar: offene Abteilungen, die eigene, die des Links, die der Einladung und bei Verbands-Login LINK_ONLY
   const selectable = useMemo(
     () =>
       (departments ?? []).filter((d) => {
         if (d.id === user?.homeDepartment?.id) return true;
         if (d.id === inviteDeptId) return true;
         if (d.joinMode === 'LINK_ONLY' && returnToSlug && d.slug === returnToSlug) return true;
+        if (d.joinMode === 'LINK_ONLY' && user?.hasProviderAuth) return true;
         return !d.joinMode || d.joinMode === 'OPEN';
       }),
-    [departments, user?.homeDepartment?.id, inviteDeptId, returnToSlug]
+    [departments, user?.homeDepartment?.id, user?.hasProviderAuth, inviteDeptId, returnToSlug]
   );
 
   const visible = useMemo(() => {
