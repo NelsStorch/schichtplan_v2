@@ -39,10 +39,16 @@ async function main() {
   // Erinnerungs-Mails vor Schichten: nur wenn ausdrücklich eingeschaltet. Hooks müssen vor
   // listen() registriert sein (danach wirft Fastify FST_ERR_INSTANCE_ALREADY_LISTENING).
   if (process.env.SHIFT_REMINDERS_ENABLED === 'true') {
+    // Kurze DB-Verbindungsaussetzer (DNS, Container-Neustart, Backup) heilen sich beim nächsten Lauf
+    // von selbst, weil Erinnerungen atomar «geclaimt» werden. Alarm daher erst nach mehreren
+    // aufeinanderfolgenden Fehlschlägen (3 × 10 Min = 30 Min); andere Fehler alarmieren sofort.
+    const DB_FAILURES_BEFORE_ALERT = 3;
+    let consecutiveDbFailures = 0;
     const run = () =>
       runExclusive(app.prisma, 'shift-reminders', () => sendDueShiftReminders(app.prisma))
         .then((res) => {
           if (!res.ran) return; // läuft schon in einem anderen Backend (z. B. beim Rollout)
+          consecutiveDbFailures = 0;
           const sent = res.value;
           trackUsage('JOB_RUN', { dim: 'SHIFT_REMINDERS' });
           if (sent > 0) {
@@ -52,12 +58,24 @@ async function main() {
         })
         .catch((err) => {
           trackUsage('JOB_FAILED', { dim: 'SHIFT_REMINDERS' });
+          const dbError = isDatabaseOverloadError(err);
+          if (dbError) {
+            consecutiveDbFailures++;
+            if (consecutiveDbFailures < DB_FAILURES_BEFORE_ALERT) {
+              app.log.warn({ err, consecutiveDbFailures }, 'Schicht-Erinnerungen: DB kurz nicht erreichbar, neuer Versuch beim nächsten Lauf');
+              return;
+            }
+          } else {
+            consecutiveDbFailures = 0;
+          }
           app.log.error(err, 'Schicht-Erinnerungen fehlgeschlagen');
           void sendServerAlert({
-            category: isDatabaseOverloadError(err) ? 'DB_OVERLOAD' : 'SERVER_ERROR',
+            category: dbError ? 'DB_OVERLOAD' : 'SERVER_ERROR',
             level: 'CRITICAL',
             title: 'Hintergrund-Job: Schicht-Erinnerungen fehlgeschlagen',
-            message: 'Der periodische Versand von Schicht-Erinnerungen ist mit einem Fehler abgebrochen.',
+            message: dbError
+              ? `Der periodische Versand von Schicht-Erinnerungen ist ${consecutiveDbFailures}× in Folge an der Datenbankverbindung gescheitert.`
+              : 'Der periodische Versand von Schicht-Erinnerungen ist mit einem Fehler abgebrochen.',
             error: err,
           }).catch(() => {});
         });

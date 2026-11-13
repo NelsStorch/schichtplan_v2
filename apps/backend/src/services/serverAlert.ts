@@ -47,6 +47,8 @@ export function isDatabaseOverloadError(err: unknown): boolean {
     if (['P1001', 'P1002', 'P1008', 'P1017', 'P2024'].includes(code)) return true;
     // Postgres SQLSTATE codes (53300 = too_many_connections, 57014 = query_canceled)
     if (['53300', '57014', '08000', '08003', '08006'].includes(code)) return true;
+    // Node-Netzwerkfehler auf dem Weg zur DB (z. B. Docker-DNS-Aussetzer oder Container-Neustart)
+    if (['EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(code)) return true;
   }
 
   const name = anyErr.name;
@@ -64,6 +66,10 @@ export function isDatabaseOverloadError(err: unknown): boolean {
     msg.includes("can't reach database server") ||
     msg.includes('connection closed') ||
     msg.includes('connection timeout') ||
+    msg.includes('getaddrinfo eai_again') ||
+    msg.includes('getaddrinfo enotfound') ||
+    msg.includes('econnrefused') ||
+    msg.includes('econnreset') ||
     // pg-Pool: keine freie Verbindung innert connectionTimeoutMillis (siehe db.ts)
     msg.includes('timeout exceeded when trying to connect') ||
     msg.includes('remaining connection slots are reserved')

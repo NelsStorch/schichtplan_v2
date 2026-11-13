@@ -31,6 +31,12 @@ describe('serverAlert', () => {
       expect(isDatabaseOverloadError({ code: '57014', message: 'canceling statement due to statement timeout' })).toBe(true);
     });
 
+    it('erkennt DNS- und Netzwerkfehler auf dem Weg zur DB (z. B. getaddrinfo EAI_AGAIN db)', () => {
+      expect(isDatabaseOverloadError({ code: 'EAI_AGAIN', message: 'getaddrinfo EAI_AGAIN db' })).toBe(true);
+      expect(isDatabaseOverloadError({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED 172.18.0.2:5432' })).toBe(true);
+      expect(isDatabaseOverloadError(new Error('Invalid `prisma.shiftSignup.findMany()` invocation:\n\ngetaddrinfo EAI_AGAIN db'))).toBe(true);
+    });
+
     it('gibt false für reguläre Anwendungs- und Validierungsfehler zurück', () => {
       expect(isDatabaseOverloadError(new Error('Ungültiges Passwort'))).toBe(false);
       expect(isDatabaseOverloadError({ code: 'P2002', message: 'Unique constraint failed' })).toBe(false);
