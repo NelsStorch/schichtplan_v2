@@ -2,12 +2,12 @@
 
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowUpRight, Building2 } from 'lucide-react';
+import { ArrowUpRight, Building2, Check, Copy, Share2 } from 'lucide-react';
 import type { DepartmentCreationEligibilityDto, UserDto } from '@schichtplan/shared';
 import { getDepartmentUrl } from '@schichtplan/shared/redirect';
 import { type OrganizationConfig } from '@schichtplan/shared';
 import { Button, Callout, BrandLogo, Field, Input, ThemeToggle, buttonClasses, useOrganization } from '@schichtplan/ui';
-import { cleanReturnTo, finalDestination, withReturnTo } from '@/lib/destination';
+import { afterLogin, cleanReturnTo } from '@/lib/destination';
 import { AuthFooter } from '@/components/AuthFooter';
 
 const slugify = (value: string) =>
@@ -54,6 +54,7 @@ function CreateDepartment() {
   const [groupId, setGroupId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedShare, setCopiedShare] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -88,9 +89,34 @@ function CreateDepartment() {
 
   /** «Später»: weiter wie nach einem normalen Login */
   const later = () => {
-    window.location.href = user?.needsDepartmentSetup
-      ? withReturnTo('/abteilung', returnTo)
-      : finalDestination(returnTo, user, org.dbType);
+    window.location.href = afterLogin(user, returnTo, org.dbType);
+  };
+
+  const shareUrl = typeof window === 'undefined' ? '/abteilung-erstellen' : `${window.location.origin}/abteilung-erstellen`;
+  const groupLabel = eligibility?.ortsgruppeName ? withOrgName(eligibility.ortsgruppeName, org) : `unsere ${org.unitTerm}`;
+  const shareMessage = `Hey! Könntest du für ${groupLabel} kurz den Schichtplan auf ${org.name} einrichten? Als ${org.unitTerm}-Leitung in ${org.authProviderShort} geht das mit einem Klick:`;
+
+  const copyForLeader = async () => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(`${shareMessage} ${shareUrl}`);
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 3000);
+  };
+
+  const shareWithLeader = async () => {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: `${org.name} für ${groupLabel} einrichten`,
+          text: shareMessage,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // Abbruch des nativen Share-Dialogs ignorieren, bei Fehler auf Copy zurückfallen
+      }
+    }
+    await copyForLeader();
   };
 
   const submit = async (e: FormEvent) => {
@@ -298,8 +324,17 @@ function CreateDepartment() {
                 In {org.authProviderShort} ist für dich keine Gruppe hinterlegt. Melde dich bei der Mitgliederverwaltung eurer {org.unitTerm}.
               </p>
             ) : (
-              <div className="space-y-4">
-                <Callout tone="info" title={org.slug === 'verein' ? 'Verein anlegen' : `Nur für die ${org.unitTerm}-Leitung`}>
+              <div className="space-y-5">
+                <Callout
+                  tone="info"
+                  title={
+                    org.slug === 'verein'
+                      ? 'Verein anlegen'
+                      : eligibility.ortsgruppeName
+                        ? `${withOrgName(eligibility.ortsgruppeName, org)} hat noch keinen Schichtplan`
+                        : `Nur für die ${org.unitTerm}-Leitung`
+                  }
+                >
                   {org.slug === 'verein' ? (
                     <p className="text-[14px] leading-relaxed">
                       Um einen neuen Verein anzulegen, melde dich bitte mit deinem E-Mail- und Passwort-Konto an.
@@ -307,14 +342,27 @@ function CreateDepartment() {
                   ) : (
                     <>
                       <p className="text-[14px] leading-relaxed">
-                        Einen neuen Schichtplan für eine {org.unitTerm} kann nur die offizielle Leitung in {org.authProviderShort} anlegen.
+                        Du bist selbst nicht als {org.unitTerm}-Leitung in {org.authProviderShort} eingetragen – deshalb kannst du die {org.unitTerm} nicht direkt selbst eröffnen.
                       </p>
                       <p className="mt-2 text-[14px] leading-relaxed">
-                        <strong>Was du tun kannst:</strong> Bitte eure Leitung, den Schichtplan einmalig anzulegen. Danach kann sie dir unter <em>{org.unitTerm} → Personen</em> das Recht <strong>Anlässe erstellen</strong> geben, damit du selbstständig Anlässe erstellen kannst – oder sie erstellt den Anlass direkt für dich.
+                        <strong>So klappt es trotzdem sofort:</strong> Schicke deiner {org.unitTerm}-Leitung den Einrichtungslink. Sobald sie den Schichtplan mit einem Klick angelegt hat, kann sie dir unter <em>{org.unitTerm} → Personen</em> das Recht <strong>Anlässe erstellen</strong> geben.
                       </p>
                     </>
                   )}
                 </Callout>
+
+                {org.slug !== 'verein' && (
+                  <div className="space-y-2.5">
+                    <Button type="button" size="lg" className="w-full" onClick={shareWithLeader}>
+                      <Share2 className="size-4" />
+                      <span>An {org.unitTerm}-Leitung senden</span>
+                    </Button>
+                    <Button type="button" variant="secondary" size="md" className="w-full" onClick={copyForLeader}>
+                      {copiedShare ? <Check className="size-4" /> : <Copy className="size-4" />}
+                      <span>{copiedShare ? 'Nachricht & Link kopiert!' : 'Nachricht & Link kopieren'}</span>
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
             <Button variant="ghost" className="w-full" onClick={later}>
