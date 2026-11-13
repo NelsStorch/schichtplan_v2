@@ -3,9 +3,18 @@ contact_links:
   - name: 🔒 Sicherheitslücke melden
     url: https://github.com/NelsStorch/schichtplan_v2/security/advisories/new
     about: Bitte vertraulich melden, nicht als öffentliches Issue.
-  - name: 📚 Hilfe-Center
+  - name: 📚 Hilfe-Center Cevi
     url: https://hilfe.cevi-schichtplan.ch/
     about: Anleitungen und FAQ für Helfer:innen, OK und Abteilungsleitungen.
+  - name: 📚 Hilfe-Center Pfadi
+    url: https://hilfe.pfadi-schichtplan.ch/
+    about: Anleitungen und FAQ für Pfadi-Abteilungen.
+  - name: 📚 Hilfe-Center Jubla
+    url: https://hilfe.jubla-schichtplan.ch/
+    about: Anleitungen und FAQ für Jubla-Scharen.
+  - name: 📚 Hilfe-Center Vereine
+    url: https://hilfe.vereins-schichtplan.ch/
+    about: Anleitungen und FAQ für Vereine und Festkomitees.
   - name: 💬 Fragen & Community-Austausch
     url: https://github.com/NelsStorch/schichtplan_v2/discussions
-    about: Für allgemeine Fragen, Ideen oder verbandsübergreifenden Austausch (Cevi, Pfadi, Jubla etc.).
+    about: Für allgemeine Fragen, Ideen oder verbandsübergreifenden Austausch (Cevi, Pfadi, Jubla, Vereine).

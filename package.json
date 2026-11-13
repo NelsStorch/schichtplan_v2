@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
-  "description": "Cevi Schichtplan V2 - Multi-Tenant, Multi-Event Shift Management",
+  "description": "Schichtplan V2 für Cevi, Pfadi, Jubla und Vereine - Multi-Tenant, Multi-Event Shift Management",
   "workspaces": [
     "packages/*",
     "apps/*"

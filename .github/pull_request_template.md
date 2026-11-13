@@ -10,6 +10,7 @@
 - [ ] Zeiten laufen über `packages/shared/src/timezone.ts` (Europe/Zurich)
 - [ ] Texte auf Deutsch mit Schweizer Schreibweise («ss» statt «ß»)
 - [ ] Hilfe-Center (`hilfe/`) angepasst, falls sich Abläufe für Nutzer:innen ändern
+- [ ] Auf allen vier Auftritten geprüft (Cevi, Pfadi, Jubla, Verein), falls Texte, Begriffe oder Branding betroffen sind
 
 ## Screenshots
 

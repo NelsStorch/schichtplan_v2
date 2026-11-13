@@ -1,4 +1,4 @@
-# Cevi Schichtplan V2 🏕️📋
+# Schichtplan V2 · Cevi · Pfadi · Jubla · Vereine 🏕️📋
 
 [![CI](https://github.com/NelsStorch/schichtplan_v2/actions/workflows/ci.yml/badge.svg)](https://github.com/NelsStorch/schichtplan_v2/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D26-brightgreen.svg)](https://nodejs.org/)
@@ -10,12 +10,23 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38bdf8.svg)](https://tailwindcss.com/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
-Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Web-Plattform zur Organisation von Schichtplänen, Einsätzen und Helferteams für Cevi-Abteilungen in der Schweiz.
+Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Web-Plattform zur Organisation von Schichtplänen, Einsätzen und Helferteams für Jugendverbände und Vereine in der Schweiz. Eine Codebasis, ein Backend und eine Datenbank bedienen vier Auftritte mit eigener Domain, eigenem Erscheinungsbild und eigenem Login:
+
+| Auftritt | Domain | Für | Login | Hilfe-Center |
+|---|---|---|---|---|
+| **Cevi Schichtplan** | [cevi-schichtplan.ch](https://cevi-schichtplan.ch/) | Cevi-Abteilungen | Cevi.DB (Hitobito) | [hilfe.cevi-schichtplan.ch](https://hilfe.cevi-schichtplan.ch/) |
+| **Pfadi Schichtplan** | [pfadi-schichtplan.ch](https://pfadi-schichtplan.ch/) | Pfadi-Abteilungen | PBS MiData (Hitobito) | [hilfe.pfadi-schichtplan.ch](https://hilfe.pfadi-schichtplan.ch/) |
+| **Jubla Schichtplan** | [jubla-schichtplan.ch](https://jubla-schichtplan.ch/) | Jubla-Scharen | Jubla-DB (Hitobito) | [hilfe.jubla-schichtplan.ch](https://hilfe.jubla-schichtplan.ch/) |
+| **Vereins Schichtplan** | [vereins-schichtplan.ch](https://vereins-schichtplan.ch/) | Vereine & Festkomitees | E-Mail & Passwort | [hilfe.vereins-schichtplan.ch](https://hilfe.vereins-schichtplan.ch/) |
+
+Helfer*innen ohne Verbandskonto tragen sich auf allen vier Auftritten mit E-Mail und Passwort oder als Gast ein.
 
 > [!NOTE]
-> **Du willst den Schichtplan für deine Abteilung oder deinen Anlass nutzen?** Dafür brauchst du diesen Code nicht.
-> Die Plattform läuft bereits auf **[cevi-schichtplan.ch](https://cevi-schichtplan.ch/)**, Anleitungen findest du im **[Hilfe-Center](https://hilfe.cevi-schichtplan.ch/)**.
+> **Du willst den Schichtplan für deine Abteilung, deine Schar, deinen Verein oder Anlass nutzen?** Dafür brauchst du diesen Code nicht.
+> Die Plattform läuft bereits: Wähle oben den Auftritt deines Verbands, Anleitungen findest du im jeweiligen Hilfe-Center.
 > Dieses Repository richtet sich an Entwickler:innen, die mithelfen oder den Aufbau verstehen möchten.
+
+<sub>Unabhängiges Projekt: Pfadi Schichtplan wird nicht von der Pfadibewegung Schweiz (PBS) betrieben oder herausgegeben.</sub>
 
 ![Schichtplan eines Anlasses aus Sicht von Helfenden](docs/screenshots/anlass.webp)
 
@@ -36,14 +47,15 @@ Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Web-Plattform zu
 
 ## ✨ Hauptfunktionen
 
-* 🏰 **Mandantenfähig via Subdomains:** Jede Cevi-Abteilung erhält eine eigene Web-Präsenz (z. B. `https://<abteilung>.cevi-schichtplan.ch`) mit individueller Farbgebung, eigenem Logo und eigener Stufenstruktur.
-* 🔑 **Cevi.DB (Hitobito) Single Sign-On:** Nahtlose OAuth-2.0-Integration mit der zentralen Verbandsdatenbank `db.cevi.ch`. Synchronisation von Cevi-Namen, Geburtsdatum, Stufen und automatischer Vergabe von Leitungsrechten für Abteilungsleitungen.
-* ⛺ **Multi-Event-Architektur:** Parallele Verwaltung beliebig vieler Anlässe pro Abteilung (z. B. *Chilbi*, *Sommerlager*, *Pfingstlager*, *Suppentag*, *Sponsorenlauf*).
+* 🌍 **Vier Verbände, eine Plattform:** Cevi, Pfadi, Jubla und Vereine laufen auf eigenen Domains (`cevi-`, `pfadi-`, `jubla-`, `vereins-schichtplan.ch`) mit eigenem Logo, eigenen Farben, eigenen Begriffen (Abteilung, Schar, Verein; Cevi-Name, Pfadiname, Leitername) und eigenem Mail-Absender. Die Verbands-Konfiguration liegt zentral in `packages/shared/src/organizations.ts`.
+* 🏰 **Mandantenfähig via Subdomains:** Jede Abteilung, Schar oder jeder Verein erhält eine eigene Web-Präsenz (z. B. `https://<abteilung>.cevi-schichtplan.ch` oder `https://<verein>.vereins-schichtplan.ch`) mit individueller Farbgebung, eigenem Logo und eigener Stufenstruktur.
+* 🔑 **Single Sign-On mit den Verbandsdatenbanken (Hitobito):** OAuth-2.0-Anbindung an Cevi.DB (`db.cevi.ch`), PBS MiData (`db.scout.ch`) und Jubla-DB (`db.jubla.ch`). Synchronisation von Cevi-, Pfadi- bzw. Leiternamen, Geburtsdatum und Stufen sowie automatische Vergabe von Leitungsrechten für Abteilungs- und Scharleitungen. Vereine melden sich mit E-Mail und Passwort an.
+* ⛺ **Multi-Event-Architektur:** Parallele Verwaltung beliebig vieler Anlässe pro Abteilung oder Verein (z. B. *Chilbi*, *Sommerlager*, *Pfingstlager*, *Suppentag*, *Sponsorenlauf*, *Turnier*, *Dorffest*).
 * 🛠️ **Mächtiger OK-Bereich (Verwaltung):**
   * Wiederverwendbarer Katalog an Aufgaben und Einsatzbereichen mit Jugendschutz-Regeln (Mindestalter, J+S-Leitungsanforderungen).
   * Schichten-Seriengenerator für wiederkehrende Zeitblöcke.
   * Helfer-Pool & Soll-Roster zur Überwachung der Abdeckung.
-  * Granulares Rollen- und Rechtesystem für OK-Mitglieder und Abteilungsleitungen.
+  * Granulares Rollen- und Rechtesystem für OK-Mitglieder, Abteilungs- und Scharleitungen sowie Vereinsvorstände.
   * Integriertes Nachrichtensystem für gezielte Helfer-Kommunikation per Mail.
   * PDF-Druckexport im professionellen Cevi-Design sowie CSV/Excel-Export.
 * 🙋 **Intuitive Helfer*innen-Experience:**
@@ -60,7 +72,7 @@ Moderne, mandantenfähige (Multi-Tenant) und multi-eventfähige Web-Plattform zu
   * Konsequenter Verzicht auf unnötige Adresserfassung.
   * Einstellbare automatische Löschfristen für anlassbezogene Zusatzfragen (z. B. T-Shirt-Grössen, Essenspräferenzen).
   * Konfigurierbare «Nur für Mitglieder»-Absicherung für interne Anlässe.
-* 📚 **Integriertes Hilfe-Center:** Umfangreiche Wissensdatenbank und Schritt-für-Schritt-Anleitungen auf `hilfe.cevi-schichtplan.ch`.
+* 📚 **Integriertes Hilfe-Center:** Wissensdatenbank und Schritt-für-Schritt-Anleitungen unter `hilfe.<verband>-schichtplan.ch`, mit Begriffen und Farben des jeweiligen Verbands.
 
 ---
 
@@ -71,14 +83,14 @@ Das Monorepo besteht aus fünf Next.js-/Fastify-Diensten, einer statischen Dokum
 ```
                                       [ Internet ]
                                            |
-                       *.cevi-schichtplan.ch (Wildcard DNS)
+      cevi- | pfadi- | jubla- | vereins-schichtplan.ch (je Apex + Wildcard-DNS)
                                            |
                                            v
                         +------------------------------------+
                         |        Traefik Reverse Proxy       |
                         +------------------------------------+
                           /        |         |        \       \
-   cevi-schichtplan.ch   /         |         |         \       \  hilfe.cevi-schichtplan.ch
+           <verband>     /         |         |         \       \  hilfe.<verband>
                         v          v         v          v       v
                +------------+ +--------+ +-------+ +-------+ +---------+
                |apps/landing| |apps/web| | apps/ | | apps/ | |  hilfe  |
@@ -103,14 +115,16 @@ Das Monorepo besteht aus fünf Next.js-/Fastify-Diensten, einer statischen Dokum
 
 ### Routing & Portale
 
+`<verband>` steht für eine der vier Domains `cevi-schichtplan.ch`, `pfadi-schichtplan.ch`, `jubla-schichtplan.ch` oder `vereins-schichtplan.ch`. Welcher Verband gilt, ergibt sich allein aus dem Domain-Ende (`getOrganizationSlugFromHost` in `@schichtplan/shared`).
+
 | Domain | Pfad / Dienst | Container-Port | Zweck |
 |---|---|---|---|
-| `cevi-schichtplan.ch` | `apps/landing` | 3001 | Öffentliche Startseite, Leistungsübersicht, Marketing & Profil |
-| `login.cevi-schichtplan.ch` | `apps/login` | 3002 | Zentrales SSO (Cevi.DB OAuth, E-Mail/Passwort, Cevi-Name) |
-| `<abteilung>.cevi-schichtplan.ch` | `apps/web` | 3000 | Mandanten-Portal: Anlässe, Schichten & OK-Bereich |
-| `admin.cevi-schichtplan.ch` | `apps/admin` | 3003 | Zentrales Administrations-Portal für globale Admins |
-| `*.cevi-schichtplan.ch/api/*` | `apps/backend` | 4000 | Fastify REST API & Webcal/ICS-Feeds |
-| `hilfe.cevi-schichtplan.ch` | `hilfe/` | 3004 | Statisches Hilfe-Center (Astro Starlight + Nginx) |
+| `<verband>` (`www.` leitet per 301 um) | `apps/landing` | 3001 | Öffentliche Startseite, Leistungsübersicht, Suche & Profil |
+| `login.<verband>` | `apps/login` | 3002 | Zentrales SSO (Cevi.DB, PBS MiData, Jubla-DB, E-Mail/Passwort) |
+| `<abteilung>.<verband>` | `apps/web` | 3000 | Mandanten-Portal: Anlässe, Schichten & OK-Bereich |
+| `admin.cevi-schichtplan.ch` | `apps/admin` | 3003 | Zentrales Administrations-Portal für globale Admins (alle Verbände, mit Verbandsfilter) |
+| `*.<verband>/api/*` | `apps/backend` | 4000 | Fastify REST API & Webcal/ICS-Feeds |
+| `hilfe.<verband>` | `hilfe/` | 3004 | Statisches Hilfe-Center (Astro Starlight + Nginx), Branding je Domain |
 | `status.cevi-schichtplan.ch` | Uptime Kuma (separater Container, nicht in diesem Repo) | – | Öffentliches Verfügbarkeits-Portal |
 
 ---
@@ -124,9 +138,9 @@ schichtplan_v2/
 │   ├── backend/        # REST-API mit Fastify 5, Prisma 7 & TypeScript
 │   ├── landing/        # Hauptseite & Marketing-Portal (Next.js 16)
 │   ├── login/          # Zentrales Single Sign-On Portal (Next.js 16)
-│   └── web/            # Mandantenfähige Schichtplan-App für Abteilungen (Next.js 16)
+│   └── web/            # Mandantenfähige Schichtplan-App für Abteilungen, Scharen & Vereine (Next.js 16)
 ├── packages/
-│   ├── shared/         # Gemeinsame Zod-Schemas, TypeScript-Typen & Hilfsfunktionen
+│   ├── shared/         # Gemeinsame Zod-Schemas, Typen, Verbands-Konfiguration & Hilfsfunktionen
 │   └── ui/             # Gemeinsames Design-System (@schichtplan/ui mit Tailwind CSS v4)
 ├── hilfe/              # Hilfe-Center Dokumentation (Astro Starlight, unabhängig gebaut)
 ├── docker-compose.dev.yml      # Lokale Docker-Entwicklungsumgebung
@@ -180,6 +194,8 @@ Nach dem Start stehen folgende Dienste lokal zur Verfügung:
 
 > [!TIP]
 > **Mandanten lokal testen:** Das Backend unterstützt den Header `x-tenant-slug: <slug>` oder Hostnamen wie `demo.localhost:3000`, um Abteilungen lokal ohne DNS-Konfiguration anzusprechen.
+>
+> **Verbände lokal testen:** Enthält der Hostname die Verbandskennung (`pfadi`, `jubla`, `verein`), gilt dieser Verband, z. B. `pfadi.localhost:3001` (Startseite Pfadi) oder `demo.jubla.localhost:3000` (Schar auf Jubla). Ohne Kennung gilt Cevi.
 
 ### 3. Datenbank initialisieren & Seeden
 
@@ -250,8 +266,10 @@ Wichtige Parameter:
 * `DATABASE_URL`: Verbindungszeichenfolge für PostgreSQL.
 * `JWT_SECRET`: Mindestens 32 Zeichen langes Secret zur Signierung der SSO-Cookies.
 * `CEVIDB_CLIENT_ID` / `CEVIDB_CLIENT_SECRET`: OAuth 2.0 Zugangsdaten aus der Cevi.DB (Hitobito).
+* `MIDATA_CLIENT_ID` / `MIDATA_CLIENT_SECRET`: OAuth 2.0 Zugangsdaten aus der PBS MiData (`db.scout.ch`).
+* `JUBLADB_CLIENT_ID` / `JUBLADB_CLIENT_SECRET`: OAuth 2.0 Zugangsdaten aus der Jubla-DB (`db.jubla.ch`).
 * `GLOBAL_ADMIN_CEVIDB_IDS`: Kommagetrennte Cevi.DB-Personen-IDs für den Zugriff auf `admin.<domain>`.
-* `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: Mail-Server für Bestätigungsmails & Erinnerungen.
+* `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: Mail-Server für Bestätigungsmails & Erinnerungen. Pro Verband lässt sich ein eigener Absender setzen (`SMTP_USER_CEVI`, `SMTP_USER_PFADI`, `SMTP_USER_JUBLA`, `SMTP_USER_VEREIN`, Standard `admin@<verband>`).
 * `ADMIN_ALERT_WEBHOOK_URL`: Discord- oder Slack-Webhook für automatische Server-Alarme.
 
 ---
@@ -259,8 +277,8 @@ Wichtige Parameter:
 ## 🚀 Deployment & Betrieb
 
 > [!IMPORTANT]
-> `deploy.ps1`, `rollback.ps1` und `restore.ps1` sind auf den Betrieb von **cevi-schichtplan.ch** zugeschnitten (ein Linux-Server, Traefik mit Wildcard-Zertifikat, Deploy von Windows aus).
-> Für eine eigene Installation reichen in der Regel `docker-compose.yml` und eine `.env` nach Vorlage `.env.prod.example`. Vorausgesetzt werden ein laufender Traefik v3 (externes Proxy-Netzwerk und Zertifikats-Resolver `myresolver`, siehe Labels in `docker-compose.yml`) und ein Wildcard-DNS-Eintrag für die Abteilungs-Subdomains.
+> `deploy.ps1`, `rollback.ps1` und `restore.ps1` sind auf den Betrieb der vier Schichtplan-Domains zugeschnitten (ein Linux-Server, Traefik mit Wildcard-Zertifikaten, Deploy von Windows aus).
+> Für eine eigene Installation reichen in der Regel `docker-compose.yml` und eine `.env` nach Vorlage `.env.prod.example`. Vorausgesetzt werden ein laufender Traefik v3 (externes Proxy-Netzwerk und Zertifikats-Resolver, siehe Labels in `docker-compose.yml`) und je Domain ein Apex- und ein Wildcard-DNS-Eintrag für die Abteilungs-Subdomains.
 
 Das Projekt ist für unterbruchfreies Deployment (**Zero-Downtime**) auf Linux-Servern mit **Traefik** als Reverse Proxy optimiert:
 
@@ -284,7 +302,7 @@ Das Projekt ist für unterbruchfreies Deployment (**Zero-Downtime**) auf Linux-S
 ## 🔒 Sicherheit & Datenschutz
 
 * **Keine Speicherung unnötiger persönlicher Daten:** Es werden keine Wohnadressen oder sensible Daten erfasst, die für einen Helfereinsatz irrelevant sind.
-* **Sichere Session-Cookies:** Wildcard-Cookie (`Domain=.cevi-schichtplan.ch`) mit `HttpOnly`, `SameSite=Lax` und `Secure`.
+* **Sichere Session-Cookies:** Wildcard-Cookie je Verbandsdomain (z. B. `Domain=.pfadi-schichtplan.ch`) mit `HttpOnly`, `SameSite=Lax` und `Secure`.
 * **Schutz administrativer Schnittstellen:** `admin.<domain>` erfordert Re-Authentifizierung, Cevi.DB-Herkunftsnachweis, Herkunftsüberprüfung (`Sec-Fetch-Site`) und automatische Rate-Limits.
 * Sicherheitsrelevante Schwachstellen können vertraulich gemeldet werden (siehe [SECURITY.md](SECURITY.md)).
 

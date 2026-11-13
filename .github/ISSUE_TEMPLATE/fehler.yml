@@ -29,11 +29,23 @@ body:
     attributes:
       label: Was hättest du erwartet?
   - type: dropdown
+    id: verband
+    attributes:
+      label: Auftritt
+      options:
+        - Cevi (cevi-schichtplan.ch)
+        - Pfadi (pfadi-schichtplan.ch)
+        - Jubla (jubla-schichtplan.ch)
+        - Verein (vereins-schichtplan.ch)
+        - Weiss nicht
+    validations:
+      required: true
+  - type: dropdown
     id: bereich
     attributes:
       label: Bereich
       options:
-        - Schichtplan (Abteilungs-Subdomain)
+        - Schichtplan (Subdomain der Abteilung, Schar oder des Vereins)
         - OK-Bereich
         - Login / Konto
         - Admin-Portal

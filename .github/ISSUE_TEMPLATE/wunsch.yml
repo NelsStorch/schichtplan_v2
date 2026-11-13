@@ -21,7 +21,7 @@ body:
       options:
         - Helfer:innen
         - OK / Anlass-Organisation
-        - Abteilungsleitung
+        - Abteilungs-/Scharleitung oder Vereinsvorstand
         - Globale Admins
   - type: textarea
     id: alternativen
