@@ -278,8 +278,34 @@ function replaceUntilStable(input: string, pattern: RegExp, replacement: string)
 function safeLog(value: unknown): string {
   return String(value ?? '')
     .slice(0, 500)
-    .replace(/[\r\n]/g, ' ')
+    .replace(/\n|\r/g, ' ')
     .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ');
+}
+
+/** Entfernt versteckte Vorschautext-Blöcke (div mit mso-hide:all) ohne Regex über den ganzen Block (linear). */
+function stripHiddenDivs(html: string): string {
+  const lower = html.toLowerCase();
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const open = lower.indexOf('<div', pos);
+    if (open === -1) break;
+    const openEnd = lower.indexOf('>', open);
+    if (openEnd === -1) break;
+    if (!/mso-hide:\s*all/.test(lower.slice(open, openEnd))) {
+      out += html.slice(pos, openEnd + 1);
+      pos = openEnd + 1;
+      continue;
+    }
+    out += html.slice(pos, open);
+    const close = lower.indexOf('</div>', openEnd);
+    if (close === -1) {
+      pos = html.length;
+      break;
+    }
+    pos = close + '</div>'.length;
+  }
+  return out + html.slice(pos);
 }
 
 /**
@@ -291,8 +317,8 @@ export function htmlToPlainText(html: string): string {
   text = stripBlocks(text, 'head');
   text = stripBlocks(text, 'style');
   text = stripBlocks(text, 'script');
+  text = stripHiddenDivs(text);
   text = text
-    .replace(/<div[^>]*mso-hide:\s*all[^>]*>[\s\S]*?<\/div>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|h1|h2|h3|tr|li)>/gi, '\n')
     .replace(/<td[^>]*>/gi, ' ');
