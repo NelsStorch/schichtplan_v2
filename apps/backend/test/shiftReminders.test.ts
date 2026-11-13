@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { eventUrl, formatShiftTime, sendDueShiftReminders } from '../src/services/shiftReminders.js';
+import { departmentPageUrl, eventUrl, formatShiftTime, sendDueShiftReminders } from '../src/services/shiftReminders.js';
 import { authCookie, createDepartment, createEvent, createShift, createTestApp, createUser, hasTestDb, resetDb } from './helpers.js';
 
 describe('formatShiftTime / eventUrl', () => {
@@ -14,6 +14,22 @@ describe('formatShiftTime / eventUrl', () => {
   it('verlinkt den Anlass auf der Abteilung', () => {
     expect(eventUrl('illnau', 'chilbi', { NODE_ENV: 'production', DOMAIN: 'cevi-schichtplan.ch' })).toBe(
       'https://illnau.cevi-schichtplan.ch/events/chilbi'
+    );
+  });
+
+  it('verlinkt Seiten der Abteilungs-App (z. B. Bons unter «Meine Schichten»)', () => {
+    const prod = { NODE_ENV: 'production', DOMAIN: 'cevi-schichtplan.ch' };
+    expect(departmentPageUrl('illnau', '/meine-schichten', 'CEVI', prod)).toBe(
+      'https://illnau.cevi-schichtplan.ch/meine-schichten'
+    );
+    expect(departmentPageUrl('wald', 'meine-schichten', 'PFADI', prod)).toBe(
+      'https://wald.pfadi-schichtplan.ch/meine-schichten'
+    );
+    expect(departmentPageUrl('illnau', '/meine-schichten', 'CEVI', { NODE_ENV: 'production', DOMAIN: 'dev.cevi-schichtplan.ch' })).toBe(
+      'https://illnau.dev.cevi-schichtplan.ch/meine-schichten'
+    );
+    expect(departmentPageUrl('illnau', '/meine-schichten', 'CEVI', { NODE_ENV: 'development' })).toBe(
+      'http://illnau.localhost:3000/meine-schichten'
     );
   });
 });

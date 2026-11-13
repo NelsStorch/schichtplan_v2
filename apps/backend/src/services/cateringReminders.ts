@@ -2,7 +2,7 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import { getOrganizationByDbType, isPlaceholderEmail } from '@schichtplan/shared';
 import { sendEmail } from './email.js';
 import { sendPushToUser } from './webPush.js';
-import { eventUrl } from './shiftReminders.js';
+import { departmentPageUrl } from './shiftReminders.js';
 
 /**
  * Sendet Bon-Erinnerungen (E-Mail und/oder Web Push) an Helfende mit offenen Bons:
@@ -135,7 +135,8 @@ export async function sendDueCateringReminders(
       const recipientName = group.user?.nickname || group.user?.firstName || group.guestName || 'Helfende Person';
       const count = group.tokens.length;
       const tokenNames = group.tokens.map((x) => x.title).join(', ');
-      const targetUrl = `${eventUrl(event.department.slug, event.slug, event.department.organization)}/meine-schichten`;
+      // «Meine Schichten» der Abteilung zeigt die Bons; /events/<slug>/meine-schichten gibt es nicht
+      const targetUrl = departmentPageUrl(event.department.slug, '/meine-schichten', event.department.organization);
 
       let sent = false;
 

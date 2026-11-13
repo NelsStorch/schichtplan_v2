@@ -55,6 +55,20 @@ export function eventUrl(
   orgOrDomainOrEnv?: OrganizationType | string | NodeJS.ProcessEnv,
   maybeEnv?: NodeJS.ProcessEnv
 ): string {
+  return departmentPageUrl(departmentSlug, `/events/${eventSlug}`, orgOrDomainOrEnv, maybeEnv);
+}
+
+/**
+ * Link auf eine Seite der Abteilungs-App (https://<abteilung>.<domain><path>), z. B. `/meine-schichten`.
+ * Berücksichtigt Organisation (Cevi/Pfadi/Jubla …), Staging (dev.) und lokale Entwicklung.
+ */
+export function departmentPageUrl(
+  departmentSlug: string,
+  path: string,
+  orgOrDomainOrEnv?: OrganizationType | string | NodeJS.ProcessEnv,
+  maybeEnv?: NodeJS.ProcessEnv
+): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
   let orgOrDomain: OrganizationType | string | undefined;
   let env: NodeJS.ProcessEnv;
   if (typeof orgOrDomainOrEnv === 'object' && orgOrDomainOrEnv !== null) {
@@ -65,7 +79,7 @@ export function eventUrl(
     env = maybeEnv || process.env;
   }
 
-  if (env.NODE_ENV !== 'production') return `http://${departmentSlug}.localhost:3000/events/${eventSlug}`;
+  if (env.NODE_ENV !== 'production') return `http://${departmentSlug}.localhost:3000${cleanPath}`;
 
   const defaultDomain = (env.COOKIE_DOMAIN || env.DOMAIN || 'cevi-schichtplan.ch').replace(/^\./, '');
   const isStaging = defaultDomain.startsWith('dev.') || defaultDomain.includes('.dev.');
@@ -84,7 +98,7 @@ export function eventUrl(
 
   const cleanRoot = rootDomain.replace(/^dev\./, '');
   const effectiveDomain = isStaging ? `dev.${cleanRoot}` : cleanRoot;
-  return `https://${departmentSlug}.${effectiveDomain}/events/${eventSlug}`;
+  return `https://${departmentSlug}.${effectiveDomain}${cleanPath}`;
 }
 
 interface CandidateEntry {
