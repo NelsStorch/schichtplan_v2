@@ -201,7 +201,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=schichtplan_dev_proxy"
       # Admin-Portal: Verwaltung für globale Admins (Zugriff wird im Backend geprüft)
-      - "traefik.http.routers.schichtplan-dev-admin.rule=Host(`admin.${DOMAIN_DEV:-dev.cevi-schichtplan.ch}`)"
+      - "traefik.http.routers.schichtplan-dev-admin.rule=Host(`admin.dev.cevi-schichtplan.ch`) || Host(`admin.dev.pfadi-schichtplan.ch`) || Host(`admin.dev.jubla-schichtplan.ch`) || Host(`admin.dev.vereins-schichtplan.ch`)"
       - "traefik.http.routers.schichtplan-dev-admin.entrypoints=websecure"
       - "traefik.http.routers.schichtplan-dev-admin.tls.certresolver=myresolver"
       - "traefik.http.routers.schichtplan-dev-admin.priority=30"

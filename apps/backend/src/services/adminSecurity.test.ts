@@ -4,6 +4,16 @@ import { adminRequestProblem, adminSecurityConfig, adminSessionProblem, bootstra
 const prod = { rootDomain: 'cevi-schichtplan.ch', allowLocalhost: false };
 
 describe('adminRequestProblem', () => {
+  it('lässt das Admin-Portal auf allen 4 Verbandsdomains zu, Dev nur auf Dev', () => {
+    for (const domain of ['cevi', 'pfadi', 'jubla', 'vereins']) {
+      expect(adminRequestProblem({ host: `admin.${domain}-schichtplan.ch` }, prod)).toBeNull();
+    }
+    const dev = { rootDomain: 'dev.cevi-schichtplan.ch', allowLocalhost: false };
+    expect(adminRequestProblem({ host: 'admin.dev.cevi-schichtplan.ch' }, dev)).toBeNull();
+    expect(adminRequestProblem({ host: 'admin.dev.jubla-schichtplan.ch' }, dev)).toBeNull();
+    expect(adminRequestProblem({ host: 'admin.pfadi-schichtplan.ch' }, dev)).toBe('HOST');
+  });
+
   it('lässt nur das Admin-Portal zu', () => {
     expect(adminRequestProblem({ host: 'admin.cevi-schichtplan.ch' }, prod)).toBeNull();
     expect(
@@ -18,6 +28,7 @@ describe('adminRequestProblem', () => {
   it('sperrt Abteilungs-Subdomains, Dev und fremde Hosts', () => {
     expect(adminRequestProblem({ host: 'illnau.cevi-schichtplan.ch' }, prod)).toBe('HOST');
     expect(adminRequestProblem({ host: 'admin.dev.cevi-schichtplan.ch' }, prod)).toBe('HOST');
+    expect(adminRequestProblem({ host: 'admin.dev.pfadi-schichtplan.ch' }, prod)).toBe('HOST');
     expect(adminRequestProblem({ host: 'localhost:4000' }, prod)).toBe('HOST');
   });
 

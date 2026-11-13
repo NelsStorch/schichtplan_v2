@@ -38,6 +38,7 @@ import {
   type AdminEventListItemDto,
 } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
+import { matchesOrg, organizationLabel, type OrgFilter } from '../lib/organizations';
 import { downloadCsv } from '../lib/csv';
 import { formatEventRange } from '../lib/format';
 import { TypedConfirmDialog } from './TypedConfirmDialog';
@@ -292,12 +293,16 @@ export function EventRows({
 }
 
 export function EventsPanel({
-  departments,
+  departments: allDepartments,
   onOpenDepartment,
+  orgFilter = 'ALL',
 }: {
   departments: AdminDepartmentListItemDto[];
   onOpenDepartment?: (departmentId: string) => void;
+  /** Verbandsfilter oben im Portal */
+  orgFilter?: OrgFilter;
 }) {
+  const departments = allDepartments.filter((d) => matchesOrg(d.organization, orgFilter));
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [when, setWhen] = useState<When>('upcoming');
@@ -316,9 +321,18 @@ export function EventsPanel({
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  // Gewählte Abteilung passt nicht mehr zum neuen Verband: zurücksetzen
+  useEffect(() => setPage(1), [orgFilter]);
+  useEffect(() => {
+    setDepartmentId((current) =>
+      current && !allDepartments.some((d) => d.id === current && matchesOrg(d.organization, orgFilter)) ? '' : current
+    );
+  }, [orgFilter, allDepartments]);
+
   useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams({ when, page: String(page), pageSize: String(PAGE_SIZE) });
+    if (orgFilter !== 'ALL') params.set('organization', orgFilter);
     if (query) params.set('q', query);
     if (departmentId) params.set('departmentId', departmentId);
     setLoading(true);
@@ -335,7 +349,7 @@ export function EventsPanel({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [query, when, departmentId, page, reload]);
+  }, [query, when, departmentId, page, reload, orgFilter]);
 
   const items = data?.items ?? [];
   const filtered = Boolean(query || departmentId);
@@ -346,6 +360,7 @@ export function EventsPanel({
       const pct = e.slotCount > 0 ? Math.round((Math.min(e.signupCount, e.slotCount) / e.slotCount) * 100) : 0;
       return {
         'Titel': e.title,
+        'Verband': organizationLabel(e.departmentOrganization),
         'Abteilung': e.departmentName,
         'Kürzel': e.slug,
         'Start': e.startDate,

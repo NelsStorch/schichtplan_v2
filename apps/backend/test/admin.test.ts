@@ -339,6 +339,35 @@ describe.skipIf(!hasTestDb)('Admin-Portal: Abteilungen, Anlässe, Rollen', () =>
     expect(await app.prisma.event.count()).toBe(0);
   });
 
+  it('filtert Anlässe und Personen nach Verband', async () => {
+    const { cookie } = await admin();
+    const cevi = await createDepartment(app, { name: 'Cevi Ort', slug: 'cevi-ort' });
+    const pfadi = await app.prisma.department.create({
+      data: { slug: 'pfadi-ort', name: 'Pfadi Ort', organization: 'PFADI', membersOnly: false },
+    });
+    await createEvent(app, cevi.id, { slug: 'cevi-anlass' });
+    await createEvent(app, pfadi.id, { slug: 'pfadi-anlass' });
+
+    const pfadiMember = await createUser(app, { passwordHash: 'x', firstName: 'Mitglied' });
+    await addMember(app, pfadi.id, pfadiMember.id, 'HELPER');
+    const midataUser = await createUser(app, { provider: 'PFADI', providerId: '4711', firstName: 'MiData' });
+    const ceviOnly = await createUser(app, { passwordHash: 'x', firstName: 'Cevi' });
+    await addMember(app, cevi.id, ceviOnly.id, 'HELPER');
+
+    const events = await inject(app, { method: 'GET', url: '/api/admin/events?when=all&organization=PFADI', cookie });
+    expect(events.statusCode).toBe(200);
+    expect(events.json().items.map((e: { slug: string }) => e.slug)).toEqual(['pfadi-anlass']);
+
+    const users = await inject(app, { method: 'GET', url: '/api/admin/users?organization=PFADI', cookie });
+    expect(users.statusCode).toBe(200);
+    const ids = users.json().items.map((u: { id: string }) => u.id);
+    expect(ids).toEqual(expect.arrayContaining([pfadiMember.id, midataUser.id]));
+    expect(ids).not.toContain(ceviOnly.id);
+
+    const invalid = await inject(app, { method: 'GET', url: '/api/admin/users?organization=SCOUT', cookie });
+    expect(invalid.statusCode).toBe(400);
+  });
+
   it('setzt Heimabteilung, filtert Personen nach Abteilung/Verwaist und führt doppelte Konten zusammen', async () => {
     const { cookie } = await admin();
     const department = await createDepartment(app, { name: 'Cevi Merge', slug: 'merge-abt' });

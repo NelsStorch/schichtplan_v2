@@ -25,6 +25,7 @@ import {
   type DepartmentPermission,
 } from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
+import { HITOBITO_PROVIDERS_TEXT } from '../lib/organizations';
 import { ACCESS_OPTIONS, CUSTOM_ACCESS, accessLabel, accessPayload, accessValue } from '../lib/access';
 import {
   ageFromBirthDate,
@@ -481,7 +482,7 @@ export function UserDialog({
       {user && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <LoginMethodBadges methods={user.loginMethods} isAdmin={user.isGlobalAdmin} />
+            <LoginMethodBadges methods={user.loginMethods} provider={user.provider} isAdmin={user.isGlobalAdmin} />
             <div className="flex flex-wrap items-center gap-3">
               {onOpenAudit && (
                 <button
@@ -592,7 +593,7 @@ export function UserDialog({
                   <Switch
                     checked={user.isGlobalAdmin}
                     onChange={(value) => {
-                      // Vergeben nur an Cevi.DB-Konten, entziehen geht immer (ausser bei sich selbst)
+                      // Vergeben nur an Hitobito-Konten (Cevi.DB, PBS MiData, Jubla-DB), entziehen geht immer (ausser bei sich selbst)
                       if (!saving && !isSelf && (!value || user.ceviDbId !== null)) setGlobalAdmin(value);
                     }}
                     label="Globale Admin"
@@ -600,8 +601,8 @@ export function UserDialog({
                       isSelf
                         ? 'Deine eigenen Admin-Rechte kannst du hier nicht entziehen.'
                         : user.ceviDbId === null && !user.isGlobalAdmin
-                          ? 'Nur für Konten mit Cevi.DB möglich. Die Person muss sich zuerst einmal mit Cevi.DB anmelden.'
-                          : 'Zugang zu diesem Admin-Portal (nur mit Cevi.DB-Anmeldung) und Leitungsrechte in allen Abteilungen. Alle Admins bekommen eine Mail.'
+                          ? `Nur für Konten mit ${HITOBITO_PROVIDERS_TEXT} möglich. Die Person muss sich zuerst einmal darüber anmelden.`
+                          : `Zugang zum Admin-Portal aller Verbände (nur mit Anmeldung über ${HITOBITO_PROVIDERS_TEXT}) und Leitungsrechte in allen Abteilungen, Scharen und Vereinen. Alle Admins bekommen eine Mail.`
                     }
                   />
                 </div>
@@ -895,7 +896,7 @@ export function UserDialog({
                         <PersonPicker
                           value={mergeTarget}
                           onChange={setMergeTarget}
-                          placeholder="Ziel-Konto suchen (Name, Cevi-Name, E-Mail) …"
+                          placeholder="Ziel-Konto suchen (Name, Spitzname, E-Mail) …"
                           disabledIds={[user.id]}
                         />
                         {mergeTarget && !ceviNameOnly && mergeTarget.loginMethods.includes('CEVINAME') && (

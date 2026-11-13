@@ -25,10 +25,12 @@ import {
   isDepartmentPermission,
   type AdminAuditEntryDto,
   type AdminAuditListDto,
+  type OrganizationType,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
 import { downloadCsv } from '../lib/csv';
 import { departmentRoleLabels, formatDateTime } from '../lib/format';
+import { organizationLabel } from '../lib/organizations';
 
 type Filter = 'all' | 'USER' | 'DEPARTMENT' | 'EVENT';
 
@@ -48,7 +50,7 @@ const actionLabels: Record<string, string> = {
   USER_BATCH_DELETE: 'Stapellöschung von Konten',
   USER_PASSWORD_RESET_LINK_GENERATE: 'Notfall-Reset-Link erstellt',
   USER_TWO_FACTOR_RESET: 'Zwei-Faktor zurückgesetzt',
-  DEPARTMENT_STUFEN_SYNC: 'Stufen mit Cevi.DB abgeglichen',
+  DEPARTMENT_STUFEN_SYNC: 'Stufen mit Hitobito abgeglichen',
 };
 
 function ActionIcon({ action }: { action: string }) {
@@ -110,7 +112,13 @@ function summary(entry: AdminAuditEntryDto): string | null {
       if (changes.slug && changes.slug !== before.slug) parts.push(`Subdomain ${before.slug} → ${changes.slug}`);
       if (changes.name && changes.name !== before.name) parts.push(`Name ${before.name} → ${changes.name}`);
       if ('ceviDbGroupId' in changes && changes.ceviDbGroupId !== before.ceviDbGroupId)
-        parts.push(`Ortsgruppe ${before.ceviDbGroupId ?? '–'} → ${changes.ceviDbGroupId ?? '–'}`);
+        parts.push(`Hitobito-Gruppe ${before.ceviDbGroupId ?? '–'} → ${changes.ceviDbGroupId ?? '–'}`);
+      if (changes.organization && changes.organization !== before.organization)
+        parts.push(
+          `Verband ${organizationLabel(before.organization as OrganizationType | undefined)} → ${organizationLabel(changes.organization as OrganizationType)}`
+        );
+      if ('hitobitoGroupId' in changes && changes.hitobitoGroupId !== before.hitobitoGroupId)
+        parts.push(`Hitobito-Gruppe ${before.hitobitoGroupId ?? '–'} → ${changes.hitobitoGroupId ?? '–'}`);
       if ('membersOnly' in changes && changes.membersOnly !== before.membersOnly)
         parts.push(changes.membersOnly ? 'Startseite nur für Mitglieder' : 'Startseite öffentlich');
       return parts.length ? parts.join(' · ') : 'Einstellungen gespeichert';

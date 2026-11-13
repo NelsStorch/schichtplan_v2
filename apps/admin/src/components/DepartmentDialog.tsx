@@ -87,8 +87,11 @@ function PersonRow({
   onAccessChange,
   onOpenUser,
   busy,
+  vocab,
 }: {
   person: AdminDepartmentPersonDto;
+  /** Begriffe des Verbands der Abteilung */
+  vocab: ReturnType<typeof getVocabulary>;
   onAccessChange: (payload: { role: 'ADMIN' | 'HELPER'; permissions: DepartmentPermission[] } | null) => void;
   onOpenUser?: (userId: string) => void;
   busy: boolean;
@@ -129,15 +132,19 @@ function PersonRow({
         <span className="flex flex-wrap items-center gap-2 pl-10 sm:pl-0">
           {person.isHome && (
             <Badge tone="outline" title="Heimabteilung">
-              {person.homeSource === 'CEVIDB' ? 'Heim · Cevi.DB' : person.homeSource === 'CONFIRMED' ? 'Heim · bestätigt' : 'Heim · selbst'}
+              {person.homeSource === 'CEVIDB'
+                ? `Heim · ${vocab.authProvider}`
+                : person.homeSource === 'CONFIRMED'
+                  ? 'Heim · bestätigt'
+                  : 'Heim · selbst'}
             </Badge>
           )}
           {person.role === 'ADMIN' && (
-            <Badge tone="outline" title="Woher die Abteilungsleitung kommt">
-              {person.leaderSource === 'CEVIDB' ? 'aus Cevi.DB' : 'von Hand'}
+            <Badge tone="outline" title={`Woher die ${vocab.departmentLeader} kommt`}>
+              {person.leaderSource === 'CEVIDB' ? `aus ${vocab.authProvider}` : 'von Hand'}
             </Badge>
           )}
-          {ceviNameOnly && <Badge>Nur Cevi-Name</Badge>}
+          {ceviNameOnly && <Badge>Nur {vocab.nickname}</Badge>}
           <span className="w-52">
             <Select
               value={value}
@@ -249,6 +256,8 @@ function PeopleTab({
   onOpenUser?: (userId: string) => void;
 }) {
   const toast = useToast();
+  const vocab = getVocabulary(detail.organization);
+  const isVerein = detail.organization === 'OTHER';
   const [filter, setFilter] = useState<PeopleFilter>('all');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -353,7 +362,8 @@ function PeopleTab({
           </div>
           {newPerson?.loginMethods.includes('CEVINAME') && newNeedsAccount && (
             <p className="text-xs text-danger-ink">
-              Cevi-Name-Profile bekommen keine Rechte. Für Leitung oder Rechte braucht es Cevi.DB oder ein Passwort.
+              Profile nur mit {vocab.nickname} bekommen keine Rechte. Für Leitung oder Rechte braucht es{' '}
+              {isVerein ? 'ein Passwort' : `${vocab.authProvider} oder ein Passwort`}.
             </p>
           )}
         </div>
@@ -404,6 +414,7 @@ function PeopleTab({
               key={`${person.userId}-${person.role}-${person.permissions.join()}`}
               person={person}
               busy={busyId === person.userId}
+              vocab={vocab}
               onAccessChange={(payload) => setAccess(person.userId, payload)}
               onOpenUser={onOpenUser}
             />
@@ -411,9 +422,10 @@ function PeopleTab({
         </ul>
       )}
       <p className="text-xs leading-relaxed text-fg-subtle">
-        Von Hand gesetzte Abteilungsleitung bleibt, auch wenn Cevi.DB nichts davon weiss. Die aus Cevi.DB entzieht der
-        nächste Login wieder, wenn die Rolle dort fehlt (nie die letzte). «Keine Zugehörigkeit» entfernt Rolle und Rechte,
-        die Heimabteilung bleibt.
+        {isVerein
+          ? 'Die Leitung eines Vereins wird immer von Hand gesetzt. Die letzte Leitung lässt sich nicht entfernen.'
+          : `Von Hand gesetzte ${vocab.departmentLeader} bleibt, auch wenn ${vocab.authProvider} nichts davon weiss. Die aus ${vocab.authProvider} entzieht der nächste Login wieder, wenn die Rolle dort fehlt (nie die letzte).`}{' '}
+        «Keine Zugehörigkeit» entfernt Rolle und Rechte, die Heimabteilung bleibt.
       </p>
     </div>
   );

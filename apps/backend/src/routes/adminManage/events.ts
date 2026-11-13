@@ -31,7 +31,7 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, _reply) => {
     const queryInput = request.query as z.output<typeof EventListQuerySchema>;
-    const { q, departmentId, when, page, pageSize } = queryInput;
+    const { q, departmentId, organization, when, page, pageSize } = queryInput;
     const now = new Date();
 
     const terms = (q ?? '').split(/\s+/).filter(Boolean).slice(0, 5);
@@ -45,6 +45,7 @@ const adminEventRoutes: FastifyPluginAsync = async (fastify) => {
           ],
         })),
         ...(departmentId ? [{ departmentId }] : []),
+        ...(organization ? [{ department: { organization } }] : []),
         ...(when === 'upcoming'
           ? [{ endDate: { gte: now } }]
           : when === 'past'

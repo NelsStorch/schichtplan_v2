@@ -20,17 +20,18 @@ import {
 } from '@schichtplan/ui';
 import { SUBDOMAIN_REGEX, getOrganizationByDbType, type AdminDepartmentListItemDto, type AdminUserListItemDto, type OrganizationType } from '@schichtplan/shared';
 import { send, errorMessage } from '../lib/api';
+import { ORGANIZATION_TYPES, matchesOrg, organizationLabel, providerLabel, type OrgFilter } from '../lib/organizations';
 import { downloadCsv } from '../lib/csv';
 import { DepartmentLogo } from './DepartmentDialog';
 import { PersonPicker } from './PersonPicker';
 
 type Filter = 'all' | 'noLeader' | 'noCeviDb' | 'active';
 
-/** Name ➜ Subdomain-Vorschlag («Cevi Illnau-Effretikon» ➜ «illnau-effretikon») */
+/** Name ➜ Subdomain-Vorschlag («Cevi Illnau-Effretikon» ➜ «illnau-effretikon», «Jubla Wald» ➜ «wald») */
 function suggestSlug(name: string) {
   return name
     .toLowerCase()
-    .replace(/^cevi\s+/, '')
+    .replace(/^(cevi|pfadi|jubla|verein)\s+/, '')
     .replace(/ä/g, 'ae')
     .replace(/ö/g, 'oe')
     .replace(/ü/g, 'ue')
@@ -45,22 +46,32 @@ function CreateDepartmentDialog({
   open,
   onClose,
   onCreated,
+  defaultOrganization,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
+  defaultOrganization: OrganizationType;
 }) {
   const toast = useToast();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
-  const [organization, setOrganization] = useState<OrganizationType>('CEVI');
+  const [organization, setOrganization] = useState<OrganizationType>(defaultOrganization);
   const [ceviDbGroupId, setCeviDbGroupId] = useState('');
   const [membersOnly, setMembersOnly] = useState(true);
   const [leader, setLeader] = useState<AdminUserListItemDto | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+
+  const org = getOrganizationByDbType(organization);
+  const isVerein = organization === 'OTHER';
+
+  // Beim Öffnen den Verband aus dem Filter oben übernehmen
+  useEffect(() => {
+    if (open) setOrganization(defaultOrganization);
+  }, [open, defaultOrganization]);
 
   // autoFocus greift im nativen <dialog> nicht (showModal setzt den Fokus danach neu)
   useEffect(() => {
@@ -73,7 +84,7 @@ function CreateDepartmentDialog({
     setName('');
     setSlug('');
     setSlugTouched(false);
-    setOrganization('CEVI');
+    setOrganization(defaultOrganization);
     setCeviDbGroupId('');
     setMembersOnly(true);
     setLeader(null);
@@ -102,15 +113,15 @@ function CreateDepartmentDialog({
           name: name.trim(),
           slug,
           organization,
-          hitobitoGroupId: ceviDbGroupId ? Number(ceviDbGroupId) : null,
+          hitobitoGroupId: !isVerein && ceviDbGroupId ? Number(ceviDbGroupId) : null,
           membersOnly,
           leaderUserId: leader?.id ?? null,
         }
       );
       toast({
-        title: 'Abteilung angelegt',
+        title: `${org.unitTerm} angelegt`,
         description: result.attached
-          ? `${result.department.name}: ${result.attached} Personen aus der Cevi.DB-Gruppe zugeordnet.`
+          ? `${result.department.name}: ${result.attached} Personen aus der ${org.authProviderShort}-Gruppe zugeordnet.`
           : result.department.name,
         tone: 'success',
       });
@@ -128,8 +139,12 @@ function CreateDepartmentDialog({
       open={open}
       onClose={close}
       size="lg"
-      title="Neue Abteilung"
-      description="Normalerweise legt die Abteilungsleitung ihre Abteilung selbst über Cevi.DB an. Hier geht es auch ohne."
+      title={`Neue ${org.unitTerm}`}
+      description={
+        isVerein
+          ? 'Normalerweise legt die Vereinsleitung ihren Verein selbst an. Hier geht es auch direkt.'
+          : `Normalerweise legt die ${org.leadTerm} die ${org.unitTerm} selbst über ${org.authProviderShort} an. Hier geht es auch ohne.`
+      }
       footer={
         <>
           <Button variant="secondary" onClick={close} disabled={saving}>
@@ -141,7 +156,7 @@ function CreateDepartmentDialog({
             disabled={saving || name.trim().length < 2 || !slugValid || !groupValid || leaderInvalid}
           >
             <Plus aria-hidden />
-            {saving ? 'Wird angelegt …' : 'Abteilung anlegen'}
+            {saving ? 'Wird angelegt …' : `${org.unitTerm} anlegen`}
           </Button>
         </>
       }
@@ -150,19 +165,20 @@ function CreateDepartmentDialog({
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Verband / Organisation" required>
             <div className="flex gap-2">
-              {(['CEVI', 'PFADI', 'JUBLA', 'OTHER'] as const).map((org) => (
+              {ORGANIZATION_TYPES.map((type) => (
                 <button
-                  key={org}
+                  key={type}
                   type="button"
-                  onClick={() => setOrganization(org)}
+                  aria-pressed={organization === type}
+                  onClick={() => setOrganization(type)}
                   className={cn(
                     'flex-1 rounded-field py-2 text-xs font-semibold border transition',
-                    organization === org
+                    organization === type
                       ? 'border-accent bg-accent/10 text-accent-ink font-bold'
                       : 'border-line bg-surface-2 text-fg-muted hover:border-line-strong'
                   )}
                 >
-                  {org === 'OTHER' ? 'Verein' : org === 'PFADI' ? 'Pfadi' : org === 'JUBLA' ? 'Jubla' : 'Cevi'}
+                  {organizationLabel(type)}
                 </button>
               ))}
             </div>
@@ -174,7 +190,7 @@ function CreateDepartmentDialog({
                 setName(e.target.value);
                 if (!slugTouched) setSlug(suggestSlug(e.target.value));
               }}
-              placeholder={organization === 'PFADI' ? 'Pfadi Musterdorf' : organization === 'JUBLA' ? 'Jubla Musterdorf' : organization === 'OTHER' ? 'Verein Musterdorf' : 'Cevi Musterdorf'}
+              placeholder={`${organizationLabel(organization)} Musterdorf`}
               maxLength={80}
               ref={nameRef}
             />
@@ -182,7 +198,7 @@ function CreateDepartmentDialog({
           <Field
             label="Subdomain"
             required
-            hint={slug ? `${slug}.${getOrganizationByDbType(organization).domain}` : 'Kleinbuchstaben, Zahlen, Bindestriche'}
+            hint={slug ? `${slug}.${org.domain}` : 'Kleinbuchstaben, Zahlen, Bindestriche'}
             error={slug && !slugValid ? 'Mindestens 3 Zeichen, nur a–z, 0–9 und -' : undefined}
           >
             <Input
@@ -195,20 +211,22 @@ function CreateDepartmentDialog({
               className="font-mono"
             />
           </Field>
-          <Field
-            label={organization === 'OTHER' ? 'Verbands-Gruppe (ID)' : `${getOrganizationByDbType(organization).authProviderShort}-Gruppe (ID)`}
-            hint="Optional. Die Ortsgruppe oder Abteilung. Bereits angemeldete Personen werden sofort zugeordnet."
-            error={groupValid ? undefined : 'Nur Ziffern'}
-          >
-            <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
-          </Field>
+          {!isVerein && (
+            <Field
+              label={`${org.authProviderShort}-Gruppe (ID)`}
+              hint={`Optional. Die Gruppe der ${org.unitTerm} in ${org.authProviderShort}. Bereits angemeldete Personen werden sofort zugeordnet.`}
+              error={groupValid ? undefined : 'Nur Ziffern'}
+            >
+              <Input value={ceviDbGroupId} onChange={(e) => setCeviDbGroupId(e.target.value.trim())} inputMode="numeric" />
+            </Field>
+          )}
         </div>
         <div className="space-y-2">
-          <span className="text-[13px] font-semibold text-fg">Abteilungsleitung (wird auch Kontaktperson)</span>
+          <span className="text-[13px] font-semibold text-fg">{isVerein ? 'Vereinsleitung' : org.leadTerm} (wird auch Kontaktperson)</span>
           <PersonPicker value={leader} onChange={setLeader} placeholder="Optional: Person suchen" />
           {leaderInvalid && (
             <p className="text-xs text-danger-ink">
-              {getOrganizationByDbType(organization).nicknameTerm}-Profile können keine Abteilungsleitung sein. Die Person braucht {organization === 'OTHER' ? 'ein Passwort' : `${getOrganizationByDbType(organization).authProviderShort} oder ein Passwort`}.
+              Profile nur mit {org.nicknameTerm} können keine Leitung sein. Die Person braucht {isVerein ? 'ein Passwort' : `${org.authProviderShort} oder ein Passwort`}.
             </p>
           )}
         </div>
@@ -231,8 +249,11 @@ export function DepartmentsPanel({
   onChanged,
   creating = false,
   onCloseCreating,
+  orgFilter = 'ALL',
 }: {
   departments: AdminDepartmentListItemDto[] | null;
+  /** Verbandsfilter oben im Portal */
+  orgFilter?: OrgFilter;
   loading: boolean;
   onOpen: (id: string) => void;
   onChanged: () => void;
@@ -241,7 +262,6 @@ export function DepartmentsPanel({
 }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const [orgFilter, setOrgFilter] = useState<OrganizationType | 'ALL'>('ALL');
   const [internalCreating, setInternalCreating] = useState(false);
 
   const isCreating = creating || internalCreating;
@@ -250,26 +270,35 @@ export function DepartmentsPanel({
     if (!val && onCloseCreating) onCloseCreating();
   };
 
-  const all = departments ?? [];
+  const all = (departments ?? []).filter((d) => matchesOrg(d.organization, orgFilter));
+  const groupId = (d: AdminDepartmentListItemDto) => d.hitobitoGroupId ?? d.ceviDbGroupId ?? null;
   const matches = (d: AdminDepartmentListItemDto, f: Filter) =>
-    f === 'noLeader' ? d.leaders.length === 0 : f === 'noCeviDb' ? d.ceviDbGroupId === null : f === 'active' ? d.upcomingEventCount > 0 : true;
+    f === 'noLeader'
+      ? d.leaders.length === 0
+      : f === 'noCeviDb'
+        ? // Vereine haben nie eine Verbands-Datenbank
+          d.organization !== 'OTHER' && groupId(d) === null
+        : f === 'active'
+          ? d.upcomingEventCount > 0
+          : true;
   const q = search.trim().toLowerCase();
   const visible = all.filter(
     (d) =>
       matches(d, filter) &&
-      (orgFilter === 'ALL' || (d.organization ?? 'CEVI') === orgFilter) &&
       (!q ||
         d.name.toLowerCase().includes(q) ||
         d.slug.includes(q) ||
-        String(d.hitobitoGroupId ?? d.ceviDbGroupId ?? '').includes(q) ||
+        String(groupId(d) ?? '').includes(q) ||
         d.leaders.some((l) => l.name.toLowerCase().includes(q)))
   );
 
   const exportCsv = () => {
     const headers = [
+      'Verband',
       'Name',
-      'Subdomain',
-      'Cevi.DB-Gruppe',
+      'Adresse',
+      'Datenbank',
+      'Gruppe (ID)',
       'Leitung',
       'Heimabteilung Nutzer',
       'Mitglieder mit Rolle',
@@ -278,9 +307,11 @@ export function DepartmentsPanel({
       'Eintragungen',
     ];
     const rows = visible.map((d) => [
+      organizationLabel(d.organization),
       d.name,
-      d.slug,
-      d.ceviDbGroupId ?? '',
+      `${d.slug}.${getOrganizationByDbType(d.organization).domain}`,
+      providerLabel(d.organization) ?? '',
+      groupId(d) ?? '',
       d.leaders.map((l) => l.name).join(', '),
       d.homeUserCount,
       d.memberCount,
@@ -288,14 +319,18 @@ export function DepartmentsPanel({
       d.upcomingEventCount,
       d.signupCount,
     ]);
-    downloadCsv(`abteilungen-${new Date().toISOString().slice(0, 10)}`, headers, rows);
+    const suffix = orgFilter === 'ALL' ? '' : `-${getOrganizationByDbType(orgFilter).slug}`;
+    downloadCsv(`abteilungen${suffix}-${new Date().toISOString().slice(0, 10)}`, headers, rows);
   };
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'Alle' },
     { id: 'active', label: 'Mit kommenden Anlässen' },
     { id: 'noLeader', label: 'Ohne Leitung' },
-    { id: 'noCeviDb', label: 'Ohne Cevi.DB' },
+    {
+      id: 'noCeviDb',
+      label: orgFilter !== 'ALL' && orgFilter !== 'OTHER' ? `Ohne ${providerLabel(orgFilter)}` : 'Ohne Verbands-DB',
+    },
   ];
 
   return (
@@ -333,52 +368,22 @@ export function DepartmentsPanel({
           </Button>
           <Button size="lg" onClick={() => setCreating(true)}>
             <Plus aria-hidden />
-            Neue Abteilung
+            {orgFilter === 'ALL' ? 'Neue Abteilung' : `Neue ${getOrganizationByDbType(orgFilter).unitTerm}`}
           </Button>
         </div>
       </div>
 
       <div className="space-y-2">
         <ChipRow>
-          {filters.map((f) => (
+          {filters
+            .filter((f) => f.id !== 'noCeviDb' || orgFilter !== 'OTHER')
+            .map((f) => (
             <Chip key={f.id} selected={filter === f.id} count={all.filter((d) => matches(d, f.id)).length} onClick={() => setFilter(f.id)}>
               {f.label}
             </Chip>
           ))}
         </ChipRow>
 
-        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-          <span className="text-2xs font-semibold uppercase tracking-wider text-fg-subtle mr-1">Verband:</span>
-          {(
-            [
-              ['ALL', 'Alle'],
-              ['CEVI', 'Cevi'],
-              ['PFADI', 'Pfadi'],
-              ['JUBLA', 'Jubla'],
-              ['OTHER', 'Vereine'],
-            ] as const
-          ).map(([key, label]) => {
-            const count = key === 'ALL' ? all.length : all.filter((d) => (d.organization ?? 'CEVI') === key).length;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setOrgFilter(key)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition',
-                  orgFilter === key
-                    ? 'bg-fg text-canvas shadow-xs font-semibold'
-                    : 'bg-surface-2 text-fg-muted hover:bg-surface-3 hover:text-fg'
-                )}
-              >
-                <span>{label}</span>
-                <span className={cn('text-2xs opacity-75', orgFilter === key ? 'text-canvas/80' : 'text-fg-subtle')}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {loading && !departments ? (
@@ -390,8 +395,14 @@ export function DepartmentsPanel({
       ) : visible.length === 0 ? (
         <EmptyState
           icon={<SearchX />}
-          title="Keine Abteilung gefunden"
-          description={all.length === 0 ? 'Es gibt noch keine Abteilungen.' : 'Mit dieser Suche gibt es keine Treffer.'}
+          title="Nichts gefunden"
+          description={
+            all.length === 0
+              ? orgFilter === 'ALL'
+                ? 'Es gibt noch keine Abteilungen.'
+                : `Bei ${organizationLabel(orgFilter, true)} gibt es noch keine ${getOrganizationByDbType(orgFilter).unitTermPlural}.`
+              : 'Mit dieser Suche gibt es keine Treffer.'
+          }
         />
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
@@ -408,8 +419,14 @@ export function DepartmentsPanel({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-display text-base font-semibold text-fg">{d.name}</span>
                       <span className="flex items-center gap-2">
-                        <span className="block truncate font-mono text-xs text-fg-subtle">{d.slug}</span>
-                        <Badge tone="outline" size="sm">{d.organization || 'CEVI'}</Badge>
+                        <span className="block truncate font-mono text-xs text-fg-subtle">
+                          {d.slug}.{getOrganizationByDbType(d.organization).domain}
+                        </span>
+                        {orgFilter === 'ALL' && (
+                          <Badge tone="outline" size="sm">
+                            {organizationLabel(d.organization)}
+                          </Badge>
+                        )}
                       </span>
                     </span>
                     <ChevronRight className="size-4 shrink-0 text-fg-subtle" aria-hidden />
@@ -441,13 +458,12 @@ export function DepartmentsPanel({
                       </span>
                     )}
                     <span className="ml-auto flex gap-1.5">
-                      {(d.hitobitoGroupId ?? d.ceviDbGroupId) !== null && (d.hitobitoGroupId ?? d.ceviDbGroupId) !== undefined ? (
+                      {groupId(d) !== null ? (
                         <Badge tone="outline">
-                          {d.organization === 'PFADI' ? 'MiData' : d.organization === 'JUBLA' ? 'Jubla-DB' : 'Cevi.DB'}{' '}
-                          {d.hitobitoGroupId ?? d.ceviDbGroupId}
+                          {providerLabel(d.organization)} {groupId(d)}
                         </Badge>
                       ) : d.organization !== 'OTHER' ? (
-                        <Badge>Ohne Verband</Badge>
+                        <Badge>Ohne {providerLabel(d.organization)}</Badge>
                       ) : null}
                       {d.upcomingEventCount > 0 && <Badge tone="success">{d.upcomingEventCount} kommend</Badge>}
                     </span>
@@ -461,6 +477,7 @@ export function DepartmentsPanel({
 
       <CreateDepartmentDialog
         open={isCreating}
+        defaultOrganization={orgFilter === 'ALL' ? 'CEVI' : orgFilter}
         onClose={() => setCreating(false)}
         onCreated={(id) => {
           setCreating(false);

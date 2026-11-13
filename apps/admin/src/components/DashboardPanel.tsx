@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -16,9 +16,17 @@ import {
   Users,
 } from 'lucide-react';
 import { Avatar, Badge, Button, Callout, Card, EmptyState, Skeleton, useToast } from '@schichtplan/ui';
-import type { AdminDashboardDto, AdminOverviewDto, AdminUserListItemDto } from '@schichtplan/shared';
+import {
+  getOrganizationByDbType,
+  type AdminDashboardDto,
+  type AdminDepartmentListItemDto,
+  type AdminOverviewDto,
+  type AdminUserListItemDto,
+  type OrganizationType,
+} from '@schichtplan/shared';
 import { api, departmentUrl, errorMessage, send } from '../lib/api';
 import { formatDate, formatEventRange, fullName } from '../lib/format';
+import { ORGANIZATION_TYPES, matchesOrg, organizationLabel, type OrgFilter } from '../lib/organizations';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
 export type AdminTab = 'uebersicht' | 'abteilungen' | 'anlaesse' | 'personen' | 'statistik' | 'protokoll';
@@ -63,19 +71,95 @@ function formatUptime(seconds?: number): string {
   return `${minutes} Min.`;
 }
 
+/** Gehört die Person zum Verband (Hitobito-Konto oder Rolle in einer Abteilung des Verbands)? */
+function userMatchesOrg(user: AdminUserListItemDto, filter: OrgFilter) {
+  if (filter === 'ALL') return true;
+  if (filter !== 'OTHER' && user.providerId && user.provider === filter) return true;
+  return user.memberships.some((m) => (m.departmentOrganization ?? 'CEVI') === filter);
+}
+
+/** Kennzahlen je Verband aus der Abteilungsliste */
+function OrganizationsOverview({
+  departments,
+  onSelect,
+}: {
+  departments: AdminDepartmentListItemDto[] | null;
+  onSelect: (org: OrganizationType) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader title="Verbände" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {ORGANIZATION_TYPES.map((type) => {
+          const org = getOrganizationByDbType(type);
+          const list = departments?.filter((d) => matchesOrg(d.organization, type));
+          const sum = (pick: (d: AdminDepartmentListItemDto) => number) => list?.reduce((n, d) => n + pick(d), 0);
+          const withoutLeader = list?.filter((d) => d.leaders.length === 0).length ?? 0;
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => onSelect(type)}
+              className="rounded-card border border-line bg-surface p-4 text-left transition hover:border-line-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/20"
+            >
+              <span className="flex items-center gap-2.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={org.logoUrl} alt="" className="size-7 shrink-0 object-contain" />
+                <span className="min-w-0">
+                  <span className="block font-display text-[15px] font-semibold text-fg">{organizationLabel(type, true)}</span>
+                  <span className="block truncate font-mono text-2xs text-fg-subtle">{org.domain}</span>
+                </span>
+              </span>
+              <dl className="tabular mt-3 grid grid-cols-3 gap-2 text-center">
+                {(
+                  [
+                    [org.unitTermPlural, list?.length],
+                    ['Kommend', sum((d) => d.upcomingEventCount)],
+                    ['Einträge', sum((d) => d.signupCount)],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div key={label} className="rounded-tile bg-surface-2 px-1 py-2">
+                    <dd className="font-display text-base font-bold leading-none text-fg">
+                      {value === undefined ? '–' : value.toLocaleString('de-CH')}
+                    </dd>
+                    <dt className="mt-1 truncate text-2xs text-fg-subtle">{label}</dt>
+                  </div>
+                ))}
+              </dl>
+              {withoutLeader > 0 && (
+                <span className="mt-3 inline-flex items-center gap-1 text-2xs font-semibold text-warning-ink">
+                  <AlertTriangle className="size-3" aria-hidden />
+                  {withoutLeader} ohne Leitung
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function DashboardPanel({
   overview,
+  departments = null,
+  orgFilter = 'ALL',
+  onOrgFilter,
   onNavigate,
   onOpenDepartment,
   onOpenUser,
 }: {
   overview: AdminOverviewDto | null;
+  departments?: AdminDepartmentListItemDto[] | null;
+  /** Verbandsfilter oben im Portal */
+  orgFilter?: OrgFilter;
+  onOrgFilter?: (next: OrgFilter) => void;
   onNavigate: (tab: AdminTab) => void;
   onOpenDepartment: (id: string) => void;
   onOpenUser: (user: AdminUserListItemDto) => void;
 }) {
   const toast = useToast();
-  const [data, setData] = useState<AdminDashboardDto | null>(null);
+  const [rawData, setData] = useState<AdminDashboardDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testingAlert, setTestingAlert] = useState(false);
 
@@ -118,6 +202,27 @@ export function DashboardPanel({
     }
   };
 
+  // Mit Verbandsfilter nur Einträge dieses Verbands zeigen
+  const data = useMemo<AdminDashboardDto | null>(() => {
+    if (!rawData || orgFilter === 'ALL') return rawData;
+    const orgOf = new Map((departments ?? []).map((d) => [d.id, d.organization] as const));
+    const deptOk = (id: string) => matchesOrg(orgOf.get(id), orgFilter);
+    return {
+      ...rawData,
+      criticalEvents: rawData.criticalEvents?.filter((e) => matchesOrg(e.departmentOrganization, orgFilter)),
+      departmentsWithoutLeader: rawData.departmentsWithoutLeader?.filter((d) => deptOk(d.id)),
+      departmentsWithoutContact: rawData.departmentsWithoutContact?.filter((d) => deptOk(d.id)),
+      inactiveDepartments: rawData.inactiveDepartments?.filter((d) => deptOk(d.id)),
+      upcomingEvents: rawData.upcomingEvents.filter((e) => matchesOrg(e.departmentOrganization, orgFilter)),
+      recentUsers: rawData.recentUsers.filter((u) => userMatchesOrg(u, orgFilter)),
+    };
+  }, [rawData, orgFilter, departments]);
+
+  // Kennzahlen eines einzelnen Verbands aus der Abteilungsliste
+  const orgDepartments = orgFilter === 'ALL' ? null : (departments ?? []).filter((d) => matchesOrg(d.organization, orgFilter));
+  const orgSum = (pick: (d: AdminDepartmentListItemDto) => number) =>
+    departments ? orgDepartments?.reduce((n, d) => n + pick(d), 0) : undefined;
+
   const hasActionableItems =
     data &&
     ((data.criticalEvents && data.criticalEvents.length > 0) ||
@@ -130,15 +235,38 @@ export function DashboardPanel({
     <div className="space-y-8">
       {/* Kennzahlen */}
       <Card className="overflow-hidden">
-        <dl className="grid grid-cols-2 gap-px bg-line md:grid-cols-3 lg:grid-cols-6 [&>div]:bg-surface">
-          <Stat label="Personen" value={overview?.users} />
-          <Stat label="Neu in 7 Tagen" value={overview?.newUsers7d} />
-          <Stat label="Abteilungen" value={overview?.departments} />
-          <Stat label="Anlässe" value={overview?.events} />
-          <Stat label="Eintragungen" value={overview?.signups} />
-          <Stat label="Eintragungen 7 Tage" value={data?.signups7d} />
-        </dl>
+        {orgFilter === 'ALL' ? (
+          <dl className="grid grid-cols-2 gap-px bg-line md:grid-cols-3 lg:grid-cols-6 [&>div]:bg-surface">
+            <Stat label="Personen" value={overview?.users} />
+            <Stat label="Neu in 7 Tagen" value={overview?.newUsers7d} />
+            <Stat label="Abteilungen" value={overview?.departments} />
+            <Stat label="Anlässe" value={overview?.events} />
+            <Stat label="Eintragungen" value={overview?.signups} />
+            <Stat label="Eintragungen 7 Tage" value={rawData?.signups7d} />
+          </dl>
+        ) : (
+          <dl className="grid grid-cols-2 gap-px bg-line md:grid-cols-3 lg:grid-cols-5 [&>div]:bg-surface">
+            <Stat
+              label={getOrganizationByDbType(orgFilter).unitTermPlural}
+              value={departments ? orgDepartments?.length : undefined}
+            />
+            <Stat label="Personen mit Heim" value={orgSum((d) => d.homeUserCount)} hint="Heim-Abteilung in diesem Verband" />
+            <Stat label="Anlässe" value={orgSum((d) => d.eventCount)} />
+            <Stat label="Kommende Anlässe" value={orgSum((d) => d.upcomingEventCount)} />
+            <Stat label="Eintragungen" value={orgSum((d) => d.signupCount)} />
+          </dl>
+        )}
       </Card>
+
+      {orgFilter === 'ALL' && onOrgFilter && (
+        <OrganizationsOverview
+          departments={departments}
+          onSelect={(type) => {
+            onOrgFilter(type);
+            onNavigate('abteilungen');
+          }}
+        />
+      )}
 
       {/* System-Health & Alarme */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-line bg-surface px-5 py-3.5">
@@ -230,7 +358,7 @@ export function DashboardPanel({
                     {data.potentialDuplicatesCount} mögliche Dubletten gefunden
                   </p>
                   <p className="text-xs text-fg-muted">
-                    Gleicher Cevi-Name + Geburtsdatum oder E-Mail bei unterschiedlichen Konten.
+                    Gleicher Spitzname + Geburtsdatum oder E-Mail bei unterschiedlichen Konten (alle Verbände).
                   </p>
                 </div>
                 <div className="mt-3 border-t border-line/50 pt-2 text-right">
@@ -413,7 +541,7 @@ export function DashboardPanel({
                         </span>
                       </span>
                       <span className="hidden sm:block">
-                        <LoginMethodBadges methods={u.loginMethods} />
+                        <LoginMethodBadges methods={u.loginMethods} provider={u.provider} />
                       </span>
                     </button>
                   </li>

@@ -8,11 +8,11 @@ import { api } from '../lib/api';
 import { fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
-/** Person über alle Konten suchen und auswählen (Name, Cevi-Name, E-Mail, Cevi.DB-ID). */
+/** Person über alle Konten suchen und auswählen (Name, Spitzname, E-Mail, Hitobito-ID). */
 export function PersonPicker({
   value,
   onChange,
-  placeholder = 'Name, Cevi-Name oder E-Mail',
+  placeholder = 'Name, Spitzname oder E-Mail',
   disabledIds = [],
 }: {
   value: AdminUserListItemDto | null;
@@ -120,7 +120,7 @@ export function PersonPicker({
                         {disabled ? 'Bereits zugeordnet' : (user.email ?? '–')}
                       </span>
                     </span>
-                    <LoginMethodBadges methods={user.loginMethods} />
+                    <LoginMethodBadges methods={user.loginMethods} provider={user.provider} />
                   </button>
                 </li>
               );

@@ -13,6 +13,8 @@ import { personLabel } from '../../services/profile.js';
 export const EventListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   departmentId: z.string().uuid().optional(),
+  /** Nur Anlässe von Abteilungen dieses Verbands */
+  organization: z.enum(['CEVI', 'PFADI', 'JUBLA', 'OTHER']).optional(),
   when: z.enum(['upcoming', 'drafts', 'urgent', 'signup_closed', 'past', 'all']).default('upcoming'),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),

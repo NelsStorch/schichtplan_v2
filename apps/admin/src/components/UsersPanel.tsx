@@ -24,6 +24,7 @@ import type {
   AdminUserListItemDto,
 } from '@schichtplan/shared';
 import { api, errorMessage } from '../lib/api';
+import { matchesOrg, type OrgFilter } from '../lib/organizations';
 import { formatDate, formatLastSeen, fullName } from '../lib/format';
 import { LoginMethodBadges } from './LoginMethodBadges';
 
@@ -40,11 +41,19 @@ const sortOptions = [
   { value: 'seen:asc', label: 'Am längsten inaktiv' },
 ];
 
-function buildQuery(params: { query: string; filter: Filter; departmentId: string; sort: string; page: number }) {
+function buildQuery(params: {
+  query: string;
+  filter: Filter;
+  departmentId: string;
+  sort: string;
+  page: number;
+  orgFilter: OrgFilter;
+}) {
   const [sort, dir] = params.sort.split(':');
   const search = new URLSearchParams({ sort, dir, page: String(params.page), pageSize: String(PAGE_SIZE) });
   if (params.query) search.set('q', params.query);
   if (params.departmentId) search.set('departmentId', params.departmentId);
+  if (params.orgFilter !== 'ALL') search.set('organization', params.orgFilter);
   if (params.filter === 'admin') search.set('role', 'admin');
   else if (params.filter !== 'all') search.set('method', params.filter);
   return search.toString();
@@ -136,20 +145,24 @@ function Departments({
 export function UsersPanel({
   currentUserId,
   overview,
-  departments = [],
+  departments: allDepartments = [],
   onOpenUser,
   onOpenDepartment,
   onChanged,
+  orgFilter = 'ALL',
 }: {
   currentUserId?: string;
   overview: AdminOverviewDto | null;
   departments?: AdminDepartmentListItemDto[];
+  /** Verbandsfilter oben im Portal */
+  orgFilter?: OrgFilter;
   onOpenUser: (user: AdminUserListItemDto) => void;
   onOpenDepartment?: (departmentId: string) => void;
   onChanged: () => void;
 }) {
   const confirm = useConfirm();
   const toast = useToast();
+  const departments = allDepartments.filter((d) => matchesOrg(d.organization, orgFilter));
 
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -258,7 +271,7 @@ export function UsersPanel({
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    api<AdminUserListDto>(`/api/admin/users?${buildQuery({ query, filter, departmentId, sort, page })}`, {
+    api<AdminUserListDto>(`/api/admin/users?${buildQuery({ query, filter, departmentId, sort, page, orgFilter })}`, {
       signal: controller.signal,
     })
       .then((result) => {
@@ -274,14 +287,27 @@ export function UsersPanel({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [query, filter, departmentId, sort, page, reload]);
+  }, [query, filter, departmentId, sort, page, reload, orgFilter]);
+
+  // Neuer Verband: Seite 1, Auswahl leeren und eine nicht mehr passende Abteilung zurücksetzen
+  useEffect(() => {
+    setPage(1);
+    setSelectedIds(new Set());
+  }, [orgFilter]);
+  useEffect(() => {
+    setDepartmentId((current) =>
+      current && current !== 'none' && !allDepartments.some((d) => d.id === current && matchesOrg(d.organization, orgFilter))
+        ? ''
+        : current
+    );
+  }, [orgFilter, allDepartments]);
 
   const changeFilter = (next: Filter) => {
     setFilter(next);
     setPage(1);
   };
 
-  const hasSubFilter = Boolean(query || departmentId);
+  const hasSubFilter = Boolean(query || departmentId || orgFilter !== 'ALL');
   const chipCount = (id: Filter, globalCount?: number) => {
     if (!hasSubFilter) return globalCount;
     return filter === id ? data?.total : undefined;
@@ -508,7 +534,7 @@ export function UsersPanel({
                       {user.email ?? <span className="text-fg-subtle">–</span>}
                     </td>
                     <td className="px-3 py-3">
-                      <LoginMethodBadges methods={user.loginMethods} />
+                      <LoginMethodBadges methods={user.loginMethods} provider={user.provider} />
                     </td>
                     <td className="px-3 py-3">
                       <Departments user={user} onOpenDepartment={onOpenDepartment} />
@@ -555,7 +581,7 @@ export function UsersPanel({
                     </span>
                     {user.email && <span className="truncate pl-10 text-[13px] text-fg-muted">{user.email}</span>}
                     <span className="pl-10">
-                      <LoginMethodBadges methods={user.loginMethods} />
+                      <LoginMethodBadges methods={user.loginMethods} provider={user.provider} />
                     </span>
                   </button>
                   <div className="flex shrink-0 items-center gap-1 pr-3">

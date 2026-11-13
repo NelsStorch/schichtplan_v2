@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { FastifyPluginAsync } from 'fastify';
-import { Prisma } from '../db.js';
+import { Prisma, type OrganizationType } from '../db.js';
 import { z } from 'zod';
 import type {
   AdminHitobitoRoleDto,
@@ -25,6 +25,8 @@ const ListQuerySchema = z.object({
   method: z.enum(['cevidb', 'password', 'ceviname', 'stale_ceviname', 'duplicate']).optional(),
   role: z.enum(['admin']).optional(),
   departmentId: z.union([z.string().uuid(), z.literal('none')]).optional(),
+  /** Nur Personen dieses Verbands (Hitobito-Konto, Heim-Abteilung oder Rolle in einer Abteilung) */
+  organization: z.enum(['CEVI', 'PFADI', 'JUBLA', 'OTHER']).optional(),
   sort: z.enum(['created', 'name', 'email', 'seen']).default('created'),
   dir: z.enum(['asc', 'desc']).optional(),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
@@ -207,6 +209,20 @@ function departmentFilter(departmentId: string | undefined): Prisma.UserWhereInp
   ];
 }
 
+function organizationFilter(organization: OrganizationType | undefined): Prisma.UserWhereInput[] {
+  if (!organization) return [];
+  return [
+    {
+      OR: [
+        // Vereine haben kein Hitobito: dort zählt nur die Zugehörigkeit zu einem Verein
+        ...(organization === 'OTHER' ? [] : [{ providerId: { not: null }, provider: organization }]),
+        { homeDepartment: { organization } },
+        { memberships: { some: { department: { organization } } } },
+      ],
+    },
+  ];
+}
+
 const adminRoutes: FastifyPluginAsync = async (fastify) => {
   // Personendaten: nie zwischenspeichern, weder im Browser noch in Proxys
   fastify.addHook('onSend', async (_request, reply) => {
@@ -284,7 +300,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, _reply) => {
     const queryInput = request.query as z.output<typeof ListQuerySchema>;
-    const { q, method, role, departmentId, sort, page, pageSize } = queryInput;
+    const { q, method, role, departmentId, organization, sort, page, pageSize } = queryInput;
     const duplicateMap = await findDuplicateUsers(fastify.prisma);
     const duplicateIds = Array.from(duplicateMap.keys());
     const dir = queryInput.dir ?? (sort === 'created' ? 'desc' : 'asc');
@@ -294,6 +310,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
         ...searchFilter(q),
 ...(method === 'duplicate' ? [{ id: { in: duplicateIds } }] : methodFilter(method as any)),
         ...departmentFilter(departmentId),
+        ...organizationFilter(organization),
         ...(role === 'admin' ? [{ isGlobalAdmin: true }] : []),
       ],
     };

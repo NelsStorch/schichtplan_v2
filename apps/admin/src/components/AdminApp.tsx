@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowUpRight,
   Building2,
@@ -13,9 +13,20 @@ import {
   ShieldAlert,
   Users,
 } from 'lucide-react';
-import { Button, Callout, CeviLogo, Spinner, ThemeToggle, buttonClasses, cn } from '@schichtplan/ui';
 import {
-  getBrowserOrganization,
+  BrandLogo,
+  Button,
+  Callout,
+  Chip,
+  ChipRow,
+  Spinner,
+  ThemeToggle,
+  buttonClasses,
+  cn,
+  useOrganization,
+} from '@schichtplan/ui';
+import {
+  getRootDomain,
   privacyUrl,
   statusUrl,
   type AdminDepartmentListItemDto,
@@ -25,6 +36,16 @@ import {
   type UserDto,
 } from '@schichtplan/shared';
 import { ApiError, REAUTH_EVENT, api, errorMessage, isReauthCode, loginUrl } from '../lib/api';
+import {
+  HITOBITO_ORGANIZATIONS,
+  HITOBITO_PROVIDERS_TEXT,
+  ORGANIZATION_TYPES,
+  loadOrgFilter,
+  matchesOrg,
+  organizationLabel,
+  saveOrgFilter,
+  type OrgFilter,
+} from '../lib/organizations';
 import { AuditPanel } from './AuditPanel';
 import { CommandPalette } from './CommandPalette';
 import { DashboardPanel, type AdminTab } from './DashboardPanel';
@@ -45,6 +66,20 @@ type Session =
 
 const displayName = (user: Pick<UserDto, 'ceviName' | 'firstName'>) => user.ceviName || user.firstName;
 
+/** Admin-Portal auf der Domain eines anderen Verbands (gleiche Umgebung: Prod bzw. Dev) */
+function adminPortalUrl(domain: string) {
+  const { protocol, hostname } = window.location;
+  const prefix = getRootDomain(hostname).startsWith('dev.') ? 'dev.' : '';
+  return `${protocol}//admin.${prefix}${domain}/`;
+}
+
+/** Wie die Admin-Sitzung angemeldet wurde, für die Statuszeile */
+function loginMethodText(method: string | null) {
+  if (method === 'cevidb' || method === 'hitobito') return ' · angemeldet über Hitobito';
+  if (method === 'password') return ' · angemeldet mit Passwort';
+  return '';
+}
+
 function Shell({
   children,
   user,
@@ -57,8 +92,8 @@ function Shell({
   onOpenCommandPalette?: () => void;
   nav?: React.ReactNode;
 }) {
-  // Verband der aufgerufenen Domain (admin.<verband>-schichtplan.ch), sonst Cevi
-  const org = useMemo(() => getBrowserOrganization(), []);
+  // Verband der aufgerufenen Domain (admin.<verband>-schichtplan.ch), vom Server-Layout gesetzt
+  const org = useOrganization();
   return (
     <div className="grain flex min-h-[100dvh] flex-col">
       <div aria-hidden className="bg-campfire pointer-events-none fixed inset-x-0 top-0 h-[40vh] opacity-60" />
@@ -66,7 +101,7 @@ function Shell({
       <header className="sticky top-0 z-header border-b border-line bg-canvas/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <span className="flex min-w-0 items-center gap-2.5">
-            <CeviLogo className="size-8" alt="" />
+            <BrandLogo className="size-8" alt="" />
             <span className="truncate font-display text-[15px] font-semibold tracking-tight text-fg">
               {org.name}
             </span>
@@ -108,6 +143,47 @@ function Shell({
         </div>
       </footer>
     </div>
+  );
+}
+
+/**
+ * Hinweis und Knöpfe für eine neue Anmeldung. Für den Admin-Bereich zählt nur Hitobito (Cevi.DB, PBS MiData,
+ * Jubla-DB). Auf der Vereins-Domain gibt es kein Hitobito-Login: dort auf ein Admin-Portal mit Hitobito verweisen.
+ */
+function ReauthHint({ code, onLogout }: { code: 'REAUTH_REQUIRED' | 'REAUTH_CEVIDB'; onLogout: () => void }) {
+  const org = useOrganization();
+  const needsHitobito = code === 'REAUTH_CEVIDB';
+  const domainWithoutHitobito = org.dbType === 'OTHER';
+  return (
+    <>
+      <p className="mt-3 text-sm leading-relaxed text-fg-subtle">
+        {needsHitobito
+          ? `Für den Admin-Bereich zählt nur die Anmeldung mit ${HITOBITO_PROVIDERS_TEXT}, nicht E-Mail und Passwort.`
+          : 'Zum Schutz gilt eine Anmeldung im Admin-Bereich nur einige Stunden. Danach musst du dich neu anmelden, auch wenn du auf den Abteilungsseiten noch angemeldet bist.'}
+      </p>
+      {needsHitobito && domainWithoutHitobito ? (
+        <>
+          <p className="mt-3 text-sm leading-relaxed text-fg-subtle">
+            Auf {org.domain} gibt es keine Hitobito-Anmeldung. Öffne das Admin-Portal über die Domain deines Verbands,
+            dort verwaltest du auch alle Vereine:
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            {HITOBITO_ORGANIZATIONS.map((o) => (
+              <a key={o.slug} href={adminPortalUrl(o.domain)} className={buttonClasses({ variant: 'secondary', size: 'lg' })}>
+                admin.{o.domain}
+                <ArrowUpRight aria-hidden />
+              </a>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="mt-7 flex flex-wrap gap-3">
+          <Button size="lg" onClick={onLogout}>
+            {needsHitobito ? `Mit ${org.authProviderShort} anmelden` : 'Neu anmelden'}
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -201,7 +277,7 @@ export function AdminApp() {
           <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
             Du bist als <span className="font-medium text-fg">{displayName(session.user)}</span> angemeldet, aber
             nicht als globale Admin eingetragen. Falls du Zugriff brauchst, melde dich mit dem richtigen Konto an
-            (für Admins gilt die Anmeldung mit Cevi.DB).
+            (für Admins gilt die Anmeldung mit {HITOBITO_PROVIDERS_TEXT}).
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Button size="lg" onClick={logout}>
@@ -231,16 +307,7 @@ export function AdminApp() {
             Bitte neu anmelden
           </h1>
           <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">{session.message}</p>
-          <p className="mt-3 text-sm leading-relaxed text-fg-subtle">
-            {session.code === 'REAUTH_CEVIDB'
-              ? 'Für den Admin-Bereich zählt nur die Anmeldung mit Cevi.DB, nicht E-Mail und Passwort.'
-              : 'Zum Schutz gilt eine Anmeldung im Admin-Bereich nur einige Stunden. Danach musst du dich neu anmelden, auch wenn du auf den Abteilungsseiten noch angemeldet bist.'}
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Button size="lg" onClick={logout}>
-              {session.code === 'REAUTH_CEVIDB' ? 'Mit Cevi.DB anmelden' : 'Neu anmelden'}
-            </Button>
-          </div>
+          <ReauthHint code={session.code} onLogout={logout} />
         </Centered>
       </Shell>
     );
@@ -254,13 +321,13 @@ const TABS: { id: AdminTab; label: string; icon: React.ReactNode; intro: string 
     id: 'uebersicht',
     label: 'Übersicht',
     icon: <LayoutDashboard aria-hidden />,
-    intro: 'Kennzahlen über alle Abteilungen, was als Nächstes ansteht und was Aufmerksamkeit braucht.',
+    intro: 'Kennzahlen über alle Verbände und Abteilungen, was als Nächstes ansteht und was Aufmerksamkeit braucht.',
   },
   {
     id: 'abteilungen',
     label: 'Abteilungen',
     icon: <Building2 aria-hidden />,
-    intro: 'Abteilungen anlegen, Einstellungen ändern, Leitung und Rollen vergeben oder eine Abteilung löschen.',
+    intro: 'Abteilungen, Scharen und Vereine anlegen, Einstellungen ändern, Leitung und Rollen vergeben oder löschen.',
   },
   {
     id: 'anlaesse',
@@ -272,7 +339,7 @@ const TABS: { id: AdminTab; label: string; icon: React.ReactNode; intro: string 
     id: 'personen',
     label: 'Personen',
     icon: <Users aria-hidden />,
-    intro: 'Alle Konten über sämtliche Abteilungen. Rollen und globale Admin-Rechte vergeben.',
+    intro: 'Alle Konten über sämtliche Verbände. Rollen und globale Admin-Rechte vergeben.',
   },
   {
     id: 'statistik',
@@ -287,6 +354,37 @@ const TABS: { id: AdminTab; label: string; icon: React.ReactNode; intro: string 
     intro: 'Jede Änderung im Admin-Portal: wer, wann, was. Einträge lassen sich nicht ändern oder löschen.',
   },
 ];
+
+/** Bereiche mit Verbandsfilter (Statistik und Protokoll gelten immer für alle) */
+const ORG_FILTER_TABS: AdminTab[] = ['uebersicht', 'abteilungen', 'anlaesse', 'personen'];
+
+/** Verbandsfilter mit Anzahl Abteilungen je Verband */
+function OrgFilterBar({
+  value,
+  onChange,
+  departments,
+}: {
+  value: OrgFilter;
+  onChange: (next: OrgFilter) => void;
+  departments: AdminDepartmentListItemDto[] | null;
+}) {
+  const count = (filter: OrgFilter) => departments?.filter((d) => matchesOrg(d.organization, filter)).length;
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2" role="group" aria-label="Verband">
+      <span className="text-2xs font-semibold uppercase tracking-wider text-fg-subtle">Verband</span>
+      <ChipRow>
+        <Chip selected={value === 'ALL'} count={count('ALL')} onClick={() => onChange('ALL')}>
+          Alle
+        </Chip>
+        {ORGANIZATION_TYPES.map((type) => (
+          <Chip key={type} selected={value === type} count={count(type)} onClick={() => onChange(type)}>
+            {organizationLabel(type, true)}
+          </Chip>
+        ))}
+      </ChipRow>
+    </div>
+  );
+}
 
 const parseHash = (): { tab: AdminTab; entity?: string } => {
   const raw = window.location.hash.slice(1);
@@ -317,6 +415,13 @@ function AdminHome({
   const [usersReload, setUsersReload] = useState(0);
   const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  // Verbandsfilter für Übersicht, Abteilungen, Anlässe und Personen (pro Browser gemerkt)
+  // AdminHome erscheint erst nach der Sitzungsprüfung im Browser: kein Unterschied zum Server-Rendern
+  const [orgFilter, setOrgFilterState] = useState<OrgFilter>(loadOrgFilter);
+  const setOrgFilter = (next: OrgFilter) => {
+    setOrgFilterState(next);
+    saveOrgFilter(next);
+  };
 
   // Globale Tastenkombinationen (⌘K, Zahlentasten 1-6 für Tabs, / für Suche)
   useEffect(() => {
@@ -482,7 +587,7 @@ function AdminHome({
         <p className="mb-4 text-xs text-fg-subtle">
           Admin-Sitzung gültig bis {timeFmt.format(new Date(adminSession.expiresAt))}
           {minutesLeft !== null && ` (noch ${minutesLeft} Min.)`}
-          {adminSession.loginMethod === 'cevidb' ? ' · angemeldet mit Cevi.DB' : ''}
+          {loginMethodText(adminSession.loginMethod)}
         </p>
       )}
       {minutesLeft !== null && minutesLeft <= 15 && (
@@ -505,10 +610,16 @@ function AdminHome({
         <h1 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight text-fg">{current.label}</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">{current.intro}</p>
       </div>
+      {ORG_FILTER_TABS.includes(tab) && (
+        <OrgFilterBar value={orgFilter} onChange={setOrgFilter} departments={departments} />
+      )}
 
       {tab === 'uebersicht' && (
         <DashboardPanel
           overview={overview}
+          departments={departments}
+          orgFilter={orgFilter}
+          onOrgFilter={setOrgFilter}
           onNavigate={navigate}
           onOpenDepartment={handleOpenDepartment}
           onOpenUser={handleOpenUser}
@@ -517,12 +628,15 @@ function AdminHome({
       {tab === 'abteilungen' && (
         <DepartmentsPanel
           departments={departments}
+          orgFilter={orgFilter}
           loading={departmentsLoading}
           onOpen={handleOpenDepartment}
           onChanged={refresh}
         />
       )}
-      {tab === 'anlaesse' && <EventsPanel departments={departments ?? []} onOpenDepartment={handleOpenDepartment} />}
+      {tab === 'anlaesse' && (
+        <EventsPanel departments={departments ?? []} orgFilter={orgFilter} onOpenDepartment={handleOpenDepartment} />
+      )}
       {tab === 'statistik' && (
         <StatsPanel
           departments={departments ?? []}
@@ -546,6 +660,7 @@ function AdminHome({
           currentUserId={user.id}
           overview={overview}
           departments={departments ?? []}
+          orgFilter={orgFilter}
           onOpenUser={handleOpenUser}
           onOpenDepartment={handleOpenDepartment}
           onChanged={refresh}

@@ -58,10 +58,11 @@ const adminPeopleRoutes: FastifyPluginAsync = async (fastify) => {
     if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
 
     if (isGlobalAdmin !== undefined && isGlobalAdmin !== user.isGlobalAdmin) {
-      // Admins melden sich mit Cevi.DB an (stärker als ein eigenes Passwort, siehe adminSecurity.ts)
+      // Admins melden sich über Hitobito an (stärker als ein eigenes Passwort, siehe adminSecurity.ts)
       if (isGlobalAdmin && user.providerId === null) {
         return reply.status(400).send({
-          error: 'Globale Admins brauchen ein Konto mit Cevi.DB. Die Person soll sich zuerst einmal mit Cevi.DB anmelden.',
+          error:
+            'Globale Admins brauchen ein Hitobito-Konto (Cevi.DB, PBS MiData oder Jubla-DB). Die Person soll sich zuerst einmal darüber anmelden.',
         });
       }
       if (!isGlobalAdmin) {

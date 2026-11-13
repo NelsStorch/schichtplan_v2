@@ -50,9 +50,12 @@ export function adminRequestProblem(
   config: Pick<AdminSecurityConfig, 'rootDomain' | 'allowLocalhost'>
 ): AdminRequestProblem | null {
   const host = bareHost(headers.host);
+  // admin.<verband>-schichtplan.ch für alle 4 Verbände; auf Dev entsprechend admin.dev.<verband>-schichtplan.ch.
+  // Prod nimmt keine Dev-Hosts an und umgekehrt.
+  const envPrefix = config.rootDomain.startsWith('dev.') ? 'dev.' : '';
   const allowedHosts = [
     `admin.${config.rootDomain}`,
-    ...ORGANIZATION_DOMAINS.map((d) => `admin.${d}`),
+    ...ORGANIZATION_DOMAINS.map((d) => `admin.${envPrefix}${d}`),
   ];
   if (!allowedHosts.includes(host) && !(config.allowLocalhost && isLocalHost(host))) return 'HOST';
 
