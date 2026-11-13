@@ -32,7 +32,11 @@ function DepartmentSetup() {
   const [stufen, setStufen] = useState<Record<string, StufeRole>>({});
   const [inviteLocked, setInviteLocked] = useState(false);
   const [inviteDeptId, setInviteDeptId] = useState<string | null>(null);
-  const [switchFrom, setSwitchFrom] = useState<string | null>(null);
+  // Andere Abteilung als die Heimabteilung (Link oder Einladung): zusätzlich beitreten statt wechseln
+  const [extraTarget, setExtraTarget] = useState<DepartmentDirectoryItemDto | null>(null);
+  const [extraBlocked, setExtraBlocked] = useState(false);
+  const [asHome, setAsHome] = useState(false);
+  const [leaving, setLeaving] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +77,42 @@ function DepartmentSetup() {
         }
       }
 
+      const stufenOf = (d: DepartmentDirectoryItemDto) =>
+        (me.stufen ?? [])
+          .filter((s) => d.stufen.some((x) => x.id === s.stufeId))
+          .map((s) => ({ stufeId: s.stufeId, role: s.role }));
+
+      // Heimabteilung ist eine andere: Beitritt zusätzlich, die Heimabteilung bleibt
+      const home = me.homeDepartment;
+      if (target && home && home.id !== target.id) {
+        if (inviteToken) setInviteDeptId(target.id);
+        const joinedHere = me.joinedDepartments?.find((d) => d.id === target!.id);
+        // Schon dabei: per Einladung direkt weiter, sonst die normale Seite (Haupt-Abteilung, Beitritte verwalten)
+        if (joinedHere?.confirmed && inviteToken) {
+          window.location.href = finalDestination(returnTo, me, org.dbType);
+          return;
+        }
+        if (joinedHere?.counts && !inviteToken) return;
+        if (inviteToken && target.stufen.length === 0) {
+          const res = await fetch('/api/auth/me/memberships', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ departmentId: target.id, inviteToken, viaLink: true, stufen: [] }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            window.location.href = finalDestination(returnTo, data as UserDto, org.dbType);
+            return;
+          }
+          setError(data.error || 'Der Einladungslink konnte nicht eingelöst werden.');
+        }
+        setExtraBlocked(!inviteToken && target.joinMode === 'INVITE_ONLY');
+        setExtraTarget(target);
+        setSelected(target.id);
+        setStufen(Object.fromEntries(stufenOf(target).map((s) => [s.stufeId, s.role])));
+        return;
+      }
+
       const join = async (stufenList: { stufeId: string; role: StufeRole }[]) => {
         const joinRes = await fetch('/api/auth/me/department', {
           method: 'PUT',
@@ -103,11 +143,7 @@ function DepartmentSetup() {
           await join([]);
           return;
         } else {
-          // Wechsel von einer anderen Abteilung oder Stufen wählen: nur mit ausdrücklichem Speichern
-          if (me.homeDepartment && me.homeDepartment.id !== target.id) {
-            setStufen({});
-            setSwitchFrom(me.homeDepartment.name);
-          }
+          // Stufen wählen: nur mit ausdrücklichem Speichern
           setSelected(target.id);
           setInviteLocked(true);
         }
@@ -147,11 +183,33 @@ function DepartmentSetup() {
     if (id !== selected) setStufen({});
   };
 
+  const selectedStufen = () =>
+    Object.entries(stufen)
+      .filter(([stufeId]) => selectedDepartment?.stufen.some((s) => s.id === stufeId))
+      .map(([stufeId, role]) => ({ stufeId, role }));
+
   const save = async () => {
     if (!selected) return;
     setSaving(true);
     setError(null);
     try {
+      // Zusätzlich beitreten: Heimabteilung bleibt unverändert
+      if (extraTarget && !asHome) {
+        const res = await fetch('/api/auth/me/memberships', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            departmentId: extraTarget.id,
+            inviteToken: inviteToken || undefined,
+            viaLink: Boolean(returnToSlug && extraTarget.slug === returnToSlug),
+            stufen: selectedStufen(),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Beitreten hat nicht geklappt.');
+        window.location.href = finalDestination(returnTo, data as UserDto, org.dbType);
+        return;
+      }
       const departmentId = selected === NONE ? null : selected;
       const res = await fetch('/api/auth/me/department', {
         method: 'PUT',
@@ -160,11 +218,7 @@ function DepartmentSetup() {
           departmentId,
           inviteToken: inviteToken || undefined,
           viaLink: Boolean(returnToSlug && selectedDepartment?.slug === returnToSlug),
-          stufen: departmentId
-            ? Object.entries(stufen)
-                .filter(([stufeId]) => selectedDepartment?.stufen.some((s) => s.id === stufeId))
-                .map(([stufeId, role]) => ({ stufeId, role }))
-            : [],
+          stufen: departmentId ? selectedStufen() : [],
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -173,6 +227,24 @@ function DepartmentSetup() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speichern hat nicht geklappt.');
       setSaving(false);
+    }
+  };
+
+  const leave = async (departmentId: string, name: string) => {
+    if (!window.confirm(`${name} verlassen? Deine Stufen dort werden entfernt. Rechte bleiben, bis die Leitung sie entfernt.`)) {
+      return;
+    }
+    setLeaving(departmentId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/auth/me/memberships/${departmentId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Verlassen hat nicht geklappt.');
+      setUser(data as UserDto);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verlassen hat nicht geklappt.');
+    } finally {
+      setLeaving(null);
     }
   };
 
@@ -210,26 +282,60 @@ function DepartmentSetup() {
             </div>
           ) : (
             <>
-              {switchFrom && selectedDepartment && (
-                <Callout tone="warning" title={`Wechsel von ${switchFrom}`}>
-                  <p className="mt-1 text-[13px] leading-relaxed text-fg">
-                    Du gehörst bisher zu <strong>{switchFrom}</strong>. Mit «Speichern und weiter» wechselst du zu{' '}
-                    <strong>{selectedDepartment.name}</strong>. Eine bisherige Bestätigung deiner Zugehörigkeit gilt
-                    dann nicht mehr.
-                  </p>
+              {extraTarget && user?.homeDepartment ? (
+                <section aria-label={`${extraTarget.name} beitreten`} className="space-y-3">
+                  <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
+                    <BrandLogo className="size-10 shrink-0" logoUrl={extraTarget.logoUrl} alt="" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-fg">{extraTarget.name}</span>
+                      <span className="block text-[13px] text-fg-subtle">
+                        {inviteToken ? 'Über deinen Einladungslink' : `Über den Link der ${org.unitTerm}`}
+                      </span>
+                    </span>
+                  </div>
+                  {extraBlocked ? (
+                    <Callout tone="info" title="Nur per Einladung">
+                      <p className="mt-1 text-[13px] leading-relaxed text-fg">
+                        {extraTarget.name} nimmt neue Mitglieder nur über einen Einladungslink auf. Frag die Leitung
+                        nach einem Link.
+                      </p>
+                    </Callout>
+                  ) : (
+                    <ul role="radiogroup" className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface/70">
+                      <DepartmentOption
+                        selected={!asHome}
+                        onSelect={() => setAsHome(false)}
+                        title="Zusätzlich beitreten"
+                        subtitle={`${user.homeDepartment.name} bleibt deine Haupt-${org.unitTerm}`}
+                        icon={<UsersRound className="size-[18px]" />}
+                      />
+                      {!fromCeviDb && (
+                        <DepartmentOption
+                          selected={asHome}
+                          onSelect={() => setAsHome(true)}
+                          title={`Als Haupt-${org.unitTerm} festlegen`}
+                          subtitle={`Ersetzt ${user.homeDepartment.name} als Haupt-${org.unitTerm}`}
+                          icon={<Check className="size-[18px]" />}
+                        />
+                      )}
+                    </ul>
+                  )}
                   <button
                     type="button"
-                    className="mt-2 text-[13px] font-semibold text-accent-ink underline underline-offset-2"
+                    className="text-[13px] font-semibold text-accent-ink underline underline-offset-2"
                     onClick={() => {
-                      if (user) window.location.href = finalDestination(returnTo, user, org.dbType);
+                      // Zur normalen Ansicht: Haupt-Abteilung und bestehende Beitritte
+                      setExtraTarget(null);
+                      setExtraBlocked(false);
+                      setAsHome(false);
+                      setSelected(user.homeDepartment?.id ?? null);
+                      setStufen(Object.fromEntries((user.stufen ?? []).map((s) => [s.stufeId, s.role])));
                     }}
                   >
-                    Nicht wechseln, bei {switchFrom} bleiben
+                    {extraBlocked ? 'Zurück zu meinen Angaben' : 'Nicht beitreten'}
                   </button>
-                </Callout>
-              )}
-
-              {(fromCeviDb || inviteLocked) && selectedDepartment ? (
+                </section>
+              ) : (fromCeviDb || inviteLocked) && selectedDepartment ? (
                 <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
                   {inviteLocked ? (
                     <BrandLogo className="size-10 shrink-0" logoUrl={selectedDepartment.logoUrl} alt="" />
@@ -301,7 +407,7 @@ function DepartmentSetup() {
                 </section>
               )}
 
-              {selectedDepartment && selectedDepartment.stufen.length > 0 && (
+              {selectedDepartment && selectedDepartment.stufen.length > 0 && !extraBlocked && (
                 <section aria-labelledby="stufen-titel" className="animate-fade-in">
                   <h2 id="stufen-titel" className="text-sm font-semibold text-fg">
                     In welchen Stufen bist du dabei?
@@ -357,9 +463,42 @@ function DepartmentSetup() {
                 </section>
               )}
 
-              <Button size="lg" className="w-full" disabled={!selected} loading={saving} onClick={save}>
-                Speichern und weiter
-              </Button>
+              {!extraTarget && (user?.joinedDepartments?.length ?? 0) > 0 && (
+                <section aria-labelledby="weitere-titel">
+                  <h2 id="weitere-titel" className="text-sm font-semibold text-fg">
+                    Weitere {org.unitTerm === 'Verein' ? 'Vereine' : 'Mitgliedschaften'}
+                  </h2>
+                  <p className="mt-1 text-[13px] text-fg-subtle">
+                    Hier bist du zusätzlich dabei. Beitreten geht über den Link oder Einladungslink.
+                  </p>
+                  <ul className="mt-3 divide-y divide-line rounded-card border border-line bg-surface/70">
+                    {user!.joinedDepartments!.map((d) => (
+                      <li key={d.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-fg">{d.name}</span>
+                          <span className="block text-xs text-fg-subtle">
+                            {d.confirmed ? 'Bestätigt' : d.counts ? 'Selbst beigetreten' : 'Wartet auf Bestätigung'}
+                          </span>
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          loading={leaving === d.id}
+                          onClick={() => leave(d.id, d.name)}
+                        >
+                          Verlassen
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {!extraBlocked && (
+                <Button size="lg" className="w-full" disabled={!selected} loading={saving} onClick={save}>
+                  {extraTarget && !asHome ? `${extraTarget.name} beitreten` : 'Speichern und weiter'}
+                </Button>
+              )}
             </>
           )}
         </div>

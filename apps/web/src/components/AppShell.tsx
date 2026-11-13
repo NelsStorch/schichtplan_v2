@@ -262,7 +262,9 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
       : departmentRoleLabel({
           isLeader: user.departmentRole === 'ADMIN',
           permissions: user.departmentPermissions ?? [],
-          isHomeDepartment: user.homeDepartment?.id === department?.id,
+          isHomeDepartment:
+            user.homeDepartment?.id === department?.id ||
+            Boolean(user.joinedDepartments?.some((d) => d.id === department?.id && d.counts)),
         });
 
   const handleDeleteAccount = async () => {
@@ -326,6 +328,18 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
                     <Building2 className="size-3 inline" />
                     {user.homeDepartment ? user.homeDepartment.name : user.needsDepartmentSetup ? 'Abteilung fehlt' : 'Keine Abteilung'}
                   </span>
+                  {user.joinedDepartments?.map((d) => (
+                    <span
+                      key={d.id}
+                      title={d.counts ? 'Zusätzlich beigetreten' : 'Beitritt noch nicht bestätigt'}
+                      className={cn(
+                        'rounded-full border border-line px-2 py-0.5 text-[11px] font-medium',
+                        d.counts ? 'bg-surface-elevated text-fg-muted' : 'border-dashed text-fg-subtle'
+                      )}
+                    >
+                      + {d.name}
+                    </span>
+                  ))}
                   {user.stufen?.map((s) => (
                     <span key={s.stufeId} className="rounded-full bg-surface-elevated border border-line px-2 py-0.5 text-[11px] font-medium text-fg-muted">
                       {s.name}

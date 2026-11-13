@@ -152,15 +152,43 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
     (
       await tx.departmentMember.findMany({
         where: { userId: targetId },
-        select: { departmentId: true, role: true, permissions: true, leaderSource: true },
+        select: {
+          departmentId: true,
+          role: true,
+          permissions: true,
+          leaderSource: true,
+          joinedAt: true,
+          confirmedAt: true,
+          confirmedById: true,
+        },
       })
     ).map((m) => [m.departmentId, m])
   );
   for (const m of await tx.departmentMember.findMany({
     where: { userId: sourceId },
-    select: { departmentId: true, role: true, permissions: true, leaderSource: true },
+    select: {
+      departmentId: true,
+      role: true,
+      permissions: true,
+      leaderSource: true,
+      joinedAt: true,
+      confirmedAt: true,
+      confirmedById: true,
+    },
   })) {
     const existing = targetMemberships.get(m.departmentId);
+    // Beitritt und Bestätigung übernehmen, wenn das Ziel sie noch nicht hat
+    if (existing && m.joinedAt && !existing.joinedAt) {
+      await tx.departmentMember.update({
+        where: { departmentId_userId: { departmentId: m.departmentId, userId: targetId } },
+        data: { joinedAt: m.joinedAt, confirmedAt: m.confirmedAt, confirmedById: m.confirmedById },
+      });
+    } else if (existing && m.confirmedAt && existing.joinedAt && !existing.confirmedAt) {
+      await tx.departmentMember.update({
+        where: { departmentId_userId: { departmentId: m.departmentId, userId: targetId } },
+        data: { confirmedAt: m.confirmedAt, confirmedById: m.confirmedById },
+      });
+    }
     if (!existing) {
       await tx.departmentMember.create({
         data: {
@@ -169,6 +197,9 @@ async function mergeOne(tx: Tx, sourceId: string, targetId: string) {
           role: targetIsGuest ? 'HELPER' : m.role,
           permissions: targetIsGuest ? [] : m.permissions,
           leaderSource: targetIsGuest ? null : m.leaderSource,
+          joinedAt: m.joinedAt,
+          confirmedAt: m.confirmedAt,
+          confirmedById: m.confirmedById,
         },
       });
     } else if (!targetIsGuest) {

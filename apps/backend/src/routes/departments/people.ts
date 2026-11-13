@@ -73,7 +73,14 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
               memberships: {
                 some: withGuests
                   ? { departmentId: tenant.id }
-                  : { departmentId: tenant.id, OR: [{ role: 'ADMIN' }, { NOT: { permissions: { isEmpty: true } } }] },
+                  : {
+                      departmentId: tenant.id,
+                      OR: [
+                        { role: 'ADMIN' },
+                        { NOT: { permissions: { isEmpty: true } } },
+                        { joinedAt: { not: null } },
+                      ],
+                    },
               },
             },
           ],
@@ -95,7 +102,14 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           homeDepartmentConfirmedBy: { select: { nickname: true, firstName: true, lastName: true } },
           memberships: {
             where: { departmentId: tenant.id },
-            select: { role: true, permissions: true, leaderSource: true },
+            select: {
+              role: true,
+              permissions: true,
+              leaderSource: true,
+              joinedAt: true,
+              confirmedAt: true,
+              confirmedById: true,
+            },
           },
           stufen: {
             where: { stufe: { departmentId: tenant.id } },
@@ -104,9 +118,23 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         },
         orderBy: [{ nickname: 'asc' }, { firstName: 'asc' }],
       });
+      // Wer hat Beitritte bestätigt? (Mitgliedschaften haben keine Relation auf die bestätigende Person)
+      const confirmerIds = [
+        ...new Set(users.map((u) => u.memberships[0]?.confirmedById).filter((id): id is string => Boolean(id))),
+      ];
+      const confirmers = new Map(
+        (
+          await fastify.prisma.user.findMany({
+            where: { id: { in: confirmerIds } },
+            select: { id: true, nickname: true, firstName: true, lastName: true },
+          })
+        ).map((c) => [c.id, personLabel(c)])
+      );
       return users.map((u): DepartmentPersonDto => {
         const isHome = u.homeDepartmentId === tenant.id;
         const membership = u.memberships[0] ?? null;
+        // Zusätzlich beigetreten (Heimabteilung ist eine andere)
+        const isAdditional = !isHome && Boolean(membership?.joinedAt);
         const role = membership ? (membership.role === 'ADMIN' ? 'ADMIN' : 'HELPER') : null;
         const permissions = role === 'ADMIN' ? [] : normalizePermissions(membership?.permissions ?? []);
         return {
@@ -117,12 +145,32 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           firstName: u.firstName,
           lastName: u.lastName,
           isHomeDepartment: isHome,
-          source: isHome ? homeSource(u.homeDepartmentSource) : null,
-          canConfirmHome: canConfirmHome(access, request.user.id, u, tenant.id, ortsgruppeId),
+          isMember: isHome || isAdditional,
+          isAdditionalMember: isAdditional,
+          source: isHome
+            ? homeSource(u.homeDepartmentSource)
+            : isAdditional
+              ? membership?.confirmedAt
+                ? 'CONFIRMED'
+                : 'SELF'
+              : null,
+          canConfirmHome: isAdditional
+            ? access.hasFullAccess && u.id !== request.user.id && !membership?.confirmedAt
+            : canConfirmHome(access, request.user.id, u, tenant.id, ortsgruppeId),
           email: u.email && !isPlaceholderEmail(u.email) ? u.email : null,
           phone: u.phone,
-          confirmedAt: isHome ? (u.homeDepartmentConfirmedAt?.toISOString() ?? null) : null,
-          confirmedBy: isHome && u.homeDepartmentConfirmedBy ? personLabel(u.homeDepartmentConfirmedBy) : null,
+          confirmedAt: isHome
+            ? (u.homeDepartmentConfirmedAt?.toISOString() ?? null)
+            : isAdditional
+              ? (membership?.confirmedAt?.toISOString() ?? null)
+              : null,
+          confirmedBy: isHome
+            ? u.homeDepartmentConfirmedBy
+              ? personLabel(u.homeDepartmentConfirmedBy)
+              : null
+            : isAdditional && membership?.confirmedById
+              ? (confirmers.get(membership.confirmedById) ?? null)
+              : null,
           departmentRole: role,
           permissions,
           leaderSource:
@@ -184,7 +232,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           lastName: true,
           memberships: {
             where: { departmentId: tenant.id },
-            select: { role: true, permissions: true, leaderSource: true },
+            select: { role: true, permissions: true, leaderSource: true, joinedAt: true },
           },
           stufen: {
             where: { stufe: { departmentId: tenant.id } },
@@ -255,7 +303,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (stufen) {
-        if (user.homeDepartmentId !== tenant.id) {
+        if (user.homeDepartmentId !== tenant.id && !membership?.joinedAt) {
           return reply.status(400).send({ error: 'Stufen gibt es nur für Personen, die zu dieser Abteilung gehören.' });
         }
         const ids = [...new Set(stufen.map((s) => s.stufeId))];
@@ -378,6 +426,36 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       if (!access.hasFullAccess) {
         return reply.status(403).send({ error: 'Bestätigen kann nur die Abteilungsleitung.' });
       }
+      // Zusätzlich beigetreten (andere Heimabteilung): Beitritt bestätigen
+      const joined = await fastify.prisma.departmentMember.findFirst({
+        where: {
+          departmentId: tenant.id,
+          userId: request.params.userId,
+          joinedAt: { not: null },
+          user: { OR: [{ homeDepartmentId: null }, { homeDepartmentId: { not: tenant.id } }] },
+        },
+        select: { confirmedAt: true, user: { select: { id: true, nickname: true, firstName: true, lastName: true } } },
+      });
+      if (joined) {
+        if (joined.user.id === request.user.id) {
+          return reply.status(400).send({ error: 'Die eigene Zugehörigkeit kannst du nicht selbst bestätigen.' });
+        }
+        if (!joined.confirmedAt) {
+          await fastify.prisma.departmentMember.update({
+            where: { departmentId_userId: { departmentId: tenant.id, userId: joined.user.id } },
+            data: { confirmedAt: new Date(), confirmedById: request.user.id },
+          });
+          await recordDepartmentAction(fastify.prisma, request.log, {
+            departmentId: tenant.id,
+            actorId: request.user.id,
+            action: 'MEMBER_CONFIRM',
+            targetUserId: joined.user.id,
+            targetLabel: personLabel(joined.user),
+          });
+        }
+        return { message: 'Zugehörigkeit bestätigt' };
+      }
+
       const user = await fastify.prisma.user.findFirst({
         where: { id: request.params.userId, homeDepartmentId: tenant.id },
         select: {
@@ -439,6 +517,31 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       if (!access.hasFullAccess) {
         return reply.status(403).send({ error: 'Bestätigen kann nur die Abteilungsleitung.' });
       }
+      const joined = await fastify.prisma.departmentMember.findFirst({
+        where: {
+          departmentId: tenant.id,
+          userId: request.params.userId,
+          joinedAt: { not: null },
+          confirmedAt: { not: null },
+          user: { OR: [{ homeDepartmentId: null }, { homeDepartmentId: { not: tenant.id } }] },
+        },
+        select: { user: { select: { id: true, nickname: true, firstName: true, lastName: true } } },
+      });
+      if (joined) {
+        await fastify.prisma.departmentMember.update({
+          where: { departmentId_userId: { departmentId: tenant.id, userId: joined.user.id } },
+          data: { confirmedAt: null, confirmedById: null },
+        });
+        await recordDepartmentAction(fastify.prisma, request.log, {
+          departmentId: tenant.id,
+          actorId: request.user.id,
+          action: 'MEMBER_UNCONFIRM',
+          targetUserId: joined.user.id,
+          targetLabel: personLabel(joined.user),
+        });
+        return { message: 'Bestätigung aufgehoben' };
+      }
+
       const user = await fastify.prisma.user.findFirst({
         where: { id: request.params.userId, homeDepartmentId: tenant.id, homeDepartmentSource: 'CONFIRMED' },
         select: { id: true, nickname: true, firstName: true, lastName: true },
@@ -479,10 +582,18 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
       const ctx = await requirePermission(request, reply, 'PEOPLE_MANAGE');
       if (!ctx) return;
       const { tenant, access } = ctx;
+      // Heimabteilung hier oder zusätzlich beigetreten
       const user = await fastify.prisma.user.findFirst({
-        where: { id: request.params.userId, homeDepartmentId: tenant.id },
+        where: {
+          id: request.params.userId,
+          OR: [
+            { homeDepartmentId: tenant.id },
+            { memberships: { some: { departmentId: tenant.id, joinedAt: { not: null } } } },
+          ],
+        },
         select: {
           id: true,
+          homeDepartmentId: true,
           homeDepartmentSource: true,
           nickname: true,
           firstName: true,
@@ -491,6 +602,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
       if (!user) return reply.status(404).send({ error: 'Person nicht gefunden' });
+      const isHome = user.homeDepartmentId === tenant.id;
       const membership = user.memberships[0] ?? null;
       const permissions = normalizePermissions(membership?.permissions ?? []);
       if (!canEditPerson(access, request.user.id, { userId: user.id, role: membership?.role ?? null, permissions })) {
@@ -508,7 +620,7 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.status(400).send({ error: 'Die Abteilungsleitung lässt sich hier nicht entfernen.' });
         }
       }
-      if (user.homeDepartmentSource === 'CEVIDB') {
+      if (isHome && user.homeDepartmentSource === 'CEVIDB') {
         const providerName = getOrganizationByDbType(tenant.organization).authProviderShort;
         return reply
           .status(400)
@@ -522,14 +634,20 @@ const departmentPeopleRoutes: FastifyPluginAsync = async (fastify) => {
             where: { userId: user.id, source: 'SELF', stufe: { departmentId: tenant.id } },
           });
           // Eine entfernte Vereinsleitung verliert auch die Leitung (sonst bliebe der Vollzugriff bestehen)
+          // Beitritt endet mit (Heimabteilung bleibt bei Zusatz-Mitgliedern unberührt)
+          const leave = { joinedAt: null, confirmedAt: null, confirmedById: null };
           await tx.departmentMember.updateMany({
             where: { departmentId: tenant.id, userId: user.id },
-            data: removesLeader ? { permissions: [], role: 'HELPER', leaderSource: null } : { permissions: [] },
+            data: removesLeader
+              ? { permissions: [], role: 'HELPER', leaderSource: null, ...leave }
+              : { permissions: [], ...leave },
           });
-          await tx.user.update({
-            where: { id: user.id },
-            data: { homeDepartmentId: null, homeDepartmentSource: null, ...NO_HOME_CONFIRMATION, departmentSetupAt: null },
-          });
+          if (isHome) {
+            await tx.user.update({
+              where: { id: user.id },
+              data: { homeDepartmentId: null, homeDepartmentSource: null, ...NO_HOME_CONFIRMATION, departmentSetupAt: null },
+            });
+          }
           if (removesLeader) await assertLeaderRemains(tx, tenant.id);
         });
       } catch (err) {

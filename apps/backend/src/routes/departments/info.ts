@@ -259,7 +259,8 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
         select: { provider: true, homeDepartmentId: true },
       });
       const provider = isOther ? 'OTHER' : (founderUser?.provider ?? 'CEVI');
-      const becomesHome = !isUpperLevel || !founderUser?.homeDepartmentId;
+      // Vereine: Wer schon eine Heimabteilung hat, behält sie und tritt dem Verein zusätzlich bei
+      const becomesHome = isOther ? !founderUser?.homeDepartmentId : !isUpperLevel || !founderUser?.homeDepartmentId;
 
       try {
         const departmentResult = await fastify.prisma.$transaction(async (tx) => {
@@ -279,6 +280,7 @@ const departmentInfoRoutes: FastifyPluginAsync = async (fastify) => {
               userId: request.user.id,
               role: 'ADMIN',
               leaderSource: isOther ? 'MANUAL' : 'CEVIDB',
+              ...(becomesHome ? {} : { joinedAt: new Date(), confirmedAt: new Date() }),
             },
           });
           if (becomesHome) {

@@ -401,6 +401,13 @@ export const SetHomeDepartmentSchema = z.object({
 
 export type SetHomeDepartmentInput = z.infer<typeof SetHomeDepartmentSchema>;
 
+/** Einer weiteren Abteilung / einem weiteren Verein beitreten (zusätzlich zur Heimabteilung) */
+export const JoinDepartmentSchema = SetHomeDepartmentSchema.extend({
+  departmentId: z.string().uuid(),
+});
+
+export type JoinDepartmentInput = z.infer<typeof JoinDepartmentSchema>;
+
 export const StufeInputSchema = z.object({
   name: z.string().trim().min(2, 'Name der Stufe ist zu kurz').max(60),
   hitobitoGroupId: z.number().int().positive().max(2_147_483_647).optional().nullable(),

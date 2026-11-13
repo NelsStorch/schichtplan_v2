@@ -284,6 +284,20 @@ export async function loadUserDto(
   });
   if (!user) return null;
 
+  // Weitere Abteilungen/Vereine (zusätzlich zur Heimabteilung beigetreten)
+  const joined = await prisma.departmentMember.findMany({
+    where: {
+      userId,
+      joinedAt: { not: null },
+      ...(user.homeDepartmentId ? { departmentId: { not: user.homeDepartmentId } } : {}),
+    },
+    select: {
+      confirmedAt: true,
+      department: { select: { id: true, name: true, slug: true, organization: true, joinMode: true } },
+    },
+    orderBy: { department: { name: 'asc' } },
+  });
+
   return {
     id: user.id,
     email: user.email,
@@ -318,6 +332,15 @@ export async function loadUserDto(
     homeDepartmentFromCeviDb: user.homeDepartmentSource === 'CEVIDB',
     homeDepartmentFromProvider: user.homeDepartmentSource === 'CEVIDB',
     homeDepartmentSource: user.homeDepartmentSource,
+    joinedDepartments: joined.map((m) => ({
+      id: m.department.id,
+      name: m.department.name,
+      slug: m.department.slug,
+      organization: m.department.organization,
+      confirmed: Boolean(m.confirmedAt),
+      // Unbestätigt bei INVITE_ONLY: Beitritt zählt erst nach Bestätigung durch die Leitung
+      counts: Boolean(m.confirmedAt) || m.department.joinMode !== 'INVITE_ONLY',
+    })),
     ortsgruppeId: user.ortsgruppeId,
     ceviDbOrtsgruppeId: user.ortsgruppeId,
     ortsgruppeName: user.ortsgruppeName,

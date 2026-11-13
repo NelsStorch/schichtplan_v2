@@ -21,7 +21,14 @@ import { DepartmentInviteBox } from './DepartmentInviteBox';
 import { PermissionEditor } from './PermissionEditor';
 
 const roleLabel = (p: DepartmentPersonDto) =>
-  departmentRoleLabel({ isLeader: p.departmentRole === 'ADMIN', permissions: p.permissions, isHomeDepartment: p.isHomeDepartment });
+  departmentRoleLabel({
+    isLeader: p.departmentRole === 'ADMIN',
+    permissions: p.permissions,
+    isHomeDepartment: p.isMember ?? p.isHomeDepartment,
+  });
+
+/** Gehört zur Abteilung (Heimabteilung oder zusätzlich beigetreten) */
+const isMemberHere = (p: DepartmentPersonDto) => p.isMember ?? p.isHomeDepartment;
 
 /** Personen der Abteilung: Rechte und Stufen bearbeiten, Übersicht wer was darf. */
 export function DepartmentPeoplePanel() {
@@ -208,17 +215,21 @@ export function DepartmentPeoplePanel() {
                     )}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-fg-subtle">
-                    {!p.isHomeDepartment
+                    {!isMemberHere(p)
                       ? 'Andere oder keine Heimabteilung'
-                      : p.stufen.length
+                      : p.isAdditionalMember && !p.stufen.length
+                        ? 'Zusätzlich beigetreten (andere Heimabteilung)'
+                        : p.stufen.length
                         ? p.stufen.map((s) => `${s.name} (${STUFE_ROLES[s.role]})`).join(', ')
                         : 'Keine Stufe'}
                   </p>
                   {p.source === 'CONFIRMED' && (
                     <p className="mt-0.5 text-xs text-fg-subtle">
-                      Von Hand bestätigt{p.confirmedBy ? ` von ${p.confirmedBy}` : ''}
+                      {p.isAdditionalMember
+                        ? `Beitritt bestätigt${p.confirmedBy ? ` von ${p.confirmedBy}` : ' (Einladung)'}`
+                        : `Von Hand bestätigt${p.confirmedBy ? ` von ${p.confirmedBy}` : ''}`}
                       {p.confirmedAt ? ` am ${formatZurichDate(p.confirmedAt)}` : ''}
-                      {!isVerein && `, nicht aus ${org.authProviderShort}`}
+                      {!isVerein && !p.isAdditionalMember && `, nicht aus ${org.authProviderShort}`}
                     </p>
                   )}
                 </div>
@@ -368,7 +379,7 @@ function PersonEditor({
         json: {
           role: isVerein && isDeptAdmin ? role : undefined,
           permissions: canHaveRights ? perms : undefined,
-          stufen: person.isHomeDepartment
+          stufen: isMemberHere(person)
             ? Object.entries(roles).map(([stufeId, r]) => ({ stufeId, role: r }))
             : undefined,
         },
@@ -437,7 +448,7 @@ function PersonEditor({
         </div>
       )}
 
-      {person.isHomeDepartment && stufen.length > 0 && (
+      {isMemberHere(person) && stufen.length > 0 && (
         <div>
           <p className="mb-1.5 text-xs font-semibold text-fg-subtle">Stufen</p>
           <ul className="space-y-1.5">
@@ -486,7 +497,7 @@ function PersonEditor({
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         <div className="flex flex-wrap gap-2">
-          {person.isHomeDepartment && person.source !== 'CEVIDB' && (!isLeader || isVerein) && (
+          {isMemberHere(person) && person.source !== 'CEVIDB' && (!isLeader || isVerein) && (
             <Button size="sm" variant="ghost" onClick={onRemove} className="hover:text-danger-ink">
               <UserMinus /> Aus {org.unitTerm} entfernen
             </Button>

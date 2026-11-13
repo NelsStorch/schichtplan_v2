@@ -256,7 +256,10 @@ function TenantNotFound() {
 
 /** Startseite «nur für Mitglieder»: Aussenstehende sehen nur, dass es die Abteilung gibt. */
 function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
-  const { department } = usePortal();
+  const { department, user } = usePortal();
+  // Schon eine Heimabteilung: hier zusätzlich beitreten (die Heimabteilung bleibt)
+  const hasHome = Boolean(user?.homeDepartment);
+  const pending = user?.joinedDepartments?.some((d) => d.id === department?.id && !d.counts);
   const loginHref = useLoginHref();
   const departmentSetupHref = useDepartmentSetupHref();
   const org = useOrganization();
@@ -268,14 +271,20 @@ function MembersOnlyView({ loggedIn }: { loggedIn: boolean }) {
           title={department?.name ?? org.unitTerm}
           description={
             loggedIn
-              ? `Diese ${org.unitTerm} zeigt ihre Anlässe nur Mitgliedern. Gehörst du dazu, gib deine ${org.unitTerm} an. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.`
+              ? pending
+                ? `Dein Beitritt wartet noch auf die Bestätigung der Leitung. Danach siehst du hier die Anlässe. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.`
+                : hasHome
+                  ? `Diese ${org.unitTerm} zeigt ihre Anlässe nur Mitgliedern. Gehörst du auch dazu, tritt ihr zusätzlich bei. Deine bisherige ${org.unitTerm} bleibt. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.`
+                  : `Diese ${org.unitTerm} zeigt ihre Anlässe nur Mitgliedern. Gehörst du dazu, gib deine ${org.unitTerm} an. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.`
               : `Diese ${org.unitTerm} zeigt ihre Anlässe nur Mitgliedern. Melde dich an, um zu sehen, ob du dazugehörst. Für einzelne Anlässe reicht auch der Link, den du vom OK bekommen hast.`
           }
           action={
             loggedIn ? (
-              <a href={departmentSetupHref} className={buttonClasses({})}>
-                <Building2 /> {org.unitTerm} angeben
-              </a>
+              pending ? undefined : (
+                <a href={departmentSetupHref} className={buttonClasses({})}>
+                  <Building2 /> {hasHome ? `${department?.name ?? org.unitTerm} beitreten` : `${org.unitTerm} angeben`}
+                </a>
+              )
             ) : (
               <a href={loginHref} className={buttonClasses({})}>
                 <LogIn /> Anmelden

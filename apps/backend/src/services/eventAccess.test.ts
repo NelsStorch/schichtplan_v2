@@ -299,3 +299,54 @@ describe('Abteilung nur per Einladung (INVITE_ONLY)', () => {
     expect(checkRules(internal, person, 'Cevi Home').ok).toBe(true);
   });
 });
+
+describe('mehrere Abteilungen (zusätzliche Beitritte)', () => {
+  const internal = event({ accessType: 'DEPARTMENT' });
+  const joined = (departmentId: string, opts: { confirmed?: boolean; joinMode?: string } = {}) => ({
+    departmentId,
+    joinedAt: new Date('2026-01-01'),
+    confirmedAt: opts.confirmed ? new Date('2026-01-02') : null,
+    department: { joinMode: opts.joinMode ?? 'LINK_ONLY' },
+  });
+
+  it('lässt zusätzlich Beigetretene zu, auch mit anderer Heimabteilung', () => {
+    const person = user({ homeDepartmentId: OTHER, homeDepartmentSource: 'CEVIDB', memberships: [joined(HOME)] });
+    expect(checkRules(internal, person, 'Cevi Home').ok).toBe(true);
+  });
+
+  it('zählt einen unbestätigten Beitritt bei INVITE_ONLY nicht', () => {
+    const person = user({ memberships: [joined(HOME, { joinMode: 'INVITE_ONLY' })] });
+    expect(checkRules(internal, person, 'Cevi Home')).toMatchObject({ ok: false, reason: 'WRONG_DEPARTMENT' });
+    const confirmed = user({ memberships: [joined(HOME, { joinMode: 'INVITE_ONLY', confirmed: true })] });
+    expect(checkRules(internal, confirmed, 'Cevi Home').ok).toBe(true);
+  });
+
+  it('zählt bei Cevi.DB-Anlässen nur bestätigte Beitritte', () => {
+    const ceviDbEvent = event({ accessType: 'DEPARTMENT_CEVIDB' });
+    const unconfirmed = user({ ceviDbId: 1, memberships: [joined(HOME)] });
+    expect(checkRules(ceviDbEvent, unconfirmed, 'Cevi Home').ok).toBe(false);
+    const confirmed = user({ ceviDbId: 1, memberships: [joined(HOME, { confirmed: true })] });
+    expect(checkRules(ceviDbEvent, confirmed, 'Cevi Home').ok).toBe(true);
+  });
+
+  it('ignoriert reine Helfer-Einträge ohne Beitritt', () => {
+    const person = user({ memberships: [{ departmentId: HOME, joinedAt: null, confirmedAt: null }] });
+    expect(checkRules(internal, person, 'Cevi Home')).toMatchObject({ ok: false, reason: 'NO_DEPARTMENT' });
+  });
+
+  it('wendet den Stufen-Filter pro Abteilung an', () => {
+    const filtered = event({
+      accessType: 'DEPARTMENT',
+      allowedStufen: [{ stufeId: STUFE_A, stufe: { departmentId: HOME, name: 'A' } }],
+    } as Partial<AccessEvent>);
+    const without = user({ homeDepartmentId: OTHER, homeDepartmentSource: 'SELF', memberships: [joined(HOME)] });
+    expect(checkRules(filtered, without, 'Cevi Home')).toMatchObject({ ok: false, reason: 'WRONG_STUFE' });
+    const withStufe = user({
+      homeDepartmentId: OTHER,
+      homeDepartmentSource: 'SELF',
+      memberships: [joined(HOME)],
+      stufen: [{ stufeId: STUFE_A, role: 'TEILNEHMER', source: 'SELF' }],
+    });
+    expect(checkRules(filtered, withStufe, 'Cevi Home').ok).toBe(true);
+  });
+});

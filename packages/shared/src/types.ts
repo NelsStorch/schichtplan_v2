@@ -341,6 +341,8 @@ export interface UserDto {
   homeDepartmentFromProvider?: boolean;
   /** Quelle der Heimabteilung ("CEVIDB", "SELF", "CONFIRMED") */
   homeDepartmentSource?: string | null;
+  /** Weitere Abteilungen/Vereine (ohne Heimabteilung) */
+  joinedDepartments?: JoinedDepartmentDto[];
   /** Hitobito Ortsgruppen-ID */
   ortsgruppeId?: number | null;
   /** Cevi.DB Ortsgruppen-ID (Alias) */
@@ -404,6 +406,14 @@ export interface HomeDepartmentDto {
   name: string;
   slug: string;
   organization?: OrganizationType;
+}
+
+/** Weitere Abteilung / weiterer Verein, dem die Person zusätzlich zur Heimabteilung beigetreten ist */
+export interface JoinedDepartmentDto extends HomeDepartmentDto {
+  /** Per Einladung oder von der Leitung bestätigt */
+  confirmed: boolean;
+  /** Zählt der Beitritt schon (bei «nur per Einladung» erst bestätigt)? */
+  counts: boolean;
 }
 
 export interface DepartmentStufeDto {
@@ -537,6 +547,10 @@ export interface DepartmentPersonDto {
   lastName: string | null;
   /** Heimabteilung ist diese Abteilung (sonst nur wegen einer Rolle in der Liste) */
   isHomeDepartment: boolean;
+  /** Gehört dazu: Heimabteilung hier oder zusätzlich beigetreten */
+  isMember?: boolean;
+  /** Zusätzlich beigetreten (Heimabteilung ist eine andere); source/confirmed* beziehen sich dann auf den Beitritt */
+  isAdditionalMember?: boolean;
   /** Kontaktdaten (für Personen mit PEOPLE_VIEW Berechtigung) */
   email?: string | null;
   phone?: string | null;
