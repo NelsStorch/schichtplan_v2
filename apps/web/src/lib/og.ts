@@ -35,7 +35,9 @@ export async function getDepartmentPreview(): Promise<DepartmentPreview | null> 
     const res = await fetch(new URL('/api/departments/current', backend), {
       // Verband mitschicken: intern ist der Host «backend», sonst gälte immer Cevi
       headers: { 'x-tenant-slug': slug, 'x-tenant-org': host },
-      cache: 'no-store',
+      // Eckdaten ändern sich selten: kurz cachen, damit nicht jeder Seiten-Render, Prefetch und Bot das Backend trifft.
+      // Der Cache-Schlüssel enthält die Header, gilt also pro Abteilung und Verband.
+      next: { revalidate: 60 },
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
