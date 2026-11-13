@@ -142,7 +142,9 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
       expect(isDepartmentLeaderRole('Group::Abteilung::AbteilungsleitungStv', 'PFADI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Abteilung::Sekretariat', 'PFADI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Region::Regionalleitung', 'PFADI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::Region::Sekretariat', 'PFADI')).toBe(true);
       expect(isDepartmentLeaderRole('Group::Kantonalverband::Kantonsleitung', 'PFADI')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::Kantonalverband::Sekretariat', 'PFADI')).toBe(true);
       // Präsidium darf in MiData nur lesen
       expect(isDepartmentLeaderRole('Group::Abteilung::Praesidium', 'PFADI')).toBe(false);
       expect(isDepartmentLeaderRole('Group::Abteilung::VizePraesidium', 'PFADI')).toBe(false);
@@ -154,6 +156,7 @@ describe('Hitobito & Vokabular (Multi-Verband)', () => {
       expect(isDepartmentLeaderRole('Group::Flock::CampLeader', 'JUBLA')).toBe(true);
       expect(isDepartmentLeaderRole('Group::RegionalBoard::Leader', 'JUBLA')).toBe(true);
       expect(isDepartmentLeaderRole('Group::StateBoard::Leader', 'JUBLA')).toBe(true);
+      expect(isDepartmentLeaderRole('Group::StateAgency::Leader', 'JUBLA')).toBe(true);
       // Präses darf in der Jubla-DB nur lesen
       expect(isDepartmentLeaderRole('Group::Flock::President', 'JUBLA')).toBe(false);
       expect(isDepartmentLeaderRole('Group::RegionalBoard::Member', 'JUBLA')).toBe(false);

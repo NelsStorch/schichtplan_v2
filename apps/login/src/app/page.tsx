@@ -1145,6 +1145,33 @@ function LoginContent() {
                       ? 'Anmelden'
                       : 'Konto erstellen'}
                   </Button>
+
+                  {authMode === 'login' && (
+                    <Callout
+                      tone="info"
+                      title={
+                        org.slug === 'verein'
+                          ? 'Schon ein Konto von Cevi, Pfadi oder Jubla?'
+                          : `Konto bisher nur über ${org.authProviderShort}?`
+                      }
+                    >
+                      <p>
+                        {org.slug === 'verein'
+                          ? 'Wenn du dich bisher über Cevi.DB, PBS MiData oder Jubla-DB angemeldet hast, kannst du über '
+                          : `Wenn du dich bisher nur mit ${org.authProviderShort} angemeldet hast, kannst du über `}
+                        <a
+                          href={withReturnTo(
+                            `/passwort-vergessen${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''}`,
+                            returnTo
+                          )}
+                          className="font-medium text-accent-ink underline-offset-4 hover:underline"
+                        >
+                          Passwort zurücksetzen
+                        </a>{' '}
+                        ein Passwort für deine bestehende E-Mail-Adresse erstellen und dich damit normal einloggen.
+                      </p>
+                    </Callout>
+                  )}
                 </div>
               </form>
             )}

@@ -10,10 +10,10 @@ import {
   type EventAccessType,
   type RequiredProfileField,
 } from '@schichtplan/shared';
-import { Callout, Input, Switch, cn } from '@schichtplan/ui';
+import { Callout, Input, Switch, cn, useOrganization } from '@schichtplan/ui';
 import { api } from '@/lib/api';
 import { usePortal } from '@/lib/portal';
-import { ACCESS_TYPE_INFO } from './event-meta';
+import { getAccessTypeInfo } from './event-meta';
 import { questionsPayload, type QuestionDraft } from './ok/QuestionsEditor';
 
 export type { QuestionDraft };
@@ -73,6 +73,9 @@ export function EventAccessFields({
   onChange: (next: EventAccessValues) => void;
 }) {
   const { department } = usePortal();
+  const org = useOrganization();
+  const isVerein = org.slug === 'verein';
+  const accessTypeOptions = useMemo(() => getAccessTypeInfo(org), [org]);
   const [directory, setDirectory] = useState<DepartmentDirectoryItemDto[]>([]);
   const [deptQuery, setDeptQuery] = useState('');
   const [showAllDepts, setShowAllDepts] = useState(false);
@@ -108,8 +111,8 @@ export function EventAccessFields({
       <fieldset>
         <legend className="mb-1 text-[13px] font-semibold text-fg">Wer darf sich eintragen?</legend>
         <p className="mb-3 text-xs text-fg-muted">
-          Eintragen braucht immer ein Konto, ein Cevi-Name ohne Passwort reicht. Das OK und persönliche Links gehen
-          immer.{' '}
+          Eintragen braucht immer ein Konto, ein {org.nicknameTerm} ohne Passwort reicht. Das OK und persönliche Links
+          gehen immer.{' '}
           <a
             href={helpUrl('/ok/zugang/')}
             target="_blank"
@@ -120,7 +123,7 @@ export function EventAccessFields({
           </a>
         </p>
         <div className="grid gap-2.5 sm:grid-cols-2">
-          {ACCESS_TYPE_INFO.map((info) => {
+          {accessTypeOptions.map((info) => {
             const Icon = info.icon;
             const selected = values.accessType === info.key;
             return (
@@ -150,19 +153,21 @@ export function EventAccessFields({
           })}
         </div>
 
-        {cfg.ceviDb && cfg.scope === 'DEPARTMENT' && department && !department.ceviDbGroupId && (
+        {!isVerein && cfg.ceviDb && cfg.scope === 'DEPARTMENT' && department && !department.ceviDbGroupId && (
           <Callout tone="warning" className="mt-3">
-            {department.name} ist noch nicht mit einer Cevi.DB-Ortsgruppe verknüpft. So erfüllt niemand die Bedingung,
-            ausser über einen persönlichen Link.
+            {department.name} ist noch nicht mit einer {org.authProviderShort}-Gruppe verknüpft. So erfüllt niemand die
+            Bedingung, ausser über einen persönlichen Link.
           </Callout>
         )}
       </fieldset>
 
       {cfg.whitelist && (
         <fieldset className="rounded-card border border-line bg-surface-2/60 p-4 sm:p-5">
-          <legend className="px-1 text-[13px] font-semibold text-fg">Weitere Abteilungen freischalten</legend>
+          <legend className="px-1 text-[13px] font-semibold text-fg">
+            Weitere {org.unitTermPlural} freischalten
+          </legend>
           <p className="mb-3 text-xs text-fg-muted">
-            {department?.name ?? 'Deine Abteilung'} ist immer dabei.{' '}
+            {department?.name ?? (isVerein ? 'Dein Verein' : `Deine ${org.unitTerm}`)} ist immer dabei.{' '}
             {values.allowedDepartmentIds.length > 0 && `${values.allowedDepartmentIds.length} weitere gewählt.`}
           </p>
           {others.length > 6 && (
@@ -175,8 +180,8 @@ export function EventAccessFields({
                 type="search"
                 value={deptQuery}
                 onChange={(e) => setDeptQuery(e.target.value)}
-                placeholder="Abteilung suchen"
-                aria-label="Abteilung suchen"
+                placeholder={`${org.unitTerm} suchen`}
+                aria-label={`${org.unitTerm} suchen`}
                 className="h-10 pl-11"
               />
             </div>
@@ -198,10 +203,14 @@ export function EventAccessFields({
                 </li>
               );
             })}
-            {others.length === 0 && <li className="text-xs text-fg-subtle">Es gibt noch keine anderen Abteilungen.</li>}
+            {others.length === 0 && (
+              <li className="text-xs text-fg-subtle">Es gibt noch keine anderen {org.unitTermPlural}.</li>
+            )}
             {others.length > 0 && visibleOthers.length === 0 && (
               <li className="px-2 py-1 text-xs text-fg-subtle sm:col-span-2 lg:col-span-3">
-                {searching ? 'Keine Abteilung gefunden.' : 'Noch keine gewählt. Suche eine Abteilung oder zeige alle an.'}
+                {searching
+                  ? `Keine ${org.unitTerm} gefunden.`
+                  : `Noch keine gewählt. Suche eine ${org.unitTerm} oder zeige alle an.`}
               </li>
             )}
           </ul>
@@ -211,7 +220,7 @@ export function EventAccessFields({
               onClick={() => setShowAllDepts((v) => !v)}
               className="mt-2 px-2 text-xs font-semibold text-accent-ink underline-offset-2 hover:underline"
             >
-              {showAllDepts ? 'Nur gewählte anzeigen' : `Alle ${others.length} Abteilungen anzeigen`}
+              {showAllDepts ? 'Nur gewählte anzeigen' : `Alle ${others.length} ${org.unitTermPlural} anzeigen`}
             </button>
           )}
         </fieldset>
@@ -267,17 +276,20 @@ export function EventAccessFields({
         onChange={(v) => set('leadersOnly', v)}
         label="Nur Leitende"
         description={
-          cfg.ceviDb
-            ? 'Leitungsrolle in Cevi.DB (Stufenleitung oder Abteilungsleitung)'
-            : 'Leitung in einer Stufe (beim Login angegeben oder aus Cevi.DB)'
+          isVerein
+            ? 'Leitungsfunktion in einer Gruppe oder im Verein'
+            : cfg.ceviDb
+              ? `Leitungsrolle in ${org.authProviderShort} (Stufenleitung oder ${org.leadTerm})`
+              : `Leitung in einer Stufe (beim Login angegeben oder aus ${org.authProviderShort})`
         }
       />
 
       <fieldset>
         <legend className="mb-1 text-[13px] font-semibold text-fg">Pflichtangaben</legend>
         <p className="mb-3 text-xs text-fg-muted">
-          Wer etwas davon noch nicht im Profil hat, wird beim ersten Eintragen danach gefragt. Bei Cevi.DB-Konten kommen
-          Name, E-Mail und Geburtsdatum aus Cevi.DB.
+          Wer etwas davon noch nicht im Profil hat, wird beim ersten Eintragen danach gefragt.
+          {!isVerein &&
+            ` Bei ${org.authProviderShort}-Konten kommen Name, E-Mail und Geburtsdatum aus ${org.authProviderShort}.`}
         </p>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(REQUIRED_PROFILE_FIELDS) as RequiredProfileField[]).map((field) => {

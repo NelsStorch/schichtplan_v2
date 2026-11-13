@@ -37,6 +37,7 @@ import {
   buttonClasses,
   cn,
   slotStatus,
+  useOrganization,
 } from '@schichtplan/ui';
 import { fmtDuration, fmtWeekday, fmtDayMonth, isPast, businessDayKey, fmtTimeRange } from '@/lib/format';
 import { loginUrl } from '@/lib/api';
@@ -88,6 +89,7 @@ export function ShiftDetailsDialog({
   onTakeOver,
 }: ShiftDetailsDialogProps) {
   // Hooks müssen vor dem frühen return stehen (sonst wechselt die Hook-Anzahl, wenn shift gesetzt wird)
+  const org = useOrganization();
   const conflictingShift = useMemo(() => {
     if (!currentUser || !shift || !event?.shifts) return null;
     const sStart = new Date(shift.startTime).getTime();
@@ -283,7 +285,8 @@ export function ShiftDetailsDialog({
           ) : needsLogin ? (
             <Callout tone="info" title="Du wurdest eingeladen">
               <p>
-                Melde dich an, um deinen Zugang zu «{event.title}» freizuschalten (ein Cevi-Name ohne Passwort reicht).
+                Melde dich an, um deinen Zugang zu «{event.title}» freizuschalten (ein {org.nicknameTerm} ohne Passwort
+                reicht).
               </p>
               <a href={loginUrl()} className={buttonClasses({ size: 'sm', className: 'mt-2' })}>
                 <LogIn className="size-3.5" /> Anmelden und Zugang freischalten

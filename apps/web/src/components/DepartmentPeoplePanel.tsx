@@ -53,6 +53,7 @@ export function DepartmentPeoplePanel() {
   }, [load]);
 
   const org = useOrganization();
+  const isVerein = org.slug === 'verein';
 
   // Was ich vergeben darf: Abteilungsleitung alles (null), sonst nur weniger als die eigenen Rechte
   const grantable = useMemo(() => (isDeptAdmin ? null : new Set(permissions)), [isDeptAdmin, permissions]);
@@ -113,7 +114,10 @@ export function DepartmentPeoplePanel() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-fg-muted">
-          {people.length} Personen. Abteilungsleitung kommt aus Cevi.DB, Rechte vergibst du hier.
+          {people.length} Personen.{' '}
+          {isVerein
+            ? 'Vereinsleitung und Rechte vergibst du hier.'
+            : `${org.leadTerm} kommt aus ${org.authProviderShort}, Rechte vergibst du hier.`}
         </p>
         <div role="tablist" aria-label="Ansicht" className="flex rounded-full bg-surface-2 p-0.5">
           {(
@@ -189,9 +193,9 @@ export function DepartmentPeoplePanel() {
                     <Badge size="sm" tone={p.departmentRole === 'ADMIN' ? 'accent' : 'neutral'}>
                       {p.departmentRole === 'ADMIN' && <Crown className="size-3" />} {roleLabel(p)}
                     </Badge>
-                    {p.source === 'CEVIDB' && (
+                    {p.source === 'CEVIDB' && !isVerein && (
                       <Badge size="sm">
-                        <Database className="size-3" /> Cevi.DB
+                        <Database className="size-3" /> {org.authProviderShort}
                       </Badge>
                     )}
                     {p.source === 'CONFIRMED' && (
@@ -210,7 +214,8 @@ export function DepartmentPeoplePanel() {
                   {p.source === 'CONFIRMED' && (
                     <p className="mt-0.5 text-xs text-fg-subtle">
                       Von Hand bestätigt{p.confirmedBy ? ` von ${p.confirmedBy}` : ''}
-                      {p.confirmedAt ? ` am ${formatZurichDate(p.confirmedAt)}` : ''}, nicht aus Cevi.DB
+                      {p.confirmedAt ? ` am ${formatZurichDate(p.confirmedAt)}` : ''}
+                      {!isVerein && `, nicht aus ${org.authProviderShort}`}
                     </p>
                   )}
                 </div>
@@ -411,12 +416,12 @@ function PersonEditor({
           <Crown className="mr-1 inline size-3.5 text-accent-ink" />
           {isVerein
             ? 'Vereinsleitung: hat alle Rechte und kann weitere Vereinsleitungen ernennen.'
-            : `Abteilungsleitung ${person.leaderSource === 'CEVIDB' ? 'laut Cevi.DB' : 'vom Admin-Portal'}: hat alle Rechte. Das ändert sich nur über die Rolle in Cevi.DB oder im Admin-Portal.`}
+            : `${org.leadTerm} ${person.leaderSource === 'CEVIDB' ? `laut ${org.authProviderShort}` : 'vom Admin-Portal'}: hat alle Rechte. Das ändert sich nur über die Rolle in ${org.authProviderShort} oder im Admin-Portal.`}
         </p>
       ) : person.isCeviNameProfile ? (
         <p className="text-xs leading-relaxed text-warning-ink">
-          Nur Cevi-Name-Profil (ohne Passwort): bekommt keine Rechte. Dafür braucht die Person ein Konto mit {org.authProviderShort}
-          oder mit E-Mail und Passwort.
+          Nur {org.nicknameTerm}-Profil (ohne Passwort): bekommt keine Rechte. Dafür braucht die Person ein Konto{' '}
+          {isVerein ? 'mit E-Mail und Passwort.' : `mit ${org.authProviderShort} oder mit E-Mail und Passwort.`}
         </p>
       ) : (
         <div>
@@ -440,7 +445,9 @@ function PersonEditor({
                 <li key={stufe.id} className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm text-fg">
                     {stufe.name}
-                    {isLocked && <span className="ml-1.5 text-xs text-fg-subtle">aus Cevi.DB</span>}
+                    {isLocked && !isVerein && (
+                      <span className="ml-1.5 text-xs text-fg-subtle">aus {org.authProviderShort}</span>
+                    )}
                   </span>
                   <div role="radiogroup" aria-label={`Rolle in ${stufe.name}`} className="flex rounded-full bg-surface p-0.5">
                     {([null, 'TEILNEHMER', 'LEITUNG'] as const).map((value) => (

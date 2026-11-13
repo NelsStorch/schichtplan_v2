@@ -13,7 +13,7 @@ import {
   type EventTemplateDto,
   type EventContactVisibility,
 } from '@schichtplan/shared';
-import { Badge, Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useToast } from '@schichtplan/ui';
+import { Badge, Button, Callout, Dialog, Field, Input, Select, Switch, Textarea, cn, useOrganization, useToast } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { fmtTime } from '@/lib/format';
 import { displayName, usePortal } from '@/lib/portal';
@@ -353,6 +353,7 @@ export function EventForm({
   dateRange?: ReactNode;
 }) {
   const toast = useToast();
+  const org = useOrganization();
   const { user } = usePortal();
   const [form, setForm] = useState<EventFormValues>({ ...EMPTY, ...initial });
   const [saving, setSaving] = useState(false);
@@ -941,10 +942,12 @@ export function EventForm({
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-fg-subtle block mb-1">Oder Cevi-Name / E-Mail</label>
+                <label className="text-[11px] font-medium text-fg-subtle block mb-1">
+                  Oder {org.nicknameTerm} / E-Mail
+                </label>
                 <input
                   type="text"
-                  placeholder="z.B. Falk oder falk@cevi.ch"
+                  placeholder={org.slug === 'verein' ? 'z.B. Max oder max@beispiel.ch' : 'z.B. Falk oder falk@beispiel.ch'}
                   value={customWho}
                   onChange={(e) => {
                     setCustomWho(e.target.value);

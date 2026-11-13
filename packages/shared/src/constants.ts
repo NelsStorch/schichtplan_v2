@@ -303,6 +303,8 @@ export const EVENT_ACCESS_TYPES = {
 export type EventAccessType = keyof typeof EVENT_ACCESS_TYPES;
 export const EVENT_ACCESS_TYPE_KEYS = Object.keys(EVENT_ACCESS_TYPES) as [EventAccessType, ...EventAccessType[]];
 
+import type { OrganizationConfig } from './organizations.js';
+
 /** Gespeicherter Wert als bekannter Typ (Unbekanntes gilt als PUBLIC) */
 export function toEventAccessType(type: string): EventAccessType {
   return Object.prototype.hasOwnProperty.call(EVENT_ACCESS_TYPES, type) ? (type as EventAccessType) : 'PUBLIC';
@@ -310,6 +312,73 @@ export function toEventAccessType(type: string): EventAccessType {
 
 export function accessTypeConfig(type: string): EventAccessTypeConfig {
   return EVENT_ACCESS_TYPES[toEventAccessType(type)];
+}
+
+type OrgTextContext = Pick<OrganizationConfig, 'slug' | 'unitTerm' | 'unitTermPlural' | 'nicknameTerm' | 'authProviderShort'>;
+
+function unitInternalTerm(unitTerm: string): string {
+  if (unitTerm === 'Verein') return 'Vereins-intern';
+  if (unitTerm === 'Schar') return 'Schar-intern';
+  return 'Abteilungs-intern';
+}
+
+/** Liefert die Anzeige-Texte eines Zugangs-Typs passend zum aktuellen Verband (Cevi, Pfadi, Jubla, Verein). */
+export function getEventAccessTypeConfig(type: string, org?: OrgTextContext | null): EventAccessTypeConfig {
+  const key = toEventAccessType(type);
+  if (!org || org.slug === 'cevi') {
+    return EVENT_ACCESS_TYPES[key];
+  }
+  const internal = unitInternalTerm(org.unitTerm);
+  const internalLower = internal.toLowerCase();
+  const unitAccusative = org.unitTerm === 'Verein' ? 'diesen Verein' : `diese ${org.unitTerm}`;
+  const isVerein = org.slug === 'verein';
+
+  switch (key) {
+    case 'PUBLIC':
+      return {
+        ...EVENT_ACCESS_TYPES.PUBLIC,
+        description: `Alle mit dem Link. Ein ${org.nicknameTerm}-Profil ohne Passwort reicht.`,
+      };
+    case 'CEVIDB_ALL':
+      return {
+        ...EVENT_ACCESS_TYPES.CEVIDB_ALL,
+        label: isVerein ? 'Alle registrierten Konten' : `${org.authProviderShort}, alle ${org.unitTermPlural}`,
+        short: isVerein ? 'Konto' : org.authProviderShort,
+        description: isVerein
+          ? 'Alle mit einem bestätigten Konto.'
+          : `Alle mit ${org.authProviderShort}-Login, egal aus welcher ${org.unitTerm}. Für regionale Anlässe und Kurse.`,
+      };
+    case 'DEPARTMENT':
+      return {
+        ...EVENT_ACCESS_TYPES.DEPARTMENT,
+        label: internal,
+        description: `Alle, die beim Login ${unitAccusative} angegeben haben.`,
+      };
+    case 'DEPARTMENT_CEVIDB':
+      return {
+        ...EVENT_ACCESS_TYPES.DEPARTMENT_CEVIDB,
+        label: isVerein ? internal : `${internal}, ${org.authProviderShort}`,
+        short: isVerein ? 'Intern' : `Intern · ${org.authProviderShort}`,
+        description: isVerein
+          ? `Nur bestätigte Mitglieder in diesem Verein.`
+          : `Nur mit ${org.authProviderShort}-Login und dort in dieser ${org.unitTerm}.`,
+      };
+    case 'WHITELIST':
+      return {
+        ...EVENT_ACCESS_TYPES.WHITELIST,
+        label: `Mehrere ${org.unitTermPlural}`,
+        description: `Wie ${internalLower}, dazu weitere freigeschaltete ${org.unitTermPlural}.`,
+      };
+    case 'WHITELIST_CEVIDB':
+      return {
+        ...EVENT_ACCESS_TYPES.WHITELIST_CEVIDB,
+        label: isVerein ? `Mehrere ${org.unitTermPlural}` : `Mehrere ${org.unitTermPlural}, ${org.authProviderShort}`,
+        short: isVerein ? 'Whitelist' : `Whitelist · ${org.authProviderShort}`,
+        description: isVerein
+          ? `Wie ${internalLower}, dazu weitere freigeschaltete ${org.unitTermPlural}.`
+          : `Wie ${internalLower} mit ${org.authProviderShort}, dazu weitere freigeschaltete ${org.unitTermPlural}.`,
+      };
+  }
 }
 
 /** Profilfelder, die ein Anlass verlangen kann. Bei Cevi.DB-Konten kommen sie aus dem Profil. */

@@ -34,6 +34,7 @@ import {
   cn,
   useToast,
   useConfirm,
+  useOrganization,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
 import { fmtTimeRange, } from '@/lib/format';
@@ -118,6 +119,8 @@ export function ShiftFormDialog({
 }) {
   const confirm = useConfirm();
   const toast = useToast();
+  const org = useOrganization();
+  const isVerein = org.slug === 'verein';
   const isEdit = Boolean(shift);
 
   const saveRef = useRef<(() => Promise<boolean>) | null>(null);
@@ -289,6 +292,8 @@ function ShiftForm({
   formId?: string;
 }) {
   const toast = useToast();
+  const org = useOrganization();
+  const isVerein = org.slug === 'verein';
   const isEdit = Boolean(shift);
 
   const [availableTasks, setAvailableTasks] = useState<TaskDefinitionDto[]>([]);
@@ -911,6 +916,8 @@ function DuplicateShiftForm({
   onDuplicated: () => void;
 }) {
   const toast = useToast();
+  const org = useOrganization();
+  const isVerein = org.slug === 'verein';
   const [title, setTitle] = useState(shift.title?.trim() ? `${shift.title} (Folgeschicht)` : '');
   const [startTime, setStartTime] = useState(toLocalInput(shift.endTime)); // Standard: schliesst direkt an vorherige Schicht an!
 
@@ -995,6 +1002,8 @@ export function SaveTemplateDialog({
   onSaved: () => void;
 }) {
   const toast = useToast();
+  const org = useOrganization();
+  const isVerein = org.slug === 'verein';
   const [title, setTitle] = useState(`${defaultTitle} (Vorlage)`);
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -1099,6 +1108,8 @@ function OrganizerForm({
   onSaved: () => void;
 }) {
   const toast = useToast();
+  const org = useOrganization();
+  const isVerein = org.slug === 'verein';
   const [form, setForm] = useState({
     who: organizer ? organizer.userCeviName || organizer.displayName : '',
     role: (organizer?.role ?? 'OK_MEMBER') as 'OK_LEAD' | 'OK_MEMBER',
@@ -1150,14 +1161,18 @@ function OrganizerForm({
         </Field>
       ) : (
         <Field
-          label="Cevi-Name oder E-Mail"
+          label={`${org.nicknameTerm} oder E-Mail`}
           required
-          hint="Die Person braucht ein Konto mit Cevi.DB oder mit E-Mail und Passwort. Bei gleichen Cevi-Namen die E-Mail angeben."
+          hint={
+            isVerein
+              ? `Die Person braucht ein Konto mit E-Mail und Passwort. Bei gleichen ${org.nicknameTerm}n die E-Mail angeben.`
+              : `Die Person braucht ein Konto mit ${org.authProviderShort} oder mit E-Mail und Passwort. Bei gleichen ${org.nicknameTerm}n die E-Mail angeben.`
+          }
         >
           <Input
             value={form.who}
             autoFocus
-            placeholder="Cevi-Name oder E-Mail"
+            placeholder={`${org.nicknameTerm} oder E-Mail`}
             onChange={(e) => setForm({ ...form, who: e.target.value })}
           />
         </Field>
@@ -1223,6 +1238,8 @@ export function DayResponsiblesDialog({
   onSaved: () => void;
 }) {
   const toast = useToast();
+  const org = useOrganization();
+  const isVerein = org.slug === 'verein';
   const [members, setMembers] = useState<DeptMemberItem[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);

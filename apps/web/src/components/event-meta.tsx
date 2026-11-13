@@ -1,6 +1,13 @@
+'use client';
+
 import { Building2, Globe2, Network, ShieldCheck, Users, UsersRound, type LucideIcon } from 'lucide-react';
-import { EVENT_ACCESS_TYPES, accessTypeConfig, type EventAccessType } from '@schichtplan/shared';
-import { Badge, type BadgeTone } from '@schichtplan/ui';
+import {
+  EVENT_ACCESS_TYPES,
+  getEventAccessTypeConfig,
+  type EventAccessType,
+  type OrganizationConfig,
+} from '@schichtplan/shared';
+import { Badge, type BadgeTone, useOrganization } from '@schichtplan/ui';
 
 /** Icon pro Zugangs-Typ. Neuer Typ in EVENT_ACCESS_TYPES -> hier ein Icon ergänzen. */
 const ACCESS_TYPE_ICONS: Record<EventAccessType, LucideIcon> = {
@@ -18,6 +25,16 @@ export const ACCESS_TYPE_INFO = (Object.keys(EVENT_ACCESS_TYPES) as EventAccessT
   icon: ACCESS_TYPE_ICONS[key] ?? Users,
 }));
 
+export function getAccessTypeInfo(org?: OrganizationConfig | null) {
+  return (Object.keys(EVENT_ACCESS_TYPES) as EventAccessType[])
+    .filter((key) => org?.slug !== 'verein' || !EVENT_ACCESS_TYPES[key].ceviDb)
+    .map((key) => ({
+      key,
+      ...getEventAccessTypeConfig(key, org),
+      icon: ACCESS_TYPE_ICONS[key] ?? Users,
+    }));
+}
+
 export function accessTypeIcon(type: EventAccessType): LucideIcon {
   return ACCESS_TYPE_ICONS[type] ?? Users;
 }
@@ -31,7 +48,8 @@ export function AccessTypeBadge({
   leadersOnly?: boolean;
   tone?: BadgeTone;
 }) {
-  const info = accessTypeConfig(type);
+  const org = useOrganization();
+  const info = getEventAccessTypeConfig(type, org);
   const Icon = accessTypeIcon(type);
   return (
     <Badge tone={tone}>

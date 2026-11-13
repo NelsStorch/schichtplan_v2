@@ -23,6 +23,7 @@ import {
   Skeleton,
   cn,
   useConfirm,
+  useOrganization,
   useToast,
 } from '@schichtplan/ui';
 import { api, errorMessage } from '@/lib/api';
@@ -63,6 +64,7 @@ export function EventAccessPanel({ event }: { event: EventDetails }) {
 }
 
 function AccessLinks({ eventSlug }: { eventSlug: string }) {
+  const org = useOrganization();
   const toast = useToast();
   const confirm = useConfirm();
   const [links, setLinks] = useState<EventAccessLinkDto[] | null>(null);
@@ -125,7 +127,7 @@ function AccessLinks({ eventSlug }: { eventSlug: string }) {
             Zugangs-Links
           </h3>
           <p className="text-xs text-fg-muted">
-            Für Personen, die die Bedingungen nicht erfüllen. Ein Konto braucht es trotzdem (Cevi-Name reicht).
+            Für Personen, die die Bedingungen nicht erfüllen. Ein Konto braucht es trotzdem ({org.nicknameTerm} reicht).
           </p>
         </div>
         <Button size="sm" onClick={() => setCreating(true)}>
