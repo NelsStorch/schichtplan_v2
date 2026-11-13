@@ -1,7 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
-import { FeedbackProvider, OrganizationProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
+import { ConsoleBanner, FeedbackProvider, OrganizationProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
 import { CommandPalette, CommandPaletteProvider } from '@/components/command';
@@ -73,6 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </FeedbackProvider>
         </OrganizationProvider>
         <UsageTracker app="web" />
+        <ConsoleBanner />
       </body>
     </html>
   );

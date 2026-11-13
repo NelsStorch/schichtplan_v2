@@ -4,6 +4,7 @@ import {
   FeedbackProvider,
   OrganizationProvider,
   ThemeScript,
+  ConsoleBanner,
   UsageTracker,
   accentVars,
 } from '@schichtplan/ui';
@@ -112,6 +113,7 @@ export default async function RootLayout({
           <FeedbackProvider>{children}</FeedbackProvider>
         </OrganizationProvider>
         <UsageTracker app="landing" />
+        <ConsoleBanner />
       </body>
     </html>
   );

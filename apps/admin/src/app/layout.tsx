@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { FeedbackProvider, ThemeScript } from '@schichtplan/ui';
+import { ConsoleBanner, FeedbackProvider, ThemeScript } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
 
 export const metadata: Metadata = {
@@ -31,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeScript />
       </head>
       <body className="min-h-[100dvh]">
+        <ConsoleBanner />
         <FeedbackProvider>{children}</FeedbackProvider>
       </body>
     </html>
