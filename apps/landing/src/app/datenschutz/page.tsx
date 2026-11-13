@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const STAND = "11. November 2026";
+const STAND = "13. November 2026";
 
 /**
  * Betreiber der Verbandsdatenbank (Hitobito), über die man sich anmelden kann, samt deren Datenschutz-Seite.
@@ -348,6 +348,14 @@ export default async function DatenschutzPage() {
             E-Mail bzw. {w.nickname} nur im Arbeitsspeicher; diese Einträge gelten
             höchstens eine Stunde und gehen bei jedem Neustart verloren.
           </p>
+          <p>
+            Zum Schutz vor Angriffen prüfen eine Web Application Firewall
+            (Coraza) und das Angriffserkennungssystem CrowdSec auf unserem Server
+            jeden Zugriff automatisch auf bekannte Angriffsmuster. Die Angaben
+            bleiben dabei auf unserem Server und werden höchstens 14 Tage
+            gespeichert. Erkennen wir einen Angriffsversuch, sperren wir die
+            IP-Adresse vorübergehend (siehe Abschnitt 7).
+          </p>
 
           <h3 className="pt-2 font-semibold text-fg">Anonyme Nutzungsstatistik</h3>
           <p>
@@ -551,6 +559,21 @@ export default async function DatenschutzPage() {
                 ).
               </li>
             )}
+            <li>
+              <strong>CrowdSec SAS</strong>, Fontenay-aux-Roses, Frankreich:
+              Nur bei einem erkannten Angriff melden wir die IP-Adresse des
+              Angreifers, den Zeitpunkt und die Art des Angriffs an CrowdSec,
+              damit gemeinsame Sperrlisten aktuell bleiben. Daten normaler
+              Besucher*innen verlassen unseren Server dabei nicht (
+              <a
+                href="https://www.crowdsec.net/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Datenschutzerklärung von CrowdSec
+              </a>
+              ).
+            </li>
             <li>
               <strong>Let&apos;s Encrypt</strong> (ISRG, USA): stellt die
               TLS-Zertifikate aus. Dabei werden nur Domainnamen übermittelt,
