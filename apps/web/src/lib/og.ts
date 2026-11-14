@@ -24,6 +24,33 @@ export function slugFromHost(host: string): string | null {
  * Liefert null, wenn es keine Abteilung gibt oder das Backend nicht antwortet: die Vorschau fällt dann auf «Cevi Schichtplan» zurück.
  */
 export async function getDepartmentPreview(): Promise<DepartmentPreview | null> {
+  const d = await fetchPreview<DepartmentPreview>('/api/departments/current');
+  return d ? { name: d.name, slug: d.slug, logoUrl: d.logoUrl ?? null, primaryColor: d.primaryColor ?? null } : null;
+}
+
+export interface EventPreview {
+  title: string;
+  slug: string;
+  logoUrl: string | null;
+  startDate: string;
+  endDate: string;
+  dayCutoffTime: string;
+  /** null: Eintragen nicht mehr möglich */
+  openSlots: number | null;
+  updatedAt: string;
+}
+
+/**
+ * Eckdaten eines Anlasses für die Link-Vorschau. Das Backend liefert sie nur für öffentliche, veröffentlichte
+ * Anlässe; bei internen Anlässen kommt null, die Seite zeigt dann die allgemeine Abteilungs-Vorschau.
+ */
+export async function getEventPreview(eventSlug: string): Promise<EventPreview | null> {
+  if (!/^[a-z0-9-]{1,200}$/i.test(eventSlug)) return null;
+  return fetchPreview<EventPreview>(`/api/events/${encodeURIComponent(eventSlug)}/preview`);
+}
+
+/** Öffentliche Vorschau-Daten der Abteilung dieser Subdomain direkt beim Backend holen (null bei Fehlern) */
+async function fetchPreview<T>(apiPath: string): Promise<T | null> {
   const backend = process.env.INTERNAL_API_URL;
   if (!backend) return null;
   const h = await headers();
@@ -32,7 +59,7 @@ export async function getDepartmentPreview(): Promise<DepartmentPreview | null> 
   const slug = slugFromHost(host);
   if (!slug) return null;
   try {
-    const res = await fetch(new URL('/api/departments/current', backend), {
+    const res = await fetch(new URL(apiPath, backend), {
       // Verband mitschicken: intern ist der Host «backend», sonst gälte immer Cevi
       headers: { 'x-tenant-slug': slug, 'x-tenant-org': host },
       // Eckdaten ändern sich selten: kurz cachen, damit nicht jeder Seiten-Render, Prefetch und Bot das Backend trifft.
@@ -41,9 +68,20 @@ export async function getDepartmentPreview(): Promise<DepartmentPreview | null> 
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
-    const d = (await res.json()) as DepartmentPreview;
-    return { name: d.name, slug: d.slug, logoUrl: d.logoUrl ?? null, primaryColor: d.primaryColor ?? null };
+    return (await res.json()) as T;
   } catch {
     return null;
   }
+}
+
+/** Seitentitel für Link-Vorschauen: «Jubla Greifensee-Nänikon – Schichtplan» statt doppeltem «Jubla» */
+export function previewTitle(departmentName: string | null | undefined, brandName: string): string {
+  return departmentName ? `${departmentName} – Schichtplan` : brandName;
+}
+
+/** «Noch 12 Plätze frei» / «Alle Schichten besetzt» für die Anlass-Vorschau (null: nichts anzeigen) */
+export function openSlotsLabel(openSlots: number | null): string | null {
+  if (openSlots === null) return null;
+  if (openSlots === 0) return 'Alle Schichten besetzt';
+  return openSlots === 1 ? 'Noch 1 Platz frei' : `Noch ${openSlots} Plätze frei`;
 }

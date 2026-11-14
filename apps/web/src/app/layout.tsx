@@ -3,11 +3,11 @@ import type { Metadata, Viewport } from 'next';
 import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
 import { ConsoleBanner, FeedbackProvider, OrganizationProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
-import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
+import { getRequestOrigin, ogImage, ogVersion } from '@schichtplan/ui/og';
 import { CommandPalette, CommandPaletteProvider } from '@/components/command';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
-import { getDepartmentPreview } from '@/lib/og';
+import { getDepartmentPreview, previewTitle } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
 
 /**
@@ -19,10 +19,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const org = getOrganization(host);
   const department = await getDepartmentPreview();
   const brandName = org.name;
-  const title = department ? `${department.name} · ${brandName}` : brandName;
-  const image = { url: `${origin}/og`, ...OG_SIZE, alt: title };
+  const title = previewTitle(department?.name, brandName);
+  // ?v= ändert sich mit Name, Logo und Farbe: Messenger holen dann das neue Bild statt der alten Kopie
+  const version = [department?.name, department?.logoUrl, department?.primaryColor];
+  const image = ogImage(`${origin}/og`, title, ...version);
   const description = department
-    ? `Schichten und Anlässe der ${department.name}: anschauen, eintragen, fertig.`
+    ? 'Alle Anlässe und offenen Schichten an einem Ort. Schicht aussuchen, eintragen, fertig.'
     : `Schichten für Chilbi, Lager und ${org.orgName}-Anlässe: anschauen, eintragen, fertig.`;
   return {
     metadataBase: new URL(origin),
@@ -34,7 +36,8 @@ export async function generateMetadata(): Promise<Metadata> {
       icon: [
         { url: org.logoUrl, type: 'image/svg+xml' },
       ],
-      apple: org.logoUrl,
+      // PNG, denn iOS kann kein SVG als Homescreen-Icon
+      apple: { url: `/apple-touch-icon.png?v=${ogVersion(...version)}`, sizes: '180x180', type: 'image/png' },
     },
     appleWebApp: { capable: true, title: 'Schichtplan', statusBarStyle: 'black-translucent' },
     openGraph: { type: 'website', siteName: brandName, locale: 'de_CH', title, description, url: '/', images: [image] },

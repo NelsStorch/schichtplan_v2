@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { OG_SIZE, OgCard, cachedOgImage, getRequestOrigin, loadBrandLogo } from '@schichtplan/ui/og';
+import { OgCard, cachedOgImage, getRequestOrigin, loadBrandLogo, ogImageOptions } from '@schichtplan/ui/og';
 import { getOrganization } from '@schichtplan/shared';
 
 export async function GET() {
@@ -19,7 +19,7 @@ export async function GET() {
           host={host}
         />
       ),
-      OG_SIZE
+      await ogImageOptions()
     );
   });
 }

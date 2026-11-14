@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { slugFromHost } from './og';
+import { openSlotsLabel, previewTitle, slugFromHost } from './og';
 
 describe('slugFromHost', () => {
   it('extrahiert den Abteilungs-Slug aus Subdomains aller Organisationen', () => {
@@ -23,5 +23,21 @@ describe('slugFromHost', () => {
 
   it('ignoriert mehrstufige oder ungültige Subdomains', () => {
     expect(slugFromHost('sub.sub.cevi-schichtplan.ch')).toBeNull();
+  });
+});
+
+describe('previewTitle', () => {
+  it('nennt die Abteilung ohne doppelten Verbandsnamen', () => {
+    expect(previewTitle('Jubla Greifensee-Nänikon', 'Jubla Schichtplan')).toBe('Jubla Greifensee-Nänikon – Schichtplan');
+    expect(previewTitle(null, 'Cevi Schichtplan')).toBe('Cevi Schichtplan');
+  });
+});
+
+describe('openSlotsLabel', () => {
+  it('beschreibt freie Plätze in Einzahl und Mehrzahl', () => {
+    expect(openSlotsLabel(12)).toBe('Noch 12 Plätze frei');
+    expect(openSlotsLabel(1)).toBe('Noch 1 Platz frei');
+    expect(openSlotsLabel(0)).toBe('Alle Schichten besetzt');
+    expect(openSlotsLabel(null)).toBeNull();
   });
 });

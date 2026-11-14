@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { headers } from 'next/headers';
@@ -125,20 +126,148 @@ export function safeAccent(color: string | null | undefined): string {
   return color && /^#[0-9a-f]{6}$/i.test(color.trim()) ? color.trim() : DEFAULT_ACCENT;
 }
 
+/**
+ * Version des Kartenlayouts. Hochzählen, wenn sich das Aussehen ändert: Die Bild-URL bekommt dadurch einen
+ * neuen `?v=`, und WhatsApp, Signal & Co. holen das Bild neu statt ihre zwischengespeicherte Version zu zeigen.
+ */
+export const OG_DESIGN_VERSION = 2;
+
+/**
+ * Kurzer Fingerabdruck für `?v=` an der Bild-URL: ändert sich mit dem Layout und mit allem, was im Bild steht
+ * (Name, Logo, Farbe, …). So zeigen Messenger nach einer Änderung das neue Bild.
+ */
+export function ogVersion(...parts: Array<string | number | null | undefined>): string {
+  return createHash('sha1')
+    .update([OG_DESIGN_VERSION, ...parts].map((p) => p ?? '').join('\u0000'))
+    .digest('hex')
+    .slice(0, 10);
+}
+
+/** Bild-Eintrag für `openGraph.images` / `twitter.images` mit Grösse, Typ und Versions-Parameter. */
+export function ogImage(url: string, alt: string, ...versionParts: Array<string | number | null | undefined>) {
+  const target = new URL(url);
+  target.searchParams.set('v', ogVersion(...versionParts));
+  return { url: target.toString(), ...OG_SIZE, type: OG_CONTENT_TYPE, alt };
+}
+
+type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 600 | 700; style: 'normal' };
+let fontsPromise: Promise<OgFont[]> | null = null;
+
+/**
+ * Geist (wie in der App) für die Vorschaubilder, sonst fehlt Satori der fette Schnitt. Liegt unter
+ * `public/fonts/og` (Landing, Login) oder `public/fonts/pdf` (Web, dort auch für PDFs). Fehlt die Datei,
+ * zeichnet Satori mit seiner eingebauten Schrift.
+ */
+export function loadOgFonts(): Promise<OgFont[]> {
+  fontsPromise ??= (async () => {
+    const fonts: OgFont[] = [];
+    const weights = [
+      [400, 'Geist-Regular.ttf'],
+      [600, 'Geist-SemiBold.ttf'],
+      [700, 'Geist-Bold.ttf'],
+    ] as const;
+    for (const [weight, file] of weights) {
+      for (const dir of ['og', 'pdf']) {
+        try {
+          const buf = await readFile(path.join(process.cwd(), 'public', 'fonts', dir, file));
+          fonts.push({ name: 'Geist', data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer, weight, style: 'normal' });
+          break;
+        } catch {
+          // nächsten Ordner versuchen
+        }
+      }
+    }
+    return fonts;
+  })();
+  return fontsPromise;
+}
+
+/** Optionen für `new ImageResponse(...)`: Grösse und Schriften */
+export async function ogImageOptions() {
+  const fonts = await loadOgFonts();
+  return { ...OG_SIZE, ...(fonts.length ? { fonts } : {}) };
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Farbe `t` (0–1) Richtung `target` mischen, Ergebnis als Hex */
+export function mixColor(hex: string, target: string, t: number): string {
+  const a = hexToRgb(hex);
+  const b = hexToRgb(target);
+  return `#${a
+    .map((c, i) => Math.round(c + (b[i] - c) * t).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/** Relative Helligkeit nach WCAG (0 = schwarz, 1 = weiss) */
+export function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Hintergrund und Schriftfarbe der Karte aus der Akzentfarbe; helle Farben (z. B. Gelb) bekommen dunkle Schrift */
+export function ogPalette(accent: string) {
+  const from = mixColor(accent, '#000000', 0.05);
+  const to = mixColor(accent, '#000000', 0.5);
+  const mid = mixColor(accent, '#000000', 0.25);
+  const dark = luminance(mid) > 0.3;
+  return {
+    from,
+    to,
+    text: dark ? '#18181b' : '#ffffff',
+    muted: dark ? 'rgba(24,24,27,0.72)' : 'rgba(255,255,255,0.82)',
+    soft: dark ? 'rgba(24,24,27,0.10)' : 'rgba(255,255,255,0.13)',
+    pill: dark ? 'rgba(24,24,27,0.88)' : 'rgba(255,255,255,0.95)',
+    pillText: dark ? '#ffffff' : mixColor(accent, '#000000', 0.35),
+  };
+}
+
+/** Schriftgrösse des Titels: kurz und gross, lange Namen kleiner. Massgeblich ist auch das längste Wort. */
+export function ogTitleSize(title: string, maxWidth = 600): number {
+  const longestWord = Math.max(...title.split(/[\s-]+/).map((w) => w.length), 1);
+  const byWord = Math.floor(maxWidth / (longestWord * 0.58));
+  const byLength = title.length > 40 ? 56 : title.length > 26 ? 62 : title.length > 14 ? 72 : 88;
+  return Math.max(44, Math.min(byLength, byWord));
+}
+
 export interface OgCardProps {
   title: string;
   subtitle: string;
-  /** Anzeige unten links, z. B. «illnau.cevi-schichtplan.ch» */
+  /** Anzeige unten, z. B. «illnau.cevi-schichtplan.ch» */
   host: string;
   logo: string | null;
   accent?: string;
-  /** Kleine Zeile über dem Titel */
+  /** Absender unten, z. B. «Jubla Schichtplan» */
   eyebrow?: string;
+  /** Hervorgehobene Zusatzangabe, z. B. «Noch 12 Plätze frei» */
+  badge?: string | null;
 }
 
-/** Layout der Vorschaukarte. Satori versteht nur Inline-Styles mit Flexbox. */
-export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, eyebrow }: OgCardProps) {
-  const titleSize = title.length > 28 ? 76 : 96;
+/** Dekorative «Schicht-Balken» links und rechts: füllen die Breite, liegen ausserhalb des quadratischen Ausschnitts. */
+const SHIFT_BARS: Array<{ x: number; y: number; w: number }> = [
+  { x: 48, y: 70, w: 150 },
+  { x: 96, y: 140, w: 110 },
+  { x: 32, y: 210, w: 180 },
+  { x: 120, y: 350, w: 120 },
+  { x: 56, y: 420, w: 160 },
+  { x: 88, y: 490, w: 100 },
+];
+
+/**
+ * Layout der Vorschaukarte (1200×630). Alles Wichtige steht mittig in einem quadratischen Bereich, denn
+ * WhatsApp zeigt das Bild oft nur als kleines Quadrat aus der Mitte. Satori versteht nur Inline-Styles mit Flexbox.
+ */
+export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, eyebrow, badge }: OgCardProps) {
+  const color = safeAccent(accent);
+  const p = ogPalette(color);
+  const titleSize = ogTitleSize(title);
+  const disc = badge ? 132 : 156;
   return (
     <div
       style={{
@@ -146,36 +275,150 @@ export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, e
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: '64px 72px',
-        color: '#fafafa',
-        backgroundColor: '#0e0e11',
-        backgroundImage: `radial-gradient(circle at 92% 8%, ${accent}66 0%, transparent 55%), radial-gradient(circle at 0% 100%, ${accent}33 0%, transparent 50%)`,
+        alignItems: 'center',
+        position: 'relative',
+        fontFamily: 'Geist',
+        color: p.text,
+        backgroundColor: p.to,
+        backgroundImage: `radial-gradient(circle at 50% 0%, rgba(255,255,255,0.22) 0%, transparent 55%), linear-gradient(150deg, ${p.from} 0%, ${p.to} 100%)`,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-        {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
-          <img src={logo} width={112} height={112} style={{ borderRadius: 24, objectFit: 'contain' }} alt="" />
-        ) : null}
-        <div style={{ display: 'flex', fontSize: 34, color: '#a1a1aa', letterSpacing: 1 }}>
-          {eyebrow ?? 'Cevi Schichtplan'}
-        </div>
-      </div>
+      {SHIFT_BARS.flatMap((b) => [
+        <div
+          key={`l${b.x}-${b.y}`}
+          style={{ position: 'absolute', left: b.x, top: b.y, width: b.w, height: 44, borderRadius: 14, backgroundColor: p.soft }}
+        />,
+        <div
+          key={`r${b.x}-${b.y}`}
+          style={{ position: 'absolute', right: b.x, top: 560 - b.y, width: b.w, height: 44, borderRadius: 14, backgroundColor: p.soft }}
+        />,
+      ])}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <div style={{ display: 'flex', fontSize: titleSize, lineHeight: 1.05, fontWeight: 700, letterSpacing: -2 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexGrow: 1,
+          width: 620,
+          paddingTop: 28,
+          paddingBottom: 8,
+          gap: 18,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: disc,
+            height: disc,
+            borderRadius: disc / 2,
+            backgroundColor: '#ffffff',
+            boxShadow: '0 14px 40px rgba(0,0,0,0.28)',
+            marginBottom: 6,
+          }}
+        >
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
+            <img src={logo} width={disc * 0.72} height={disc * 0.72} style={{ objectFit: 'contain' }} alt="" />
+          ) : null}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            textAlign: 'center',
+            textWrap: 'balance',
+            width: '100%',
+            fontSize: titleSize,
+            lineHeight: 1.05,
+            fontWeight: 700,
+            letterSpacing: -1.5,
+          }}
+        >
           {title}
         </div>
-        <div style={{ display: 'flex', fontSize: 40, lineHeight: 1.3, color: '#d4d4d8', maxWidth: 980 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            textAlign: 'center',
+            width: '100%',
+            fontSize: 32,
+            lineHeight: 1.25,
+            fontWeight: 600,
+            color: p.muted,
+          }}
+        >
           {subtitle}
         </div>
+        {badge ? (
+          <div
+            style={{
+              display: 'flex',
+              marginTop: 4,
+              padding: '10px 26px',
+              borderRadius: 999,
+              fontSize: 28,
+              fontWeight: 700,
+              backgroundColor: p.pill,
+              color: p.pillText,
+            }}
+          >
+            {badge}
+          </div>
+        ) : null}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', fontSize: 32, color: '#a1a1aa' }}>{host}</div>
-        <div style={{ display: 'flex', width: 160, height: 10, borderRadius: 5, backgroundColor: accent }} />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          paddingBottom: 30,
+          fontSize: 24,
+          color: p.muted,
+        }}
+      >
+        <div style={{ display: 'flex', fontWeight: 700, color: p.text }}>{eyebrow ?? 'Cevi Schichtplan'}</div>
+        <div style={{ display: 'flex' }}>·</div>
+        <div style={{ display: 'flex' }}>{host}</div>
       </div>
+    </div>
+  );
+}
+
+export interface OgIconProps {
+  logo: string | null;
+  accent?: string;
+  /** Kantenlänge in Pixeln */
+  size: number;
+}
+
+/**
+ * Quadratisches App-Icon (z. B. apple-touch-icon): Logo auf Weiss. iOS rundet die Ecken selbst ab
+ * und kann kein SVG, darum als PNG.
+ */
+export function OgIcon({ logo, accent = DEFAULT_ACCENT, size }: OgIconProps) {
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ffffff',
+      }}
+    >
+      {logo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
+        <img src={logo} width={size * 0.78} height={size * 0.78} style={{ objectFit: 'contain' }} alt="" />
+      ) : (
+        <div style={{ display: 'flex', width: size * 0.5, height: size * 0.5, borderRadius: size * 0.12, backgroundColor: safeAccent(accent) }} />
+      )}
     </div>
   );
 }

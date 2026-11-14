@@ -1,17 +1,17 @@
 import { ImageResponse } from 'next/og';
 import { getOrganization } from '@schichtplan/shared';
 import {
-  OG_SIZE,
   OgCard,
   cachedOgImage,
   getRequestOrigin,
   loadBrandLogo,
   loadRemoteLogo,
+  ogImageOptions,
   safeAccent,
 } from '@schichtplan/ui/og';
 import { getDepartmentPreview } from '@/lib/og';
 
-/** Vorschaubild jeder Abteilungs-Seite (auch Anlässe): Abteilungsname, -logo und -farbe. */
+/** Vorschaubild der Abteilungs-Seite (und interner Anlässe): Abteilungsname, -logo und -farbe. */
 export async function GET() {
   const { origin, host } = await getRequestOrigin();
   const org = getOrganization(host);
@@ -25,12 +25,12 @@ export async function GET() {
           logo={logo}
           accent={safeAccent(department?.primaryColor ?? org.primaryColor)}
           title={department?.name ?? org.name}
-          subtitle="Schichten anschauen, eintragen, fertig."
+          subtitle="Schicht aussuchen, eintragen, fertig."
           eyebrow={org.name}
           host={host}
         />
       ),
-      OG_SIZE
+      await ogImageOptions()
     );
   });
 }

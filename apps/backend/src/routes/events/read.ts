@@ -29,6 +29,7 @@ import {
   type DisambiguationCandidate,
 } from '../../services/disambiguation.js';
 import { canTakeOver } from '../../services/replacement.js';
+import { toEventPreview } from '../../services/eventPreview.js';
 
 import { toQuestionDto, toResponsiblePersonDto, } from './shared.js';
 
@@ -118,6 +119,50 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
       filledSlots: e.shifts.reduce((sum, s) => sum + Math.min(s._count.signups, s.requiredSlots), 0),
     }));
   });
+
+  // Eckdaten für Link-Vorschauen (WhatsApp & Co.): nur öffentliche, veröffentlichte Anlässe, ohne Personendaten
+  fastify.get<{ Params: { slug: string } }>(
+    '/api/events/:slug/preview',
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'Link-Vorschau eines Anlasses',
+        description:
+          'Liefert Titel, Zeitraum und freie Plätze eines öffentlichen Anlasses für Link-Vorschauen. Interne Anlässe und Entwürfe ergeben 404.',
+        params: z.object({ slug: z.string().max(200).describe('Slug des Anlasses') }),
+      },
+    },
+    async (request, reply) => {
+      if (!request.tenant) {
+        return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      const event = await fastify.prisma.event.findUnique({
+        where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
+        select: {
+          title: true,
+          slug: true,
+          logoUrl: true,
+          startDate: true,
+          endDate: true,
+          dayCutoffTime: true,
+          isPublished: true,
+          accessType: true,
+          leadersOnly: true,
+          allowPublicSignup: true,
+          updatedAt: true,
+          shifts: { select: { requiredSlots: true, _count: { select: { signups: true } } } },
+        },
+      });
+      const preview = event ? toEventPreview(event) : null;
+      // Gleiche Antwort für «gibt es nicht» und «nicht öffentlich»: verrät nicht, ob ein interner Anlass existiert
+      if (!preview) {
+        reply.header('Cache-Control', 'no-store');
+        return reply.status(404).send({ error: 'Keine Vorschau verfügbar' });
+      }
+      reply.header('Cache-Control', 'public, max-age=60');
+      return preview;
+    }
+  );
 
   // Event Details anhand von Slug. Namen und Kontaktangaben je nach Berechtigung.
   fastify.get<{ Params: { slug: string }; Querystring: { zugang?: string } }>(

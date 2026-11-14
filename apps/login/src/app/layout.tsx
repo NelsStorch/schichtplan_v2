@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ConsoleBanner, OrganizationProvider, ThemeScript, UsageTracker, accentVars } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
-import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
+import { getRequestOrigin, ogImage } from '@schichtplan/ui/og';
 import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -10,14 +10,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const org = getOrganization(host);
   const title = `Anmelden · ${org.name}`;
   const description = `Zentrales Login für Leiter*innen und Helfer*innen des ${org.name}s`;
-  const image = { url: `${origin}/og`, ...OG_SIZE, alt: `Anmelden beim ${org.name}` };
+  const image = ogImage(`${origin}/og`, `Anmelden beim ${org.name}`);
   return {
     metadataBase: new URL(origin),
     title: { default: title, template: `%s · ${org.name}` },
     description,
     icons: {
       icon: [{ url: org.logoUrl, type: 'image/svg+xml' }],
-      apple: org.logoUrl,
+      // PNG, denn iOS kann kein SVG als Homescreen-Icon
+      apple: { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     },
     openGraph: { type: 'website', siteName: org.name, locale: 'de_CH', title, description, url: '/', images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },

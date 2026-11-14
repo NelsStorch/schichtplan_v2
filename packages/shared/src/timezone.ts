@@ -157,6 +157,26 @@ export function zurichTimeKey(date: Date | string): string {
   return toZurichInput(date).slice(11, 16);
 }
 
+/**
+ * Zeitraum eines Anlasses kompakt in Schweizer Zeit, z. B. «24.10.2026», «24.–26.10.2026» oder
+ * «30.10.–02.11.2026». Das Ende zählt nach `cutoff` (z. B. Fest bis 02:00 gehört noch zum Vortag).
+ */
+export function formatZurichDateRange(
+  start: Date | string,
+  end: Date | string,
+  cutoff: string | null | undefined = '04:00'
+): string {
+  const from = zurichDayKey(start);
+  let to = businessDayKey(end, cutoff);
+  if (to < from) to = from;
+  const [fy, fm, fd] = from.split('-');
+  const [ty, tm, td] = to.split('-');
+  if (from === to) return `${fd}.${fm}.${fy}`;
+  if (fy === ty && fm === tm) return `${fd}.–${td}.${tm}.${ty}`;
+  if (fy === ty) return `${fd}.${fm}.–${td}.${tm}.${ty}`;
+  return `${fd}.${fm}.${fy}–${td}.${tm}.${ty}`;
+}
+
 /** YYYY-MM-DD um ganze Kalendertage verschieben */
 export function addDaysToDayKey(dayKey: string, days: number): string {
   const [y, m, d] = dayKey.split('-').map(Number);

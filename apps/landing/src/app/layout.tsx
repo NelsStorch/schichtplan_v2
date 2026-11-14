@@ -9,7 +9,7 @@ import {
   accentVars,
 } from '@schichtplan/ui';
 import type { Metadata, Viewport } from 'next';
-import { OG_SIZE, getRequestOrigin } from '@schichtplan/ui/og';
+import { getRequestOrigin, ogImage } from '@schichtplan/ui/og';
 import { JsonLd } from '@/components/JsonLd';
 import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
 
@@ -19,11 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = `${org.name} · Helferliste & Schichtplan für ${org.targetGroup}`;
   const description = org.metaDescription;
 
-  const image = {
-    url: `${origin}/og`,
-    ...OG_SIZE,
-    alt: `${org.name}: Kostenlose Schicht- und Helferplanung für ${org.targetGroup}`,
-  };
+  const image = ogImage(`${origin}/og`, `${org.name}: Kostenlose Schicht- und Helferplanung für ${org.targetGroup}`);
 
   return {
     metadataBase: new URL(origin),
@@ -42,7 +38,8 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [{ url: org.logoUrl, type: 'image/svg+xml' }],
-      apple: org.logoUrl,
+      // PNG, denn iOS kann kein SVG als Homescreen-Icon
+      apple: { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     },
     openGraph: {
       type: 'website',
