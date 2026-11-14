@@ -5,7 +5,7 @@ import {
   cachedOgImage,
   getRequestOrigin,
   loadBrandLogo,
-  loadRemoteLogo,
+  loadImage,
   ogImageOptions,
   safeAccent,
 } from '@schichtplan/ui/og';
@@ -18,7 +18,7 @@ export async function GET() {
   // Name, Logo oder Farbe der Abteilung können sich ändern: nach 10 Minuten neu zeichnen
   return cachedOgImage(host, 10 * 60 * 1000, async () => {
     const [department, brandLogo] = await Promise.all([getDepartmentPreview(), loadBrandLogo(host)]);
-    const logo = (await loadRemoteLogo(department?.logoUrl, origin)) ?? brandLogo;
+    const logo = (await loadImage(department?.logoUrl, origin)) ?? brandLogo;
     return new ImageResponse(
       (
         <OgCard

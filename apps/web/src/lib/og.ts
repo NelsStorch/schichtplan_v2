@@ -38,15 +38,29 @@ export interface EventPreview {
   /** null: Eintragen nicht mehr möglich */
   openSlots: number | null;
   updatedAt: string;
+  bannerUrl: string | null;
+  /** Nur mit Schicht-Link (`?schicht=ID`) */
+  shift: {
+    id: string;
+    title: string;
+    startTime: string;
+    endTime: string;
+    openSlots: number | null;
+  } | null;
 }
 
 /**
  * Eckdaten eines Anlasses für die Link-Vorschau. Das Backend liefert sie nur für öffentliche, veröffentlichte
  * Anlässe; bei internen Anlässen kommt null, die Seite zeigt dann die allgemeine Abteilungs-Vorschau.
  */
-export async function getEventPreview(eventSlug: string): Promise<EventPreview | null> {
+export async function getEventPreview(eventSlug: string, shiftId?: string | null): Promise<EventPreview | null> {
   if (!/^[a-z0-9-]{1,200}$/i.test(eventSlug)) return null;
-  return fetchPreview<EventPreview>(`/api/events/${encodeURIComponent(eventSlug)}/preview`);
+  const query = shiftId && isUuid(shiftId) ? `?schicht=${shiftId}` : '';
+  return fetchPreview<EventPreview>(`/api/events/${encodeURIComponent(eventSlug)}/preview${query}`);
+}
+
+export function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 /** Öffentliche Vorschau-Daten der Abteilung dieser Subdomain direkt beim Backend holen (null bei Fehlern) */
@@ -80,8 +94,24 @@ export function previewTitle(departmentName: string | null | undefined, brandNam
 }
 
 /** «Noch 12 Plätze frei» / «Alle Schichten besetzt» für die Anlass-Vorschau (null: nichts anzeigen) */
-export function openSlotsLabel(openSlots: number | null): string | null {
+export function openSlotsLabel(openSlots: number | null, full = 'Alle Schichten besetzt'): string | null {
   if (openSlots === null) return null;
-  if (openSlots === 0) return 'Alle Schichten besetzt';
+  if (openSlots === 0) return full;
   return openSlots === 1 ? 'Noch 1 Platz frei' : `Noch ${openSlots} Plätze frei`;
+}
+
+const ORG_PREFIX = /^(cevi|jubla|pfadi|jungwacht|blauring|cvjm|cevj)\s+/i;
+
+/**
+ * Kurzer Name unter dem App-Icon (Homescreen zeigt nur etwa 12 Zeichen): «Cevi Illnau» → «Cevi Illnau»,
+ * «Jubla Greifensee-Nänikon» → «Greifensee». Passt nichts, bleibt es bei «Schichtplan».
+ */
+export function appShortName(departmentName: string | null | undefined): string {
+  const name = departmentName?.trim();
+  if (!name) return 'Schichtplan';
+  if (name.length <= 12) return name;
+  const withoutOrg = name.replace(ORG_PREFIX, '');
+  if (withoutOrg.length <= 12) return withoutOrg;
+  const first = withoutOrg.split(/[\s-]+/)[0];
+  return first.length >= 3 && first.length <= 12 ? first : 'Schichtplan';
 }

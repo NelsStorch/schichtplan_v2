@@ -1,64 +1,57 @@
 import type { MetadataRoute } from 'next';
 import { getOrganization } from '@schichtplan/shared';
-import { getRequestOrigin } from '@schichtplan/ui/og';
+import { getRequestOrigin, ogVersion, safeAccent } from '@schichtplan/ui/og';
+import { appShortName, getDepartmentPreview, previewTitle } from '@/lib/og';
 
+/**
+ * Jede Abteilung ist eine eigene Subdomain und damit eine eigene installierbare App: Name, Farbe und Icon
+ * kommen darum von der Abteilung (Icon mit ihrem Logo, siehe app-icon/route.tsx).
+ */
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   let org = getOrganization('cevi');
+  let department: Awaited<ReturnType<typeof getDepartmentPreview>> = null;
   try {
     const { host } = await getRequestOrigin();
     org = getOrganization(host);
+    department = await getDepartmentPreview();
   } catch {}
 
+  const v = ogVersion(department?.name, department?.logoUrl, department?.primaryColor);
+  const icon = (size: 192 | 512, purpose: 'any' | 'maskable') => ({
+    src: `/app-icon?size=${size}${purpose === 'maskable' ? '&maskable=1' : ''}&v=${v}`,
+    sizes: `${size}x${size}`,
+    type: 'image/png',
+    purpose,
+  });
+
   return {
-    name: org.name,
-    short_name: 'Schichtplan',
-    description: `Schichten für Chilbi, Lager und ${org.orgName}-Anlässe: anschauen, eintragen, fertig.`,
+    id: '/',
+    name: previewTitle(department?.name, org.name),
+    short_name: appShortName(department?.name),
+    description: department
+      ? `Anlässe und Schichten der ${department.name}: anschauen, eintragen, fertig.`
+      : `Schichten für Chilbi, Lager und ${org.orgName}-Anlässe: anschauen, eintragen, fertig.`,
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: '#0c0a09',
-    theme_color: '#e11d48',
+    background_color: '#ffffff',
+    theme_color: safeAccent(department?.primaryColor ?? org.primaryColor),
     lang: 'de-CH',
-    icons: [
-      {
-        src: '/icons/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icons/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-      {
-        src: '/icons/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icons/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-    ],
+    icons: [icon(192, 'any'), icon(192, 'maskable'), icon(512, 'any'), icon(512, 'maskable')],
     shortcuts: [
       {
         name: 'Meine Schichten',
         short_name: 'Meine Schichten',
         description: 'Deine gebuchten Schichten und Zeiten',
         url: '/meine-schichten',
-        icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+        icons: [{ src: `/app-icon?size=192&v=${v}`, sizes: '192x192', type: 'image/png' }],
       },
       {
         name: 'Anlässe & Schichten',
         short_name: 'Anlässe',
         description: 'Alle Anlässe und offene Schichten der Abteilung',
         url: '/',
-        icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+        icons: [{ src: `/app-icon?size=192&v=${v}`, sizes: '192x192', type: 'image/png' }],
       },
     ],
   };

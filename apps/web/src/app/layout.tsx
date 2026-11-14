@@ -3,11 +3,11 @@ import type { Metadata, Viewport } from 'next';
 import { getOrganization, getOrganizationSlugFromHost } from '@schichtplan/shared';
 import { ConsoleBanner, FeedbackProvider, OrganizationProvider, ThemeScript, UsageTracker } from '@schichtplan/ui';
 import { fontVariables } from '@schichtplan/ui/fonts';
-import { getRequestOrigin, ogImage, ogVersion } from '@schichtplan/ui/og';
+import { getRequestOrigin, ogImage, ogVersion, safeAccent } from '@schichtplan/ui/og';
 import { CommandPalette, CommandPaletteProvider } from '@/components/command';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
-import { getDepartmentPreview, previewTitle } from '@/lib/og';
+import { appShortName, getDepartmentPreview, previewTitle } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
 
 /**
@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
       // PNG, denn iOS kann kein SVG als Homescreen-Icon
       apple: { url: `/apple-touch-icon.png?v=${ogVersion(...version)}`, sizes: '180x180', type: 'image/png' },
     },
-    appleWebApp: { capable: true, title: 'Schichtplan', statusBarStyle: 'black-translucent' },
+    appleWebApp: { capable: true, title: appShortName(department?.name), statusBarStyle: 'black-translucent' },
     openGraph: { type: 'website', siteName: brandName, locale: 'de_CH', title, description, url: '/', images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   };
@@ -47,12 +47,17 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Kein maximum-scale/user-scalable: Zoomen muss möglich bleiben (Barrierefreiheit).
 // Das iOS-Auto-Zoom auf Inputs verhindern stattdessen 16px-Schriftgrössen in Feldern.
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  viewportFit: 'cover',
-  themeColor: '#e11d48',
-};
+export async function generateViewport(): Promise<Viewport> {
+  const { host } = await getRequestOrigin();
+  const department = await getDepartmentPreview();
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+    // Abteilungsfarbe: färbt die Browserleiste und den Rand der Vorschau in Discord/Telegram
+    themeColor: safeAccent(department?.primaryColor ?? getOrganization(host).primaryColor),
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { host } = await getRequestOrigin();

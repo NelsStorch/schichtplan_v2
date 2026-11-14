@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
+import { loginPageMetadata } from '@/lib/ogPages';
 
-export const metadata: Metadata = {
-  title: 'Zwei-Faktor-Code',
-  description: 'Anmeldung mit dem Code aus deiner Authenticator-App bestätigen.',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return loginPageMetadata('zwei-faktor');
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;

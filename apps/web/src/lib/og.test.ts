@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { openSlotsLabel, previewTitle, slugFromHost } from './og';
+import { appShortName, openSlotsLabel, previewTitle, slugFromHost } from './og';
 
 describe('slugFromHost', () => {
   it('extrahiert den Abteilungs-Slug aus Subdomains aller Organisationen', () => {
@@ -39,5 +39,16 @@ describe('openSlotsLabel', () => {
     expect(openSlotsLabel(1)).toBe('Noch 1 Platz frei');
     expect(openSlotsLabel(0)).toBe('Alle Schichten besetzt');
     expect(openSlotsLabel(null)).toBeNull();
+  });
+});
+
+describe('appShortName', () => {
+  it('kürzt lange Abteilungsnamen für den Homescreen', () => {
+    expect(appShortName('Cevi Illnau')).toBe('Cevi Illnau');
+    expect(appShortName('Jubla Greifensee-Nänikon')).toBe('Greifensee');
+    expect(appShortName('Cevi Zürich 11 Oerlikon')).toBe('Zürich');
+    expect(appShortName('Pfadi Winterthur')).toBe('Winterthur');
+    expect(appShortName(null)).toBe('Schichtplan');
+    expect(appShortName('Abcdefghijklmnopqrstuvwxyz')).toBe('Schichtplan');
   });
 });

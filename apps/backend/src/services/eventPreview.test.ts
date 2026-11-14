@@ -13,6 +13,7 @@ const base: EventPreviewSource = {
   leadersOnly: false,
   allowPublicSignup: true,
   updatedAt: new Date('2026-08-01T10:00:00Z'),
+  bannerUrl: '/images/banners/chilbi.svg',
   shifts: [
     { requiredSlots: 4, _count: { signups: 1 } },
     { requiredSlots: 2, _count: { signups: 5 } }, // überbucht zählt nicht negativ
@@ -38,5 +39,22 @@ describe('toEventPreview', () => {
   it('zeigt keine freien Plätze, wenn das Eintragen geschlossen oder der Anlass vorbei ist', () => {
     expect(toEventPreview({ ...base, allowPublicSignup: false }, now)?.openSlots).toBeNull();
     expect(toEventPreview(base, new Date('2026-09-01T00:00:00Z'))?.openSlots).toBeNull();
+  });
+
+  it('beschreibt eine einzelne Schicht mit Titel und freien Plätzen', () => {
+    const shift = {
+      id: 's1',
+      title: null,
+      category: 'Bar',
+      startTime: new Date('2026-08-22T16:00:00Z'),
+      endTime: new Date('2026-08-22T20:00:00Z'),
+      requiredSlots: 4,
+      _count: { signups: 1 },
+      tasks: [{ title: 'Bar ausschenken' }],
+    };
+    expect(toEventPreview(base, now, shift)?.shift).toMatchObject({ title: 'Bar ausschenken', openSlots: 3 });
+    expect(toEventPreview(base, now, { ...shift, tasks: [] })?.shift?.title).toBe('Bar');
+    expect(toEventPreview(base, now, { ...shift, category: null, tasks: [] })?.shift?.title).toBe('Schicht');
+    expect(toEventPreview({ ...base, accessType: 'DEPARTMENT' }, now, shift)).toBeNull();
   });
 });

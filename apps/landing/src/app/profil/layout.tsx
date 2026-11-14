@@ -1,15 +1,8 @@
 import type { Metadata } from 'next';
-import { getOrganization } from '@schichtplan/shared';
-import { getRequestOrigin } from '@schichtplan/ui/og';
+import { landingPageMetadata } from '@/lib/ogPages';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { host } = await getRequestOrigin();
-  const org = getOrganization(host);
-  return {
-    title: 'Mein Profil',
-    description: `Deine Angaben, ${org.unitTerm}, Stufen und eigenen Schichten im ${org.name} verwalten.`,
-    robots: { index: false, follow: false },
-  };
+  return landingPageMetadata('profil');
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {

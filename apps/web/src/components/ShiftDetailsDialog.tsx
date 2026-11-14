@@ -13,6 +13,7 @@ import {
   Mail,
   Phone,
   Repeat,
+  Share2,
   Shield,
   UserCheck,
   UserMinus,
@@ -38,6 +39,7 @@ import {
   cn,
   slotStatus,
   useOrganization,
+  useToast,
 } from '@schichtplan/ui';
 import { fmtDuration, fmtWeekday, fmtDayMonth, isPast, businessDayKey, fmtTimeRange } from '@/lib/format';
 import { loginUrl } from '@/lib/api';
@@ -90,6 +92,7 @@ export function ShiftDetailsDialog({
 }: ShiftDetailsDialogProps) {
   // Hooks müssen vor dem frühen return stehen (sonst wechselt die Hook-Anzahl, wenn shift gesetzt wird)
   const org = useOrganization();
+  const toast = useToast();
   const conflictingShift = useMemo(() => {
     if (!currentUser || !shift || !event?.shifts) return null;
     const sStart = new Date(shift.startTime).getTime();
@@ -146,6 +149,30 @@ export function ShiftDetailsDialog({
     event.responsibleMode === 'BY_DAY'
       ? (event.dayResponsibles?.[dayKey] ?? [])
       : (shift.responsibles ?? []);
+
+  /** Schicht-Link teilen (Handy: Teilen-Menü, sonst kopieren). Der Link bekommt eine eigene Vorschau. */
+  const shareShift = async () => {
+    const url = `${window.location.origin}/events/${encodeURIComponent(event.slug)}?schicht=${shift.id}`;
+    const name = shift.title?.trim() || (shift.tasks?.length === 1 ? shift.tasks[0].title : '') || 'Schicht';
+    const when = `${fmtWeekday(shift.startTime)} ${fmtDayMonth(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}`;
+    const need = free > 0 ? ` Noch ${free === 1 ? '1 Platz' : `${free} Plätze`} frei.` : '';
+    const text = `${name} am ${event.title} (${when}).${need} Trägst du dich ein?`;
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: `${name} – ${event.title}`, text, url });
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text}
+${url}`);
+      toast({ title: 'Link kopiert', description: 'Einfach in WhatsApp oder E-Mail einfügen.' });
+    } catch {
+      toast({ title: 'Kopieren nicht möglich', description: url, tone: 'error' });
+    }
+  };
 
   return (
     <Dialog
@@ -211,6 +238,11 @@ export function ShiftDetailsDialog({
                 }}
               >
                 <Edit className="size-3.5" /> Bearbeiten
+              </Button>
+            )}
+            {!over && (
+              <Button variant="secondary" size="sm" onClick={() => shareShift()}>
+                <Share2 className="size-3.5" /> Teilen
               </Button>
             )}
             <Button variant="secondary" size="sm" onClick={onClose}>

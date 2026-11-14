@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
+import { loginPageMetadata } from '@/lib/ogPages';
 
-export const metadata: Metadata = {
-  title: 'Passwort vergessen',
-  description: 'Link zum Zurücksetzen deines Passworts anfordern.',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return loginPageMetadata('passwort-vergessen');
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;

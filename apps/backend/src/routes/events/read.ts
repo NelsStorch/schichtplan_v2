@@ -121,7 +121,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Eckdaten für Link-Vorschauen (WhatsApp & Co.): nur öffentliche, veröffentlichte Anlässe, ohne Personendaten
-  fastify.get<{ Params: { slug: string } }>(
+  fastify.get<{ Params: { slug: string }; Querystring: { schicht?: string } }>(
     '/api/events/:slug/preview',
     {
       schema: {
@@ -130,6 +130,9 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
         description:
           'Liefert Titel, Zeitraum und freie Plätze eines öffentlichen Anlasses für Link-Vorschauen. Interne Anlässe und Entwürfe ergeben 404.',
         params: z.object({ slug: z.string().max(200).describe('Slug des Anlasses') }),
+        querystring: z.object({
+          schicht: z.string().uuid().optional().describe('Optional: Schicht für eine Schicht-Vorschau'),
+        }),
       },
     },
     async (request, reply) => {
@@ -139,9 +142,11 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
       const event = await fastify.prisma.event.findUnique({
         where: { departmentId_slug: { departmentId: request.tenant.id, slug: request.params.slug } },
         select: {
+          id: true,
           title: true,
           slug: true,
           logoUrl: true,
+          bannerUrl: true,
           startDate: true,
           endDate: true,
           dayCutoffTime: true,
@@ -153,7 +158,23 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
           shifts: { select: { requiredSlots: true, _count: { select: { signups: true } } } },
         },
       });
-      const preview = event ? toEventPreview(event) : null;
+      const shift =
+        event && request.query.schicht
+          ? await fastify.prisma.shift.findFirst({
+              where: { id: request.query.schicht, eventId: event.id },
+              select: {
+                id: true,
+                title: true,
+                category: true,
+                startTime: true,
+                endTime: true,
+                requiredSlots: true,
+                _count: { select: { signups: true } },
+                tasks: { select: { title: true }, take: 2 },
+              },
+            })
+          : null;
+      const preview = event ? toEventPreview(event, new Date(), shift) : null;
       // Gleiche Antwort für «gibt es nicht» und «nicht öffentlich»: verrät nicht, ob ein interner Anlass existiert
       if (!preview) {
         reply.header('Cache-Control', 'no-store');

@@ -14,13 +14,12 @@ import { ThemeToggle } from "@schichtplan/ui";
 import { getRequestOrigin } from "@schichtplan/ui/og";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ContactReveal } from "./ContactReveal";
+import { landingPageMetadata } from "@/lib/ogPages";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { host } = await getRequestOrigin();
-  const org = getOrganization(host);
+  const base = await landingPageMetadata("datenschutz");
   return {
-    title: "Datenschutzerklärung",
-    description: `Welche Personendaten der ${org.name} bearbeitet, wozu und welche Rechte du hast (nDSG).`,
+    ...base,
     // Eigener Canonical statt dem der Startseite (aus dem Layout), sonst widersprechen sich die Signale
     alternates: { canonical: "/datenschutz" },
     // Nicht in Suchmaschinen, keine Kopie im Cache (zusätzlich zu robots.txt)

@@ -177,6 +177,16 @@ export function formatZurichDateRange(
   return `${fd}.${fm}.${fy}–${td}.${tm}.${ty}`;
 }
 
+const zurichWeekdayFmt = new Intl.DateTimeFormat(SWISS_LOCALE, { weekday: 'short', timeZone: SWISS_TIMEZONE });
+
+/** Zeitpunkt und Dauer einer Schicht kompakt, z. B. «Sa 22.08.2026 · 18:00–22:00» (Schweizer Zeit) */
+export function formatZurichShiftWhen(start: Date | string, end: Date | string): string {
+  const d = typeof start === 'string' ? new Date(start) : start;
+  if (isNaN(d.getTime())) return '';
+  const weekday = zurichWeekdayFmt.format(d).replace('.', '');
+  return `${weekday} ${formatZurichDate(d)} · ${formatZurichTimeRange(d, end)}`;
+}
+
 /** YYYY-MM-DD um ganze Kalendertage verschieben */
 export function addDaysToDayKey(dayKey: string, days: number): string {
   const [y, m, d] = dayKey.split('-').map(Number);

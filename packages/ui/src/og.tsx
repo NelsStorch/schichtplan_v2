@@ -89,6 +89,25 @@ export async function loadRemoteLogo(url: string | null | undefined, base: strin
   }
 }
 
+/**
+ * Bild für die Vorschau laden: eigene Dateien (`/images/...`, z. B. Banner-Vorlagen) direkt aus `public/`,
+ * alles andere wie Logos über die Adresse. null, wenn es fehlt oder Satori das Format nicht kann.
+ */
+export async function loadImage(url: string | null | undefined, base: string): Promise<string | null> {
+  if (!url) return null;
+  if (/^\/images\/[a-z0-9/_-]+\.(svg|png|jpe?g)$/i.test(url) && !url.includes('..')) {
+    try {
+      const file = await readFile(path.join(process.cwd(), 'public', ...url.slice(1).split('/')));
+      const ext = url.split('.').pop()!.toLowerCase();
+      const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'png' ? 'image/png' : 'image/jpeg';
+      return `data:${mime};base64,${file.toString('base64')}`;
+    } catch {
+      // weiter über die Adresse
+    }
+  }
+  return loadRemoteLogo(url, base);
+}
+
 const OG_CACHE_MAX_ENTRIES = 100;
 const ogCache = new Map<string, { expires: number; png: Promise<ArrayBuffer> }>();
 
@@ -247,6 +266,8 @@ export interface OgCardProps {
   eyebrow?: string;
   /** Hervorgehobene Zusatzangabe, z. B. «Noch 12 Plätze frei» */
   badge?: string | null;
+  /** Hintergrundbild (Data-URI), z. B. das Banner des Anlasses; wird abgedunkelt, Schrift dann weiss */
+  background?: string | null;
 }
 
 /** Dekorative «Schicht-Balken» links und rechts: füllen die Breite, liegen ausserhalb des quadratischen Ausschnitts. */
@@ -263,9 +284,12 @@ const SHIFT_BARS: Array<{ x: number; y: number; w: number }> = [
  * Layout der Vorschaukarte (1200×630). Alles Wichtige steht mittig in einem quadratischen Bereich, denn
  * WhatsApp zeigt das Bild oft nur als kleines Quadrat aus der Mitte. Satori versteht nur Inline-Styles mit Flexbox.
  */
-export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, eyebrow, badge }: OgCardProps) {
+export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, eyebrow, badge, background }: OgCardProps) {
   const color = safeAccent(accent);
-  const p = ogPalette(color);
+  // Auf einem abgedunkelten Foto immer weisse Schrift, die Plakette in der Akzentfarbe
+  const p = background
+    ? { ...ogPalette('#3f3f46'), pill: '#ffffff', pillText: mixColor(color, '#000000', luminance(color) > 0.3 ? 0.55 : 0.1) }
+    : ogPalette(color);
   const titleSize = ogTitleSize(title);
   const disc = badge ? 132 : 156;
   return (
@@ -283,7 +307,29 @@ export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, e
         backgroundImage: `radial-gradient(circle at 50% 0%, rgba(255,255,255,0.22) 0%, transparent 55%), linear-gradient(150deg, ${p.from} 0%, ${p.to} 100%)`,
       }}
     >
-      {SHIFT_BARS.flatMap((b) => [
+      {background ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
+        <img
+          src={background}
+          width={OG_SIZE.width}
+          height={OG_SIZE.height}
+          style={{ position: 'absolute', left: 0, top: 0, width: OG_SIZE.width, height: OG_SIZE.height, objectFit: 'cover' }}
+          alt=""
+        />
+      ) : null}
+      {background ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: OG_SIZE.width,
+            height: OG_SIZE.height,
+            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.82) 100%), linear-gradient(150deg, ${color}55 0%, transparent 60%)`,
+          }}
+        />
+      ) : null}
+      {(background ? [] : SHIFT_BARS).flatMap((b) => [
         <div
           key={`l${b.x}-${b.y}`}
           style={{ position: 'absolute', left: b.x, top: b.y, width: b.w, height: 44, borderRadius: 14, backgroundColor: p.soft }}
@@ -345,6 +391,7 @@ export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, e
             display: 'flex',
             justifyContent: 'center',
             textAlign: 'center',
+            textWrap: 'balance',
             width: '100%',
             fontSize: 32,
             lineHeight: 1.25,
@@ -395,13 +442,15 @@ export interface OgIconProps {
   accent?: string;
   /** Kantenlänge in Pixeln */
   size: number;
+  /** Anteil der Kante, den das Logo einnimmt. Für «maskable»-Icons (Android schneidet rund zu) kleiner wählen. */
+  inset?: number;
 }
 
 /**
  * Quadratisches App-Icon (z. B. apple-touch-icon): Logo auf Weiss. iOS rundet die Ecken selbst ab
  * und kann kein SVG, darum als PNG.
  */
-export function OgIcon({ logo, accent = DEFAULT_ACCENT, size }: OgIconProps) {
+export function OgIcon({ logo, accent = DEFAULT_ACCENT, size, inset = 0.78 }: OgIconProps) {
   return (
     <div
       style={{
@@ -415,10 +464,45 @@ export function OgIcon({ logo, accent = DEFAULT_ACCENT, size }: OgIconProps) {
     >
       {logo ? (
         // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
-        <img src={logo} width={size * 0.78} height={size * 0.78} style={{ objectFit: 'contain' }} alt="" />
+        <img src={logo} width={Math.round(size * inset)} height={Math.round(size * inset)} style={{ objectFit: 'contain' }} alt="" />
       ) : (
         <div style={{ display: 'flex', width: size * 0.5, height: size * 0.5, borderRadius: size * 0.12, backgroundColor: safeAccent(accent) }} />
       )}
     </div>
   );
+}
+
+export interface OgSubpage {
+  /** Titel der Seite (Browser-Tab und Vorschau) */
+  title: string;
+  /** Beschreibung (Meta-Description und Vorschautext) */
+  description: string;
+  /** Kurzer Satz im Vorschaubild unter dem Titel */
+  subtitle: string;
+}
+
+/**
+ * Metadaten für eine Unterseite mit eigenem Vorschaubild (`/og?seite=<key>`). Die `/og`-Route der App
+ * zeichnet für denselben Schlüssel Titel und Untertitel aus `page`.
+ */
+export async function ogSubpageMetadata(key: string, path: string, page: OgSubpage) {
+  const { origin, host } = await getRequestOrigin();
+  const org = getOrganization(host);
+  const title = `${page.title} · ${org.name}`;
+  const image = ogImage(`${origin}/og?seite=${encodeURIComponent(key)}`, title, key, page.title, page.subtitle);
+  return {
+    title: page.title,
+    description: page.description,
+    robots: { index: false, follow: false },
+    openGraph: {
+      type: 'website' as const,
+      siteName: org.name,
+      locale: 'de_CH',
+      title,
+      description: page.description,
+      url: `${origin}${path}`,
+      images: [image],
+    },
+    twitter: { card: 'summary_large_image' as const, title, description: page.description, images: [image] },
+  };
 }
