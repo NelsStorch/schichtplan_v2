@@ -224,6 +224,8 @@ export interface QrOptions {
   checkinLateMinutes?: number;
   prisma?: PrismaClient;
   organization?: OrganizationType;
+  /** Plakette in der Mitte leer lassen, wenn das Logo später darübergelegt wird (z. B. im Story-Bild) */
+  omitLogo?: boolean;
 }
 
 /**
@@ -244,7 +246,7 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
   const isTwoTone = hasSecondary && secondaryQrColor !== primaryQrColor && style !== 'SOLID';
 
   const orgType: OrganizationType = options.organization ?? getOrganization(options.text).dbType;
-  const logo = await resolveLogo(options.logoUrl, options.prisma, orgType);
+  const logo = options.omitLogo ? { isCeviDefault: false } : await resolveLogo(options.logoUrl, options.prisma, orgType);
 
   const qr = QRCode.create(options.text, { errorCorrectionLevel: 'H' });
   const n = qr.modules.size;
@@ -287,7 +289,9 @@ export async function generateQrSvg(options: QrOptions): Promise<string> {
   const logoSize = badgeModules - badgePad * 2;
 
   let logoSvg = '';
-  if (logo.buffer && logo.mimeType) {
+  if (options.omitLogo) {
+    // Plakette bleibt leer
+  } else if (logo.buffer && logo.mimeType) {
     const dataUri = `data:${logo.mimeType};base64,${logo.buffer.toString('base64')}`;
     logoSvg = `<image href="${dataUri}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet" />`;
   } else {

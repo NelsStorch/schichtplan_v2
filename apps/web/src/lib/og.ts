@@ -66,7 +66,16 @@ export function isUuid(value: string): boolean {
 }
 
 /** Öffentliche Vorschau-Daten der Abteilung dieser Subdomain direkt beim Backend holen (null bei Fehlern) */
-async function fetchPreview<T>(apiPath: string): Promise<T | null> {
+/**
+ * QR-Code zum Anlass im Design der Abteilung (QR-Farben, Stil, Logo; derselbe Generator wie beim Check-in-Aushang)
+ * als SVG-Text. null, wenn er nicht verfügbar ist.
+ */
+export async function getEventQrSvg(eventSlug: string): Promise<string | null> {
+  if (!/^[a-z0-9-]{1,200}$/i.test(eventSlug)) return null;
+  return fetchPreview(`/api/events/${encodeURIComponent(eventSlug)}/preview/qr`, (res) => res.text());
+}
+
+async function fetchPreview<T>(apiPath: string, read: (res: Response) => Promise<T> = (res) => res.json() as Promise<T>): Promise<T | null> {
   const backend = process.env.INTERNAL_API_URL;
   if (!backend) return null;
   const h = await headers();
@@ -84,7 +93,7 @@ async function fetchPreview<T>(apiPath: string): Promise<T | null> {
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
-    return (await res.json()) as T;
+    return await read(res);
   } catch {
     return null;
   }

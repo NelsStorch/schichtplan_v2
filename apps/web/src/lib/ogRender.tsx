@@ -13,7 +13,7 @@ import {
   ogVersion,
   safeAccent,
 } from '@schichtplan/ui/og';
-import { getDepartmentPreview, getEventPreview, isUuid, openSlotsLabel, type EventPreview } from './og';
+import { getDepartmentPreview, getEventPreview, getEventQrSvg, isUuid, openSlotsLabel, type EventPreview } from './og';
 
 /**
  * Vorschaubilder der Web-App an einem Ort: von den Routen (`/og`, `/events/[slug]/og`, `/events/[slug]/story`)
@@ -153,10 +153,14 @@ export async function eventStoryResponse(slug: string): Promise<Response | null>
   if (!event) return null;
   const org = getOrganization(host);
   const key = `${host}:story:${event.slug}:${eventVersion(event, department)}`;
-  return cachedOgImage(key, TTL, async () => {
+  // Kurz halten: QR-Farben und -Stil der Abteilung stecken nicht im Fingerabdruck
+  return cachedOgImage(key, 10 * 60 * 1000, async () => {
     const images = await eventImages(event, department, origin, host);
+    // QR-Code in Farben und Stil der Abteilung wie auf dem Check-in-Aushang, Logo mittig darüber.
+    // Antwortet das Backend nicht, ein schlichter QR-Code ohne Logo.
     const url = `${origin}/events/${encodeURIComponent(event.slug)}`;
-    const svg = await QRCode.toString(url, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' });
+    const branded = await getEventQrSvg(event.slug);
+    const svg = branded ?? (await QRCode.toString(url, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }));
     const qr = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
     return new ImageResponse(
       <OgStory
@@ -168,6 +172,7 @@ export async function eventStoryResponse(slug: string): Promise<Response | null>
         badge={openSlotsLabel(event.openSlots)}
         eyebrow={images.department?.name ?? org.name}
         qr={qr}
+        qrLogo={branded ? images.logo : null}
         host={host}
       />,
       { ...(await ogImageOptions()), ...STORY_SIZE }

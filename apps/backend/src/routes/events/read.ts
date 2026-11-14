@@ -29,7 +29,9 @@ import {
   type DisambiguationCandidate,
 } from '../../services/disambiguation.js';
 import { canTakeOver } from '../../services/replacement.js';
-import { toEventPreview } from '../../services/eventPreview.js';
+import { isPreviewVisible, toEventPreview } from '../../services/eventPreview.js';
+import { generateQrSvg } from '../../services/qrGenerator.js';
+import { eventUrl } from '../../services/shiftReminders.js';
 
 import { toQuestionDto, toResponsiblePersonDto, } from './shared.js';
 
@@ -186,6 +188,50 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
       }
       reply.header('Cache-Control', 'public, max-age=60');
       return preview;
+    }
+  );
+
+  // QR-Code zum Anlass im Design der Abteilung (Farben, Stil) für das Story-Bild; gleiche Sichtbarkeit wie die Vorschau
+  fastify.get<{ Params: { slug: string } }>(
+    '/api/events/:slug/preview/qr',
+    {
+      schema: {
+        tags: ['Events'],
+        summary: 'QR-Code zum Anlass (SVG)',
+        description:
+          'Liefert einen QR-Code mit dem Link zum Anlass in den QR-Farben und im QR-Stil der Abteilung, mit freier Plakette für das Logo (Story-Bild). Gleiche Sichtbarkeit wie die Link-Vorschau.',
+        params: z.object({ slug: z.string().max(200).describe('Slug des Anlasses') }),
+      },
+    },
+    async (request, reply) => {
+      const tenant = request.tenant;
+      if (!tenant) {
+        return reply.status(404).send({ error: 'Keine Abteilung im Kontext' });
+      }
+      const event = await fastify.prisma.event.findUnique({
+        where: { departmentId_slug: { departmentId: tenant.id, slug: request.params.slug } },
+        select: { slug: true, isPublished: true, accessType: true },
+      });
+      if (!event || !isPreviewVisible(event, tenant.membersOnly)) {
+        reply.header('Cache-Control', 'no-store');
+        return reply.status(404).send({ error: 'Keine Vorschau verfügbar' });
+      }
+      // Gleiche Farbwahl wie beim Check-in-Aushang
+      const color = tenant.qrCustomColors && tenant.qrColorPrimary ? tenant.qrColorPrimary : tenant.primaryColor;
+      const secondaryColor =
+        tenant.qrCustomColors && tenant.qrColorSecondary ? tenant.qrColorSecondary : tenant.secondaryColor;
+      // Plakette leer: Das Story-Bild legt das Logo selbst darüber (der Bildgenerator zeichnet nicht jedes Vektor-Logo)
+      const svg = await generateQrSvg({
+        text: eventUrl(tenant.slug, event.slug, tenant.organization),
+        color,
+        secondaryColor,
+        qrStyle: (tenant.qrStyle as 'CORNERS' | 'GRADIENT' | 'SOLID') || 'CORNERS',
+        organization: tenant.organization,
+        omitLogo: true,
+      });
+      reply.header('Cache-Control', 'public, max-age=300');
+      reply.type('image/svg+xml');
+      return svg;
     }
   );
 

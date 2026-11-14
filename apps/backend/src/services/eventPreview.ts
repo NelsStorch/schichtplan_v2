@@ -62,14 +62,22 @@ export interface EventPreviewDto {
  * Anlass-Seite auch ohne Login jeder Person mit dem Link zeigt (gleiche Regel wie GET /api/events/:slug):
  * keine Entwürfe und bei Abteilungen «nur für Mitglieder» keine internen Anlässe. Keine Personendaten.
  */
+/** Gleiche Regel wie GET /api/events/:slug ohne Login: keine Entwürfe, bei «nur für Mitglieder» keine internen Anlässe */
+export function isPreviewVisible(
+  event: { isPublished: boolean; accessType: string },
+  departmentMembersOnly: boolean
+): boolean {
+  if (!event.isPublished) return false;
+  return !(departmentMembersOnly && accessTypeConfig(event.accessType).scope !== 'ANY');
+}
+
 export function toEventPreview(
   event: EventPreviewSource,
   now = new Date(),
   shift: ShiftPreviewSource | null = null,
   departmentMembersOnly = false
 ): EventPreviewDto | null {
-  if (!event.isPublished) return null;
-  if (departmentMembersOnly && accessTypeConfig(event.accessType).scope !== 'ANY') return null;
+  if (!isPreviewVisible(event, departmentMembersOnly)) return null;
   const open = event.shifts.reduce((sum, s) => sum + Math.max(0, s.requiredSlots - s._count.signups), 0);
   const canSignUp = event.allowPublicSignup && event.endDate > now;
   return {

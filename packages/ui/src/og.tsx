@@ -494,6 +494,8 @@ export interface OgStoryProps {
   badge?: string | null;
   /** QR-Code als Data-URI (SVG) */
   qr: string;
+  /** Logo, das mittig über den QR-Code gelegt wird (dessen Plakette ist dann leer) */
+  qrLogo?: string | null;
   /** Kurze Adresse unter dem QR-Code */
   host: string;
   /** Absender über dem Titel, z. B. Abteilungsname */
@@ -504,7 +506,7 @@ export interface OgStoryProps {
  * Hochformat-Bild (1080×1920) für Instagram-Story und WhatsApp-Status. Oben und unten bleibt Platz für die
  * Bedienelemente der Apps, der QR-Code führt zum Anlass (in Stories lassen sich Links nicht antippen).
  */
-export function OgStory({ title, subtitle, logo, accent = DEFAULT_ACCENT, background, badge, qr, host, eyebrow }: OgStoryProps) {
+export function OgStory({ title, subtitle, logo, accent = DEFAULT_ACCENT, background, badge, qr, qrLogo, host, eyebrow }: OgStoryProps) {
   const color = safeAccent(accent);
   const p = background
     ? { ...ogPalette('#3f3f46'), pill: '#ffffff', pillText: mixColor(color, '#000000', luminance(color) > 0.3 ? 0.55 : 0.1) }
@@ -635,8 +637,21 @@ export function OgStory({ title, subtitle, logo, accent = DEFAULT_ACCENT, backgr
             boxShadow: '0 18px 50px rgba(0,0,0,0.3)',
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image */}
-          <img src={qr} width={300} height={300} alt="" />
+          <div style={{ display: 'flex', position: 'relative', width: 300, height: 300 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image */}
+            <img src={qr} width={300} height={300} alt="" />
+            {qrLogo ? (
+              // Mitte der Plakette (rund 16 % der Kante, siehe qrGenerator.ts im Backend)
+              // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
+              <img
+                src={qrLogo}
+                width={48}
+                height={48}
+                style={{ position: 'absolute', left: 126, top: 126, objectFit: 'contain' }}
+                alt=""
+              />
+            ) : null}
+          </div>
           <div style={{ display: 'flex', marginTop: 14, fontSize: 32, fontWeight: 700, color: '#18181b' }}>
             Scannen &amp; eintragen
           </div>
