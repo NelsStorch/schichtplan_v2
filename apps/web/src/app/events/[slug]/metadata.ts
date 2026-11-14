@@ -4,9 +4,9 @@ import { getRequestOrigin, ogImage } from '@schichtplan/ui/og';
 import { getDepartmentPreview, getEventPreview, openSlotsLabel } from '@/lib/og';
 
 /**
- * Link-Vorschau eines Anlasses oder (mit `shiftId`) einer einzelnen Schicht. Nur für öffentliche Anlässe:
- * Bei internen Anlässen, Anlässen nur für Leitende und Entwürfen liefert das Backend nichts, dann kommt null
- * und es bleibt bei der allgemeinen Abteilungs-Vorschau.
+ * Link-Vorschau eines Anlasses oder (mit `shiftId`) einer einzelnen Schicht, soweit die Anlass-Seite die Angaben
+ * auch ohne Login zeigt. Bei Entwürfen und internen Anlässen von Abteilungen «nur für Mitglieder» liefert das
+ * Backend nichts, dann kommt null und es bleibt bei der allgemeinen Abteilungs-Vorschau.
  */
 export async function eventPreviewMetadata(slug: string, shiftId?: string | null): Promise<Metadata | null> {
   const [event, department, { origin, host }] = await Promise.all([

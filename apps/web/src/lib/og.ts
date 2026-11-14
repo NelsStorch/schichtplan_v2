@@ -50,8 +50,8 @@ export interface EventPreview {
 }
 
 /**
- * Eckdaten eines Anlasses für die Link-Vorschau. Das Backend liefert sie nur für öffentliche, veröffentlichte
- * Anlässe; bei internen Anlässen kommt null, die Seite zeigt dann die allgemeine Abteilungs-Vorschau.
+ * Eckdaten eines Anlasses für die Link-Vorschau. Das Backend liefert nur, was die Anlass-Seite auch ohne Login
+ * zeigt; bei Entwürfen und internen Anlässen von Abteilungen «nur für Mitglieder» kommt null (Abteilungs-Vorschau).
  */
 export async function getEventPreview(eventSlug: string, shiftId?: string | null): Promise<EventPreview | null> {
   if (!/^[a-z0-9-]{1,200}$/i.test(eventSlug)) return null;

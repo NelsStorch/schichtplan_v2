@@ -1,4 +1,4 @@
-import { toEventAccessType } from '@schichtplan/shared';
+import { accessTypeConfig } from '@schichtplan/shared';
 
 export interface EventPreviewSource {
   title: string;
@@ -52,16 +52,18 @@ export interface EventPreviewDto {
 }
 
 /**
- * Eckdaten eines Anlasses für Link-Vorschauen (WhatsApp & Co.), ohne Anmeldung abrufbar.
- * Nur für veröffentlichte, öffentliche Anlässe: Titel interner Anlässe, von Anlässen nur für Leitende oder mit
- * eingeschränktem Zugang gehören nicht in eine Vorschau, die jede Person mit dem Link sieht. Keine Personendaten.
+ * Eckdaten eines Anlasses für Link-Vorschauen (WhatsApp & Co.), ohne Anmeldung abrufbar. Zeigt nur, was die
+ * Anlass-Seite auch ohne Login jeder Person mit dem Link zeigt (gleiche Regel wie GET /api/events/:slug):
+ * keine Entwürfe und bei Abteilungen «nur für Mitglieder» keine internen Anlässe. Keine Personendaten.
  */
 export function toEventPreview(
   event: EventPreviewSource,
   now = new Date(),
-  shift: ShiftPreviewSource | null = null
+  shift: ShiftPreviewSource | null = null,
+  departmentMembersOnly = false
 ): EventPreviewDto | null {
-  if (!event.isPublished || event.leadersOnly || toEventAccessType(event.accessType) !== 'PUBLIC') return null;
+  if (!event.isPublished) return null;
+  if (departmentMembersOnly && accessTypeConfig(event.accessType).scope !== 'ANY') return null;
   const open = event.shifts.reduce((sum, s) => sum + Math.max(0, s.requiredSlots - s._count.signups), 0);
   const canSignUp = event.allowPublicSignup && event.endDate > now;
   return {

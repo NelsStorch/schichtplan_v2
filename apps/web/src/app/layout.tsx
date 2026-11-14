@@ -11,8 +11,8 @@ import { getDepartmentPreview, previewTitle } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
 
 /**
- * Pro Abteilung (Subdomain) eigener Titel für Link-Vorschauen. Bewusst nur Abteilungsname und -logo:
- * Anlässe können intern oder «nur für Mitglieder» sein, ihre Titel gehören nicht in eine öffentliche Vorschau.
+ * Pro Abteilung (Subdomain) eigener Titel für Link-Vorschauen: Abteilungsname und -logo. Anlässe haben ihre
+ * eigene Vorschau (events/[slug]/metadata.ts), soweit die Anlass-Seite sie auch ohne Login zeigt.
  */
 export async function generateMetadata(): Promise<Metadata> {
   const { origin, host } = await getRequestOrigin();

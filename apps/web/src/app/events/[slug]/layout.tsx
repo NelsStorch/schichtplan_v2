@@ -6,7 +6,7 @@ const FALLBACK: Metadata = {
   description: 'Schichten des Anlasses ansehen und dich eintragen.',
 };
 
-/** Link-Vorschau mit Titel, Datum und freien Plätzen, aber nur für öffentliche Anlässe (siehe metadata.ts) */
+/** Link-Vorschau mit Titel, Datum und freien Plätzen, soweit ohne Login sichtbar (siehe metadata.ts) */
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const preview = await eventPreviewMetadata(slug);

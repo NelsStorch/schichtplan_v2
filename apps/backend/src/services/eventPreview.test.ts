@@ -28,12 +28,19 @@ describe('toEventPreview', () => {
     expect(preview).toMatchObject({ title: 'Chilbi 2026', slug: 'chilbi-2026', openSlots: 6 });
   });
 
-  it('verrät nichts über Entwürfe, interne, Leitenden- oder eingeschränkte Anlässe', () => {
+  it('verrät nichts über Entwürfe', () => {
     expect(toEventPreview({ ...base, isPublished: false }, now)).toBeNull();
-    expect(toEventPreview({ ...base, leadersOnly: true }, now)).toBeNull();
-    for (const accessType of ['DEPARTMENT', 'DEPARTMENT_CEVIDB', 'CEVIDB_ALL', 'WHITELIST', 'WHITELIST_CEVIDB']) {
-      expect(toEventPreview({ ...base, accessType }, now)).toBeNull();
+  });
+
+  it('zeigt interne Anlässe wie die Anlass-Seite ohne Login, ausser bei Abteilungen «nur für Mitglieder»', () => {
+    for (const accessType of ['DEPARTMENT', 'DEPARTMENT_CEVIDB', 'WHITELIST', 'WHITELIST_CEVIDB']) {
+      expect(toEventPreview({ ...base, accessType }, now)?.title).toBe('Chilbi 2026');
+      expect(toEventPreview({ ...base, accessType }, now, null, true)).toBeNull();
     }
+    expect(toEventPreview({ ...base, leadersOnly: true }, now)?.title).toBe('Chilbi 2026');
+    // Öffentliche (und Cevi.DB-weite) Anlässe bleiben auch dort über den Link sichtbar
+    expect(toEventPreview(base, now, null, true)?.title).toBe('Chilbi 2026');
+    expect(toEventPreview({ ...base, accessType: 'CEVIDB_ALL' }, now, null, true)?.title).toBe('Chilbi 2026');
   });
 
   it('zeigt keine freien Plätze, wenn das Eintragen geschlossen oder der Anlass vorbei ist', () => {
@@ -55,6 +62,6 @@ describe('toEventPreview', () => {
     expect(toEventPreview(base, now, shift)?.shift).toMatchObject({ title: 'Bar ausschenken', openSlots: 3 });
     expect(toEventPreview(base, now, { ...shift, tasks: [] })?.shift?.title).toBe('Bar');
     expect(toEventPreview(base, now, { ...shift, category: null, tasks: [] })?.shift?.title).toBe('Schicht');
-    expect(toEventPreview({ ...base, accessType: 'DEPARTMENT' }, now, shift)).toBeNull();
+    expect(toEventPreview({ ...base, accessType: 'DEPARTMENT' }, now, shift, true)).toBeNull();
   });
 });

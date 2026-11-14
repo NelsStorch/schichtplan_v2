@@ -12,9 +12,9 @@ import {
 import { getDepartmentPreview, getEventPreview, isUuid, openSlotsLabel } from '@/lib/og';
 
 /**
- * Vorschaubild eines öffentlichen Anlasses (Titel, Datum, freie Plätze, Banner im Hintergrund) oder mit
- * `?schicht=ID` einer einzelnen Schicht. Interne Anlässe und Entwürfe bekommen 404 (das Backend liefert für sie
- * keine Vorschau-Daten), ihre Seite verweist auf das Abteilungsbild.
+ * Vorschaubild eines Anlasses (Titel, Datum, freie Plätze, Banner im Hintergrund) oder mit `?schicht=ID` einer
+ * einzelnen Schicht. Entwürfe und interne Anlässe von Abteilungen «nur für Mitglieder» bekommen 404 (das Backend
+ * liefert für sie keine Vorschau-Daten), ihre Seite verweist auf das Abteilungsbild.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

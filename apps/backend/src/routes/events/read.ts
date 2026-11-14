@@ -120,7 +120,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
     }));
   });
 
-  // Eckdaten für Link-Vorschauen (WhatsApp & Co.): nur öffentliche, veröffentlichte Anlässe, ohne Personendaten
+  // Eckdaten für Link-Vorschauen (WhatsApp & Co.): nur was die Anlass-Seite auch ohne Login zeigt, ohne Personendaten
   fastify.get<{ Params: { slug: string }; Querystring: { schicht?: string } }>(
     '/api/events/:slug/preview',
     {
@@ -128,7 +128,7 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['Events'],
         summary: 'Link-Vorschau eines Anlasses',
         description:
-          'Liefert Titel, Zeitraum und freie Plätze eines öffentlichen Anlasses für Link-Vorschauen. Interne Anlässe und Entwürfe ergeben 404.',
+          'Liefert Titel, Zeitraum, Banner und freie Plätze eines Anlasses für Link-Vorschauen, soweit die Anlass-Seite sie auch ohne Login zeigt. Entwürfe und interne Anlässe von Abteilungen «nur für Mitglieder» ergeben 404.',
         params: z.object({ slug: z.string().max(200).describe('Slug des Anlasses') }),
         querystring: z.object({
           schicht: z.string().uuid().optional().describe('Optional: Schicht für eine Schicht-Vorschau'),
@@ -174,8 +174,8 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
               },
             })
           : null;
-      const preview = event ? toEventPreview(event, new Date(), shift) : null;
-      // Gleiche Antwort für «gibt es nicht» und «nicht öffentlich»: verrät nicht, ob ein interner Anlass existiert
+      const preview = event ? toEventPreview(event, new Date(), shift, request.tenant.membersOnly) : null;
+      // Gleiche Antwort für «gibt es nicht» und «nicht sichtbar»: verrät nicht, ob ein interner Anlass existiert
       if (!preview) {
         reply.header('Cache-Control', 'no-store');
         return reply.status(404).send({ error: 'Keine Vorschau verfügbar' });
