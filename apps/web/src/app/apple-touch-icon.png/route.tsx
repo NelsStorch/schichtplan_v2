@@ -1,18 +1,18 @@
 import { ImageResponse } from 'next/og';
 import { getOrganization } from '@schichtplan/shared';
-import { OgIcon, cachedOgImage, getRequestOrigin, loadBrandLogo, loadImage } from '@schichtplan/ui/og';
+import { OgIcon, cachedOgImage, getRequestOrigin, loadBrandLogo, loadImage, ogVersion } from '@schichtplan/ui/og';
 import { getDepartmentPreview } from '@/lib/og';
 
 const SIZE = 180;
 
 /** Homescreen-Icon für iOS (und Link-Vorschauen, die es als Favicon nehmen): Abteilungslogo als PNG. */
 export async function GET() {
-  const { origin, host } = await getRequestOrigin();
+  const [{ origin, host }, department] = await Promise.all([getRequestOrigin(), getDepartmentPreview()]);
   const org = getOrganization(host);
-  return cachedOgImage(`icon:${host}`, 10 * 60 * 1000, async () => {
-    const [department, brandLogo] = await Promise.all([getDepartmentPreview(), loadBrandLogo(host)]);
-    const logo = (await loadImage(department?.logoUrl, origin)) ?? brandLogo;
-    return new ImageResponse(<OgIcon logo={logo} accent={department?.primaryColor ?? org.primaryColor} size={SIZE} />, {
+  const v = ogVersion(department?.name, department?.logoUrl, department?.primaryColor);
+  return cachedOgImage(`icon:${host}:${v}`, 10 * 60 * 1000, async () => {
+    const [logo, brandLogo] = await Promise.all([loadImage(department?.logoUrl, origin), loadBrandLogo(host)]);
+    return new ImageResponse(<OgIcon logo={logo ?? brandLogo} accent={department?.primaryColor ?? org.primaryColor} size={SIZE} />, {
       width: SIZE,
       height: SIZE,
     });

@@ -68,6 +68,83 @@ export async function loadBrandLogo(host?: string): Promise<string | null> {
   }
 }
 
+const MAX_IMAGE_BYTES = 1_500_000;
+
+/**
+ * Prüft, ob ein Hostname auf eine lokale, private oder interne Netzwerk-Adresse zeigt (SSRF-Schutz).
+ */
+export function isPrivateOrInternalHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (
+    !host ||
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    !host.includes('.')
+  ) {
+    return true;
+  }
+  if (host.includes(':')) {
+    return (
+      host === '::1' ||
+      host === '::' ||
+      host.startsWith('fc') ||
+      host.startsWith('fd') ||
+      host.startsWith('fe80') ||
+      host.startsWith('::ffff:127.') ||
+      host.startsWith('::ffff:10.') ||
+      host.startsWith('::ffff:192.168.') ||
+      host.startsWith('::ffff:169.254.')
+    );
+  }
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = ipv4.slice(1).map(Number);
+    if (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function readBoundedBytes(res: Response, maxBytes: number): Promise<Buffer | null> {
+  const contentLength = Number(res.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) return null;
+  if (!res.body) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length <= maxBytes ? buf : null;
+  }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel();
+          return null;
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
+}
+
 /**
  * Fremdes Logo (z. B. Abteilungswappen) laden. Satori kann nur PNG, JPEG und SVG,
  * alles andere sowie Fehler/Timeouts ergeben null (dann greift das Cevi-Logo).
@@ -75,14 +152,22 @@ export async function loadBrandLogo(host?: string): Promise<string | null> {
 export async function loadRemoteLogo(url: string | null | undefined, base: string): Promise<string | null> {
   if (!url) return null;
   try {
-    const target = new URL(url, base);
-    if (!['http:', 'https:', 'data:'].includes(target.protocol)) return null;
-    const res = await fetch(target, { signal: AbortSignal.timeout(3000) });
+    const isInternalUpload = /^\/api\/uploads\/[0-9a-f-]+$/i.test(url);
+    const effectiveBase = isInternalUpload && process.env.INTERNAL_API_URL ? process.env.INTERNAL_API_URL : base;
+    const target = new URL(url, effectiveBase);
+    if (target.protocol === 'data:') {
+      return /^data:image\/(png|jpeg|svg\+xml);base64,/i.test(url) && url.length <= MAX_IMAGE_BYTES * 1.4
+        ? url
+        : null;
+    }
+    if (!['http:', 'https:'].includes(target.protocol)) return null;
+    if (!isInternalUpload && isPrivateOrInternalHost(target.hostname)) return null;
+    const res = await fetch(target, { signal: AbortSignal.timeout(3000), redirect: 'error' });
     if (!res.ok) return null;
     const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
     if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(type)) return null;
-    const bytes = Buffer.from(await res.arrayBuffer());
-    if (bytes.length > 1_500_000) return null;
+    const bytes = await readBoundedBytes(res, MAX_IMAGE_BYTES);
+    if (!bytes) return null;
     return `data:${type};base64,${bytes.toString('base64')}`;
   } catch {
     return null;
