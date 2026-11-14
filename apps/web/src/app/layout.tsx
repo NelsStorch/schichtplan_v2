@@ -7,7 +7,7 @@ import { getRequestOrigin, ogImage, ogVersion, safeAccent } from '@schichtplan/u
 import { CommandPalette, CommandPaletteProvider } from '@/components/command';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
-import { appShortName, getDepartmentPreview, previewTitle } from '@/lib/og';
+import { getDepartmentPreview, previewTitle } from '@/lib/og';
 import { PortalProvider } from '@/lib/portal';
 
 /**
@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
       // PNG, denn iOS kann kein SVG als Homescreen-Icon
       apple: { url: `/apple-touch-icon.png?v=${ogVersion(...version)}`, sizes: '180x180', type: 'image/png' },
     },
-    appleWebApp: { capable: true, title: appShortName(department?.name), statusBarStyle: 'black-translucent' },
+    appleWebApp: { capable: true, title: 'Schichtplan', statusBarStyle: 'black-translucent' },
     openGraph: { type: 'website', siteName: brandName, locale: 'de_CH', title, description, url: '/', images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   };

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { getOrganization } from '@schichtplan/shared';
 import { getRequestOrigin, ogVersion, safeAccent } from '@schichtplan/ui/og';
-import { appShortName, getDepartmentPreview, previewTitle } from '@/lib/og';
+import { appName, getDepartmentPreview } from '@/lib/og';
 
 /**
  * Jede Abteilung ist eine eigene Subdomain und damit eine eigene installierbare App: Name, Farbe und Icon
@@ -26,8 +26,9 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
 
   return {
     id: '/',
-    name: previewTitle(department?.name, org.name),
-    short_name: appShortName(department?.name),
+    name: appName(department?.name),
+    // Unter dem Icon ist nur Platz für etwa 12 Zeichen; das Logo zeigt die Abteilung
+    short_name: 'Schichtplan',
     description: department
       ? `Anlässe und Schichten der ${department.name}: anschauen, eintragen, fertig.`
       : `Schichten für Chilbi, Lager und ${org.orgName}-Anlässe: anschauen, eintragen, fertig.`,

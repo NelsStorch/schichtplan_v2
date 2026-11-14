@@ -100,18 +100,11 @@ export function openSlotsLabel(openSlots: number | null, full = 'Alle Schichten 
   return openSlots === 1 ? 'Noch 1 Platz frei' : `Noch ${openSlots} Plätze frei`;
 }
 
-const ORG_PREFIX = /^(cevi|jubla|pfadi|jungwacht|blauring|cvjm|cevj)\s+/i;
-
 /**
- * Kurzer Name unter dem App-Icon (Homescreen zeigt nur etwa 12 Zeichen): «Cevi Illnau» → «Cevi Illnau»,
- * «Jubla Greifensee-Nänikon» → «Greifensee». Passt nichts, bleibt es bei «Schichtplan».
+ * Name der installierten App: «Schichtplan – Jubla Greifensee-Nänikon». Die meisten haben nur eine Abteilung,
+ * darum steht «Schichtplan» vorne (und allein unter dem Icon, dort ist nur Platz für etwa 12 Zeichen).
  */
-export function appShortName(departmentName: string | null | undefined): string {
+export function appName(departmentName: string | null | undefined): string {
   const name = departmentName?.trim();
-  if (!name) return 'Schichtplan';
-  if (name.length <= 12) return name;
-  const withoutOrg = name.replace(ORG_PREFIX, '');
-  if (withoutOrg.length <= 12) return withoutOrg;
-  const first = withoutOrg.split(/[\s-]+/)[0];
-  return first.length >= 3 && first.length <= 12 ? first : 'Schichtplan';
+  return name ? `Schichtplan – ${name}` : 'Schichtplan';
 }
