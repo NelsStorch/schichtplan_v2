@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Copy,
+  ImageDown,
   Info,
   Lock,
   Mail,
@@ -19,13 +20,14 @@ import {
   UserPlus,
 } from 'lucide-react';
 import type { EventRosterResponseDto, ShiftSignupLogDto } from '@schichtplan/shared';
-import { ATTENDANCE_MODES } from '@schichtplan/shared';
+import { ATTENDANCE_MODES, accessTypeConfig } from '@schichtplan/shared';
 import { Badge, Card, ProgressRing, buttonClasses, cn, useToast } from '@schichtplan/ui';
 import { AccessTypeBadge } from '@/components/event-meta';
 import { useOkEvent } from '@/components/ok/OkContext';
 import { OkPageHeader } from '@/components/ok/OkLayout';
 import { ageWarnings } from '@/components/ok/shiftChecks';
 import { api } from '@/lib/api';
+import { usePortal } from '@/lib/portal';
 import { dayKeyToIso, fmtDayMonth, fmtFullDate, fmtTime, fmtWeekday, groupByBusinessDay, shiftName } from '@/lib/format';
 
 type TodoTone = 'warning' | 'info' | 'success';
@@ -52,6 +54,9 @@ function relTime(iso: string) {
 export default function OkOverviewPage() {
   const { event, base, stats, permissions } = useOkEvent();
   const toast = useToast();
+  const { department } = usePortal();
+  // Story-Bild: gleiche Sichtbarkeit wie die Link-Vorschau (nicht für interne Anlässe von Abteilungen «nur für Mitglieder»)
+  const storyAvailable = !(department?.membersOnly && accessTypeConfig(event.accessType).scope !== 'ANY');
   const [roster, setRoster] = useState<EventRosterResponseDto | null>(null);
   const [logs, setLogs] = useState<ShiftSignupLogDto[] | null>(null);
 
@@ -226,6 +231,16 @@ export default function OkOverviewPage() {
             <button type="button" onClick={copyLink} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
               <Copy className="size-4" /> Link kopieren
             </button>
+            {storyAvailable && (
+              <a
+                href={`/events/${encodeURIComponent(event.slug)}/story?download=1`}
+                download
+                title="Hochformat-Bild mit QR-Code für Instagram-Story oder WhatsApp-Status"
+                className={buttonClasses({ size: 'sm', variant: 'secondary' })}
+              >
+                <ImageDown className="size-4" /> Story-Bild
+              </a>
+            )}
           </>
         }
       />

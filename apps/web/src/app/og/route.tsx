@@ -1,36 +1,6 @@
-import { ImageResponse } from 'next/og';
-import { getOrganization } from '@schichtplan/shared';
-import {
-  OgCard,
-  cachedOgImage,
-  getRequestOrigin,
-  loadBrandLogo,
-  loadImage,
-  ogImageOptions,
-  safeAccent,
-} from '@schichtplan/ui/og';
-import { getDepartmentPreview } from '@/lib/og';
+import { departmentOgResponse } from '@/lib/ogRender';
 
-/** Vorschaubild der Abteilungs-Seite (und interner Anlässe): Abteilungsname, -logo und -farbe. */
+/** Vorschaubild der Abteilungs-Seite: Abteilungsname, -logo und -farbe (siehe lib/ogRender.tsx) */
 export async function GET() {
-  const { origin, host } = await getRequestOrigin();
-  const org = getOrganization(host);
-  // Name, Logo oder Farbe der Abteilung können sich ändern: nach 10 Minuten neu zeichnen
-  return cachedOgImage(host, 10 * 60 * 1000, async () => {
-    const [department, brandLogo] = await Promise.all([getDepartmentPreview(), loadBrandLogo(host)]);
-    const logo = (await loadImage(department?.logoUrl, origin)) ?? brandLogo;
-    return new ImageResponse(
-      (
-        <OgCard
-          logo={logo}
-          accent={safeAccent(department?.primaryColor ?? org.primaryColor)}
-          title={department?.name ?? org.name}
-          subtitle="Schicht aussuchen, eintragen, fertig."
-          eyebrow={org.name}
-          host={host}
-        />
-      ),
-      await ogImageOptions()
-    );
-  });
+  return departmentOgResponse();
 }

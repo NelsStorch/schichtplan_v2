@@ -1,4 +1,4 @@
-import { accessTypeConfig } from '@schichtplan/shared';
+import { accessTypeConfig, replacementDeadline } from '@schichtplan/shared';
 
 export interface EventPreviewSource {
   title: string;
@@ -11,6 +11,8 @@ export interface EventPreviewSource {
   accessType: string;
   leadersOnly: boolean;
   allowPublicSignup: boolean;
+  allowReplacement: boolean;
+  replacementCutoffHours: number;
   updatedAt: Date;
   bannerUrl: string | null;
   shifts: Array<{ requiredSlots: number; _count: { signups: number } }>;
@@ -25,6 +27,8 @@ export interface ShiftPreviewSource {
   requiredSlots: number;
   _count: { signups: number };
   tasks: Array<{ title: string }>;
+  /** Nur Einträge mit «Ersatz gesucht» (ohne Personendaten, nur zum Zählen) */
+  signups: Array<{ id: string }>;
 }
 
 export interface ShiftPreviewDto {
@@ -34,6 +38,8 @@ export interface ShiftPreviewDto {
   startTime: string;
   endTime: string;
   openSlots: number | null;
+  /** Wie viele Eingetragene Ersatz suchen (0, wenn die Frist vorbei oder Ersatz ausgeschaltet ist) */
+  replacementWanted: number;
 }
 
 export interface EventPreviewDto {
@@ -90,6 +96,10 @@ export function toEventPreview(
             event.allowPublicSignup && shift.endTime > now
               ? Math.max(0, shift.requiredSlots - shift._count.signups)
               : null,
+          replacementWanted:
+            event.allowReplacement && now < replacementDeadline(shift.startTime, event.replacementCutoffHours)
+              ? shift.signups.length
+              : 0,
         }
       : null,
   };

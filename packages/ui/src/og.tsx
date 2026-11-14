@@ -114,7 +114,9 @@ const ogCache = new Map<string, { expires: number; png: Promise<ArrayBuffer> }>(
 /**
  * Fertig gerenderte Vorschaubilder im Speicher halten. Das Rendern dauert fast eine Sekunde, und WhatsApp
  * schickt die Nachricht ohne Vorschau, wenn man vorher absendet. Gleichzeitige Abrufe teilen sich ein Rendering.
- * Begrenzt auf wenige Einträge, weil der Schlüssel (Host) bei Wildcard-Subdomains von aussen kommt.
+ * Begrenzt auf wenige Einträge, weil der Schlüssel (Host) bei Wildcard-Subdomains von aussen kommt:
+ * 100 Bilder à 150–250 KB sind höchstens rund 25 MB Arbeitsspeicher, auf der Festplatte landet nichts.
+ * Enthält der Schlüssel einen Fingerabdruck des Inhalts (ogVersion), gilt nach jeder Änderung sofort ein neues Bild.
  */
 export async function cachedOgImage(
   key: string,
@@ -253,6 +255,11 @@ export function ogTitleSize(title: string, maxWidth = 600): number {
   const byWord = Math.floor(maxWidth / (longestWord * 0.58));
   const byLength = title.length > 40 ? 56 : title.length > 26 ? 62 : title.length > 14 ? 72 : 88;
   return Math.max(44, Math.min(byLength, byWord));
+}
+
+/** «Sa 22.08. · 18:00–22:00 · Chilbi»: kein Zeilenumbruch vor dem Punkt, sonst beginnt eine Zeile mit «·» */
+function keepSeparators(text: string): string {
+  return text.replace(/ · /g, ' · ');
 }
 
 export interface OgCardProps {
@@ -399,7 +406,7 @@ export function OgCard({ title, subtitle, host, logo, accent = DEFAULT_ACCENT, e
             color: p.muted,
           }}
         >
-          {subtitle}
+          {keepSeparators(subtitle)}
         </div>
         {badge ? (
           <div
@@ -444,13 +451,15 @@ export interface OgIconProps {
   size: number;
   /** Anteil der Kante, den das Logo einnimmt. Für «maskable»-Icons (Android schneidet rund zu) kleiner wählen. */
   inset?: number;
+  /** Ohne weissen Hintergrund (Favicon im Browser-Tab, Badge bei Push-Mitteilungen) */
+  transparent?: boolean;
 }
 
 /**
  * Quadratisches App-Icon (z. B. apple-touch-icon): Logo auf Weiss. iOS rundet die Ecken selbst ab
  * und kann kein SVG, darum als PNG.
  */
-export function OgIcon({ logo, accent = DEFAULT_ACCENT, size, inset = 0.78 }: OgIconProps) {
+export function OgIcon({ logo, accent = DEFAULT_ACCENT, size, inset = 0.78, transparent = false }: OgIconProps) {
   return (
     <div
       style={{
@@ -459,7 +468,7 @@ export function OgIcon({ logo, accent = DEFAULT_ACCENT, size, inset = 0.78 }: Og
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#ffffff',
+        backgroundColor: transparent ? 'transparent' : '#ffffff',
       }}
     >
       {logo ? (
@@ -468,6 +477,174 @@ export function OgIcon({ logo, accent = DEFAULT_ACCENT, size, inset = 0.78 }: Og
       ) : (
         <div style={{ display: 'flex', width: size * 0.5, height: size * 0.5, borderRadius: size * 0.12, backgroundColor: safeAccent(accent) }} />
       )}
+    </div>
+  );
+}
+
+export const STORY_SIZE = { width: 1080, height: 1920 } as const;
+
+export interface OgStoryProps {
+  title: string;
+  /** z. B. Datum des Anlasses */
+  subtitle: string;
+  logo: string | null;
+  accent?: string;
+  /** Banner des Anlasses (Data-URI), abgedunkelt im Hintergrund */
+  background?: string | null;
+  badge?: string | null;
+  /** QR-Code als Data-URI (SVG) */
+  qr: string;
+  /** Kurze Adresse unter dem QR-Code */
+  host: string;
+  /** Absender über dem Titel, z. B. Abteilungsname */
+  eyebrow: string;
+}
+
+/**
+ * Hochformat-Bild (1080×1920) für Instagram-Story und WhatsApp-Status. Oben und unten bleibt Platz für die
+ * Bedienelemente der Apps, der QR-Code führt zum Anlass (in Stories lassen sich Links nicht antippen).
+ */
+export function OgStory({ title, subtitle, logo, accent = DEFAULT_ACCENT, background, badge, qr, host, eyebrow }: OgStoryProps) {
+  const color = safeAccent(accent);
+  const p = background
+    ? { ...ogPalette('#3f3f46'), pill: '#ffffff', pillText: mixColor(color, '#000000', luminance(color) > 0.3 ? 0.55 : 0.1) }
+    : ogPalette(color);
+  const titleSize = Math.round(Math.min(124, ogTitleSize(title, 880) * 1.45));
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        position: 'relative',
+        fontFamily: 'Geist',
+        color: p.text,
+        backgroundColor: p.to,
+        backgroundImage: `radial-gradient(circle at 50% 0%, rgba(255,255,255,0.22) 0%, transparent 50%), linear-gradient(160deg, ${p.from} 0%, ${p.to} 100%)`,
+      }}
+    >
+      {background ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
+        <img
+          src={background}
+          width={STORY_SIZE.width}
+          height={STORY_SIZE.height}
+          style={{ position: 'absolute', left: 0, top: 0, width: STORY_SIZE.width, height: STORY_SIZE.height, objectFit: 'cover' }}
+          alt=""
+        />
+      ) : null}
+      {background ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: STORY_SIZE.width,
+            height: STORY_SIZE.height,
+            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 40%, rgba(0,0,0,0.85) 100%), linear-gradient(160deg, ${color}55 0%, transparent 60%)`,
+          }}
+        />
+      ) : null}
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexGrow: 1,
+          width: 920,
+          paddingTop: 240,
+          paddingBottom: 280,
+          gap: 30,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 220,
+            height: 220,
+            borderRadius: 110,
+            backgroundColor: '#ffffff',
+            boxShadow: '0 18px 50px rgba(0,0,0,0.3)',
+          }}
+        >
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image
+            <img src={logo} width={160} height={160} style={{ objectFit: 'contain' }} alt="" />
+          ) : null}
+        </div>
+        <div style={{ display: 'flex', fontSize: 40, fontWeight: 600, color: p.muted }}>{eyebrow}</div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            textAlign: 'center',
+            textWrap: 'balance',
+            width: '100%',
+            fontSize: titleSize,
+            lineHeight: 1.05,
+            fontWeight: 700,
+            letterSpacing: -2,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            textAlign: 'center',
+            textWrap: 'balance',
+            width: '100%',
+            fontSize: 48,
+            fontWeight: 600,
+            color: p.muted,
+          }}
+        >
+          {keepSeparators(subtitle)}
+        </div>
+        {badge ? (
+          <div
+            style={{
+              display: 'flex',
+              padding: '16px 40px',
+              borderRadius: 999,
+              fontSize: 44,
+              fontWeight: 700,
+              backgroundColor: p.pill,
+              color: p.pillText,
+            }}
+          >
+            {badge}
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: 40,
+            padding: 28,
+            borderRadius: 40,
+            backgroundColor: '#ffffff',
+            boxShadow: '0 18px 50px rgba(0,0,0,0.3)',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- Satori rendert <img>, kein next/image */}
+          <img src={qr} width={300} height={300} alt="" />
+          <div style={{ display: 'flex', marginTop: 14, fontSize: 32, fontWeight: 700, color: '#18181b' }}>
+            Scannen &amp; eintragen
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', textAlign: 'center', width: '100%', fontSize: 30, color: p.muted }}>
+          {host}
+        </div>
+      </div>
     </div>
   );
 }

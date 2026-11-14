@@ -154,6 +154,8 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
           accessType: true,
           leadersOnly: true,
           allowPublicSignup: true,
+          allowReplacement: true,
+          replacementCutoffHours: true,
           updatedAt: true,
           shifts: { select: { requiredSlots: true, _count: { select: { signups: true } } } },
         },
@@ -171,6 +173,8 @@ const eventReadRoutes: FastifyPluginAsync = async (fastify) => {
                 requiredSlots: true,
                 _count: { select: { signups: true } },
                 tasks: { select: { title: true }, take: 2 },
+                // Nur zählen, wer Ersatz sucht: keine Namen in der Vorschau
+                signups: { where: { replacementWantedAt: { not: null } }, select: { id: true } },
               },
             })
           : null;

@@ -12,6 +12,8 @@ const base: EventPreviewSource = {
   accessType: 'PUBLIC',
   leadersOnly: false,
   allowPublicSignup: true,
+  allowReplacement: true,
+  replacementCutoffHours: 0,
   updatedAt: new Date('2026-08-01T10:00:00Z'),
   bannerUrl: '/images/banners/chilbi.svg',
   shifts: [
@@ -58,10 +60,28 @@ describe('toEventPreview', () => {
       requiredSlots: 4,
       _count: { signups: 1 },
       tasks: [{ title: 'Bar ausschenken' }],
+      signups: [{ id: 'x' }],
     };
     expect(toEventPreview(base, now, shift)?.shift).toMatchObject({ title: 'Bar ausschenken', openSlots: 3 });
     expect(toEventPreview(base, now, { ...shift, tasks: [] })?.shift?.title).toBe('Bar');
     expect(toEventPreview(base, now, { ...shift, category: null, tasks: [] })?.shift?.title).toBe('Schicht');
     expect(toEventPreview({ ...base, accessType: 'DEPARTMENT' }, now, shift, true)).toBeNull();
+  });
+
+  it('zählt «Ersatz gesucht» nur, solange Ersatz erlaubt und die Frist offen ist', () => {
+    const shift = {
+      id: 's1',
+      title: 'Bar',
+      category: null,
+      startTime: new Date('2026-08-22T16:00:00Z'),
+      endTime: new Date('2026-08-22T20:00:00Z'),
+      requiredSlots: 2,
+      _count: { signups: 2 },
+      tasks: [],
+      signups: [{ id: 'a' }],
+    };
+    expect(toEventPreview(base, now, shift)?.shift?.replacementWanted).toBe(1);
+    expect(toEventPreview({ ...base, allowReplacement: false }, now, shift)?.shift?.replacementWanted).toBe(0);
+    expect(toEventPreview(base, new Date('2026-08-22T17:00:00Z'), shift)?.shift?.replacementWanted).toBe(0);
   });
 });

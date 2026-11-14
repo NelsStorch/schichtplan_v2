@@ -46,6 +46,8 @@ export interface EventPreview {
     startTime: string;
     endTime: string;
     openSlots: number | null;
+    /** Wie viele Eingetragene Ersatz suchen */
+    replacementWanted: number;
   } | null;
 }
 

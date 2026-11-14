@@ -150,13 +150,18 @@ export function ShiftDetailsDialog({
       ? (event.dayResponsibles?.[dayKey] ?? [])
       : (shift.responsibles ?? []);
 
+  // Sucht jemand Ersatz, teilt «Teilen» die Ersatz-Suche (eigene Vorschau «Ersatz gesucht»)
+  const sharesReplacement = offerCount > 0 && replacementOpen && !over;
+
   /** Schicht-Link teilen (Handy: Teilen-Menü, sonst kopieren). Der Link bekommt eine eigene Vorschau. */
   const shareShift = async () => {
-    const url = `${window.location.origin}/events/${encodeURIComponent(event.slug)}?schicht=${shift.id}`;
+    const url = `${window.location.origin}/events/${encodeURIComponent(event.slug)}?schicht=${shift.id}${sharesReplacement ? '&ersatz=1' : ''}`;
     const name = shift.title?.trim() || (shift.tasks?.length === 1 ? shift.tasks[0].title : '') || 'Schicht';
     const when = `${fmtWeekday(shift.startTime)} ${fmtDayMonth(shift.startTime)}, ${fmtTimeRange(shift.startTime, shift.endTime)}`;
     const need = free > 0 ? ` Noch ${free === 1 ? '1 Platz' : `${free} Plätze`} frei.` : '';
-    const text = `${name} am ${event.title} (${when}).${need} Trägst du dich ein?`;
+    const text = sharesReplacement
+      ? `Ersatz gesucht: ${name} am ${event.title} (${when}). Übernimmst du?`
+      : `${name} am ${event.title} (${when}).${need} Trägst du dich ein?`;
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({ title: `${name} – ${event.title}`, text, url });
@@ -166,8 +171,7 @@ export function ShiftDetailsDialog({
       }
     }
     try {
-      await navigator.clipboard.writeText(`${text}
-${url}`);
+      await navigator.clipboard.writeText(`${text}\n${url}`);
       toast({ title: 'Link kopiert', description: 'Einfach in WhatsApp oder E-Mail einfügen.' });
     } catch {
       toast({ title: 'Kopieren nicht möglich', description: url, tone: 'error' });
@@ -242,7 +246,15 @@ ${url}`);
             )}
             {!over && (
               <Button variant="secondary" size="sm" onClick={() => shareShift()}>
-                <Share2 className="size-3.5" /> Teilen
+                {sharesReplacement ? (
+                  <>
+                    <Repeat className="size-3.5" /> Ersatz-Suche teilen
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="size-3.5" /> Teilen
+                  </>
+                )}
               </Button>
             )}
             <Button variant="secondary" size="sm" onClick={onClose}>

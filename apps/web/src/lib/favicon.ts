@@ -34,14 +34,7 @@ export function updateFavicon(iconUrl?: string | null) {
     link.removeAttribute('type');
   }
 
-  // Apple Touch Icon
-  let appleLink = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
-  if (!appleLink) {
-    appleLink = document.createElement('link');
-    appleLink.rel = 'apple-touch-icon';
-    document.head.appendChild(appleLink);
-  }
-  appleLink.href = url;
+  // Das apple-touch-icon bleibt beim PNG vom Server (/apple-touch-icon.png): iOS kann kein SVG
 }
 
 /**

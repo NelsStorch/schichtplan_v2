@@ -177,8 +177,9 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: payload.body,
-    icon: payload.icon || '/icons/icon-192.png',
-    badge: payload.badge || '/images/cevi-logo.png',
+    // Logo der Abteilung (jede Subdomain hat ihren eigenen Service Worker)
+    icon: payload.icon || '/app-icon?size=192',
+    badge: payload.badge || '/app-icon?size=96&plain=1',
     tag: payload.tag || 'cevi-schichtplan',
     renotify: true,
     data: { url: payload.url || '/' },

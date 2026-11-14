@@ -7,7 +7,8 @@ import { getRequestOrigin, ogImage, ogVersion, safeAccent } from '@schichtplan/u
 import { CommandPalette, CommandPaletteProvider } from '@/components/command';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
-import { getDepartmentPreview, previewTitle } from '@/lib/og';
+import { appName, getDepartmentPreview, previewTitle } from '@/lib/og';
+import { departmentOgResponse, warmOgImage } from '@/lib/ogRender';
 import { PortalProvider } from '@/lib/portal';
 
 /**
@@ -19,25 +20,31 @@ export async function generateMetadata(): Promise<Metadata> {
   const org = getOrganization(host);
   const department = await getDepartmentPreview();
   const brandName = org.name;
+  // Vorschau: Abteilung zuerst (WhatsApp kürzt den Titel). Browser-Tab und Verlauf: wie die installierte App.
   const title = previewTitle(department?.name, brandName);
+  const tabTitle = department ? appName(department.name) : brandName;
   // ?v= ändert sich mit Name, Logo und Farbe: Messenger holen dann das neue Bild statt der alten Kopie
   const version = [department?.name, department?.logoUrl, department?.primaryColor];
+  const v = ogVersion(...version);
   const image = ogImage(`${origin}/og`, title, ...version);
+  // Vorschaubild schon vorbereiten, damit es bereitliegt, wenn ein Messenger es abholt
+  warmOgImage(departmentOgResponse);
   const description = department
     ? 'Alle Anlässe und offenen Schichten an einem Ort. Schicht aussuchen, eintragen, fertig.'
     : `Schichten für Chilbi, Lager und ${org.orgName}-Anlässe: anschauen, eintragen, fertig.`;
   return {
     metadataBase: new URL(origin),
-    title: { default: title, template: `%s · ${brandName}` },
+    title: { default: tabTitle, template: `%s · ${brandName}` },
     description,
     robots: { index: false, follow: false },
     manifest: '/manifest.webmanifest',
     icons: {
-      icon: [
-        { url: org.logoUrl, type: 'image/svg+xml' },
-      ],
+      // Browser-Tab: Logo der Abteilung (klein gerechnet, ohne Hintergrund), sonst das Verbandslogo
+      icon: department
+        ? [{ url: `/app-icon?size=64&plain=1&v=${v}`, sizes: '64x64', type: 'image/png' }]
+        : [{ url: org.logoUrl, type: 'image/svg+xml' }],
       // PNG, denn iOS kann kein SVG als Homescreen-Icon
-      apple: { url: `/apple-touch-icon.png?v=${ogVersion(...version)}`, sizes: '180x180', type: 'image/png' },
+      apple: { url: `/apple-touch-icon.png?v=${v}`, sizes: '180x180', type: 'image/png' },
     },
     appleWebApp: { capable: true, title: 'Schichtplan', statusBarStyle: 'black-translucent' },
     openGraph: { type: 'website', siteName: brandName, locale: 'de_CH', title, description, url: '/', images: [image] },
